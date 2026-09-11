@@ -55,7 +55,7 @@ variable "max_instances" {
 }
 
 variable "allow_unauthenticated" {
-  description = "true for the frontend app and the backend's public health-check; set false for anything that should only ever be reached by another beeside service."
+  description = "Documents intent only (true for the frontend app and the backend's public health-check). The module itself no longer grants roles/run.invoker to allUsers based on this flag: in a project where public IAM bindings require a conditional org-policy exception (see envs/dev/public-access-tag-policy.tf), the binding must live at the root, outside this shared module, so it can carry an explicit depends_on the policy and its tag binding without creating a dependency cycle back onto this module. An environment that does not need such an exception (no Domain Restricted Sharing, or an equivalent already-permissive org policy) would instead grant this directly against module.<name>.service_name/location at its own root."
   type    = bool
   default = true
 }
@@ -79,6 +79,20 @@ resource "google_cloud_run_v2_service" "this" {
       env {
         name  = "NODE_ENV"
         value = var.environment == "dev" ? "development" : var.environment
+      }
+
+      # Mirrors the "volumes" block below one-for-one: when a Cloud SQL
+      # instance is wired in, the container must explicitly mount it.
+      # Without this, Cloud Run's own API silently adds this exact mount
+      # server-side on create, and every subsequent `terraform plan` then
+      # shows a spurious diff trying to remove it, since the .tf never
+      # declared it in the first place.
+      dynamic "volume_mounts" {
+        for_each = var.cloudsql_instance_connection_name == null ? [] : [1]
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
       }
     }
 
@@ -105,14 +119,6 @@ resource "google_cloud_run_v2_service" "this" {
     # would silently revert a real deploy back to the placeholder image.
     ignore_changes = [template[0].containers[0].image]
   }
-}
-
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  count    = var.allow_unauthenticated ? 1 : 0
-  location = google_cloud_run_v2_service.this.location
-  name     = google_cloud_run_v2_service.this.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 output "url" {
