@@ -1,0 +1,17 @@
+{
+  "name": "beeside-first-assessment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "beeside First Assessment monorepo. Governed by Functional Freeze v1, Design Freeze v1, the Journey, the approved Snapshot, and Technical Freeze v1.1 FINAL. See README.md.",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=shared/canonical-fields && npm run build --workspace=backend && npm run build --workspace=frontend",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "test": "npm run test --workspace=shared/canonical-fields && npm run test --workspace=backend && npm run test --workspace=frontend",
+    "typecheck": "npm run typecheck --workspace=shared/canonical-fields && npm run typecheck --workspace=backend"
+  }
+}

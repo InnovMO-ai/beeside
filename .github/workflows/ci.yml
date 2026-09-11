@@ -1,0 +1,48 @@
+name: CI
+
+# Runs on every pull request and on pushes to main. This is the gate a code
+# change must pass before it can flow to any environment (Build Plan v1.1
+# FINAL, Phase 1 acceptance criteria: "a code change flows dev -> staging ->
+# production with no manual file copying"). No deploy job runs from here —
+# deployment is triggered separately per environment (see deploy-*.yml).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: ["shared/canonical-fields", "backend", "frontend"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        if: matrix.workspace != 'shared/canonical-fields'
+        run: npm run lint --workspace=${{ matrix.workspace }}
+
+      - name: Build
+        run: npm run build --workspace=${{ matrix.workspace }}
+
+      - name: Test
+        run: npm run test --workspace=${{ matrix.workspace }}
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan for committed secrets
+        run: bash scripts/secrets-scan.sh

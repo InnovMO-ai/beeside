@@ -1,0 +1,79 @@
+name: Deploy — dev
+
+# Automatic on every merge to main, once CI has passed. dev is the only
+# environment that deploys without a manual gate — staging and production
+# require an explicit promotion (see deploy-staging.yml / deploy-production.yml),
+# consistent with Build Plan v1.1 FINAL's checkpoint-gated build philosophy
+# extended into the deployment pipeline itself.
+#
+# Vendor: GCP. Authentication uses Workload Identity Federation (see
+# infra/terraform/envs/dev/main.tf) — no long-lived key is ever stored in
+# GitHub. The real deploy steps only run once this GitHub Environment
+# ("dev") has the GCP_PROJECT_ID / GCP_REGION / GCP_WORKLOAD_IDENTITY_PROVIDER
+# / GCP_SERVICE_ACCOUNT_EMAIL / GCP_ARTIFACT_REPO variables set (see
+# README.md) — until then this workflow safely no-ops with an explanatory
+# message rather than failing.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  id-token: write # required for Workload Identity Federation
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Not yet configured
+        if: vars.GCP_PROJECT_ID == ''
+        run: |
+          echo "Build succeeded. Live deployment to dev is blocked pending GCP setup:"
+          echo "  - the dev GCP project + Terraform apply (infra/terraform/envs/dev)"
+          echo "  - this GitHub Environment's GCP_* variables (see README.md)"
+
+      - uses: actions/setup-node@v4
+        if: vars.GCP_PROJECT_ID != ''
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+        if: vars.GCP_PROJECT_ID != ''
+      - run: npm run build
+        if: vars.GCP_PROJECT_ID != ''
+
+      - id: auth
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push images
+        if: vars.GCP_PROJECT_ID != ''
+        run: |
+          gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }} backend
+          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }}
+          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }} frontend
+          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        if: vars.GCP_PROJECT_ID != ''
+        run: |
+          gcloud run deploy beeside-dev-backend-api \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }} \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          gcloud run deploy beeside-dev-frontend-app \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }} \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet

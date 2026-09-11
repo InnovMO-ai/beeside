@@ -1,0 +1,75 @@
+name: Deploy — staging
+
+# Manually triggered promotion from a known-good dev deploy. Requires the
+# "staging" GitHub Environment's protection rule (reviewer approval) once
+# configured — enforcing that staging is never skipped on the way to production.
+#
+# Vendor: GCP, via Workload Identity Federation — see deploy-dev.yml's header
+# for the mechanism. Real steps only run once this Environment's GCP_*
+# variables are set (README.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (commit SHA or tag) already verified in dev"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Not yet configured
+        if: vars.GCP_PROJECT_ID == ''
+        run: |
+          echo "Live deployment to staging is blocked pending GCP setup — see README.md."
+
+      - uses: actions/setup-node@v4
+        if: vars.GCP_PROJECT_ID != ''
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+        if: vars.GCP_PROJECT_ID != ''
+      - run: npm run build
+        if: vars.GCP_PROJECT_ID != ''
+      - run: npm run test
+        if: vars.GCP_PROJECT_ID != ''
+
+      - id: auth
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push images
+        if: vars.GCP_PROJECT_ID != ''
+        run: |
+          gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }} backend
+          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }}
+          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }} frontend
+          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }}
+
+      - name: Deploy to Cloud Run
+        if: vars.GCP_PROJECT_ID != ''
+        run: |
+          gcloud run deploy beeside-staging-backend-api \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }} \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          gcloud run deploy beeside-staging-frontend-app \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }} \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet

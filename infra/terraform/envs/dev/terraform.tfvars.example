@@ -1,0 +1,5 @@
+# No longer required for dev — project_id and region now default to Mike's
+# confirmed values directly in main.tf. Keep this file only if you want to
+# override them locally without editing main.tf.
+# project_id = "beeside-dev-508220"
+# region     = "northamerica-south1"

@@ -1,0 +1,19 @@
+{
+  "name": "@beeside/canonical-fields",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single source of truth for beeside's canonical field-key registry, shared across backend, frontend, and (from Phase 7) the rules engine, so no consumer can silently drift from the frozen field list (Functional Specification v1 Appendix A / §2.1).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "jest --runInBand"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  }
+}
