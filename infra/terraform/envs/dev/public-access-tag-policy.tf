@@ -55,19 +55,29 @@ resource "google_org_policy_policy" "domain_restricted_sharing_dev" {
   spec {
     inherit_from_parent = true
 
+    # No unconditional rule here. Google's own reference example for this
+    # exact constraint (Domain Restricted Sharing, tag-scoped exception —
+    # see "Restrict identities with domain-restricted sharing" in the
+    # Organization Policy docs) uses a single conditional rule and nothing
+    # else. An earlier version of this file paired it with an unconditional
+    # `values { allowed_values = [] }` rule, believing one was mandatory;
+    # the Org Policy API rejected that with "A PolicyRule must be
+    # non-empty and have one of the fields under kind set" /
+    # INVALID_POLICY_SPEC, because an empty values block doesn't populate
+    # any of the rule's kind fields (values/allow_all/deny_all) at all — it
+    # isn't a valid rule, empty or not.
+    #
+    # It also isn't needed. A rule's condition is a gate: when the
+    # condition evaluates false for a given resource, that rule contributes
+    # nothing for it, exactly as if the rule were absent. With only the
+    # conditional rule below, a resource without allUsersIngress=true has
+    # zero rules from this project-level spec applying to it — so
+    # inherit_from_parent's merge has nothing from this level to add,
+    # and the resource is governed purely by beeside.you's inherited
+    # Domain Restricted Sharing policy, unchanged. Only backend-api and
+    # frontend-app (tagged below) ever match the condition and receive the
+    # additional allow_all grant.
     rules {
-      # Mandatory unconditional rule (Org Policy requires at least one
-      # whenever a conditional rule is present). Adds nothing on top of
-      # what inherit_from_parent already merges in from the organization's
-      # existing policy.
-      values {
-        allowed_values = []
-      }
-    }
-
-    rules {
-      # Only resources carrying allUsersIngress=true (bound above to
-      # exactly backend-api and frontend-app) get this additional grant.
       condition {
         expression = "resource.matchTag('${data.google_project.current.number}/allUsersIngress', 'true')"
       }
