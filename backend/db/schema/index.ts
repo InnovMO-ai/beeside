@@ -6,3 +6,4 @@ export * from "./assessment";
 export * from "./state-history";
 export * from "./subscription";
 export * from "./ops";
+export * from "./config-versioning";

@@ -15,16 +15,23 @@
 
 BEGIN;
 
-\echo '--- SETUP: test-only version rows (rolled back with everything else) ---'
+\echo '--- SETUP: test-only published versions via the Phase 3 lifecycle (rolled back with everything else) ---'
 DO $$
+DECLARE
+  v_admin UUID;
+  v_registry config_registry;
 BEGIN
-  INSERT INTO question_bank_version (version, config, is_current)
-    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM question_bank_version WHERE is_current);
-  INSERT INTO rules_engine_version (version, config, is_current)
-    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM rules_engine_version WHERE is_current);
-  INSERT INTO snapshot_template_version (version, config, is_current)
-    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM snapshot_template_version WHERE is_current);
-  RAISE NOTICE 'SETUP OK: test-v1 rows created in the three version registries';
+  INSERT INTO admin_user (role, auth_identity) VALUES ('ADMIN', 'config-admin@beeside.internal') RETURNING admin_user_id INTO v_admin;
+  PERFORM set_config('beeside_test.config_admin', v_admin::text, true);
+  FOREACH v_registry IN ARRAY ARRAY['QUESTION_BANK', 'RULES_ENGINE', 'SNAPSHOT_TEMPLATE']::config_registry[] LOOP
+    PERFORM config_create_draft(v_registry, 'test-v1',
+      CASE WHEN v_registry = 'QUESTION_BANK' THEN '{"schema_version": 1, "locales": ["en", "es"], "questions": [], "suite": "phase2"}'
+           ELSE '{"schema_version": 1, "locales": ["en", "es"], "suite": "phase2"}' END::jsonb, v_admin);
+    PERFORM config_submit_for_preview(v_registry, 'test-v1', v_admin);
+    PERFORM config_record_review(v_registry, 'test-v1', v_admin, 'APPROVED', true, 'integrity suite fixture');
+    PERFORM config_publish(v_registry, 'test-v1', v_admin);
+  END LOOP;
+  RAISE NOTICE 'SETUP OK: test-v1 published and current in the three version registries';
 END $$;
 
 \echo '--- T1: basic entity creation (company, person, project) ---'
@@ -404,9 +411,17 @@ END $$;
 
 \echo '--- T16: only one is_current version row allowed per version registry ---'
 DO $$
+DECLARE v_admin UUID := current_setting('beeside_test.config_admin')::uuid;
 BEGIN
+  PERFORM config_create_draft('RULES_ENGINE', 'test-v2', '{"schema_version": 2, "locales": ["en", "es"], "suite": "phase2"}', v_admin);
+  PERFORM config_submit_for_preview('RULES_ENGINE', 'test-v2', v_admin);
+  PERFORM config_record_review('RULES_ENGINE', 'test-v2', v_admin, 'APPROVED', true, 'integrity suite fixture');
+  PERFORM config_publish('RULES_ENGINE', 'test-v2', v_admin);
   BEGIN
-    INSERT INTO rules_engine_version (version, config, is_current) VALUES ('test-v2', '{}', true);
+    -- Bypass the lifecycle functions on purpose (authorized write path, flag reverted with the
+    -- subtransaction): the partial unique index is the last line of defense.
+    PERFORM set_config('app.config_mutation_authorized', 'true', true);
+    UPDATE rules_engine_version SET is_current = true WHERE version = 'test-v1';
     RAISE EXCEPTION 'SENTINEL_FAIL: a second is_current=true rules_engine_version was allowed';
   EXCEPTION
     WHEN unique_violation THEN RAISE NOTICE 'T16 PASS: second concurrent is_current version rejected';

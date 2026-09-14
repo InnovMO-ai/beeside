@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "placeholder": true,
+  "locales": ["en", "es"],
+  "copy": {
+    "en": { "title": "beeside First Assessment (placeholder question bank)" },
+    "es": { "title": "beeside First Assessment (banco de preguntas provisional)" }
+  },
+  "questions": []
+}

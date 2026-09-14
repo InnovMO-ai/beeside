@@ -50,3 +50,29 @@ export const signalStrengthEnum = pgEnum("signal_strength", [
 // admin_user (Admin/Supervisor acting from Precision or Operation Hub), or — reserved for
 // a future automated change — the system itself.
 export const actorTypeEnum = pgEnum("actor_type", ["PERSON", "ADMIN_USER", "SYSTEM"]);
+
+// Phase 3 — versioned configuration (Technical Architecture v1.1 §5, Functional Specification v1 §10).
+export const configRegistryEnum = pgEnum("config_registry", [
+  "QUESTION_BANK",
+  "RULES_ENGINE",
+  "SNAPSHOT_TEMPLATE",
+]);
+
+// Draft → Preview → Publish. PREVIEW freezes the bundle for review; PUBLISHED is immutable.
+export const configVersionStatusEnum = pgEnum("config_version_status", ["DRAFT", "PREVIEW", "PUBLISHED"]);
+
+// Derived by the database at preview time, never declared by the author: CONTENT only when the
+// bundle differs from the current published version exclusively inside `copy` subtrees.
+export const configChangeKindEnum = pgEnum("config_change_kind", ["CONTENT", "LOGIC_SCHEMA"]);
+
+export const configReviewDecisionEnum = pgEnum("config_review_decision", ["APPROVED", "REJECTED"]);
+
+export const configVersionEventTypeEnum = pgEnum("config_version_event_type", [
+  "DRAFT_CREATED",
+  "DRAFT_UPDATED",
+  "SUBMITTED_FOR_PREVIEW",
+  "RETURNED_TO_DRAFT",
+  "REVIEW_RECORDED",
+  "PUBLISHED",
+  "CURRENT_REPOINTED",
+]);
