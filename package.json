@@ -13,5 +13,8 @@
     "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
     "test": "npm run test --workspace=shared/canonical-fields && npm run test --workspace=backend && npm run test --workspace=frontend",
     "typecheck": "npm run typecheck --workspace=shared/canonical-fields && npm run typecheck --workspace=backend"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
   }
 }
