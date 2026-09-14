@@ -1,7 +1,31 @@
 -- Phase 2 integrity test suite (corrected). Every "expect rejection" test re-raises
 -- anything that isn't the genuine trigger exception, so an ambiguous result becomes
 -- a visible ERROR instead of a silent false PASS.
-\set ON_ERROR_STOP off
+--
+-- The whole suite runs inside ONE transaction that always ends in ROLLBACK: no fixture
+-- (company, person, project, version rows, test field keys, ...) ever persists, including
+-- rows that immutability/append-only triggers would otherwise make impossible to clean up.
+-- ON_ERROR_STOP makes any unexpected error abort psql, which also discards the transaction.
+-- Fixtures are addressed by the ids this suite creates, never by "first row in the table",
+-- so the suite is safe to run against a database that already holds other data.
+--
+-- Expected result: 34 "Tn PASS" notices, the CHECK lines, and a final ROLLBACK.
+-- Usage: psql "$DATABASE_URL" -X -f db/tests/run_tests.sql
+\set ON_ERROR_STOP on
+
+BEGIN;
+
+\echo '--- SETUP: test-only version rows (rolled back with everything else) ---'
+DO $$
+BEGIN
+  INSERT INTO question_bank_version (version, config, is_current)
+    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM question_bank_version WHERE is_current);
+  INSERT INTO rules_engine_version (version, config, is_current)
+    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM rules_engine_version WHERE is_current);
+  INSERT INTO snapshot_template_version (version, config, is_current)
+    SELECT 'test-v1', '{}', NOT EXISTS (SELECT 1 FROM snapshot_template_version WHERE is_current);
+  RAISE NOTICE 'SETUP OK: test-v1 rows created in the three version registries';
+END $$;
 
 \echo '--- T1: basic entity creation (company, person, project) ---'
 DO $$
@@ -13,7 +37,9 @@ BEGIN
   INSERT INTO person (first_name, last_name, primary_email, interface_language, preferred_interaction_language, preferred_deliverable_language)
     VALUES ('Laura', 'Diaz', 'laura@patito.com', 'es', 'es', 'es') RETURNING person_id INTO p2;
   INSERT INTO project (company_id, created_by_person_id, responsible_person_id, question_bank_version, rules_engine_version, snapshot_template_version)
-    VALUES (c, p1, p1, 'v1', 'v1', 'v1') RETURNING project_id INTO proj;
+    VALUES (c, p1, p1, 'test-v1', 'test-v1', 'test-v1') RETURNING project_id INTO proj;
+  -- Transaction-local: visible to the rest of this suite only, gone at ROLLBACK.
+  PERFORM set_config('beeside_test.project_id', proj::text, true);
   RAISE NOTICE 'T1 PASS: company=%, person1=%, person2=%, project=%', c, p1, p2, proj;
 END $$;
 
@@ -35,12 +61,12 @@ END $$;
 DO $$
 DECLARE proj UUID; a1 UUID; a2 UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
-  INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.priority_reason', 'string', 'question_bank', 'first_assessment');
-  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.priority_reason', '"grow sales"', 'string', 'v1') RETURNING answer_id INTO a1;
+  proj := current_setting('beeside_test.project_id')::uuid;
+  INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.__test_priority_reason', 'string', 'question_bank', 'first_assessment');
+  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.__test_priority_reason', '"grow sales"', 'string', 'test-v1') RETURNING answer_id INTO a1;
 
   BEGIN
-    INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.priority_reason', '"duplicate current"', 'string', 'v1');
+    INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.__test_priority_reason', '"duplicate current"', 'string', 'test-v1');
     RAISE EXCEPTION 'SENTINEL_FAIL: second non-superseded answer for same field_key was allowed';
   EXCEPTION
     WHEN unique_violation THEN RAISE NOTICE 'T3a PASS: partial unique index rejected a second current answer';
@@ -53,7 +79,7 @@ BEGIN
   -- index, since both rows would transiently have superseded_by IS NULL at once.
   a2 := gen_random_uuid();
   UPDATE answer SET superseded_by = a2 WHERE answer_id = a1;
-  INSERT INTO answer (answer_id, project_id, field_key, value, value_type, question_bank_version) VALUES (a2, proj, 'fa.priority_reason', '"expand ops"', 'string', 'v1');
+  INSERT INTO answer (answer_id, project_id, field_key, value, value_type, question_bank_version) VALUES (a2, proj, 'fa.__test_priority_reason', '"expand ops"', 'string', 'test-v1');
   RAISE NOTICE 'T3b PASS: correct-order supersede succeeded (old row marked superseded before new row inserted)';
 
   BEGIN
@@ -71,13 +97,19 @@ BEGIN
   END;
 END $$;
 
+-- The superseded_by FK is DEFERRABLE INITIALLY DEFERRED, so inside this never-committed
+-- transaction it would never be checked. Force the check now: any violation aborts the suite.
+\echo '--- CHECK: deferred answer.superseded_by FK holds after the supersede sequence ---'
+SET CONSTRAINTS answer_superseded_by_answer_answer_id_fk IMMEDIATE;
+SET CONSTRAINTS answer_superseded_by_answer_answer_id_fk DEFERRED;
+
 \echo '--- T4: finding.area_id must be a finding-capable category (rejects "Other" = 15) ---'
 DO $$
 DECLARE proj UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   BEGIN
-    INSERT INTO finding (project_id, area_id, status, reason_client, rules_engine_version) VALUES (proj, 15, 'DEFINED', 'test', 'v1');
+    INSERT INTO finding (project_id, area_id, status, reason_client, rules_engine_version) VALUES (proj, 15, 'DEFINED', 'test', 'test-v1');
     RAISE EXCEPTION 'SENTINEL_FAIL: finding with area_id=15 (Other) was allowed';
   EXCEPTION
     WHEN OTHERS THEN IF SQLERRM LIKE 'SENTINEL_FAIL%' THEN RAISE; ELSE RAISE NOTICE 'T4 PASS: finding on non-finding-capable category rejected (%)', SQLERRM; END IF;
@@ -88,17 +120,17 @@ END $$;
 DO $$
 DECLARE proj UUID; affected INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   BEGIN
     INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rules_engine_version)
-      VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.does_not_exist'], 'v1');
+      VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_does_not_exist'], 'test-v1');
     RAISE EXCEPTION 'SENTINEL_FAIL: finding with unknown evidence_field_keys was allowed';
   EXCEPTION
     WHEN OTHERS THEN IF SQLERRM LIKE 'SENTINEL_FAIL%' THEN RAISE; ELSE RAISE NOTICE 'T5a PASS: unknown evidence_field_keys rejected (%)', SQLERRM; END IF;
   END;
 
   INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rules_engine_version)
-    VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.priority_reason'], 'v1');
+    VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_priority_reason'], 'test-v1');
   GET DIAGNOSTICS affected = ROW_COUNT;
   IF affected = 1 THEN
     RAISE NOTICE 'T5b PASS: finding with valid evidence_field_keys inserted (% row)', affected;
@@ -111,7 +143,7 @@ END $$;
 DO $$
 DECLARE proj UUID; affected INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
 
   UPDATE finding SET status = 'NEEDS_ATTENTION' WHERE project_id = proj AND area_id = 1;
   GET DIAGNOSTICS affected = ROW_COUNT;
@@ -133,7 +165,7 @@ END $$;
 DO $$
 DECLARE proj UUID; cnt INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   SELECT count(*) INTO cnt FROM assessment_state_transition WHERE project_id = proj;
   IF cnt = 2 THEN
     RAISE NOTICE 'T7a PASS: % assessment_state_transition rows auto-logged (DRAFT->IN_PROGRESS, IN_PROGRESS->COMPLETED_LOCKED)', cnt;
@@ -153,9 +185,9 @@ END $$;
 DO $$
 DECLARE proj UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   BEGIN
-    UPDATE project SET rules_engine_version = 'v2' WHERE project_id = proj;
+    UPDATE project SET rules_engine_version = 'test-v2' WHERE project_id = proj;
     RAISE EXCEPTION 'SENTINEL_FAIL: rules_engine_version was changed after project creation';
   EXCEPTION
     WHEN OTHERS THEN IF SQLERRM LIKE 'SENTINEL_FAIL%' THEN RAISE; ELSE RAISE NOTICE 'T8 PASS: pinned version change rejected (%)', SQLERRM; END IF;
@@ -166,7 +198,7 @@ END $$;
 DO $$
 DECLARE proj UUID; affected INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
 
   UPDATE project SET premium_ever_activated = true, premium_first_activated_at = now() WHERE project_id = proj;
   GET DIAGNOSTICS affected = ROW_COUNT;
@@ -194,7 +226,7 @@ DECLARE
   proj UUID; p1 UUID; p2 UUID; admin1 UUID; cnt INT; change_id UUID; rc INT;
   logged_actor_type TEXT; logged_admin UUID; logged_person UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   SELECT person_id INTO p1 FROM person WHERE primary_email = 'miguel@patito.com';
   SELECT person_id INTO p2 FROM person WHERE primary_email = 'laura@patito.com';
   INSERT INTO admin_user (role, auth_identity) VALUES ('SUPERVISOR', 'supervisor@beeside.internal') RETURNING admin_user_id INTO admin1;
@@ -281,7 +313,7 @@ END $$;
 DO $$
 DECLARE proj UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   INSERT INTO subscription (project_id, status, current_period_start, current_period_end)
     VALUES (proj, 'PREMIUM_ACTIVE', now(), now() + interval '30 days');
   BEGIN
@@ -298,7 +330,7 @@ END $$;
 DO $$
 DECLARE proj UUID; ent_active BOOLEAN; hist_cnt INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   SELECT premium_access_active INTO ent_active FROM entitlement WHERE project_id = proj;
   SELECT count(*) INTO hist_cnt FROM subscription_state_transition WHERE project_id = proj;
   IF ent_active = true AND hist_cnt = 1 THEN
@@ -312,9 +344,9 @@ END $$;
 DO $$
 DECLARE proj UUID; snap_id UUID;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   INSERT INTO snapshot (project_id, rules_engine_version, snapshot_template_version, content)
-    VALUES (proj, 'v1', 'v1', '{"example":"frozen"}') RETURNING snapshot_id INTO snap_id;
+    VALUES (proj, 'test-v1', 'test-v1', '{"example":"frozen"}') RETURNING snapshot_id INTO snap_id;
 
   BEGIN
     UPDATE snapshot SET content = '{"tampered":true}' WHERE snapshot_id = snap_id;
@@ -332,7 +364,7 @@ BEGIN
 
   BEGIN
     INSERT INTO snapshot (project_id, rules_engine_version, snapshot_template_version, content)
-      VALUES (proj, 'v1', 'v1', '{}');
+      VALUES (proj, 'test-v1', 'test-v1', '{}');
     RAISE EXCEPTION 'SENTINEL_FAIL: a second snapshot for the same project was allowed';
   EXCEPTION
     WHEN unique_violation THEN RAISE NOTICE 'T13c PASS: second snapshot for same project rejected';
@@ -344,7 +376,7 @@ END $$;
 DO $$
 DECLARE proj UUID; cnt INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
+  proj := current_setting('beeside_test.project_id')::uuid;
   INSERT INTO operation_hub_link (project_id, external_system, external_workspace_id) VALUES (proj, 'clickup', 'ws-1');
   INSERT INTO operation_hub_link (project_id, external_system, external_workspace_id) VALUES (proj, 'future_system', 'ws-2');
   SELECT count(*) INTO cnt FROM operation_hub_link WHERE project_id = proj;
@@ -355,7 +387,7 @@ BEGIN
   END IF;
 END $$;
 
-\echo '--- T15: rules_matrix_category / capability_taxonomy_category seed counts ---'
+\echo '--- T15: rules_matrix_category / capability_taxonomy_category catalog counts (migration 0002) ---'
 DO $$
 DECLARE rm_cnt INT; ct_cnt INT; finding_areas INT; country_cnt INT;
 BEGIN
@@ -374,7 +406,7 @@ END $$;
 DO $$
 BEGIN
   BEGIN
-    INSERT INTO rules_engine_version (version, config, is_current) VALUES ('v2', '{}', true);
+    INSERT INTO rules_engine_version (version, config, is_current) VALUES ('test-v2', '{}', true);
     RAISE EXCEPTION 'SENTINEL_FAIL: a second is_current=true rules_engine_version was allowed';
   EXCEPTION
     WHEN unique_violation THEN RAISE NOTICE 'T16 PASS: second concurrent is_current version rejected';
@@ -382,14 +414,14 @@ BEGIN
   END;
 END $$;
 
-\echo '--- T17: answer.value GIN index usable for multi-select containment queries (target_markets pattern) ---'
+\echo '--- T17: answer.value supports multi-select containment queries (target_markets pattern) ---'
 DO $$
 DECLARE proj UUID; hit_cnt INT;
 BEGIN
-  SELECT project_id INTO proj FROM project LIMIT 1;
-  INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.target_markets', 'multi_select', 'question_bank', 'first_assessment');
-  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.target_markets', '["MX","US"]', 'multi_select', 'v1');
-  SELECT count(*) INTO hit_cnt FROM answer WHERE field_key = 'fa.target_markets' AND value @> '["MX"]';
+  proj := current_setting('beeside_test.project_id')::uuid;
+  INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.__test_target_markets', 'multi_select', 'question_bank', 'first_assessment');
+  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.__test_target_markets', '["MX","US"]', 'multi_select', 'test-v1');
+  SELECT count(*) INTO hit_cnt FROM answer WHERE project_id = proj AND field_key = 'fa.__test_target_markets' AND value @> '["MX"]';
   IF hit_cnt = 1 THEN
     RAISE NOTICE 'T17 PASS: containment query over multi-select answer.value returned expected row';
   ELSE
@@ -397,4 +429,8 @@ BEGIN
   END IF;
 END $$;
 
-\echo '--- DONE ---'
+\echo '--- CHECK: all deferred constraints hold at end of suite ---'
+SET CONSTRAINTS ALL IMMEDIATE;
+
+\echo '--- DONE: rolling back, no test data persists ---'
+ROLLBACK;

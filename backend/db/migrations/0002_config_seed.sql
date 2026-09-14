@@ -1,4 +1,12 @@
--- Phase 2 seed data — config/reference tables only. Never hand-edit field_key_registry.
+-- Custom SQL migration (drizzle-kit generate --custom): canonical reference catalogs.
+-- Replaces the former out-of-band db/seed/0001_config_seed.sql so every environment gets
+-- exactly the same catalogs through the tracked Drizzle migration sequence.
+--
+-- Deliberately NOT included: placeholder question_bank_version / rules_engine_version /
+-- snapshot_template_version rows. Those existed only to satisfy project's NOT NULL FKs
+-- during testing; published versions belong to Phase 3's versioning workflow. The
+-- integrity test suite now creates its own version rows inside its rolled-back transaction.
+-- field_key_registry is never seeded here: it is synced from shared/canonical-fields.
 
 -- Rules Matrix v1 §0 — fixed 15-value category list. First 14 are finding areas (§1-§14 in order);
 -- "Other" (15) is a valid constraint/priority value but never produces a finding.
@@ -18,6 +26,7 @@ INSERT INTO rules_matrix_category (category_id, name, display_order, is_finding_
   (13, 'Insurance',                               13,  true),
   (14, 'Go-to-market/commercial strategy',        14,  true),
   (15, 'Other',                                   15,  false);
+--> statement-breakpoint
 
 -- Capability Taxonomy v1 §2 — 10 client-facing categories (up to 6 shown per assessment,
 -- selection/ranking logic lives in rules_engine_version.config, not here).
@@ -32,18 +41,11 @@ INSERT INTO capability_taxonomy_category (category_id, name, description, displa
   (8,  'Systems & technology',               'Making your existing systems work in the new market', 8),
   (9,  'Banking & insurance',                'Local financial and risk infrastructure', 9),
   (10, 'Go-to-market strategy',              'How you''ll sell and compete locally', 10);
+--> statement-breakpoint
 
--- country — starter set only. Content owner should complete the full ISO-3166-1 list
--- (or the curated subset beeside actually supports) before Phase 2 goes live; this does
--- not block the schema, only the data.
+-- country — starter set only (ISO 3166-1 alpha-2). The content owner completes the full or
+-- curated list later through a new migration; this does not block the schema.
 INSERT INTO country (country_code, name) VALUES
   ('MX', 'Mexico'), ('US', 'United States'), ('CA', 'Canada'), ('BR', 'Brazil'),
   ('CO', 'Colombia'), ('CL', 'Chile'), ('AR', 'Argentina'), ('ES', 'Spain'),
   ('DE', 'Germany'), ('GB', 'United Kingdom');
-
--- Placeholder v1 versions — real content (question bank, rules config, snapshot template)
--- is Phase 8/product-content work, not Phase 2 schema. These rows only satisfy the
--- NOT NULL FK on `project` for local testing.
-INSERT INTO question_bank_version (version, config, is_current) VALUES ('v1', '{}', true);
-INSERT INTO rules_engine_version (version, config, is_current) VALUES ('v1', '{}', true);
-INSERT INTO snapshot_template_version (version, config, is_current) VALUES ('v1', '{}', true);
