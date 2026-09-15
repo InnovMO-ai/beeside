@@ -36,7 +36,7 @@ describeWithDb("First Assessment core (PostgreSQL, rolled back)", () => {
     const token = await start();
     const project = await projectOf(token);
     expect(project.assessment_state).toBe("IN_PROGRESS");
-    expect(project.question_bank_version).toBe("fa-qb-1.0.0");
+    expect(project.question_bank_version).toBe("fa-qb-1.1.0");
     expect(project.created_by_person_id).toBe(project.responsible_person_id);
 
     const person = (await h.client.query("SELECT * FROM person WHERE person_id = $1", [project.created_by_person_id])).rows[0];
@@ -122,7 +122,7 @@ describeWithDb("First Assessment core (PostgreSQL, rolled back)", () => {
     await h.client.query("SAVEPOINT direct");
     await expect(
       h.client.query(
-        "INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES ($1, 'fa.project.primary_concern', '\"x\"', 'text', 'fa-qb-1.0.0')",
+        "INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES ($1, 'fa.project.primary_concern', '\"x\"', 'text', 'fa-qb-1.1.0')",
         [project.project_id],
       ),
     ).rejects.toMatchObject({ code: "BV409" });
@@ -147,7 +147,7 @@ describeWithDb("First Assessment core (PostgreSQL, rolled back)", () => {
       projectObjective: "set_up_local_operation",
       timing: { launchTimingStatus: "firm_commitment", launchTarget: { precision: "quarter", value: "2027-Q2" }, timingDriver: "customer_contract" },
       declaredPriority: { priorityKnown: "yes", clientPriority: "local_entity_legal_setup", timing: "within_30_days", reason: null },
-      assessment: { status: "COMPLETED_LOCKED", questionBankVersion: "fa-qb-1.0.0", rulesEngineVersion: "re-1.0.0", snapshotTemplateVersion: "st-1.0.0" },
+      assessment: { status: "COMPLETED_LOCKED", questionBankVersion: "fa-qb-1.1.0", rulesEngineVersion: "re-1.0.0", snapshotTemplateVersion: "st-1.0.0" },
     });
     // Phases 7–8: the locked assessment now carries its findings, capability ranks and Snapshot.
     expect(context?.findings).toHaveLength(14);

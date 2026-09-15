@@ -51,6 +51,8 @@ export interface SnapshotTemplateBundle {
   copy: Record<Locale, SnapshotTemplateCopy>;
   phrases: { copy: Record<Locale, SnapshotPhrases> };
   emails: Record<string, { copy: Record<Locale, { subject: string; body: string; cta: string }> }>;
+  /** Private Snapshot link validity (days from issuance). Optional: absent → 60 (policy pending). */
+  links?: { snapshot_link_days?: number };
 }
 
 export const FA_SNAPSHOT_TEMPLATE_VERSION = "st-1.0.0";

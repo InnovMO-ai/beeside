@@ -42,12 +42,13 @@ function StatusIcon({ tone }: { tone: SnapshotTone | "reconcile" }) {
   }
 }
 
-export function ExpansionSnapshot({ snapshot, locale }: { snapshot: SnapshotView; locale: Locale }) {
+export function ExpansionSnapshot({ snapshot, locale, recordView = true }: { snapshot: SnapshotView; locale: Locale; recordView?: boolean }) {
   const view = snapshot.content.locales[locale] ?? snapshot.content.locales[snapshot.content.deliverable_locale];
   const tracked = useRef(false);
 
   useEffect(() => {
-    if (tracked.current) return;
+    // A Control Center reviewer opening the Snapshot is not a respondent view: no journey event.
+    if (tracked.current || !recordView) return;
     tracked.current = true;
     track({ type: "snapshot_viewed", interfaceLanguage: locale });
     // eslint-disable-next-line react-hooks/exhaustive-deps

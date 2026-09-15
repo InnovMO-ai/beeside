@@ -78,6 +78,20 @@
       "when": 1789491015283,
       "tag": "0010_premium_precision_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789497024756,
+      "tag": "0011_operations_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789497025293,
+      "tag": "0012_operations_lifecycle_integrity",
+      "breakpoints": true
     }
   ]
 }

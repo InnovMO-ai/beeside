@@ -1,27 +1,13 @@
 import { Db } from "../../db/database";
-import { QuestionBankBundle } from "../engine/bundle-types";
-import { renderEmail } from "../email/email-adapter";
-import { ExtensionDays, extendAccess, openAccessWindow } from "./access-lifecycle";
+import { EmailTemplate, emailRequestedRecently, enqueueEmail } from "../../operations/email-outbox";
+import { ExtensionDays, addDays, extendAccess, isExtensionDays, lifecyclePolicyOf, openAccessWindow } from "./access-lifecycle";
 import { recordJourneyEvent } from "./analytics";
 import { FaError } from "./errors";
 import { insertCompany, startProject } from "./project-factory";
 import { isValidEmail, normalizeEmail, normalizeWebsiteDomain } from "./normalize";
-import {
-  FaDeps,
-  ProjectRow,
-  emailSentRecently,
-  findLatestProjectForPerson,
-  findUsableToken,
-  formatDate,
-  issueToken,
-  loadProject,
-  localeOf,
-  recordEmailEvent,
-  revokeTokens,
-} from "./repository";
+import { FaDeps, ProjectRow, findLatestProjectForPerson, findUsableToken, issueToken, loadProject } from "./repository";
 import { looksLikeAccessToken } from "./tokens";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 export const EXTENSION_REASONS = {
   missing_information: "MISSING_INFORMATION",
   project_not_structured: "PROJECT_NOT_STRUCTURED",
@@ -30,68 +16,41 @@ export const EXTENSION_REASONS = {
 } as const;
 export type ExtensionReason = keyof typeof EXTENSION_REASONS;
 
-async function sendProjectEmail(
-  tx: Db,
-  deps: FaDeps,
-  project: ProjectRow,
-  bundle: QuestionBankBundle,
-  template: "resume_link" | "existing_assessment_link",
-  token: string,
-  now: Date,
-): Promise<void> {
-  const locale = localeOf(project.preferred_interaction_language);
-  const rendered = renderEmail(bundle, template, locale, {
-    preferred_name: project.preferred_name ?? project.first_name,
-    access_until: project.access_expires_at ? formatDate(project.access_expires_at, locale) : "",
-    company_name: project.company_name,
-  });
-  const result = await deps.email.send({
-    template,
-    to: project.primary_email,
-    locale,
-    subject: rendered.subject,
-    body: rendered.body,
-    ctaLabel: rendered.cta,
-    ctaUrl: `${deps.config.appBaseUrl.replace(/\/$/, "")}/resume/${token}`,
-    projectId: project.project_id,
-  });
-  await recordEmailEvent(tx, project.project_id, template, project.primary_email, deps.email.name, result.providerReference, now);
-}
+/** Contextual help sent the day after an extension or recovery (Handoff v1 §19). */
+const FOLLOWUP_TEMPLATES: Record<ExtensionReason, EmailTemplate> = {
+  missing_information: "access_followup_missing_information",
+  project_not_structured: "access_followup_project_not_structured",
+  unsure_market_timing: "access_followup_unsure_market_timing",
+  something_else: "access_followup_something_else",
+};
 
 /**
- * A private link stays openable while the saved work is retained (not merely while access is open),
- * so an expired or capped assessment shows its recover/closed state instead of a generic dead link.
- * Access itself is still enforced separately on continue/extend.
+ * Starts the access lifecycle on the first private link emitted (day 0) with the calendar of the
+ * project's pinned configuration, and re-anchors temporary retention to that moment. Opening or
+ * reopening a link never calls this again.
  */
-function resumeLinkExpiry(project: ProjectRow, now: Date): Date {
-  const fallback = new Date(now.getTime() + 15 * DAY_MS);
-  if (project.assessment_state !== "IN_PROGRESS") return fallback;
-  const until = project.retention_until ?? project.access_max_until;
-  return until && until.getTime() > now.getTime() ? until : fallback;
-}
-
-/** Starts the access lifecycle on the first private link issued (day 0). */
-async function ensureAccessWindow(tx: Db, project: ProjectRow, now: Date): Promise<boolean> {
+async function ensureAccessWindow(tx: Db, deps: FaDeps, project: ProjectRow, now: Date): Promise<boolean> {
   if (project.access_window_started_at || project.assessment_state !== "IN_PROGRESS") return false;
-  const window = openAccessWindow(now);
+  const { policy } = lifecyclePolicyOf(await deps.bundles.byVersion(project.question_bank_version));
+  const window = openAccessWindow(now, policy);
   await tx.query(
     `UPDATE fa_project_lifecycle
-        SET access_window_started_at = $2, access_expires_at = $3, access_max_until = $4, retention_until = $5, updated_at = $2
+        SET access_window_started_at = $2, access_expires_at = $3, access_max_until = $4,
+            retention_until = GREATEST(retention_until, $5), retention_basis = 'ACCESS_WINDOW', updated_at = $2
       WHERE project_id = $1`,
     [project.project_id, window.startedAt, window.expiresAt, window.maxUntil, window.retentionUntil],
   );
   return true;
 }
 
-/** Finish Later: confirms the save and emails a private resume link (5-minute resend cooldown). */
+/** Finish Later: confirms the save and enqueues a private resume link (resend cooldown applies). */
 export async function finishLater(deps: FaDeps, projectId: string): Promise<{ accessUntil: string | null }> {
   const now = deps.config.now();
   return deps.db.transaction(async (tx) => {
     let project = await loadProject(tx, projectId, true);
     if (!project) throw new FaError("NOT_FOUND", "project not found");
     if (project.assessment_state !== "IN_PROGRESS") throw new FaError("LOCKED", "this First Assessment is complete");
-    if (await ensureAccessWindow(tx, project, now)) project = (await loadProject(tx, projectId, true)) ?? project;
-    const bundle = await deps.bundles.byVersion(project.question_bank_version);
+    if (await ensureAccessWindow(tx, deps, project, now)) project = (await loadProject(tx, projectId, true)) ?? project;
 
     await recordJourneyEvent(tx, {
       eventType: "finish_later_clicked",
@@ -99,14 +58,36 @@ export async function finishLater(deps: FaDeps, projectId: string): Promise<{ ac
       questionBankVersion: project.question_bank_version,
       interfaceLanguage: project.interface_language,
     });
-    if (!(await emailSentRecently(tx, projectId, "resume_link", deps.config.emailCooldownMinutes, now))) {
-      await revokeTokens(tx, projectId, "RESUME", now);
-      const token = await issueToken(tx, projectId, "RESUME", true, resumeLinkExpiry(project, now));
-      await sendProjectEmail(tx, deps, project, bundle, "resume_link", token, now);
-      await recordJourneyEvent(tx, { eventType: "resume_email_sent", projectId, questionBankVersion: project.question_bank_version });
+    if (!(await emailRequestedRecently(tx, projectId, "resume_link", deps.config.emailCooldownMinutes, now))) {
+      await enqueueEmail(tx, {
+        dedupeKey: `resume_link:${projectId}:${now.getTime()}`,
+        projectId,
+        personId: project.created_by_person_id,
+        template: "resume_link",
+        enqueuedBy: "fa.finish_later",
+        now,
+      });
     }
     return { accessUntil: project.access_expires_at?.toISOString() ?? null };
   });
+}
+
+/** Enqueues a fresh private link for one project (cooldown applies). Returns whether it was enqueued. */
+async function enqueuePrivateLink(tx: Db, deps: FaDeps, projectId: string, enqueuedBy: string, now: Date): Promise<boolean> {
+  let project = await loadProject(tx, projectId, true);
+  if (!project || project.assessment_state === "DELETED" || project.assessment_state === "EXPIRED") return false;
+  if (await emailRequestedRecently(tx, project.project_id, "existing_assessment_link", deps.config.emailCooldownMinutes, now)) return false;
+  if (await ensureAccessWindow(tx, deps, project, now)) project = (await loadProject(tx, projectId, true)) ?? project;
+  await enqueueEmail(tx, {
+    dedupeKey: `existing_assessment_link:${project.project_id}:${now.getTime()}`,
+    projectId: project.project_id,
+    personId: project.created_by_person_id,
+    template: "existing_assessment_link",
+    enqueuedBy,
+    now,
+  });
+  await recordJourneyEvent(tx, { eventType: "resume_link_requested", projectId: project.project_id, questionBankVersion: project.question_bank_version });
+  return true;
 }
 
 /**
@@ -117,17 +98,12 @@ export async function sendVerifiedLinkToPerson(deps: FaDeps, personId: string): 
   const now = deps.config.now();
   const latest = await findLatestProjectForPerson(deps.db, personId);
   if (!latest) return;
-  await deps.db.transaction(async (tx) => {
-    let project = await loadProject(tx, latest.project_id, true);
-    if (!project) return;
-    if (await emailSentRecently(tx, project.project_id, "existing_assessment_link", deps.config.emailCooldownMinutes, now)) return;
-    if (await ensureAccessWindow(tx, project, now)) project = (await loadProject(tx, latest.project_id, true)) ?? project;
-    const bundle = await deps.bundles.byVersion(project.question_bank_version);
-    await revokeTokens(tx, project.project_id, "RESUME", now);
-    const token = await issueToken(tx, project.project_id, "RESUME", true, resumeLinkExpiry(project, now));
-    await sendProjectEmail(tx, deps, project, bundle, "existing_assessment_link", token, now);
-    await recordJourneyEvent(tx, { eventType: "resume_link_requested", projectId: project.project_id, questionBankVersion: project.question_bank_version });
-  });
+  await deps.db.transaction((tx) => enqueuePrivateLink(tx, deps, latest.project_id, "fa.link_request", now));
+}
+
+/** ADMIN operation: re-send the respondent's own private link to their own address. */
+export async function resendPrivateLinkForProject(deps: FaDeps, tx: Db, projectId: string, now: Date): Promise<boolean> {
+  return enqueuePrivateLink(tx, deps, projectId, "admin.resend_private_link", now);
 }
 
 export async function requestLinkByEmail(deps: FaDeps, rawEmail: unknown): Promise<void> {
@@ -143,7 +119,7 @@ export async function projectFromLink(deps: FaDeps, rawToken: unknown): Promise<
   const now = deps.config.now();
   const token = looksLikeAccessToken(rawToken) ? await findUsableToken(deps.db, rawToken, "RESUME", now) : null;
   const project = token ? await loadProject(deps.db, token.project_id) : null;
-  if (!project) throw new FaError("NOT_FOUND", "this link is no longer available");
+  if (!project || project.assessment_state === "DELETED") throw new FaError("NOT_FOUND", "this link is no longer available");
   return { project, now };
 }
 
@@ -176,7 +152,7 @@ export async function openLink(deps: FaDeps, rawToken: unknown): Promise<LinkCho
     interfaceLanguage: project.interface_language,
     canContinue: inProgress && windowOpen,
     canRecover: recoverable,
-    closed: (inProgress && !windowOpen && !recoverable) || project.assessment_state === "EXPIRED" || project.assessment_state === "DELETED",
+    closed: (inProgress && !windowOpen && !recoverable) || project.assessment_state === "EXPIRED",
     completed: project.assessment_state === "COMPLETED_LOCKED",
     anotherProjectInMind: another.rows[0]?.yes === true,
     accessUntil: project.access_expires_at?.toISOString() ?? null,
@@ -207,7 +183,11 @@ export async function continueFromLink(deps: FaDeps, rawToken: unknown): Promise
   });
 }
 
-/** Immediate +15/+30 extension (or recovery after expiry) with a structured reason; cap day 45. */
+/**
+ * Immediate +15/+30 extension (or recovery after expiry) with a structured reason, capped at the
+ * maximum access day. Never conditioned on anything commercial. The day after, one contextual
+ * help email for that reason may follow (continue the assessment first; Premium only secondary).
+ */
 export async function extendFromLink(
   deps: FaDeps,
   rawToken: unknown,
@@ -220,6 +200,8 @@ export async function extendFromLink(
     if (!project) throw new FaError("NOT_FOUND", "this link is no longer available");
     if (project.assessment_state !== "IN_PROGRESS") throw new FaError("LOCKED", "this First Assessment is complete");
     if (!project.access_expires_at || !project.access_max_until) throw new FaError("INVALID_INPUT", "no access window to extend");
+    const { policy } = lifecyclePolicyOf(await deps.bundles.byVersion(project.question_bank_version));
+    if (!isExtensionDays(days, policy)) throw new FaError("INVALID_INPUT", "this extension is not available", { fields: ["days"] });
     const outcome = extendAccess({ expiresAt: project.access_expires_at, maxUntil: project.access_max_until }, days, now);
     if (!outcome.ok) throw new FaError("NOT_RECOVERABLE", "this First Assessment can no longer be extended", { reason: outcome.reason });
 
@@ -228,6 +210,7 @@ export async function extendFromLink(
       outcome.newExpiresAt,
       now,
     ]);
+    await tx.query("UPDATE project SET extension_requested = true, updated_at = $2 WHERE project_id = $1 AND NOT extension_requested", [project.project_id, now]);
     await tx.query(
       `INSERT INTO fa_access_extension (project_id, requested_days, reason, previous_expires_at, new_expires_at, was_expired, requested_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -238,6 +221,16 @@ export async function extendFromLink(
       projectId: project.project_id,
       questionBankVersion: project.question_bank_version,
       properties: { days, reason },
+    });
+    await enqueueEmail(tx, {
+      dedupeKey: `access_followup:${project.project_id}:${reason}`,
+      projectId: project.project_id,
+      personId: project.created_by_person_id,
+      template: FOLLOWUP_TEMPLATES[reason],
+      enqueuedBy: outcome.wasExpired ? "fa.access_recovered" : "fa.access_extended",
+      sendAfter: addDays(now, 1),
+      context: { reason },
+      now,
     });
     return { accessUntil: outcome.newExpiresAt.toISOString() };
   });

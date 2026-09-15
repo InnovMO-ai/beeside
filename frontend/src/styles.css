@@ -725,3 +725,213 @@ a.button {
 .premium-status p + p {
   margin-top: 0.5rem;
 }
+
+/* ---------------------------------------------------------------- control center (internal) */
+.admin-shell {
+  min-height: 100vh;
+  background: var(--white);
+}
+.admin-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem clamp(1rem, 3vw, 2rem);
+  border-bottom: 1px solid var(--mist);
+}
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--purple-900);
+}
+.admin-logo {
+  height: 48px;
+  width: auto;
+}
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.admin-nav button,
+.admin-tabs button {
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+.admin-nav button[aria-current="page"],
+.admin-tabs button[aria-selected="true"] {
+  border-color: var(--purple-900);
+  color: var(--purple-900);
+  font-weight: 700;
+}
+.admin-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9375rem;
+}
+.admin-page {
+  padding: 1.5rem clamp(1rem, 3vw, 2rem) 3rem;
+  max-width: 90rem;
+}
+.admin-signin {
+  max-width: 40rem;
+}
+.admin-title {
+  margin: 0.5rem 0 1rem;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+}
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+}
+.admin-search,
+.admin-actions,
+.admin-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+.admin-search .input {
+  max-width: 28rem;
+}
+.admin-actions .input {
+  width: auto;
+  min-width: 12rem;
+}
+.admin-form-row label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+.admin-inline {
+  width: auto;
+}
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1rem;
+}
+.admin-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid #e3e3ea;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  min-width: 0;
+}
+.admin-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+.admin-wide {
+  grid-column: 1 / -1;
+}
+.admin-kv {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+.admin-kv div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
+  gap: 0.75rem;
+}
+.admin-kv dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+.admin-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-table-wrap {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--mist);
+}
+.admin-table th {
+  color: var(--ink-soft);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-table code,
+.admin-kv code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.admin-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--mist);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-badge[data-role="ADMIN"] {
+  background: var(--purple-900);
+  color: var(--white);
+}
+.admin-badge[data-outcome="DENIED"],
+.admin-badge[data-outcome="FAILED"] {
+  background: #fff1f3;
+  color: #be123c;
+}
+.admin-link {
+  font: inherit;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--purple-900);
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
+}
+.admin-notice {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--mist);
+}
+.admin-error {
+  color: #9b1c31;
+}
+.admin-json,
+.admin-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 28rem;
+  overflow: auto;
+}
+.admin-code {
+  min-height: 18rem;
+}
+.admin-snapshot {
+  max-width: 72rem;
+}

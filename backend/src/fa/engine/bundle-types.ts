@@ -91,9 +91,20 @@ export interface QuestionBankBundle {
   steps: StepDef[];
   questions: QuestionDef[];
   identity: { personal_email_domains: string[] };
-  links: { terms_url: string; privacy_policy_url: string | null };
+  /**
+   * Admin-editable links (Functional Specification v1 §10). The Privacy Policy URL stays null until
+   * the definitive document exists — it is never invented.
+   */
+  links: { terms_url: string; privacy_policy_url: string | null; preview_room_url?: string; premium_terms_url?: string };
   /** Interface copy for non-question screens and states (nested `copy` objects keyed by locale). */
   ui: Record<string, { copy: Record<Locale, Record<string, string>> }>;
-  /** Transactional email templates (sent through the email adapter). */
-  emails: Record<string, { copy: Record<Locale, { subject: string; body: string; cta: string }> }>;
+  /** Transactional email templates (sent through the email outbox). `secondary_cta` is optional. */
+  emails: Record<string, { copy: Record<Locale, { subject: string; body: string; cta: string; secondary_cta?: string }> }>;
+  /**
+   * Access / communication / temporary-retention calendar (see access-lifecycle.ts). Optional:
+   * bundles published before it existed run under LIFECYCLE_POLICY_V1.
+   */
+  lifecycle?: import("../services/access-lifecycle").LifecyclePolicyConfig;
+  /** Post-Snapshot Premium transition copy (optional; bundles without it use premium-content-1.0.0). */
+  premium?: { copy: Record<Locale, import("../../premium/content").PremiumCopy> };
 }

@@ -1,6 +1,7 @@
 import { getFieldDefinition } from "@beeside/canonical-fields";
 import { BUNDLE_LOCALES, OptionDef, QuestionBankBundle, QuestionType } from "./bundle-types";
 import { conditionFields } from "./conditions";
+import { validateLifecyclePolicyConfig } from "../services/access-lifecycle";
 
 const TYPE_TO_DATA_TYPE: Record<QuestionType, string> = {
   single_select: "single_select",
@@ -108,6 +109,29 @@ export function validateQuestionBankBundle(bundle: QuestionBankBundle): string[]
   for (const token of used) {
     const name = token.replace(/[{}\s]/g, "");
     if (!declared.has(name)) err(`undeclared template variable ${name}`);
+  }
+
+  // Operations configuration (optional sections; bundles published before them stay valid).
+  for (const [name, url] of Object.entries(bundle.links ?? {})) {
+    if (url === null && name === "privacy_policy_url") continue;
+    if (typeof url !== "string" || !/^https:\/\/[^\s]+$/.test(url)) err(`links.${name} must be an https URL`);
+  }
+  if (bundle.lifecycle !== undefined) for (const message of validateLifecyclePolicyConfig(bundle.lifecycle)) err(message);
+  if (bundle.premium !== undefined) {
+    const en = bundle.premium.copy?.en;
+    const es = bundle.premium.copy?.es;
+    if (!en || !es) err("premium.copy must include en and es");
+    else {
+      if (en.consideration.pillars.map((p) => p.key).join("|") !== es.consideration.pillars.map((p) => p.key).join("|")) err("premium pillars differ between locales");
+      if (en.consideration.outcomes.length !== es.consideration.outcomes.length) err("premium outcomes differ between locales");
+      if (en.activation.points.length !== es.activation.points.length) err("premium activation points differ between locales");
+    }
+  }
+  for (const [template, def] of Object.entries(bundle.emails)) {
+    for (const locale of BUNDLE_LOCALES) {
+      const copy = def.copy[locale];
+      if (!copy?.subject?.trim() || !copy.body?.trim() || !copy.cta?.trim()) err(`emails.${template}: missing ${locale} subject, body or cta`);
+    }
   }
 
   return errors;

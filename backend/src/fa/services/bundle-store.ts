@@ -1,8 +1,32 @@
+import { createHash } from "node:crypto";
 import { Db } from "../../db/database";
 import type { RulesEngineBundle } from "../../rules/types";
 import type { SnapshotTemplateBundle } from "../../snapshot/template";
 import { QuestionBankBundle } from "../engine/bundle-types";
 import { FaError } from "./errors";
+
+function withoutCopy(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutCopy);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => key !== "copy")
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, v]) => [key, withoutCopy(v)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * Fingerprint of everything in a question bank the rules engine depends on: stages, steps and
+ * questions (ids, field keys, types, option values, applicability) — not copy, emails, links,
+ * lifecycle or Premium content. Two versions with the same fingerprint produce identical answers.
+ */
+export function questionSchemaFingerprint(bundle: Pick<QuestionBankBundle, "stages" | "steps" | "questions">): string {
+  const schema = withoutCopy({ stages: bundle.stages, steps: bundle.steps, questions: bundle.questions });
+  return createHash("sha256").update(JSON.stringify(schema)).digest("hex");
+}
 
 /**
  * Reads versioned bundles from the Phase 3 registries. Published bundles are immutable, so a
@@ -61,5 +85,23 @@ export class BundleStore {
     const version = rows[0]?.version;
     if (!version) throw new FaError("NOT_READY", "the First Assessment is not available yet");
     return { version, bundle: await this.byVersion(version) };
+  }
+
+  /**
+   * A rules engine evaluates the question bank versions it lists, and any later version whose
+   * question schema is identical to one of them (a copy, email, link, lifecycle or Premium content
+   * publish never makes new assessments impossible to complete).
+   */
+  async questionBankCompatibleWith(listedVersions: readonly string[], version: string): Promise<boolean> {
+    if (listedVersions.includes(version)) return true;
+    const target = questionSchemaFingerprint(await this.byVersion(version));
+    for (const listed of listedVersions) {
+      try {
+        if (questionSchemaFingerprint(await this.byVersion(listed)) === target) return true;
+      } catch {
+        // a listed version that is not published cannot vouch for compatibility
+      }
+    }
+    return false;
   }
 }

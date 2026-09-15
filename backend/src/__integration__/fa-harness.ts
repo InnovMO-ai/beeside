@@ -32,6 +32,8 @@ export function useHarness(): Harness {
     email,
     bundles: new BundleStore(db),
     config: { appBaseUrl: "https://fa.test", sessionTtlHours: 24, emailCooldownMinutes: 5, now: () => clock.now },
+    // Deliver outbox email before the response, so tests observe captured messages deterministically.
+    emailDispatch: "inline",
   };
   const harness: Harness = {
     client,
@@ -51,6 +53,8 @@ export function useHarness(): Harness {
   afterAll(() => client.end());
   beforeEach(async () => {
     email.messages.length = 0;
+    email.idempotencyKeys.length = 0;
+    email.failNext.length = 0;
     clock.now = new Date();
     await client.query("BEGIN");
     await syncFieldRegistry(client);

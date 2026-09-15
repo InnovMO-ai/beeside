@@ -1,16 +1,19 @@
 import { Db } from "../db/database";
 import type { QuestionBankBundle } from "../fa/engine/bundle-types";
-import { fillTemplate } from "../fa/email/email-adapter";
 import { recordJourneyEvent } from "../fa/services/analytics";
 import { FaError } from "../fa/services/errors";
-import { FaDeps, ProjectRow, findUsableToken, issueToken, loadProject, recordEmailEvent, revokeTokens } from "../fa/services/repository";
+import { FaDeps, ProjectRow, findUsableToken, loadProject } from "../fa/services/repository";
 import { looksLikeAccessToken } from "../fa/services/tokens";
+import { DEFAULT_SNAPSHOT_LINK_DAYS, enqueueEmail } from "../operations/email-outbox";
 import { evaluateRules } from "../rules/engine";
 import { validateRulesEngineBundle } from "../rules/validate-rules-bundle";
 import { ClientSnapshotContent, composeClientSnapshot, composeInternalAssessment, localeOf } from "./compose";
 
-/** Private Snapshot links stay usable for this long after generation (retention policy pending). */
-export const SNAPSHOT_LINK_DAYS = 60;
+/**
+ * Default private Snapshot link validity (days from issuance). Not definitive policy: a Snapshot
+ * template may set `links.snapshot_link_days`; it is independent of the FA access lifecycle.
+ */
+export const SNAPSHOT_LINK_DAYS = DEFAULT_SNAPSHOT_LINK_DAYS;
 
 export interface SnapshotView {
   snapshotId: string;
@@ -42,7 +45,7 @@ export async function generateAssessmentOutputs(
   if (!pin) throw new FaError("NOT_FOUND", "project not found");
   const rules = await deps.bundles.rulesByVersion(pin.rules_engine_version);
   const template = await deps.bundles.templateByVersion(pin.snapshot_template_version);
-  if (validateRulesEngineBundle(rules).length > 0 || !rules.question_bank_versions.includes(project.question_bank_version)) {
+  if (validateRulesEngineBundle(rules).length > 0 || !(await deps.bundles.questionBankCompatibleWith(rules.question_bank_versions, project.question_bank_version))) {
     throw new FaError("NOT_READY", "the pinned rules engine cannot evaluate this question bank version");
   }
 
@@ -144,31 +147,22 @@ export async function generateAssessmentOutputs(
   return { snapshotId: snapshot.rows[0]?.snapshot_id ?? "" };
 }
 
-/** Snapshot delivery (Master Build Guide Appendix B5) with a private link, via the email adapter. */
-export async function sendSnapshotEmail(tx: Db, deps: FaDeps, projectId: string, now: Date): Promise<void> {
-  const project = await loadProject(tx, projectId);
-  if (!project) return;
-  const pins = await tx.query<{ snapshot_template_version: string }>("SELECT snapshot_template_version FROM project WHERE project_id = $1", [projectId]);
+/**
+ * Snapshot delivery (Master Build Guide Appendix B5): enqueued in the completion transaction; the
+ * outbox worker issues the private link (validity from the pinned template, default 60 days) and sends.
+ */
+export async function enqueueSnapshotEmail(tx: Db, deps: FaDeps, project: ProjectRow, now: Date): Promise<void> {
+  const pins = await tx.query<{ snapshot_template_version: string }>("SELECT snapshot_template_version FROM project WHERE project_id = $1", [project.project_id]);
   const template = await deps.bundles.templateByVersion(pins.rows[0]?.snapshot_template_version ?? "");
-  const locale = localeOf(project.preferred_deliverable_language);
-  const copy = template.emails.snapshot_ready?.copy[locale];
-  if (!copy) throw new FaError("NOT_READY", "the Snapshot delivery email is not configured");
-
-  await revokeTokens(tx, projectId, "RESUME", now);
-  const token = await issueToken(tx, projectId, "RESUME", true, new Date(now.getTime() + SNAPSHOT_LINK_DAYS * 86_400_000));
-  const variables = { preferred_name: project.preferred_name ?? project.first_name };
-  const result = await deps.email.send({
+  if (!template.emails.snapshot_ready) throw new FaError("NOT_READY", "the Snapshot delivery email is not configured");
+  await enqueueEmail(tx, {
+    dedupeKey: `snapshot_ready:${project.project_id}`,
+    projectId: project.project_id,
+    personId: project.created_by_person_id,
     template: "snapshot_ready",
-    to: project.primary_email,
-    locale,
-    subject: fillTemplate(copy.subject, variables),
-    body: fillTemplate(copy.body, variables),
-    ctaLabel: fillTemplate(copy.cta, variables),
-    ctaUrl: `${deps.config.appBaseUrl.replace(/\/$/, "")}/resume/${token}`,
-    projectId,
+    enqueuedBy: "fa.assessment_completed",
+    now,
   });
-  await recordEmailEvent(tx, projectId, "snapshot_ready", project.primary_email, deps.email.name, result.providerReference, now);
-  await recordJourneyEvent(tx, { eventType: "snapshot_email_sent", projectId, questionBankVersion: project.question_bank_version });
 }
 
 async function loadSnapshot(db: Db, projectId: string): Promise<SnapshotView> {

@@ -20,6 +20,11 @@ export interface FaDeps {
   config: FaConfig;
   /** Phase 9 checkout boundary; manual confirmation (no payment provider) when absent. */
   premium?: { checkout: CheckoutAdapter };
+  /**
+   * When enqueued email is delivered after a request: `inline` (tests, local), `background`
+   * (default, right after the response) or `none` (only the worker delivers).
+   */
+  emailDispatch?: "inline" | "background" | "none";
 }
 
 export type AssessmentState = "DRAFT" | "IN_PROGRESS" | "COMPLETED_LOCKED" | "EXPIRED" | "DELETED";
@@ -111,13 +116,24 @@ export async function issueToken(
   emailVerified: boolean,
   expiresAt: Date,
 ): Promise<string> {
+  return (await issueTokenRecord(db, projectId, kind, emailVerified, expiresAt)).token;
+}
+
+/** Issues a token and returns both the raw token (for the link) and its row id (for rotation). */
+export async function issueTokenRecord(
+  db: Db,
+  projectId: string,
+  kind: TokenKind,
+  emailVerified: boolean,
+  expiresAt: Date,
+): Promise<{ token: string; tokenId: string }> {
   const token = generateAccessToken();
-  await db.query(
+  const { rows } = await db.query<{ token_id: string }>(
     `INSERT INTO project_access_token (project_id, kind, token_hash, email_verified, expires_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+     VALUES ($1, $2, $3, $4, $5) RETURNING token_id`,
     [projectId, kind, hashAccessToken(token), emailVerified, expiresAt],
   );
-  return token;
+  return { token, tokenId: rows[0]?.token_id as string };
 }
 
 export async function revokeTokens(db: Db, projectId: string, kind: TokenKind, now: Date): Promise<void> {

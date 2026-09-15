@@ -11,6 +11,31 @@ export const PREMIUM_CONTENT_VERSION = "premium-content-1.0.0";
 export const PREVIEW_ROOM_URL = "https://www.beeside.you/preview";
 export const PREMIUM_TERMS_URL = "https://www.beeside.you/termsandconditions";
 
+export interface PremiumContent {
+  /** `question-bank:<version>` when governed by the versioned configuration, else the code default. */
+  version: string;
+  previewRoomUrl: string;
+  termsUrl: string;
+  copy: Record<"en" | "es", PremiumCopy>;
+}
+
+/**
+ * Since fa-qb-1.1.0 the Premium transition copy and its links are admin-governed inside the
+ * question bank bundle (published through Draft → Preview → Publish) and read from the project's
+ * pinned version; earlier bundles fall back to premium-content-1.0.0.
+ */
+export function premiumContentOf(
+  bundle: { premium?: { copy: Record<"en" | "es", PremiumCopy> }; links?: { preview_room_url?: string; premium_terms_url?: string } } | null,
+  bundleVersion: string | null,
+): PremiumContent {
+  return {
+    version: bundle?.premium && bundleVersion ? `question-bank:${bundleVersion}` : PREMIUM_CONTENT_VERSION,
+    previewRoomUrl: bundle?.links?.preview_room_url ?? PREVIEW_ROOM_URL,
+    termsUrl: bundle?.links?.premium_terms_url ?? PREMIUM_TERMS_URL,
+    copy: bundle?.premium?.copy ?? PREMIUM_COPY,
+  };
+}
+
 export interface PremiumCopy {
   transition: { eyebrow: string; headline: string; body: string; continue_cta: string; explore_cta: string; explore_helper: string; new_tab: string };
   consideration: {

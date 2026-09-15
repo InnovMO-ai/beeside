@@ -2,7 +2,7 @@
   "name": "@beeside/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "beeside First Assessment \u2014 backend API service (Node.js + TypeScript).",
+  "description": "beeside First Assessment — backend API service (Node.js + TypeScript).",
   "main": "dist/index.js",
   "scripts": {
     "prebuild": "npm run build --prefix ../shared/canonical-fields",
@@ -21,7 +21,11 @@
     "db:check": "drizzle-kit check",
     "db:sync-fields": "tsx src/scripts/sync-field-registry.ts",
     "config:publish-dev": "tsx src/scripts/publish-dev-config.ts",
-    "billing:inject-event": "tsx src/scripts/inject-subscription-event.ts"
+    "billing:inject-event": "tsx src/scripts/inject-subscription-event.ts",
+    "worker": "node dist/worker.js",
+    "jobs:run": "tsx src/scripts/run-job.ts",
+    "admin:provision": "tsx src/scripts/provision-admin.ts",
+    "dev:oidc": "tsx src/scripts/dev-oidc-provider.ts"
   },
   "dependencies": {
     "@beeside/canonical-fields": "0.1.0",

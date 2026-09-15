@@ -8,3 +8,4 @@ export * from "./subscription";
 export * from "./ops";
 export * from "./config-versioning";
 export * from "./fa-core";
+export * from "./operations";

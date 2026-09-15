@@ -2,6 +2,7 @@ import { boolean, check, index, integer, jsonb, pgEnum, pgTable, smallint, text,
 import { sql } from "drizzle-orm";
 import { person } from "./identity";
 import { project } from "./project";
+import { questionBankVersion } from "./reference";
 
 // First Assessment Core (Build Plan v1.1 Phases 4–6 + current Functional & Experience Handoff v1).
 
@@ -27,6 +28,8 @@ export const legalAcceptance = pgTable(
     document: legalDocumentEnum("document").notNull(),
     // The URL presented at acceptance time (configurable setting; NULL only if not yet configured).
     documentUrl: text("document_url"),
+    // Phase 11 evidence: the pinned question bank version whose links and consent copy were shown.
+    questionBankVersion: text("question_bank_version").references(() => questionBankVersion.version),
     interfaceLanguage: text("interface_language").notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -53,9 +56,13 @@ export const projectAccessToken = pgTable(
   ],
 );
 
-// Finish Later access lifecycle (15 days initial, +15/+30 extensions, day-45 cap, day-60 retention).
-// Access and retention are different concepts: access_expires_at governs whether the respondent can
-// continue; retention_until only bounds internal temporary retention while Premium was never active.
+// Three separate lifecycles share this row (Phase 11):
+//   * access — access_window_* start only when the first private link is emitted (15 days
+//     provisional, +15/+30 extensions, capped at day 45); opening a link never changes them;
+//   * private-link validity — lives on project_access_token.expires_at, not here;
+//   * temporary data retention — retention_until is ALWAYS set: from the lifecycle origin (identity)
+//     until a link is emitted, then from the access-window start; it only ever moves later, and
+//     only applies while Premium was never activated.
 export const faProjectLifecycle = pgTable(
   "fa_project_lifecycle",
   {
@@ -67,20 +74,25 @@ export const faProjectLifecycle = pgTable(
     accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
     accessMaxUntil: timestamp("access_max_until", { withTimezone: true }),
     retentionUntil: timestamp("retention_until", { withTimezone: true }),
-    // Written by the Phase 11 lifecycle automation; present now so no restructuring is needed.
+    // LIFECYCLE_ORIGIN (no private link emitted yet) or ACCESS_WINDOW.
+    retentionBasis: text("retention_basis"),
+    // Written by the lifecycle job (write-once per milestone).
     reminderDay10SentAt: timestamp("reminder_day10_sent_at", { withTimezone: true }),
     recoveryEmailSentAt: timestamp("recovery_email_sent_at", { withTimezone: true }),
+    // The access_expires_at value whose expiry was last recorded (one assessment_expired per expiry).
+    accessExpiryRecordedFor: timestamp("access_expiry_recorded_for", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     check(
       "fa_project_lifecycle_access_window_consistency",
-      sql`(${t.accessWindowStartedAt} IS NULL AND ${t.accessExpiresAt} IS NULL AND ${t.accessMaxUntil} IS NULL AND ${t.retentionUntil} IS NULL)
-       OR (${t.accessWindowStartedAt} IS NOT NULL AND ${t.accessExpiresAt} IS NOT NULL AND ${t.accessMaxUntil} IS NOT NULL AND ${t.retentionUntil} IS NOT NULL
-           AND ${t.accessExpiresAt} <= ${t.accessMaxUntil} AND ${t.accessMaxUntil} <= ${t.retentionUntil})`,
+      sql`(${t.accessWindowStartedAt} IS NULL AND ${t.accessExpiresAt} IS NULL AND ${t.accessMaxUntil} IS NULL)
+       OR (${t.accessWindowStartedAt} IS NOT NULL AND ${t.accessExpiresAt} IS NOT NULL AND ${t.accessMaxUntil} IS NOT NULL
+           AND ${t.accessExpiresAt} <= ${t.accessMaxUntil})`,
     ),
     index("fa_project_lifecycle_access_expires_idx").on(t.accessExpiresAt),
+    index("fa_project_lifecycle_retention_until_idx").on(t.retentionUntil),
   ],
 );
 

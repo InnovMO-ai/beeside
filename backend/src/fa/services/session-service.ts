@@ -9,7 +9,7 @@ import { FaError } from "./errors";
 import { startProject } from "./project-factory";
 import { AssessmentState, FaDeps, ProjectRow, TokenRow, findUsableToken, issueToken, loadProject, loadStoredAnswers } from "./repository";
 import { looksLikeAccessToken } from "./tokens";
-import { generateAssessmentOutputs, sendSnapshotEmail } from "../../snapshot/snapshot-service";
+import { enqueueSnapshotEmail, generateAssessmentOutputs } from "../../snapshot/snapshot-service";
 
 export interface SessionContext {
   token: TokenRow;
@@ -220,7 +220,7 @@ export async function completeStep(deps: FaDeps, ctx: SessionContext, stepId: st
         questionBankVersion: project.question_bank_version,
         interfaceLanguage: project.interface_language,
       });
-      await sendSnapshotEmail(tx, deps, project.project_id, now);
+      await enqueueSnapshotEmail(tx, deps, project, now);
     }
     const refreshed = await loadProject(tx, project.project_id);
     if (!refreshed) throw new FaError("NOT_FOUND", "project not found");

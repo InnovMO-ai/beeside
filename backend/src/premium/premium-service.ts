@@ -3,7 +3,8 @@ import { recordJourneyEvent } from "../fa/services/analytics";
 import { FaError } from "../fa/services/errors";
 import { FaDeps } from "../fa/services/repository";
 import { CheckoutAdapter, CheckoutOutcome, DevSimulatedCheckout, ManualConfirmationCheckout } from "./checkout";
-import { PREMIUM_TERMS_URL, PREVIEW_ROOM_URL } from "./content";
+import { BundleStore } from "../fa/services/bundle-store";
+import { PremiumContent, premiumContentOf } from "./content";
 import { processSubscriptionEvent } from "./subscription-events";
 
 /** Days of the simulated development period only; real periods always come from the provider event. */
@@ -23,9 +24,19 @@ export interface PremiumStatus {
   termsUrl: string;
 }
 
-export async function getPremiumStatus(db: Db, projectId: string): Promise<PremiumStatus> {
+/** Premium copy and links for one project: its pinned question bank (fa-qb-1.1.0+) or the code default. */
+export async function premiumContentForProject(db: Db, bundles: BundleStore, projectId: string): Promise<PremiumContent> {
+  const { rows } = await db.query<{ question_bank_version: string }>("SELECT question_bank_version FROM project WHERE project_id = $1", [projectId]);
+  const version = rows[0]?.question_bank_version;
+  if (!version) throw new FaError("NOT_FOUND", "project not found");
+  const bundle = await bundles.byVersion(version).catch(() => null);
+  return premiumContentOf(bundle, version);
+}
+
+export async function getPremiumStatus(db: Db, projectId: string, bundles?: BundleStore): Promise<PremiumStatus> {
   const { rows } = await db.query<{
     assessment_state: string;
+    question_bank_version: string;
     premium_ever_activated: boolean;
     premium_access_active: boolean | null;
     effective_until: Date | null;
@@ -34,7 +45,7 @@ export async function getPremiumStatus(db: Db, projectId: string): Promise<Premi
     request_kind: "activation" | "reactivation" | null;
     requested_at: Date | null;
   }>(
-    `SELECT p.assessment_state, p.premium_ever_activated, e.premium_access_active, e.effective_until, s.status, s.current_period_end,
+    `SELECT p.assessment_state, p.question_bank_version, p.premium_ever_activated, e.premium_access_active, e.effective_until, s.status, s.current_period_end,
             r.kind AS request_kind, r.requested_at
        FROM project p
        LEFT JOIN entitlement e ON e.project_id = p.project_id
@@ -48,6 +59,7 @@ export async function getPremiumStatus(db: Db, projectId: string): Promise<Premi
   const available = row.assessment_state === "COMPLETED_LOCKED";
   const accessActive = row.premium_access_active === true;
   const pending = row.request_kind && row.requested_at ? { kind: row.request_kind, requestedAt: row.requested_at.toISOString() } : null;
+  const links = bundles ? premiumContentOf(await bundles.byVersion(row.question_bank_version).catch(() => null), row.question_bank_version) : premiumContentOf(null, null);
   return {
     available,
     everActivated: row.premium_ever_activated,
@@ -57,8 +69,8 @@ export async function getPremiumStatus(db: Db, projectId: string): Promise<Premi
     pendingRequest: pending,
     canActivate: available && !row.premium_ever_activated && !pending,
     canReactivate: available && row.premium_ever_activated && !accessActive && !pending,
-    previewRoomUrl: PREVIEW_ROOM_URL,
-    termsUrl: PREMIUM_TERMS_URL,
+    previewRoomUrl: links.previewRoomUrl,
+    termsUrl: links.termsUrl,
   };
 }
 
@@ -97,19 +109,19 @@ export async function requestPremiumActivation(
   const checkout = checkoutFor(deps);
   return deps.db.transaction(async (tx) => {
     await tx.query("SELECT project_id FROM project WHERE project_id = $1 FOR UPDATE", [projectId]);
-    const status = await getPremiumStatus(tx, projectId);
+    const status = await getPremiumStatus(tx, projectId, deps.bundles);
     if (status.pendingRequest) return { outcome: { kind: "pending_confirmation" as const }, status };
     if (!status.canActivate && !status.canReactivate) throw new FaError("NOT_APPLICABLE", "Premium cannot be requested for this project right now");
     const kind = status.canActivate ? "activation" : "reactivation";
     const inserted = await tx.query<{ request_id: string }>(
       `INSERT INTO premium_activation_request (project_id, person_id, kind, terms_url, terms_accepted_at, interface_language, checkout_adapter, requested_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $5) RETURNING request_id`,
-      [projectId, personId, kind, PREMIUM_TERMS_URL, now, input.interfaceLanguage === "es" ? "es" : "en", checkout.name],
+      [projectId, personId, kind, status.termsUrl, now, input.interfaceLanguage === "es" ? "es" : "en", checkout.name],
     );
     const requestId = inserted.rows[0]?.request_id as string;
     await recordJourneyEvent(tx, { eventType: "premium_activation_requested", projectId, properties: { kind, checkout: checkout.name } });
     const { outcome, reference } = await checkout.begin(tx, { requestId, projectId, kind, now });
     if (reference) await tx.query("UPDATE premium_activation_request SET checkout_reference = $2 WHERE request_id = $1", [requestId, reference]);
-    return { outcome, status: await getPremiumStatus(tx, projectId) };
+    return { outcome, status: await getPremiumStatus(tx, projectId, deps.bundles) };
   });
 }

@@ -285,16 +285,19 @@ export const EMAIL_COPY: QuestionBankBundle["emails"] = {
       },
     },
   },
+  // Lifecycle emails (Handoff v1 §18–§19). Each shows the exact date instead of asking the person to
+  // count days; the contextual follow-up is help, never a sales push, and its primary action is
+  // always to continue the First Assessment (Precision needs the First Assessment baseline).
   access_reminder_day10: {
     copy: {
       en: {
-        subject: "Your First Assessment is saved for 5 more days",
-        body: "Hi {{preferred_name}}, your First Assessment is saved for 5 more days. Need more time? You can continue now or keep it available for longer.",
+        subject: "Your First Assessment is saved for {{days_left}} more days",
+        body: "Hi {{preferred_name}}, your First Assessment is saved for {{days_left}} more days — it is available until {{access_until}}. Need more time? You can continue now or keep it available for longer.",
         cta: "Continue my assessment",
       },
       es: {
-        subject: "Tu First Assessment estará guardado 5 días más",
-        body: "Hola {{preferred_name}}, tu First Assessment estará guardado 5 días más. ¿Necesitas más tiempo? Puedes continuar ahora o mantenerlo disponible por más tiempo.",
+        subject: "Tu First Assessment estará guardado {{days_left}} días más",
+        body: "Hola {{preferred_name}}, tu First Assessment estará guardado {{days_left}} días más — está disponible hasta el {{access_until}}. ¿Necesitas más tiempo? Puedes continuar ahora o mantenerlo disponible por más tiempo.",
         cta: "Continuar mi evaluación",
       },
     },
@@ -303,13 +306,75 @@ export const EMAIL_COPY: QuestionBankBundle["emails"] = {
     copy: {
       en: {
         subject: "We can still restore your First Assessment",
-        body: "Hi {{preferred_name}}, we don’t want you to lose the work you already started. Your First Assessment is no longer active, but we can still restore your progress.",
+        body: "Hi {{preferred_name}}, we don’t want you to lose the work you already started. Your First Assessment is no longer active, but we can still restore your progress until {{recoverable_until}}.",
         cta: "Recover my assessment",
       },
       es: {
         subject: "Todavía podemos restaurar tu First Assessment",
-        body: "Hola {{preferred_name}}, no queremos que pierdas el trabajo que ya empezaste. Tu First Assessment ya no está activo, pero todavía podemos restaurar tu avance.",
+        body: "Hola {{preferred_name}}, no queremos que pierdas el trabajo que ya empezaste. Tu First Assessment ya no está activo, pero todavía podemos restaurar tu avance hasta el {{recoverable_until}}.",
         cta: "Recuperar mi evaluación",
+      },
+    },
+  },
+  access_followup_missing_information: {
+    copy: {
+      en: {
+        subject: "It’s fine to answer with what you know today",
+        body: "Hi {{preferred_name}}, your First Assessment is available until {{access_until}}. You don’t need every detail to finish it — answer with what you know today and mark anything you’re unsure about. Once your First Assessment is complete, beeside Precision can help validate, clarify and complete the missing information.",
+        cta: "Continue First Assessment",
+        secondary_cta: "How Precision works",
+      },
+      es: {
+        subject: "Está bien responder con lo que sabes hoy",
+        body: "Hola {{preferred_name}}, tu First Assessment está disponible hasta el {{access_until}}. No necesitas cada detalle para terminarlo: responde con lo que sabes hoy y marca lo que todavía no tengas claro. Cuando completes tu First Assessment, beeside Precision puede ayudarte a validar, aclarar y completar la información que falte.",
+        cta: "Continuar First Assessment",
+        secondary_cta: "Cómo funciona Precision",
+      },
+    },
+  },
+  access_followup_project_not_structured: {
+    copy: {
+      en: {
+        subject: "A structured plan isn’t required to finish",
+        body: "Hi {{preferred_name}}, your First Assessment is available until {{access_until}}. You don’t need a fully structured project to complete it — your Snapshot will show what already looks defined and what needs attention. If you later want support shaping the project, beeside’s growth and strategic advisory can help.",
+        cta: "Continue First Assessment",
+        secondary_cta: "About strategic advisory",
+      },
+      es: {
+        subject: "No necesitas un plan estructurado para terminar",
+        body: "Hola {{preferred_name}}, tu First Assessment está disponible hasta el {{access_until}}. No necesitas un proyecto totalmente estructurado para completarlo: tu Snapshot mostrará qué ya se ve definido y qué necesita atención. Si más adelante quieres apoyo para darle forma al proyecto, la asesoría estratégica y de crecimiento de beeside puede ayudarte.",
+        cta: "Continuar First Assessment",
+        secondary_cta: "Sobre la asesoría estratégica",
+      },
+    },
+  },
+  access_followup_unsure_market_timing: {
+    copy: {
+      en: {
+        subject: "Market and timing questions are normal at this stage",
+        body: "Hi {{preferred_name}}, your First Assessment is available until {{access_until}}. You can answer with your current view — “Not sure” is a valid answer. Once you have your Snapshot, beeside’s market entry expertise can help clarify market and timing questions.",
+        cta: "Continue First Assessment",
+        secondary_cta: "About market entry support",
+      },
+      es: {
+        subject: "Las dudas de mercado y tiempos son normales en esta etapa",
+        body: "Hola {{preferred_name}}, tu First Assessment está disponible hasta el {{access_until}}. Puedes responder con tu visión actual: “No estoy seguro” es una respuesta válida. Cuando tengas tu Snapshot, la experiencia de beeside en entrada a mercados puede ayudarte a aclarar las dudas de mercado y tiempos.",
+        cta: "Continuar First Assessment",
+        secondary_cta: "Sobre el apoyo de entrada a mercados",
+      },
+    },
+  },
+  access_followup_something_else: {
+    copy: {
+      en: {
+        subject: "Your First Assessment is still here for you",
+        body: "Hi {{preferred_name}}, your First Assessment is available until {{access_until}}. Your progress is saved, so you can continue whenever it suits you.",
+        cta: "Continue First Assessment",
+      },
+      es: {
+        subject: "Tu First Assessment sigue aquí para ti",
+        body: "Hola {{preferred_name}}, tu First Assessment está disponible hasta el {{access_until}}. Tu avance está guardado, así que puedes continuar cuando te convenga.",
+        cta: "Continuar First Assessment",
       },
     },
   },

@@ -1,8 +1,8 @@
 import express, { NextFunction, Request, Response, Router } from "express";
+import { dispatchEmails } from "../operations/email-outbox";
 import { getSessionSnapshot, openSnapshotFromLink } from "../snapshot/snapshot-service";
-import { PREMIUM_CONTENT_VERSION, PREMIUM_COPY, PREMIUM_TERMS_URL, PREVIEW_ROOM_URL } from "../premium/content";
-import { getPremiumStatus, requestPremiumActivation } from "../premium/premium-service";
-import { isExtensionDays } from "./services/access-lifecycle";
+import { premiumContentOf } from "../premium/content";
+import { getPremiumStatus, premiumContentForProject, requestPremiumActivation } from "../premium/premium-service";
 import { isUuid, recordJourneyEvent, sanitizeClientEvent } from "./services/analytics";
 import { ISO_COUNTRY_CODES } from "./engine/iso-countries";
 import { FaError } from "./services/errors";
@@ -43,6 +43,8 @@ function body(req: Request): Record<string, unknown> {
 /**
  * Public First Assessment API. Mounted only when FA_API_ENABLED=true (see createApp): the deployed
  * backend does not collect personal data until the Phase 13 abuse-prevention controls exist.
+ * Requests never send email themselves: they enqueue into the outbox, and delivery runs after the
+ * business transaction has committed.
  */
 export function createFaRouter(deps: FaDeps): Router {
   const router = Router();
@@ -74,6 +76,7 @@ export function createFaRouter(deps: FaDeps): Router {
 
   router.post("/identity", handle(async (req, res) => {
     const result = await submitIdentity(deps, parseIdentityInput(req.body));
+    await dispatchEmails(deps);
     res.status(result.status === "started" ? 201 : 202).json(result);
   }));
 
@@ -98,7 +101,9 @@ export function createFaRouter(deps: FaDeps): Router {
     const ctx = await session(req);
     const duration = body(req).durationMs;
     const durationMs = typeof duration === "number" && Number.isInteger(duration) && duration >= 0 && duration < 86_400_000 ? duration : null;
-    res.json(await completeStep(deps, ctx, req.params.stepId ?? "", durationMs));
+    const view = await completeStep(deps, ctx, req.params.stepId ?? "", durationMs);
+    await dispatchEmails(deps);
+    res.json(view);
   }));
 
   router.get("/session/snapshot", handle(async (req, res) => {
@@ -110,14 +115,26 @@ export function createFaRouter(deps: FaDeps): Router {
     res.json(await openSnapshotFromLink(deps, body(req).token));
   }));
 
-  // ---- Phase 9: Premium transition (after the Snapshot; no price, no payment provider).
-  router.get("/premium/content", (_req, res) => {
-    res.set("Cache-Control", "public, max-age=300").json({ version: PREMIUM_CONTENT_VERSION, previewRoomUrl: PREVIEW_ROOM_URL, termsUrl: PREMIUM_TERMS_URL, copy: PREMIUM_COPY });
-  });
+  // ---- Premium transition (after the Snapshot; no price, no payment provider). Copy and links are
+  // versioned configuration: the project's pinned question bank, or the current one when anonymous.
+  router.get("/premium/content", handle(async (_req, res) => {
+    const { version, bundle } = await deps.bundles.current();
+    res.set("Cache-Control", "public, max-age=300").json(premiumContentOf(bundle, version));
+  }));
+
+  router.get("/session/premium/content", handle(async (req, res) => {
+    const ctx = await session(req);
+    res.json(await premiumContentForProject(deps.db, deps.bundles, ctx.project.project_id));
+  }));
+
+  router.post("/links/premium/content", handle(async (req, res) => {
+    const { project } = await projectFromLink(deps, body(req).token);
+    res.json(await premiumContentForProject(deps.db, deps.bundles, project.project_id));
+  }));
 
   router.get("/session/premium", handle(async (req, res) => {
     const ctx = await session(req);
-    res.json(await getPremiumStatus(deps.db, ctx.project.project_id));
+    res.json(await getPremiumStatus(deps.db, ctx.project.project_id, deps.bundles));
   }));
 
   router.post("/session/premium/activation", handle(async (req, res) => {
@@ -129,7 +146,7 @@ export function createFaRouter(deps: FaDeps): Router {
 
   router.post("/links/premium", handle(async (req, res) => {
     const { project } = await projectFromLink(deps, body(req).token);
-    res.json(await getPremiumStatus(deps.db, project.project_id));
+    res.json(await getPremiumStatus(deps.db, project.project_id, deps.bundles));
   }));
 
   router.post("/links/premium/activation", handle(async (req, res) => {
@@ -140,7 +157,9 @@ export function createFaRouter(deps: FaDeps): Router {
 
   router.post("/session/finish-later", handle(async (req, res) => {
     const ctx = await session(req);
-    res.json({ saved: true, ...(await finishLater(deps, ctx.project.project_id)) });
+    const result = await finishLater(deps, ctx.project.project_id);
+    await dispatchEmails(deps);
+    res.json({ saved: true, ...result });
   }));
 
   router.post("/session/another-project", handle(async (req, res) => {
@@ -158,11 +177,13 @@ export function createFaRouter(deps: FaDeps): Router {
 
   router.post("/links/extend", handle(async (req, res) => {
     const b = body(req);
-    if (!isExtensionDays(b.days)) throw new FaError("INVALID_INPUT", "days must be 15 or 30", { fields: ["days"] });
+    if (b.days !== 15 && b.days !== 30) throw new FaError("INVALID_INPUT", "days must be 15 or 30", { fields: ["days"] });
     if (typeof b.reason !== "string" || !(b.reason in EXTENSION_REASONS)) {
       throw new FaError("INVALID_INPUT", "a valid reason is required", { fields: ["reason"] });
     }
-    res.json(await extendFromLink(deps, b.token, b.days, b.reason as ExtensionReason));
+    const result = await extendFromLink(deps, b.token, b.days, b.reason as ExtensionReason);
+    await dispatchEmails(deps);
+    res.json(result);
   }));
 
   router.post("/links/new-project", handle(async (req, res) => {
@@ -180,6 +201,7 @@ export function createFaRouter(deps: FaDeps): Router {
   // Always the same answer, whether or not the email exists (no account enumeration).
   router.post("/links/request", handle(async (req, res) => {
     await requestLinkByEmail(deps, body(req).email);
+    await dispatchEmails(deps);
     res.status(202).json({ status: "accepted" });
   }));
 

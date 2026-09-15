@@ -1,12 +1,20 @@
 import { QuestionBankBundle, QuestionDef, StageId, StepDef } from "../engine/bundle-types";
+import { LIFECYCLE_POLICY_V1, lifecyclePolicyToConfig } from "../services/access-lifecycle";
+import { PREMIUM_COPY, PREMIUM_TERMS_URL, PREVIEW_ROOM_URL } from "../../premium/content";
 import { Bi } from "./helpers";
 import { BUSINESS_QUESTIONS, GOAL_QUESTIONS, PROJECT_QUESTIONS, STORY_QUESTIONS } from "./questions-project-business";
 import { CAPABILITY_QUESTIONS, OPERATION_COMPONENT_QUESTIONS, OPERATION_DETAIL_QUESTIONS } from "./questions-operation";
 import { CONSTRAINT_QUESTIONS, PREFERENCE_QUESTIONS, PRIORITY_QUESTIONS } from "./questions-priorities";
 import { EMAIL_COPY, STAGES, UI_COPY } from "./ui-copy";
 
-/** Version identifier for this bundle in the question_bank_version registry. */
-export const FA_QUESTION_BANK_VERSION = "fa-qb-1.0.0";
+/**
+ * Version identifier for this bundle in the question_bank_version registry.
+ * fa-qb-1.1.0 keeps every question, step and option of fa-qb-1.0.0 unchanged and adds the
+ * operations configuration: the access/communication/retention calendar (`lifecycle`, 15 days
+ * provisional), lifecycle email copy with exact dates, the contextual follow-ups, the Premium
+ * transition copy and its links — all admin-governed through the versioned publish workflow.
+ */
+export const FA_QUESTION_BANK_VERSION = "fa-qb-1.1.0";
 
 export const TERMS_URL = "https://www.beeside.you/termsandconditions";
 
@@ -69,7 +77,7 @@ export function buildQuestionBankBundle(): QuestionBankBundle {
     schema_version: 1,
     product: "first_assessment",
     locales: ["en", "es"],
-    variables: ["preferred_name", "access_until", "company_name"],
+    variables: ["preferred_name", "access_until", "company_name", "days_left", "recoverable_until", "until"],
     stages: STAGES,
     steps: STEPS,
     questions: [
@@ -85,10 +93,12 @@ export function buildQuestionBankBundle(): QuestionBankBundle {
       ...PREFERENCE_QUESTIONS,
     ],
     identity: { personal_email_domains: PERSONAL_EMAIL_DOMAINS },
-    // The Privacy Policy URL is a configurable canonical setting that is not yet defined; the
-    // acceptance is recorded with document_url NULL until it is published (see closure report).
-    links: { terms_url: TERMS_URL, privacy_policy_url: null },
+    // The Privacy Policy URL is a configurable canonical setting that is not yet defined: it stays
+    // null (never invented) and acceptances record which configuration version was shown.
+    links: { terms_url: TERMS_URL, privacy_policy_url: null, preview_room_url: PREVIEW_ROOM_URL, premium_terms_url: PREMIUM_TERMS_URL },
     ui: UI_COPY,
     emails: EMAIL_COPY,
+    lifecycle: lifecyclePolicyToConfig(LIFECYCLE_POLICY_V1),
+    premium: { copy: PREMIUM_COPY },
   };
 }
