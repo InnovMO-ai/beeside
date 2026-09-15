@@ -15,7 +15,7 @@ import {
   retentionFromOrigin,
   validateLifecyclePolicyConfig,
 } from "../fa/services/access-lifecycle";
-import { questionSchemaFingerprint } from "../fa/services/bundle-store";
+import { KNOWN_QUESTION_SCHEMA_FINGERPRINTS, questionSchemaFingerprint } from "../fa/services/bundle-store";
 import { adminDepsFromEnv } from "../index";
 import { sanitizeAuditDetails } from "../operations/audit";
 import { backoffSeconds, isEmailTemplate, sanitizeDeliveryError, snapshotLinkDays } from "../operations/email-outbox";
@@ -72,6 +72,8 @@ describe("question bank compatibility and validation", () => {
     const logicChanged = JSON.parse(JSON.stringify(bundle));
     logicChanged.questions[0].required = !logicChanged.questions[0].required;
     expect(questionSchemaFingerprint(logicChanged)).not.toBe(questionSchemaFingerprint(bundle));
+    // fa-qb-1.1.0 keeps exactly the questions of fa-qb-1.0.0 (the version re-1.0.0 evaluates).
+    expect(questionSchemaFingerprint(bundle)).toBe(KNOWN_QUESTION_SCHEMA_FINGERPRINTS["fa-qb-1.0.0"]);
   });
 
   it("publishes fa-qb-1.1.0 with valid lifecycle, links, Premium copy and every email in both locales", () => {

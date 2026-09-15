@@ -29,6 +29,15 @@ export function questionSchemaFingerprint(bundle: Pick<QuestionBankBundle, "stag
 }
 
 /**
+ * Question schemas of released question bank versions, so compatibility also holds in an
+ * environment where only a later version was ever published (a fresh database bootstraps
+ * fa-qb-1.1.0 directly). A unit test pins the current bundle to fa-qb-1.0.0's schema.
+ */
+export const KNOWN_QUESTION_SCHEMA_FINGERPRINTS: Readonly<Record<string, string>> = {
+  "fa-qb-1.0.0": "80ec2d15fe077604bebd196af725ce6eebbc601fc8c64a82bd74d901ada715b2",
+};
+
+/**
  * Reads versioned bundles from the Phase 3 registries. Published bundles are immutable, so a
  * version is cached once read; the "current" pointer is always read fresh.
  */
@@ -96,10 +105,11 @@ export class BundleStore {
     if (listedVersions.includes(version)) return true;
     const target = questionSchemaFingerprint(await this.byVersion(version));
     for (const listed of listedVersions) {
+      if (KNOWN_QUESTION_SCHEMA_FINGERPRINTS[listed] === target) return true;
       try {
         if (questionSchemaFingerprint(await this.byVersion(listed)) === target) return true;
       } catch {
-        // a listed version that is not published cannot vouch for compatibility
+        // a listed version that is not published here cannot vouch for compatibility by itself
       }
     }
     return false;
