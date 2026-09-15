@@ -1,17 +1,16 @@
 /**
- * Canonical field-key registry — placeholder scaffold.
+ * Canonical field-key registry and shared contracts.
  *
- * This package is intentionally near-empty in Phase 1. Its real content is
- * the full field list from Functional Specification v1 Appendix A / §2.1,
- * authored in Phase 6 as the question bank is built, and the
- * `assessment_state` / subscription-entitlement enums authored in Phase 2 as
- * the schema is built. Phase 1's job is only to prove that backend, frontend,
- * and (later) the rules engine import field keys from ONE shared package
- * rather than redeclaring them locally — the mechanism that prevents schema
- * drift called out as a risk in Build Plan v1.1 FINAL, Phase 2.
+ * `FA_FIELDS` (./fields) is the single source of truth for First Assessment field keys; the
+ * database `field_key_registry` is a synchronized representation of it. Backend, the question
+ * bank and (later) the rules engine import keys from this ONE package rather than redeclaring
+ * them — the mechanism that prevents schema drift (Build Plan v1.1 FINAL, Phase 2 risk).
  */
 
-export const CANONICAL_FIELDS_PACKAGE_VERSION = "0.1.0-phase1-skeleton" as const;
+export const CANONICAL_FIELDS_PACKAGE_VERSION = "1.0.0-fa-core" as const;
+
+export * from "./fields";
+export * from "./precision-context";
 
 /**
  * `assessment_state` — deliberately fixed to the five-value v1.1 set.

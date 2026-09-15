@@ -7,13 +7,20 @@ export const company = pgTable(
     companyId: uuid("company_id").primaryKey().default(sql`gen_random_uuid()`),
     name: text("name").notNull(),
     website: text("website"),
+    // Company matching signals (recognition only — companies are never auto-merged):
+    // normalized_domain = website host; email_domain = corporate domain after '@' of the work
+    // email (NULL for personal-mail domains); normalized_name = casefolded, punctuation-free name.
     normalizedDomain: text("normalized_domain"),
+    normalizedName: text("normalized_name"),
+    emailDomain: text("email_domain"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("company_normalized_domain_idx").on(t.normalizedDomain),
     index("company_name_idx").on(t.name),
+    index("company_normalized_name_idx").on(t.normalizedName),
+    index("company_email_domain_idx").on(t.emailDomain),
   ],
 );
 

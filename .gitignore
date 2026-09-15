@@ -11,5 +11,6 @@ build/
 terraform.tfvars
 !terraform.tfvars.example
 coverage/
+*.tsbuildinfo
 .DS_Store
 npm-debug.log*

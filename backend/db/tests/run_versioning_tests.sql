@@ -12,6 +12,15 @@
 
 BEGIN;
 
+-- Isolation: the suite exercises every registry from an unconfigured state. On a database that
+-- already has published configuration (the development bootstrap), the current pointers are
+-- cleared inside this transaction only; the final ROLLBACK restores them untouched.
+SELECT set_config('app.config_mutation_authorized', 'true', true) \g /dev/null
+UPDATE question_bank_version SET is_current = false WHERE is_current \g /dev/null
+UPDATE rules_engine_version SET is_current = false WHERE is_current \g /dev/null
+UPDATE snapshot_template_version SET is_current = false WHERE is_current \g /dev/null
+SELECT set_config('app.config_mutation_authorized', 'false', true) \g /dev/null
+
 SELECT set_config('vt.qb_placeholder', :'qb_placeholder', true),
        set_config('vt.re_placeholder', :'re_placeholder', true),
        set_config('vt.st_placeholder', :'st_placeholder', true) \g /dev/null
@@ -129,6 +138,8 @@ BEGIN
     VALUES ('Suite', 'Person', 'versioning-suite@beeside-test.invalid', 'es', 'es', 'es') RETURNING person_id INTO v_id;
   PERFORM set_config('vt.person', v_id::text, true);
 
+  -- field_key_registry is sync-only (0006); this rolled-back fixture key uses the sync authorization.
+  PERFORM set_config('app.field_registry_sync_authorized', 'true', true);
   INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES
     ('fa.__vt_target_country', 'single_select', 'question_bank', 'first_assessment');
 

@@ -1,0 +1,415 @@
+/* beeside First Assessment — functional visual direction (Handoff v1 §26).
+   Light surfaces, dark typography, beeside purple as the only accent, generous whitespace,
+   large editorial type. No gradients, washes or decorative bee motifs. */
+
+:root {
+  --purple-900: #2e0879;
+  --purple-600: #7357c1;
+  --purple-200: #b9aedd;
+  --ink: #17181b;
+  --ink-soft: #54555c;
+  --ink-faint: #96979c;
+  --white: #ffffff;
+  --mist: #f1f1fa;
+  --radius: 10px;
+  --font: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--purple-900);
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--purple-600);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  background: var(--white);
+  padding: 0.5rem 1rem;
+  z-index: 10;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* ---------------------------------------------------------------- shell */
+.shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem clamp(1.25rem, 5vw, 4rem);
+}
+.logo {
+  display: block;
+  /* The official asset carries its own clear space; it is scaled, never cropped or recolored. */
+  height: 76px;
+  width: auto;
+  margin: -14px 0 -14px -20px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.language-select {
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.6rem;
+}
+
+.progress-rail {
+  padding: 0 clamp(1.25rem, 5vw, 4rem);
+}
+.progress-rail ol {
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.progress-rail li {
+  flex: 1;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+.progress-rail li::before {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-bottom: 0.5rem;
+  border-radius: 2px;
+  background: var(--mist);
+}
+.progress-rail li[data-state="done"]::before,
+.progress-rail li[data-state="current"]::before {
+  background: var(--purple-900);
+}
+.progress-rail li[data-state="current"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+main {
+  padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 4rem;
+}
+.content {
+  max-width: 44rem;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--purple-900);
+  font-weight: 700;
+}
+.step-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--purple-900);
+}
+.display {
+  margin: 0 0 1.25rem;
+  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.lead {
+  margin: 0 0 2rem;
+  font-size: clamp(1.125rem, 2vw, 1.3rem);
+  color: var(--ink-soft);
+}
+.helper {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+/* ---------------------------------------------------------------- welcome */
+.welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: stretch;
+}
+.welcome-visual {
+  /* Reserved for the single approved opening photograph (asset not yet supplied). */
+  min-height: 22rem;
+  border-radius: var(--radius);
+  background: var(--mist);
+}
+@media (max-width: 760px) {
+  .welcome {
+    grid-template-columns: 1fr;
+  }
+  .welcome-visual {
+    min-height: 12rem;
+    order: -1;
+  }
+}
+
+/* ---------------------------------------------------------------- forms */
+.field {
+  margin: 0 0 1.5rem;
+}
+.field label,
+.field .label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+.optional-tag {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+.input,
+.textarea,
+.select {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+}
+.textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--purple-900);
+}
+.field-error {
+  margin: 0.4rem 0 0;
+  color: #9b1c31;
+  font-size: 0.9375rem;
+}
+.note {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  background: var(--mist);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+.check {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin: 0.75rem 0 0;
+}
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  accent-color: var(--purple-900);
+}
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.25rem;
+}
+@media (max-width: 560px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------- questions */
+fieldset.question {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.question-title {
+  display: block;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.question-title .optional-tag {
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+.options {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.5rem 0 0;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 3.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  background: var(--white);
+  cursor: pointer;
+}
+.option:hover {
+  border-color: var(--purple-600);
+}
+.option input {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: none;
+  accent-color: var(--purple-900);
+}
+.option[data-selected="true"] {
+  border-color: var(--purple-900);
+  box-shadow: inset 0 0 0 1px var(--purple-900);
+}
+.option[data-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-soft);
+  border-color: var(--mist);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: var(--mist);
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  color: var(--purple-900);
+  font: inherit;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+}
+.suggestions {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  max-height: 16rem;
+  overflow: auto;
+}
+.suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  background: var(--white);
+  cursor: pointer;
+}
+.suggestions button:hover,
+.suggestions button:focus-visible {
+  background: var(--mist);
+}
+
+/* ---------------------------------------------------------------- actions */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 2.5rem 0 0;
+}
+.button {
+  font: inherit;
+  font-weight: 700;
+  border-radius: var(--radius);
+  padding: 0.85rem 1.6rem;
+  border: 1px solid var(--purple-900);
+  cursor: pointer;
+  min-height: 3rem;
+}
+.button-primary {
+  background: var(--purple-900);
+  color: var(--white);
+}
+.button-primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.button-secondary {
+  background: var(--white);
+  color: var(--purple-900);
+}
+.button-text {
+  border-color: transparent;
+  background: transparent;
+  color: var(--purple-900);
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+.save-status {
+  min-height: 1.5rem;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+.save-status[data-status="failed"] {
+  color: #9b1c31;
+}
+.transition-line {
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  max-width: 36rem;
+}

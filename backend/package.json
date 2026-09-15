@@ -2,21 +2,28 @@
   "name": "@beeside/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "beeside First Assessment — backend API service (Node.js + TypeScript). Phase 1: foundation skeleton and health-check endpoint only.",
+  "description": "beeside First Assessment — backend API service (Node.js + TypeScript).",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "npm run build --prefix ../shared/canonical-fields",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\"",
+    "pretest": "npm run build --prefix ../shared/canonical-fields",
     "test": "jest --runInBand",
+    "pretest:integration": "npm run build --prefix ../shared/canonical-fields",
     "test:integration": "jest --runInBand -c jest.integration.config.js",
+    "pretypecheck": "npm run build --prefix ../shared/canonical-fields",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:check": "drizzle-kit check"
+    "db:check": "drizzle-kit check",
+    "db:sync-fields": "tsx src/scripts/sync-field-registry.ts",
+    "config:publish-dev": "tsx src/scripts/publish-dev-config.ts"
   },
   "dependencies": {
+    "@beeside/canonical-fields": "0.1.0",
     "drizzle-orm": "^0.45.2",
     "express": "^4.19.2",
     "pg": "^8.23.0"

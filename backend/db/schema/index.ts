@@ -7,3 +7,4 @@ export * from "./state-history";
 export * from "./subscription";
 export * from "./ops";
 export * from "./config-versioning";
+export * from "./fa-core";

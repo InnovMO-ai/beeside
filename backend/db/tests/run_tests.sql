@@ -69,6 +69,8 @@ DO $$
 DECLARE proj UUID; a1 UUID; a2 UUID;
 BEGIN
   proj := current_setting('beeside_test.project_id')::uuid;
+  -- field_key_registry is sync-only (0006); this rolled-back fixture key uses the sync authorization.
+  PERFORM set_config('app.field_registry_sync_authorized', 'true', true);
   INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.__test_priority_reason', 'string', 'question_bank', 'first_assessment');
   INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.__test_priority_reason', '"grow sales"', 'string', 'test-v1') RETURNING answer_id INTO a1;
 
@@ -431,12 +433,18 @@ END $$;
 
 \echo '--- T17: answer.value supports multi-select containment queries (target_markets pattern) ---'
 DO $$
-DECLARE proj UUID; hit_cnt INT;
+DECLARE proj UUID; open_proj UUID; hit_cnt INT;
 BEGIN
   proj := current_setting('beeside_test.project_id')::uuid;
+  -- The T1 project is COMPLETED_LOCKED by now and its answers are frozen (0006), so this check
+  -- uses a second, still-open project for the same company and person (versions pinned on insert).
+  INSERT INTO project (company_id, created_by_person_id, responsible_person_id)
+    SELECT company_id, created_by_person_id, created_by_person_id FROM project WHERE project_id = proj
+    RETURNING project_id INTO open_proj;
+  PERFORM set_config('app.field_registry_sync_authorized', 'true', true);
   INSERT INTO field_key_registry (field_key, data_type, source, module) VALUES ('fa.__test_target_markets', 'multi_select', 'question_bank', 'first_assessment');
-  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (proj, 'fa.__test_target_markets', '["MX","US"]', 'multi_select', 'test-v1');
-  SELECT count(*) INTO hit_cnt FROM answer WHERE project_id = proj AND field_key = 'fa.__test_target_markets' AND value @> '["MX"]';
+  INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES (open_proj, 'fa.__test_target_markets', '["MX","US"]', 'multi_select', 'test-v1');
+  SELECT count(*) INTO hit_cnt FROM answer WHERE project_id = open_proj AND field_key = 'fa.__test_target_markets' AND value @> '["MX"]';
   IF hit_cnt = 1 THEN
     RAISE NOTICE 'T17 PASS: containment query over multi-select answer.value returned expected row';
   ELSE
