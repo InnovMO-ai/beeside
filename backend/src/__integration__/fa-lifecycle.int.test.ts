@@ -86,7 +86,7 @@ describeWithDb("First Assessment save/resume lifecycle (PostgreSQL, rolled back)
       details: { reason: "maximum_reached" },
     });
 
-    const extensions = await h.client.query("SELECT requested_days, reason, was_expired FROM fa_access_extension ORDER BY requested_at");
+    const extensions = await h.client.query("SELECT requested_days, reason, was_expired FROM fa_access_extension ORDER BY requested_at, requested_days");
     expect(extensions.rows).toEqual([
       { requested_days: 15, reason: "UNSURE_MARKET_TIMING", was_expired: true },
       { requested_days: 30, reason: "MISSING_INFORMATION", was_expired: false },

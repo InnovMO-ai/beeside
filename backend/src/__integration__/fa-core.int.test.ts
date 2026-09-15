@@ -93,8 +93,16 @@ describeWithDb("First Assessment core (PostgreSQL, rolled back)", () => {
     expect(back.body.answers.GROWTH1).toBeUndefined();
 
     const project = await projectOf(token);
+    // Ordered by the supersede chain itself: inside the rolled-back test transaction every row has
+    // the same answered_at/created_at, so timestamps cannot order the revisions deterministically.
     const history = await h.client.query(
-      "SELECT value, superseded_by IS NULL AS current FROM answer WHERE project_id = $1 AND field_key = 'fa.project.stage' ORDER BY answered_at, created_at",
+      `WITH RECURSIVE chain AS (
+         SELECT a.answer_id, a.value, a.superseded_by, 1 AS position FROM answer a
+          WHERE a.project_id = $1 AND a.field_key = 'fa.project.stage'
+            AND NOT EXISTS (SELECT 1 FROM answer p WHERE p.superseded_by = a.answer_id)
+         UNION ALL
+         SELECT a.answer_id, a.value, a.superseded_by, c.position + 1 FROM answer a JOIN chain c ON a.answer_id = c.superseded_by)
+       SELECT value, superseded_by IS NULL AS current FROM chain ORDER BY position`,
       [project.project_id],
     );
     expect(history.rows.map((r) => r.value)).toEqual(["exploring", "already_operating", "validating"]);
