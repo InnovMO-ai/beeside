@@ -38,6 +38,37 @@ jobs:
       - name: Test
         run: npm run test --workspace=${{ matrix.workspace }}
 
+  # The images the pipeline deploys are built here on every change, so a broken
+  # Dockerfile or a missing workspace file fails in CI and never at deploy time.
+  container-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile -t beeside-backend:ci .
+      - name: Build frontend image
+        run: docker build -f frontend/Dockerfile -t beeside-frontend:ci .
+      - name: The backend image ships its migrations and runs as a non-root user
+        run: |
+          docker run --rm beeside-backend:ci node -e "require('fs').readdirSync('db/migrations')" > /dev/null
+          test "$(docker run --rm beeside-backend:ci id -un)" = "node"
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      # What actually ships in the images. A high or critical advisory here blocks the change.
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+      # Development-only tooling is reported but does not block (it never reaches an environment).
+      - name: Report development-only advisories
+        run: npm audit --audit-level=high || true
+
   secrets-scan:
     runs-on: ubuntu-latest
     steps:

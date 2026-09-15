@@ -9,3 +9,4 @@ export * from "./ops";
 export * from "./config-versioning";
 export * from "./fa-core";
 export * from "./operations";
+export * from "./analytics-integrations";

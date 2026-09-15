@@ -233,7 +233,10 @@ async function prepare(tx: Db, deps: FaDeps, delivery: DeliveryRow, now: Date): 
   if (def.linkKind === "RESUME") {
     const issued = await issueTokenRecord(tx, project.project_id, "RESUME", true, await linkExpiry(tx, deps, project, now));
     tokenId = issued.tokenId;
-    ctaUrl = `${ctaUrl}/resume/${issued.token}`;
+    // The token travels in the URL fragment: browsers never send it to a server, so it cannot
+    // appear in request logs, proxies or referrers (Phase 13). The app also accepts the older
+    // /resume/<token> path so links already in inboxes keep working.
+    ctaUrl = `${ctaUrl}/resume#${issued.token}`;
   }
   const message: EmailMessage = {
     template,

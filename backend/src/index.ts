@@ -3,14 +3,32 @@ import { Pool } from "pg";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
-import { createPoolDb } from "./db/database";
+import { Db, createPoolDb } from "./db/database";
 import { LogEmailTransport } from "./fa/email/email-adapter";
 import { createFaRouter } from "./fa/routes";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
+import { integrationsFromEnv } from "./integrations/config";
 import { BillingDeps, createBillingRouter } from "./premium/billing-router";
 import { devSimulatedCheckout } from "./premium/premium-service";
 import { healthRouter } from "./routes/health";
+import { readinessRouter, shippedMigrationCount } from "./routes/readiness";
+import { MAX_REQUEST_BYTES, errorHandler, notFoundJson, originGuard, rejectOversizedBodies, requestContext, securityHeaders } from "./security/http-hardening";
+import { MemoryRateLimitStore, PostgresRateLimitStore, RATE_LIMITS, RateLimiter, createRateLimiter, rateLimit } from "./security/rate-limit";
+import { Logger, jsonLogger } from "./security/redact";
+import { allowedOrigins, assertRuntimeConfig, runtimeDbPrivilegeProblems, trustProxyHops } from "./security/runtime-config";
+
+export interface SecurityOptions {
+  /** Adds HSTS and refuses development conveniences. */
+  production?: boolean;
+  /** Origins allowed to send state-changing browser requests; omit to skip the check (tests). */
+  allowedOrigins?: ReadonlySet<string>;
+  /** Proxy hops to trust when reading the client address (0 unless a proxy sets X-Forwarded-For). */
+  trustProxyHops?: number;
+  /** Omit to run without rate limiting (tests and local runs). */
+  limiter?: RateLimiter;
+  log?: Logger;
+}
 
 export interface AppOptions {
   /** First Assessment API dependencies; the API is mounted only when provided. */
@@ -19,15 +37,29 @@ export interface AppOptions {
   billing?: BillingDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
   admin?: AdminDeps;
+  /** Readiness probe: reports ready only when the shipped migrations are applied. */
+  readiness?: { db: Db; expectedMigrations: number };
+  security?: SecurityOptions;
 }
 
 export function createApp(options: AppOptions = {}) {
   const app = express();
+  const security = options.security ?? {};
+  const log = security.log ?? jsonLogger;
   app.disable("x-powered-by");
+  // Client addresses key the rate limits: only the configured number of proxy hops is believed.
+  app.set("trust proxy", security.trustProxyHops ?? 0);
+  app.use(requestContext());
+  app.use(securityHeaders({ production: security.production === true }));
+  app.use(rejectOversizedBodies(MAX_REQUEST_BYTES));
+  if (security.allowedOrigins) app.use(originGuard(security.allowedOrigins));
   app.use(healthRouter);
-  if (options.fa) app.use("/api/fa", createFaRouter(options.fa));
-  if (options.billing) app.use("/api/billing", createBillingRouter(options.billing));
-  if (options.admin) app.use("/api/admin", createAdminRouter(options.admin));
+  if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
+  if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
+  if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
+  if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
+  app.use(notFoundJson());
+  app.use(errorHandler(log));
   return app;
 }
 
@@ -51,14 +83,15 @@ export function baseDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps {
       now: () => new Date(),
     },
     emailDispatch: "background",
+    integrations: integrationsFromEnv(env, jsonLogger),
   };
 }
 
 /**
  * The First Assessment API collects personal data, so it stays off unless explicitly enabled
- * (FA_API_ENABLED=true) — the deployed dev service does not enable it before Phase 13 controls.
- * No payment provider is selected either: Premium requests wait for manual confirmation, unless a
- * local machine explicitly simulates the provider (PREMIUM_DEV_SIMULATION=true, never in production).
+ * (FA_API_ENABLED=true). No payment provider is selected either: Premium requests wait for manual
+ * confirmation, unless a local machine explicitly simulates the provider (PREMIUM_DEV_SIMULATION=true,
+ * never in production).
  */
 export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | undefined {
   if (env.FA_API_ENABLED !== "true") return undefined;
@@ -114,12 +147,64 @@ export function adminDepsFromEnv(env: NodeJS.ProcessEnv = process.env): AdminDep
   };
 }
 
+/**
+ * Rate limiting, trusted proxy hops and the Origin allow-list. Counters live in PostgreSQL when a
+ * database is configured, so all instances share one budget; the hashing secret is required in
+ * production (validateRuntimeConfig) and falls back to a development value locally.
+ */
+export function securityOptionsFromEnv(env: NodeJS.ProcessEnv = process.env, db: Db | null = null): SecurityOptions {
+  const store = db ? new PostgresRateLimitStore(db) : new MemoryRateLimitStore();
+  const disabled = env.RATE_LIMITING_ENABLED === "false" && env.NODE_ENV !== "production";
+  return {
+    production: env.NODE_ENV === "production",
+    allowedOrigins: allowedOrigins(env),
+    trustProxyHops: trustProxyHops(env),
+    log: jsonLogger,
+    ...(disabled
+      ? {}
+      : {
+          limiter: createRateLimiter({
+            store,
+            secret: env.SECURITY_HASH_SECRET ?? "development-rate-limit-secret-not-for-production",
+            now: () => new Date(),
+            log: jsonLogger,
+          }),
+        }),
+  };
+}
+
 /* istanbul ignore next -- exercised by real deployment, not unit tests */
 if (require.main === module) {
-  const app = createApp({ fa: faDepsFromEnv(), billing: billingDepsFromEnv(), admin: adminDepsFromEnv() });
-  const port = Number(process.env.PORT ?? 8080);
-  app.listen(port, () => {
-    // eslint-disable-next-line no-console
-    console.log(`beeside backend listening on :${port}`);
+  assertRuntimeConfig(process.env, (level, message) => jsonLogger(level, message));
+  const fa = faDepsFromEnv();
+  const billing = billingDepsFromEnv();
+  const admin = adminDepsFromEnv();
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? null;
+  const app = createApp({
+    fa,
+    billing,
+    admin,
+    security: securityOptionsFromEnv(process.env, db),
+    ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
+  const port = Number(process.env.PORT ?? 8080);
+  const server = app.listen(port, () => jsonLogger("info", "beeside backend listening", { port }));
+  // Slow-request protections (a request may not hold a connection open indefinitely).
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 35_000;
+  server.keepAliveTimeout = 65_000;
+
+  // Least privilege: the runtime database user must not be able to change the schema or own it.
+  if (db && process.env.DB_PRIVILEGE_CHECK !== "off") {
+    void runtimeDbPrivilegeProblems(db)
+      .then((problems) => {
+        if (problems.length === 0) return;
+        for (const problem of problems) jsonLogger(process.env.NODE_ENV === "production" ? "error" : "warn", "database privilege check", { problem });
+        if (process.env.NODE_ENV === "production") {
+          jsonLogger("error", "refusing to serve production traffic with an over-privileged database user");
+          server.close(() => process.exit(1));
+        }
+      })
+      .catch((error: unknown) => jsonLogger("warn", "database privilege check could not run", { error: String(error) }));
+  }
 }

@@ -120,6 +120,11 @@ export async function requestPremiumActivation(
     );
     const requestId = inserted.rows[0]?.request_id as string;
     await recordJourneyEvent(tx, { eventType: "premium_activation_requested", projectId, properties: { kind, checkout: checkout.name } });
+    await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, 'premium.activation_requested', $2::jsonb, $3)", [
+      projectId,
+      JSON.stringify({ request_id: requestId, project_id: projectId, kind }),
+      now,
+    ]);
     const { outcome, reference } = await checkout.begin(tx, { requestId, projectId, kind, now });
     if (reference) await tx.query("UPDATE premium_activation_request SET checkout_reference = $2 WHERE request_id = $1", [requestId, reference]);
     return { outcome, status: await getPremiumStatus(tx, projectId, deps.bundles) };

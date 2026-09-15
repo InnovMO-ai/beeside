@@ -49,6 +49,15 @@ export function anonymousSessionId(): string {
 
 let queue: Array<ClientEvent & { clientOccurredAt: string }> = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
+let linkToken: string | null = null;
+
+/**
+ * Reading the Snapshot from the email link means there is no working session: the private link
+ * identifies the project so those events are attributed instead of counted as anonymous.
+ */
+export function setAnalyticsLinkToken(token: string | null) {
+  linkToken = token;
+}
 
 export function track(event: ClientEvent) {
   queue.push({ ...event, clientOccurredAt: new Date().toISOString() });
@@ -62,7 +71,7 @@ export async function flush() {
   const events = queue;
   queue = [];
   try {
-    await api.events({ anonymousSessionId: anonymousSessionId(), events });
+    await api.events({ anonymousSessionId: anonymousSessionId(), linkToken, events });
   } catch {
     // Analytics must never interrupt the assessment.
   }

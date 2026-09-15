@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:job": "node dist/scripts/migrate.js",
     "db:check": "drizzle-kit check",
     "db:sync-fields": "tsx src/scripts/sync-field-registry.ts",
     "config:publish-dev": "tsx src/scripts/publish-dev-config.ts",

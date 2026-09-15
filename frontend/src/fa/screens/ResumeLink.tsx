@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { setAnalyticsLinkToken } from "../analytics";
 import { api, ApiError } from "../api";
 import { LegalConsent } from "../components/LegalConsent";
 import { formatDate, T } from "../copy";
@@ -44,6 +45,9 @@ export function ResumeLink({ bundle, t, locale, token, onLocale, onSession }: Re
 
   useEffect(() => {
     void open(true);
+    // Events from this screen belong to the project behind the private link, not to an anonymous visit.
+    setAnalyticsLinkToken(token);
+    return () => setAnalyticsLinkToken(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -167,6 +171,7 @@ export function ResumeLink({ bundle, t, locale, token, onLocale, onSession }: Re
           onLocale={onLocale}
           anotherProjectInMind={false}
           premium={{ loadStatus: () => api.linkPremium(token), activate: (acceptTerms) => api.linkPremiumActivation(token, acceptTerms) }}
+          feedback={{ load: () => api.linkFeedback(token), submit: (input) => api.submitLinkFeedback(token, input) }}
         />
         {!premiumHistory && (
           <section className="content snapshot-next" aria-labelledby="choices-title">

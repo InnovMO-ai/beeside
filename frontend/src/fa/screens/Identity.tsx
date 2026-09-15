@@ -20,6 +20,10 @@ interface IdentityProps {
 
 export function Identity({ bundle, t, locale, onStarted, onExistingEmail }: IdentityProps) {
   const [values, setValues] = useState({ firstName: "", lastName: "", company: "", email: "", website: "" });
+  // Anti-abuse (Phase 13): a field no person sees, and how long the form took. Neither ever refuses
+  // a respondent on its own — a filled honeypot is answered like an already-known email.
+  const [honeypot, setHoneypot] = useState("");
+  const [openedAt] = useState(() => Date.now());
   const [acceptLegal, setAcceptLegal] = useState(false);
   const [personalAck, setPersonalAck] = useState(false);
   const [errors, setErrors] = useState<Set<FieldName>>(new Set());
@@ -57,6 +61,8 @@ export function Identity({ bundle, t, locale, onStarted, onExistingEmail }: Iden
         acceptLegal,
         personalEmailAcknowledged: personal && personalAck,
         anonymousSessionId: anonymousSessionId(),
+        referenceCode: honeypot,
+        formElapsedMs: Date.now() - openedAt,
       });
       if (result.status === "started") onStarted(result.sessionToken);
       else onExistingEmail();
@@ -107,6 +113,10 @@ export function Identity({ bundle, t, locale, onStarted, onExistingEmail }: Iden
         {t("identity", "title")}
       </h1>
       <p className="lead">{t("identity", "intro")}</p>
+      <div className="honeypot" aria-hidden="true">
+        <label htmlFor="identity-reference-code">Reference code</label>
+        <input id="identity-reference-code" name="referenceCode" type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+      </div>
       <div className="two-col">
         {input("firstName", t("identity", "first_name"), { autoComplete: "given-name" })}
         {input("lastName", t("identity", "last_name"), { autoComplete: "family-name" })}

@@ -9,6 +9,7 @@ name: Deploy — production
 # for the mechanism. Real steps only run once this Environment's GCP_*
 # variables are set (README.md), and per Mike's instruction this environment
 # is not to be created/applied until explicitly approved and until Phase 15.
+# Order is always: build -> migrate (migration database user) -> deploy.
 
 on:
   workflow_dispatch:
@@ -33,7 +34,7 @@ jobs:
       - name: Not yet configured
         if: vars.GCP_PROJECT_ID == ''
         run: |
-          echo "Live deployment to production is blocked pending GCP setup and Phase 15's go/no-go sign-off. See README.md."
+          echo "Live deployment to production is blocked pending GCP setup and Phase 15's go/no-go sign-off. See README.md and docs/deployment/README.md."
 
       - uses: actions/setup-node@v4
         if: vars.GCP_PROJECT_ID != ''
@@ -61,17 +62,40 @@ jobs:
         if: vars.GCP_PROJECT_ID != ''
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
-          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }} backend
-          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }}
-          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }} frontend
-          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }}
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
+          docker build -f backend/Dockerfile -t $REGISTRY/backend-api:${{ inputs.ref }} .
+          docker push $REGISTRY/backend-api:${{ inputs.ref }}
+          docker build -f frontend/Dockerfile -t $REGISTRY/frontend-app:${{ inputs.ref }} .
+          docker push $REGISTRY/frontend-app:${{ inputs.ref }}
+
+      - name: Apply database migrations
+        if: vars.GCP_PROJECT_ID != ''
+        run: |
+          if [ -z "${{ vars.MIGRATION_JOB_NAME }}" ]; then
+            echo "No migration job is configured (vars.MIGRATION_JOB_NAME). See docs/deployment/README.md."
+            exit 1
+          fi
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
+          gcloud run jobs update ${{ vars.MIGRATION_JOB_NAME }} \
+            --image $REGISTRY/backend-api:${{ inputs.ref }} \
+            --command node --args dist/scripts/migrate.js \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          gcloud run jobs execute ${{ vars.MIGRATION_JOB_NAME }} --wait \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
 
       - name: Deploy to Cloud Run
         if: vars.GCP_PROJECT_ID != ''
         run: |
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run deploy beeside-production-backend-api \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ inputs.ref }} \
+            --image $REGISTRY/backend-api:${{ inputs.ref }} \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           gcloud run deploy beeside-production-frontend-app \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ inputs.ref }} \
+            --image $REGISTRY/frontend-app:${{ inputs.ref }} \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          if [ -n "${{ vars.WORKER_SERVICE_NAME }}" ]; then
+            gcloud run deploy ${{ vars.WORKER_SERVICE_NAME }} \
+              --image $REGISTRY/backend-api:${{ inputs.ref }} \
+              --command node --args dist/worker.js \
+              --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          fi

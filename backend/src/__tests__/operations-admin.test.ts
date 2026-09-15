@@ -112,7 +112,7 @@ describe("email outbox helpers", () => {
 
 describe("RBAC", () => {
   it("makes SUPERVISOR strictly read-only and ADMIN complete", () => {
-    expect(permissionsFor("SUPERVISOR").sort()).toEqual(["config.read", "operations.read", "projects.read"]);
+    expect(permissionsFor("SUPERVISOR").sort()).toEqual(["analytics.read", "config.read", "operations.read", "projects.read"]);
     expect(permissionsFor("ADMIN").sort()).toEqual((Object.keys(PERMISSIONS) as string[]).sort());
     for (const permission of ["config.write", "config.publish", "operations.execute", "premium.manage", "audit.read", "admin_users.manage"] as const) {
       expect(can("SUPERVISOR", permission)).toBe(false);

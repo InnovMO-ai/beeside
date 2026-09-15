@@ -12,6 +12,7 @@ export const PERMISSIONS = {
   "projects.read": ["ADMIN", "SUPERVISOR"],
   "config.read": ["ADMIN", "SUPERVISOR"],
   "operations.read": ["ADMIN", "SUPERVISOR"],
+  "analytics.read": ["ADMIN", "SUPERVISOR"],
   "config.write": ["ADMIN"],
   "config.publish": ["ADMIN"],
   "operations.execute": ["ADMIN"],

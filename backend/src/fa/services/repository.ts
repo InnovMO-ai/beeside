@@ -2,6 +2,7 @@ import { Db } from "../../db/database";
 import { QuestionBankBundle } from "../engine/bundle-types";
 import { EmailTransport } from "../email/email-adapter";
 import type { CheckoutAdapter } from "../../premium/checkout";
+import type { IntegrationSet } from "../../integrations/types";
 import { BundleStore } from "./bundle-store";
 import { generateAccessToken, hashAccessToken } from "./tokens";
 
@@ -20,6 +21,8 @@ export interface FaDeps {
   config: FaConfig;
   /** Phase 9 checkout boundary; manual confirmation (no payment provider) when absent. */
   premium?: { checkout: CheckoutAdapter };
+  /** Phase 12 outbound destinations; nothing is relayed when no destination is enabled. */
+  integrations?: IntegrationSet;
   /**
    * When enqueued email is delivered after a request: `inline` (tests, local), `background`
    * (default, right after the response) or `none` (only the worker delivers).

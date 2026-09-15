@@ -164,7 +164,7 @@ export async function runJourney(h: Harness, token: string, persona: Record<stri
 
 export function lastLinkToken(h: Harness): string {
   const message = h.email.messages[h.email.messages.length - 1];
-  const token = message?.ctaUrl.split("/resume/")[1];
+  const token = message?.ctaUrl.split("/resume#")[1];
   if (!token) throw new Error("no captured link");
   return token;
 }

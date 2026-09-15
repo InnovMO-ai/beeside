@@ -2,7 +2,7 @@ import request from "supertest";
 import { Db } from "../db/database";
 import { BundleStore } from "../fa/services/bundle-store";
 import { createApp, faDepsFromEnv } from "../index";
-import { BILLING_SIGNATURE_HEADER, signBillingPayload, verifyBillingSignature } from "../premium/billing-router";
+import { BILLING_SIGNATURE_HEADER, BILLING_TIMESTAMP_HEADER, signBillingPayload, verifyBillingSignature } from "../premium/billing-router";
 import { DevSimulatedCheckout, ManualConfirmationCheckout } from "../premium/checkout";
 import { PREMIUM_COPY, PREVIEW_ROOM_URL } from "../premium/content";
 
@@ -10,15 +10,30 @@ const SECRET = "unit-billing-secret-0123456789abcdef012345";
 
 describe("billing event signature", () => {
   const body = Buffer.from('{"event_type":"premium_activated"}');
+  const now = new Date("2026-09-15T12:00:00.000Z");
+  const timestamp = Math.floor(now.getTime() / 1000);
+  const verify = (signature: string | undefined, ts: string | null = String(timestamp), at: Date = now, raw: Buffer = body) =>
+    verifyBillingSignature(SECRET, raw, signature, ts ?? undefined, at);
 
-  it("accepts only the HMAC-SHA256 of the exact raw body", () => {
-    const signature = signBillingPayload(SECRET, body);
+  it("accepts only the HMAC-SHA256 of the timestamp and the exact raw body", () => {
+    const signature = signBillingPayload(SECRET, timestamp, body);
     expect(signature).toMatch(/^sha256=[0-9a-f]{64}$/);
-    expect(verifyBillingSignature(SECRET, body, signature)).toBe(true);
-    expect(verifyBillingSignature(SECRET, Buffer.from('{"event_type":"premium_reactivated"}'), signature)).toBe(false);
-    expect(verifyBillingSignature("another-secret-0123456789abcdef0123456", body, signature)).toBe(false);
-    expect(verifyBillingSignature(SECRET, body, undefined)).toBe(false);
-    expect(verifyBillingSignature(SECRET, body, "sha256=short")).toBe(false);
+    expect(verify(signature)).toBe(true);
+    expect(verify(signature, String(timestamp), now, Buffer.from('{"event_type":"premium_reactivated"}'))).toBe(false);
+    expect(verifyBillingSignature("another-secret-0123456789abcdef0123456", body, signature, String(timestamp), now)).toBe(false);
+    expect(verify(undefined)).toBe(false);
+    expect(verify("sha256=short")).toBe(false);
+    // The timestamp is part of the signature and must be present and well formed.
+    expect(verify(signature, null)).toBe(false);
+    expect(verify(signature, "not-a-timestamp")).toBe(false);
+    expect(verify(signBillingPayload(SECRET, timestamp + 1, body))).toBe(false);
+  });
+
+  it("refuses a delivery replayed outside the tolerance window", () => {
+    const signature = signBillingPayload(SECRET, timestamp, body);
+    expect(verify(signature, String(timestamp), new Date(now.getTime() + 299_000))).toBe(true);
+    expect(verify(signature, String(timestamp), new Date(now.getTime() + 301_000))).toBe(false);
+    expect(verify(signature, String(timestamp), new Date(now.getTime() - 301_000))).toBe(false);
   });
 });
 
@@ -27,14 +42,32 @@ describe("billing event endpoint (no database reached)", () => {
     query: () => Promise.reject(new Error("database must not be reached")),
     transaction: () => Promise.reject(new Error("database must not be reached")),
   } as unknown as Db;
-  const app = () => request(createApp({ billing: { db: untouchedDb, bundles: {} as BundleStore, secret: SECRET } }));
+  const now = new Date("2026-09-15T12:00:00.000Z");
+  const timestamp = Math.floor(now.getTime() / 1000);
+  const app = () => request(createApp({ billing: { db: untouchedDb, bundles: {} as BundleStore, secret: SECRET, now: () => now } }));
   const post = (raw: string, signature?: string) =>
-    app().post("/api/billing/events").set("Content-Type", "application/json").set(BILLING_SIGNATURE_HEADER, signature ?? signBillingPayload(SECRET, raw)).send(raw);
+    app()
+      .post("/api/billing/events")
+      .set("Content-Type", "application/json")
+      .set(BILLING_TIMESTAMP_HEADER, String(timestamp))
+      .set(BILLING_SIGNATURE_HEADER, signature ?? signBillingPayload(SECRET, timestamp, raw))
+      .send(raw);
 
-  it("rejects unsigned or forged deliveries before parsing them", async () => {
+  it("rejects unsigned, forged or replayed deliveries before parsing them", async () => {
     const raw = JSON.stringify({ event_type: "premium_activated" });
     expect((await app().post("/api/billing/events").set("Content-Type", "application/json").send(raw)).status).toBe(401);
-    expect((await post(raw, signBillingPayload("wrong-secret-0123456789abcdef0123456789", raw))).status).toBe(401);
+    expect((await post(raw, signBillingPayload("wrong-secret-0123456789abcdef0123456789", timestamp, raw))).status).toBe(401);
+    const stale = Math.floor(now.getTime() / 1000) - 3600;
+    expect(
+      (
+        await app()
+          .post("/api/billing/events")
+          .set("Content-Type", "application/json")
+          .set(BILLING_TIMESTAMP_HEADER, String(stale))
+          .set(BILLING_SIGNATURE_HEADER, signBillingPayload(SECRET, stale, raw))
+          .send(raw)
+      ).status,
+    ).toBe(401);
   });
 
   it("validates the provider-agnostic contract", async () => {

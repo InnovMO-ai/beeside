@@ -1,4 +1,5 @@
 import { Db } from "../db/database";
+import { deliverDueIntegrations, relayOutboxEvents } from "../integrations/relay";
 import { LifecycleMilestones, lifecyclePolicyOf, recoveryDue, reminderDue } from "../fa/services/access-lifecycle";
 import { recordJourneyEvent } from "../fa/services/analytics";
 import { FaDeps } from "../fa/services/repository";
@@ -17,7 +18,7 @@ import { DeliveryStats, deliverDueEmails, enqueueEmail, sanitizeDeliveryError } 
  * No job depends on anyone having the Admin Control Center open.
  */
 
-export const JOB_NAMES = ["email_outbox", "access_lifecycle", "temporary_retention"] as const;
+export const JOB_NAMES = ["email_outbox", "access_lifecycle", "temporary_retention", "integration_outbox", "security_housekeeping"] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 export type JobTrigger = "worker" | "cli" | "admin" | "test";
 
@@ -224,8 +225,37 @@ const temporaryRetention: Handler = async (deps, { now, runId, heartbeat }) => {
   return stats;
 };
 
+/**
+ * Integration outbox: fans committed outbox events out to one delivery per routed destination and
+ * then delivers what is due. Deliveries for a destination that is not enabled simply wait, so no
+ * event is lost while a destination is still being configured.
+ */
+const integrationOutbox: Handler = async (deps, { now, heartbeat }) => {
+  const relayed = await relayOutboxEvents(deps.db, now);
+  const totals = { events_relayed: relayed.events, deliveries_created: relayed.deliveries, claimed: 0, delivered: 0, skipped: 0, failed: 0, dead: 0 };
+  for (let round = 0; round < 40; round++) {
+    const stats = await deliverDueIntegrations(deps.db, deps.integrations, now, 25);
+    totals.claimed += stats.claimed;
+    totals.delivered += stats.delivered;
+    totals.skipped += stats.skipped;
+    totals.failed += stats.failed;
+    totals.dead += stats.dead;
+    await heartbeat();
+    if (stats.claimed < 25) break;
+  }
+  return totals;
+};
+
+/** Housekeeping of security counters: rate-limit windows are kept only while they are useful. */
+const securityHousekeeping: Handler = async (deps, { now }) => {
+  const removed = await deps.db.query("DELETE FROM rate_limit_counter WHERE expires_at <= $1", [now]);
+  return { rate_limit_windows_removed: removed.rowCount ?? 0 };
+};
+
 const HANDLERS: Record<JobName, Handler> = {
   email_outbox: emailOutbox,
   access_lifecycle: accessLifecycle,
   temporary_retention: temporaryRetention,
+  integration_outbox: integrationOutbox,
+  security_housekeeping: securityHousekeeping,
 };

@@ -92,6 +92,20 @@
       "when": 1789497025293,
       "tag": "0012_operations_lifecycle_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789510990736,
+      "tag": "0013_analytics_integrations_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789511098619,
+      "tag": "0014_analytics_integrations_security_integrity",
+      "breakpoints": true
     }
   ]
 }

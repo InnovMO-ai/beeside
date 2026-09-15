@@ -935,3 +935,96 @@ a.button {
 .admin-snapshot {
   max-width: 72rem;
 }
+
+/* Post-Snapshot feedback (Phase 12) */
+.honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.feedback {
+  max-width: 44rem;
+  margin: 3rem auto 0;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+}
+.feedback-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+.feedback-scale {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.feedback-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.feedback-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  min-height: 3rem;
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 700;
+}
+.feedback-option:has(input:checked) {
+  border-color: var(--purple-900);
+  background: var(--purple-900);
+  color: var(--white);
+}
+.feedback-option:focus-within {
+  outline: 2px solid var(--purple-900);
+  outline-offset: 2px;
+}
+.feedback-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.feedback-hint {
+  display: flex;
+  justify-content: space-between;
+  max-width: 17rem;
+  margin-top: 0.4rem;
+}
+.feedback-thanks {
+  margin: 0;
+}
+
+/* Analytics (Phase 12) */
+.admin-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.admin-tabs button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--mist);
+  border-radius: 999px;
+  background: var(--white);
+  cursor: pointer;
+}
+.admin-tabs button[aria-current="page"] {
+  background: var(--purple-900);
+  border-color: var(--purple-900);
+  color: var(--white);
+}
+.admin-comment {
+  display: block;
+  max-width: 34rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

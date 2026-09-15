@@ -1,5 +1,8 @@
 import { baseDepsFromEnv } from "./index";
+import { integrationsFromEnv } from "./integrations/config";
 import { JobName, runJob } from "./operations/jobs";
+import { jsonLogger } from "./security/redact";
+import { assertRuntimeConfig } from "./security/runtime-config";
 
 /**
  * Background job runner (system operations — no HTTP surface, no customer or admin credentials).
@@ -12,6 +15,8 @@ const DEFAULT_INTERVALS: Record<JobName, number> = {
   email_outbox: 30,
   access_lifecycle: 15 * 60,
   temporary_retention: 60 * 60,
+  integration_outbox: 60,
+  security_housekeeping: 60 * 60,
 };
 
 function intervalFor(job: JobName, env: NodeJS.ProcessEnv): number {
@@ -21,7 +26,8 @@ function intervalFor(job: JobName, env: NodeJS.ProcessEnv): number {
 
 /* istanbul ignore next -- process entry point */
 if (require.main === module) {
-  const deps = { ...baseDepsFromEnv(process.env), emailDispatch: "none" as const };
+  assertRuntimeConfig(process.env, (level, message) => jsonLogger(level, message));
+  const deps = { ...baseDepsFromEnv(process.env), emailDispatch: "none" as const, integrations: integrationsFromEnv(process.env, jsonLogger) };
   const running = new Set<JobName>();
   const timers: NodeJS.Timeout[] = [];
   const tick = async (job: JobName) => {

@@ -178,7 +178,15 @@ async function loadSnapshot(db: Db, projectId: string): Promise<SnapshotView> {
 /** The respondent's own Snapshot, from their working session. */
 export async function getSessionSnapshot(deps: FaDeps, project: ProjectRow): Promise<SnapshotView> {
   if (project.assessment_state !== "COMPLETED_LOCKED") throw new FaError("INCOMPLETE", "the First Assessment is not complete yet");
-  return loadSnapshot(deps.db, project.project_id);
+  const snapshot = await loadSnapshot(deps.db, project.project_id);
+  // Phase 12: a delivered Snapshot is attributable to its project even when the browser event is not.
+  await recordJourneyEvent(deps.db, {
+    eventType: "snapshot_opened",
+    projectId: project.project_id,
+    questionBankVersion: project.question_bank_version,
+    properties: { channel: "session" },
+  });
+  return snapshot;
 }
 
 /** The Snapshot behind a verified private link (the delivery email or a re-requested link). */
@@ -187,5 +195,12 @@ export async function openSnapshotFromLink(deps: FaDeps, rawToken: unknown): Pro
   const token = looksLikeAccessToken(rawToken) ? await findUsableToken(deps.db, rawToken, "RESUME", now) : null;
   const project = token ? await loadProject(deps.db, token.project_id) : null;
   if (!project || project.assessment_state !== "COMPLETED_LOCKED") throw new FaError("NOT_FOUND", "this Snapshot is not available");
-  return loadSnapshot(deps.db, project.project_id);
+  const snapshot = await loadSnapshot(deps.db, project.project_id);
+  await recordJourneyEvent(deps.db, {
+    eventType: "snapshot_opened",
+    projectId: project.project_id,
+    questionBankVersion: project.question_bank_version,
+    properties: { channel: "private_link" },
+  });
+  return snapshot;
 }

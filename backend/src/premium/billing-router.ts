@@ -10,22 +10,40 @@ import { isSubscriptionEventType, processSubscriptionEvent } from "./subscriptio
  * Provider-agnostic subscription event endpoint (Technical Architecture v1.1 §15). A future payment
  * provider adapter translates its webhooks into this signed contract; no provider is selected here.
  * Mounted only when BILLING_EVENTS_ENABLED=true with a server-side secret (never hard-coded).
+ *
+ * Phase 13: the signature covers a timestamp as well as the body, and a request whose timestamp is
+ * outside the tolerance window is refused — a captured call cannot be replayed later. (Replaying an
+ * event within the window still changes nothing: the idempotency key makes it a no-op.)
  */
 export interface BillingDeps {
   db: Db;
   bundles: BundleStore;
   secret: string;
+  /** Injected in tests; defaults to the wall clock. */
+  now?: () => Date;
 }
 
 export const BILLING_SIGNATURE_HEADER = "x-beeside-signature";
+export const BILLING_TIMESTAMP_HEADER = "x-beeside-timestamp";
+export const BILLING_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
-export function signBillingPayload(secret: string, rawBody: string | Buffer): string {
-  return `sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`;
+export function signBillingPayload(secret: string, timestamp: number, rawBody: string | Buffer): string {
+  const body = typeof rawBody === "string" ? Buffer.from(rawBody) : rawBody;
+  return `sha256=${createHmac("sha256", secret).update(`${timestamp}.`).update(body).digest("hex")}`;
 }
 
-export function verifyBillingSignature(secret: string, rawBody: Buffer, header: string | undefined): boolean {
-  if (!header) return false;
-  const expected = Buffer.from(signBillingPayload(secret, rawBody));
+export function verifyBillingSignature(
+  secret: string,
+  rawBody: Buffer,
+  header: string | undefined,
+  timestampHeader: string | undefined,
+  now: Date,
+  toleranceSeconds = BILLING_TIMESTAMP_TOLERANCE_SECONDS,
+): boolean {
+  if (!header || !timestampHeader || !/^\d{1,12}$/.test(timestampHeader)) return false;
+  const timestamp = Number(timestampHeader);
+  if (Math.abs(Math.floor(now.getTime() / 1000) - timestamp) > toleranceSeconds) return false;
+  const expected = Buffer.from(signBillingPayload(secret, timestamp, rawBody));
   const received = Buffer.from(header);
   return expected.length === received.length && timingSafeEqual(expected, received);
 }
@@ -41,12 +59,13 @@ function date(value: unknown, field: string, required: boolean): Date | null {
 }
 
 export function createBillingRouter(deps: BillingDeps): Router {
+  const clock = deps.now ?? (() => new Date());
   const router = Router();
   router.post("/events", express.raw({ type: "application/json", limit: "32kb" }), (req: Request, res: Response) => {
     void (async () => {
       try {
         const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-        if (!verifyBillingSignature(deps.secret, raw, req.header(BILLING_SIGNATURE_HEADER))) {
+        if (!verifyBillingSignature(deps.secret, raw, req.header(BILLING_SIGNATURE_HEADER), req.header(BILLING_TIMESTAMP_HEADER), clock())) {
           throw new FaError("UNAUTHENTICATED", "invalid signature");
         }
         let payload: Record<string, unknown>;

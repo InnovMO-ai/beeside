@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
+import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
+import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
+import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
 import { createConfigVersioningRouter } from "../config-versioning/router";
 import { ConfigVersioningService } from "../config-versioning/service";
 import { FaError } from "../fa/services/errors";
@@ -59,10 +62,12 @@ const API_PATH = "/api/admin";
  * sensitive read and every write (allowed, denied or failed) is audited. Customer tokens are never
  * accepted here, and Admin sessions are never accepted by the customer API.
  */
-export function createAdminRouter(deps: AdminDeps): Router {
+export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLimiter } = {}): Router {
   const router = Router();
   const { db } = deps.fa;
   const now = () => deps.fa.config.now();
+  // Sign-in attempts are limited per client address; authenticated traffic per session.
+  router.use("/auth", rateLimit(security.limiter, RATE_LIMITS.adminAuthAddress));
 
   router.use((req: AdminRequest, res, next) => {
     req.requestId = randomUUID();
@@ -190,6 +195,7 @@ export function createAdminRouter(deps: AdminDeps): Router {
       next();
     })().catch((error: unknown) => next(error));
   });
+  router.use(rateLimit(security.limiter, RATE_LIMITS.adminSession, (req) => (req as AdminRequest).admin?.sessionId ?? null));
 
   /** Permission gate: a denied attempt is audited and answered 403 before any work happens. */
   const allow =
@@ -380,6 +386,52 @@ export function createAdminRouter(deps: AdminDeps): Router {
       details: { job, status: result.status, stats: result.status === "SUCCEEDED" ? result.stats : null },
     });
     res.status(result.status === "SKIPPED" ? 409 : 200).json(result);
+  }));
+
+  router.get("/operations/integration-deliveries", allow("operations.read", "operations.viewed"), handle(async (req, res) => {
+    const status = typeof req.query.status === "string" ? req.query.status : null;
+    const destination = typeof req.query.destination === "string" ? req.query.destination : null;
+    res.json({ deliveries: await listIntegrationDeliveries(db, { status, destination }) });
+  }));
+
+  router.post("/operations/integration-deliveries/:deliveryId/retry", allow("operations.execute", "integration_delivery.retry"), handle(async (req, res) => {
+    const id = req.params.deliveryId ?? "";
+    if (!UUID.test(id)) throw new FaError("NOT_FOUND", "delivery not found");
+    const ok = await db.transaction((tx) => retryIntegrationDelivery(tx, id, now()));
+    await audit(req, "integration_delivery.retry", ok ? "ALLOWED" : "FAILED", { targetType: "integration_delivery", targetId: id });
+    if (!ok) throw new FaError("NOT_APPLICABLE", "this delivery cannot be retried");
+    res.json({ retried: true });
+  }));
+
+  // ------------------------------------------------------------------ analytics (read-only, both roles)
+  // Aggregates only: journey events, the anonymous segmentation profile and operational tables.
+  // No answer content, name, email or company reaches these responses, and small segments are
+  // suppressed instead of shown.
+  const analyticsView = (view: string, load: (req: AdminRequest) => Promise<unknown>) =>
+    handle(async (req, res) => {
+      const range = parseRange(req.query as Record<string, unknown>, now());
+      const data = await load(req);
+      await audit(req, "analytics.viewed", "ALLOWED", {
+        details: { view, from: range.from.toISOString(), to: range.to.toISOString(), segmented: isSegmented(parseSegment(req.query as Record<string, unknown>)) },
+      });
+      res.json(data);
+    });
+  const rangeOf = (req: AdminRequest) => parseRange(req.query as Record<string, unknown>, now());
+  const segmentOf = (req: AdminRequest) => parseSegment(req.query as Record<string, unknown>);
+
+  router.get("/analytics/funnel", allow("analytics.read", "analytics.viewed"), analyticsView("funnel", (req) => funnel(db, rangeOf(req), segmentOf(req))));
+  router.get("/analytics/journey-health", allow("analytics.read", "analytics.viewed"), analyticsView("journey_health", (req) => journeyHealth(db, rangeOf(req), segmentOf(req), now())));
+  router.get("/analytics/friction", allow("analytics.read", "analytics.viewed"), analyticsView("friction", (req) => friction(db, rangeOf(req), segmentOf(req), now())));
+  router.get("/analytics/feedback", allow("analytics.read", "analytics.viewed"), analyticsView("feedback", (req) => feedbackMetrics(db, rangeOf(req), segmentOf(req))));
+  router.get("/analytics/segments", allow("analytics.read", "analytics.viewed"), analyticsView("segments", (req) => segmentBreakdown(db, rangeOf(req))));
+  router.get("/analytics/operations", allow("analytics.read", "analytics.viewed"), analyticsView("operations", (req) => operationalMetrics(db, rangeOf(req), now())));
+
+  // The optional comments are client content, not analytics: reading them is audited on its own.
+  router.get("/analytics/feedback/comments", allow("analytics.read", "analytics.feedback_comments_viewed"), handle(async (req, res) => {
+    const range = parseRange(req.query as Record<string, unknown>, now());
+    const comments = await feedbackComments(db, range);
+    await audit(req, "analytics.feedback_comments_viewed", "ALLOWED", { details: { count: comments.length, from: range.from.toISOString(), to: range.to.toISOString() } });
+    res.json({ comments });
   }));
 
   // ------------------------------------------------------------------ audit + admin users (ADMIN)

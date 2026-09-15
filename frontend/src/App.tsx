@@ -26,7 +26,21 @@ type Screen =
   | { name: "unavailable" };
 
 const RESUME_PATH = /^\/resume\/([A-Za-z0-9_-]{20,})\/?$/;
+const TOKEN = /^[A-Za-z0-9_-]{20,}$/;
 const SESSION_PREMIUM: PremiumSource = { loadStatus: api.sessionPremium, activate: api.sessionPremiumActivation };
+const SESSION_FEEDBACK = { load: api.sessionFeedback, submit: api.submitSessionFeedback };
+
+/**
+ * Private links carry their token in the URL fragment (/resume#token), which browsers never send to
+ * a server, so it cannot appear in access logs. Links issued before that change used /resume/<token>
+ * and keep working.
+ */
+function resumeTokenFromLocation(): string | null {
+  if (!window.location.pathname.startsWith("/resume")) return null;
+  const fragment = window.location.hash.replace(/^#/, "");
+  if (TOKEN.test(fragment)) return fragment;
+  return RESUME_PATH.exec(window.location.pathname)?.[1] ?? null;
+}
 const LOCALE_KEY = "beeside.fa.locale";
 
 function initialLocale(): Locale {
@@ -44,8 +58,8 @@ export function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [locale, setLocale] = useState<Locale>(initialLocale);
   const [screen, setScreen] = useState<Screen>(() => {
-    const match = RESUME_PATH.exec(window.location.pathname);
-    return match ? { name: "resume", token: match[1] } : { name: "loading" };
+    const token = resumeTokenFromLocation();
+    return token ? { name: "resume", token } : { name: "loading" };
   });
   const [view, setView] = useState<SessionView | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
@@ -248,6 +262,7 @@ export function App() {
           anotherProjectInMind={view?.anotherProjectInMind === "yes"}
           onStartAnother={async () => startSession((await api.anotherProject(true)).sessionToken)}
           premium={SESSION_PREMIUM}
+          feedback={SESSION_FEEDBACK}
         />
       )}
       {screen.name === "resume" && <ResumeLink bundle={bundle} t={t} locale={locale} token={screen.token} onLocale={applyLocale} onSession={startSession} />}

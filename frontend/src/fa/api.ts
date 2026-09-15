@@ -1,4 +1,29 @@
-import { Bundle, ExtensionReason, LinkChoices, PremiumActivationResult, PremiumContent, PremiumStatus, SessionView, SnapshotView } from "./types";
+import { Bundle, ExtensionReason, LinkChoices, Locale, PremiumActivationResult, PremiumContent, PremiumStatus, SessionView, SnapshotView } from "./types";
+
+/** Post-Snapshot feedback: the frozen question and its scale come from the server. */
+export interface FeedbackCopy {
+  question: string;
+  scale_min: string;
+  scale_max: string;
+  comment_label: string;
+  optional: string;
+  submit: string;
+  thanks: string;
+  rating_required: string;
+  error: string;
+}
+
+export interface FeedbackStatus {
+  available: boolean;
+  submitted: boolean;
+  questionVersion: string;
+  copy: Record<Locale, FeedbackCopy>;
+}
+
+export interface FeedbackInput {
+  usefulness: number;
+  comment: string | null;
+}
 
 const BASE = "/api/fa";
 const SESSION_KEY = "beeside.fa.session";
@@ -87,5 +112,9 @@ export const api = {
   linkPremiumActivation: (token: string, acceptTerms: boolean) => request<PremiumActivationResult>("POST", "/links/premium/activation", { token, acceptTerms }),
   countries: () => request<{ codes: string[] }>("GET", "/reference/countries"),
   requestLink: (email: string) => request<{ status: "accepted" }>("POST", "/links/request", { email }),
-  events: (payload: { anonymousSessionId: string; events: unknown[] }) => request<{ accepted: number }>("POST", "/events", payload, true),
+  events: (payload: { anonymousSessionId: string; linkToken?: string | null; events: unknown[] }) => request<{ accepted: number }>("POST", "/events", payload, true),
+  sessionFeedback: () => request<FeedbackStatus>("GET", "/session/feedback", undefined, true),
+  submitSessionFeedback: (input: FeedbackInput) => request<FeedbackStatus>("POST", "/session/feedback", input, true),
+  linkFeedback: (token: string) => request<FeedbackStatus>("POST", "/links/feedback", { token }),
+  submitLinkFeedback: (token: string, input: FeedbackInput) => request<FeedbackStatus>("POST", "/links/feedback/submit", { token, ...input }),
 };

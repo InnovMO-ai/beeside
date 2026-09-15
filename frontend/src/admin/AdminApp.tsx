@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import logo from "../assets/beeside-logo.png";
 import { ExpansionSnapshot } from "../fa/components/ExpansionSnapshot";
 import type { SnapshotView } from "../fa/types";
+import { AnalyticsView } from "./AnalyticsView";
 import { AdminApiError, AdminRole, Me, Permission, REGISTRIES, RegistrySlug, adminApi } from "./api";
 
 /**
@@ -16,6 +17,7 @@ type Route =
   | { name: "projects" }
   | { name: "project"; id: string; tab: ProjectTab }
   | { name: "config" }
+  | { name: "analytics" }
   | { name: "operations" }
   | { name: "audit" }
   | { name: "people" };
@@ -35,7 +37,7 @@ export function parseAdminRoute(pathname: string): Route {
     const tab = TABS.find((t) => t.id === parts[2])?.id ?? "overview";
     return { name: "project", id: parts[1], tab };
   }
-  if (parts[0] === "config" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
+  if (parts[0] === "config" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
   return { name: "projects" };
 }
 
@@ -146,6 +148,7 @@ export function AdminApp() {
   const nav: Array<{ route: Route; label: string; show: boolean }> = [
     { route: { name: "projects" }, label: "Projects", show: can("projects.read") },
     { route: { name: "config" }, label: "Configuration", show: can("config.read") },
+    { route: { name: "analytics" }, label: "Analytics", show: can("analytics.read") },
     { route: { name: "operations" }, label: "Operations", show: can("operations.read") },
     { route: { name: "audit" }, label: "Audit", show: can("audit.read") },
     { route: { name: "people" }, label: "People", show: can("admin_users.manage") },
@@ -191,6 +194,7 @@ export function AdminApp() {
         {route.name === "projects" && <ProjectsView onOpen={(id) => navigate({ name: "project", id, tab: "overview" })} />}
         {route.name === "project" && <ProjectView id={route.id} tab={route.tab} can={can} onTab={(tab) => navigate({ ...route, tab })} onBack={() => navigate({ name: "projects" })} />}
         {route.name === "config" && <ConfigView can={can} />}
+        {route.name === "analytics" && can("analytics.read") && <AnalyticsView />}
         {route.name === "operations" && <OperationsView can={can} />}
         {route.name === "audit" && can("audit.read") && <AuditView />}
         {route.name === "people" && can("admin_users.manage") && <PeopleView />}

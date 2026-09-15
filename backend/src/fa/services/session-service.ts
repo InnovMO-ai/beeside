@@ -5,6 +5,7 @@ import { QuestionBankBundle, QuestionDef } from "../engine/bundle-types";
 import { computeJourney, dynamicOptionValues } from "../engine/journey";
 import { isNotSureValue, validateAnswerValue } from "../engine/values";
 import { recordJourneyEvent } from "./analytics";
+import { upsertProjectProfile } from "../../analytics/project-profile";
 import { FaError } from "./errors";
 import { startProject } from "./project-factory";
 import { AssessmentState, FaDeps, ProjectRow, TokenRow, findUsableToken, issueToken, loadProject, loadStoredAnswers } from "./repository";
@@ -220,8 +221,22 @@ export async function completeStep(deps: FaDeps, ctx: SessionContext, stepId: st
         questionBankVersion: project.question_bank_version,
         interfaceLanguage: project.interface_language,
       });
+      // Phase 12: ids only — outbound destinations read what their mapping needs at delivery time.
+      await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, 'assessment.completed', $2::jsonb, $3)", [
+        project.project_id,
+        JSON.stringify({ project_id: project.project_id, question_bank_version: project.question_bank_version }),
+        now,
+      ]);
       await enqueueSnapshotEmail(tx, deps, project, now);
     }
+    // Segmentation dimensions for analytics (enumerated values only, never answer content).
+    await upsertProjectProfile(tx, {
+      projectId: project.project_id,
+      questionBankVersion: project.question_bank_version,
+      effectiveAnswers: next.effectiveAnswers,
+      now,
+      completed: next.complete,
+    });
     const refreshed = await loadProject(tx, project.project_id);
     if (!refreshed) throw new FaError("NOT_FOUND", "project not found");
     return buildSessionView(tx, refreshed, ctx.bundle);

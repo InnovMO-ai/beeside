@@ -36,15 +36,15 @@ Confirmed by Mike. The public beeside marketing site stays on Wix (not part of t
 
 - SSO/identity provider account (Phase 10) — Google Workspace SSO is a natural fit given Mike's existing Workspace account.
 - Transactional email provider account and a sending domain with DNS access (Phase 5) — a separate decision from Google Workspace/Gmail.
-- SmartSuite API credentials, workspace access, and its current schema (Phase 12).
-- Bot-challenge provider account (Phase 13) — Google reCAPTCHA is a natural GCP-native option.
+- SmartSuite API credentials, workspace access, and its current schema (Phase 12) — the adapter, its configurable field mapping, idempotency and retry/dead-letter are built and inert: with no credentials the destination stays disabled, and development captures what would be sent.
+- Bot-challenge provider account (Phase 13) — Google reCAPTCHA is a natural GCP-native option; the verifier interface exists and no provider is selected, so no challenge is shown or verified.
 - The current published Privacy Policy's exact deletion-scope wording (Phase 11).
 - Confirmation of any preferred vendors where Technical Freeze v1.1 FINAL §P named a class of solution rather than a specific product.
 - Initial ADMIN role holder(s) for the Control Center (Phase 10).
 - A pilot-cohort plan (Phase 15).
 - Staging and production GCP projects/resources — created only once their own phase needs them, per Mike's approved scope.
 
-**Not needed at all yet, per Technical Freeze v1.1 FINAL:** a payment provider and ClickUp workspace access are explicitly deferred and do not block Phase 1 through Phase 15's start.
+**Not needed at all yet, per Technical Freeze v1.1 FINAL:** a payment provider and ClickUp workspace access are explicitly deferred and do not block Phase 1 through Phase 15's start. The Operation Hub / ClickUp linkage is strictly outbound and has no workspace contract yet: PostgreSQL stays the system of record, and an external workspace can never write a Person, Company, Project, First Assessment answer, finding, Snapshot or entitlement.
 
 ## Local development
 
@@ -63,4 +63,4 @@ Requires Terraform >= 1.7 with the `hashicorp/google` provider. For dev, `projec
 
 ## CI/CD
 
-`.github/workflows/ci.yml` builds, lints, tests every workspace, and runs a secrets scan on every PR and push to `main` — cloud-agnostic, no changes needed for GCP. `deploy-dev.yml` auto-triggers after CI passes on `main`; `deploy-staging.yml` and `deploy-production.yml` are manually dispatched promotions requiring a verified ref from the environment before it. All three deploy workflows authenticate to GCP via Workload Identity Federation (no long-lived key ever stored in GitHub) and push images to Artifact Registry / deploy to Cloud Run — but every real step is gated behind that GitHub Environment's `GCP_PROJECT_ID` variable being set, so until GCP is actually provisioned, each workflow safely prints an explanatory message instead of failing.
+`.github/workflows/ci.yml` builds, lints, tests every workspace, builds both container images, audits the dependencies that actually ship, and runs a secrets scan on every PR and push to `main` — cloud-agnostic, no changes needed for GCP. `deploy-dev.yml` triggers after CI passes on `main`; `deploy-staging.yml` and `deploy-production.yml` are manually dispatched promotions requiring a verified ref from the environment before it. All three deploy workflows authenticate to GCP via Workload Identity Federation (no long-lived key ever stored in GitHub), build both images from the repository root, apply the database migrations shipped in the backend image as their own Cloud Run job (with the migration database user, never the runtime one), and only then deploy to Cloud Run — every real step is gated behind that GitHub Environment's `GCP_PROJECT_ID` variable being set, and dev additionally requires `DEPLOY_DEV_ENABLED=true`, so until the deployment prerequisites exist a merge to `main` safely prints an explanatory message instead of changing a running service. What is still missing before any environment can be deployed — the runtime database user, the migration job, the worker service and the API routing decision — is listed in `docs/deployment/README.md`.

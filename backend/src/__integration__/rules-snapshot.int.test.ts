@@ -100,9 +100,12 @@ describeWithDb("Rules + Snapshot at COMPLETED_LOCKED (PostgreSQL, rolled back)",
         await h.client.query("ROLLBACK TO SAVEPOINT frozen");
       }
     };
-    expect(await attempt("UPDATE snapshot SET content = '{}' WHERE project_id = $1", [project.project_id])).toMatchObject({ message: expect.stringContaining("immutable") });
-    expect(await attempt("UPDATE internal_assessment SET content = '{}' WHERE project_id = $1", [project.project_id])).toMatchObject({ message: expect.stringContaining("immutable") });
-    expect(await attempt("UPDATE finding SET status = 'DEFINED' WHERE project_id = $1 AND area_id = 2", [project.project_id])).toMatchObject({ message: expect.stringContaining("COMPLETED_LOCKED") });
+    // Refused either by the guard or, when the suite runs as the least-privilege runtime role
+    // (Phase 13), by the missing UPDATE privilege — stricter, never weaker.
+    const frozen = (reason: string) => expect.stringMatching(new RegExp(`${reason}|permission denied`));
+    expect(await attempt("UPDATE snapshot SET content = '{}' WHERE project_id = $1", [project.project_id])).toMatchObject({ message: frozen("immutable") });
+    expect(await attempt("UPDATE internal_assessment SET content = '{}' WHERE project_id = $1", [project.project_id])).toMatchObject({ message: frozen("immutable") });
+    expect(await attempt("UPDATE finding SET status = 'DEFINED' WHERE project_id = $1 AND area_id = 2", [project.project_id])).toMatchObject({ message: frozen("COMPLETED_LOCKED") });
     expect(
       await attempt(
         `INSERT INTO finding (project_id, area_id, status, reason_client, rule_triggered, reason_internal, rules_engine_version)

@@ -1,6 +1,6 @@
 import request from "supertest";
 import { createApp } from "../index";
-import { BILLING_SIGNATURE_HEADER, signBillingPayload } from "../premium/billing-router";
+import { BILLING_SIGNATURE_HEADER, BILLING_TIMESTAMP_HEADER, signBillingPayload } from "../premium/billing-router";
 import { linkOperationHub, operationHubAccess } from "../premium/operation-hub";
 import { getPrecisionStartContext } from "../premium/precision-handoff";
 import { devSimulatedCheckout } from "../premium/premium-service";
@@ -15,14 +15,20 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
   const h = useHarness();
 
   const billing = () =>
-    request(createApp({ fa: h.deps, billing: { db: h.deps.db, bundles: h.deps.bundles, secret: SECRET } })) as unknown as request.SuperTest<request.Test>;
+    request(
+      createApp({ fa: h.deps, billing: { db: h.deps.db, bundles: h.deps.bundles, secret: SECRET, now: () => h.clock.now } }),
+    ) as unknown as request.SuperTest<request.Test>;
 
+  // Phase 13: the signature covers a timestamp as well as the body, so a captured delivery cannot
+  // be replayed later.
   async function sendEvent(payload: Record<string, unknown>, signature?: string) {
     const raw = JSON.stringify(payload);
+    const timestamp = Math.floor(h.clock.now.getTime() / 1000);
     return billing()
       .post("/api/billing/events")
       .set("Content-Type", "application/json")
-      .set(BILLING_SIGNATURE_HEADER, signature ?? signBillingPayload(SECRET, raw))
+      .set(BILLING_TIMESTAMP_HEADER, String(timestamp))
+      .set(BILLING_SIGNATURE_HEADER, signature ?? signBillingPayload(SECRET, timestamp, raw))
       .send(raw);
   }
 

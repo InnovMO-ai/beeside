@@ -7,9 +7,11 @@ export type FaErrorCode =
   | "LOCKED"
   | "ACCESS_EXPIRED"
   | "NOT_RECOVERABLE"
-  | "NOT_READY";
+  | "NOT_READY"
+  | "ALREADY_SUBMITTED";
 
 const STATUS: Record<FaErrorCode, number> = {
+  ALREADY_SUBMITTED: 409,
   INVALID_INPUT: 400,
   UNAUTHENTICATED: 401,
   NOT_FOUND: 404,

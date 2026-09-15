@@ -10,6 +10,7 @@ export type Permission =
   | "projects.read"
   | "config.read"
   | "operations.read"
+  | "analytics.read"
   | "config.write"
   | "config.publish"
   | "operations.execute"
@@ -87,6 +88,13 @@ export const adminApi = {
     call<Json>("POST", `/config/${registry}/versions/${encodeURIComponent(version)}/reviews`, input),
   publish: (registry: RegistrySlug, version: string) => call<Json>("POST", `/config/${registry}/versions/${encodeURIComponent(version)}/publish`, {}),
   setCurrent: (registry: RegistrySlug, version: string, reason: string) => call<Json>("POST", `/config/${registry}/versions/${encodeURIComponent(version)}/set-current`, { reason }),
+
+  analytics: (view: "funnel" | "journey-health" | "friction" | "feedback" | "segments" | "operations", query: string) => call<Json>("GET", `/analytics/${view}${query}`),
+  feedbackComments: (query: string) => call<{ comments: Json[] }>("GET", `/analytics/feedback/comments${query}`),
+
+  integrationDeliveries: (status: string, destination: string) =>
+    call<{ deliveries: Json[] }>("GET", `/operations/integration-deliveries?status=${encodeURIComponent(status)}&destination=${encodeURIComponent(destination)}`),
+  retryIntegrationDelivery: (id: string) => call<Json>("POST", `/operations/integration-deliveries/${id}/retry`, {}),
 
   deliveries: (status: string) => call<{ deliveries: Json[] }>("GET", `/operations/email-deliveries${status ? `?status=${status}` : ""}`),
   retryDelivery: (id: string) => call<Json>("POST", `/operations/email-deliveries/${id}/retry`, {}),

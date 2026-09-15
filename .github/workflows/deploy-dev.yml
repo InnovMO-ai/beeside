@@ -1,18 +1,19 @@
 name: Deploy — dev
 
-# Automatic on every merge to main, once CI has passed. dev is the only
-# environment that deploys without a manual gate — staging and production
-# require an explicit promotion (see deploy-staging.yml / deploy-production.yml),
-# consistent with Build Plan v1.1 FINAL's checkpoint-gated build philosophy
-# extended into the deployment pipeline itself.
+# Automatic on every merge to main, once CI has passed — but only when the dev
+# environment is explicitly opened for deployment (vars.DEPLOY_DEV_ENABLED ==
+# 'true'). Until the deployment prerequisites recorded in docs/deployment are in
+# place (migration job, runtime database user, routing), merging to main must not
+# change a running service, so the gate is off by default. staging and production
+# require an explicit promotion (see deploy-staging.yml / deploy-production.yml).
 #
 # Vendor: GCP. Authentication uses Workload Identity Federation (see
-# infra/terraform/envs/dev/main.tf) — no long-lived key is ever stored in
-# GitHub. The real deploy steps only run once this GitHub Environment
-# ("dev") has the GCP_PROJECT_ID / GCP_REGION / GCP_WORKLOAD_IDENTITY_PROVIDER
-# / GCP_SERVICE_ACCOUNT_EMAIL / GCP_ARTIFACT_REPO variables set (see
-# README.md) — until then this workflow safely no-ops with an explanatory
-# message rather than failing.
+# infra/terraform/envs/dev/main.tf) — no long-lived key is ever stored in GitHub.
+#
+# Order is always: build images -> apply migrations (as the migration database
+# user, in its own Cloud Run job) -> deploy the services. A revision never serves
+# traffic against a schema that is behind it: /health/ready fails until the
+# migrations shipped in the image are applied.
 
 on:
   workflow_run:
@@ -25,55 +26,82 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ vars.GCP_PROJECT_ID }}" != "" ] && [ "${{ vars.DEPLOY_DEV_ENABLED }}" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Build succeeded. Deployment to dev is not enabled:"
+            echo "  - GCP_PROJECT_ID and the other GCP_* variables must be set (README.md)"
+            echo "  - DEPLOY_DEV_ENABLED must be 'true' (see docs/deployment/README.md)"
+          fi
+
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: gate
+    if: ${{ github.event.workflow_run.conclusion == 'success' && needs.gate.outputs.enabled == 'true' }}
     runs-on: ubuntu-latest
     environment: dev
     steps:
       - uses: actions/checkout@v4
 
-      - name: Not yet configured
-        if: vars.GCP_PROJECT_ID == ''
-        run: |
-          echo "Build succeeded. Live deployment to dev is blocked pending GCP setup:"
-          echo "  - the dev GCP project + Terraform apply (infra/terraform/envs/dev)"
-          echo "  - this GitHub Environment's GCP_* variables (see README.md)"
-
       - uses: actions/setup-node@v4
-        if: vars.GCP_PROJECT_ID != ''
         with:
           node-version: "20"
           cache: "npm"
       - run: npm ci
-        if: vars.GCP_PROJECT_ID != ''
       - run: npm run build
-        if: vars.GCP_PROJECT_ID != ''
 
       - id: auth
-        if: vars.GCP_PROJECT_ID != ''
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
 
-      - if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v2
 
+      # Both images build from the repository root: the backend depends on the
+      # @beeside/canonical-fields workspace and ships backend/db/migrations.
       - name: Build and push images
-        if: vars.GCP_PROJECT_ID != ''
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
-          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }} backend
-          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }}
-          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }} frontend
-          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }}
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
+          docker build -f backend/Dockerfile -t $REGISTRY/backend-api:${{ github.sha }} .
+          docker push $REGISTRY/backend-api:${{ github.sha }}
+          docker build -f frontend/Dockerfile -t $REGISTRY/frontend-app:${{ github.sha }} .
+          docker push $REGISTRY/frontend-app:${{ github.sha }}
+
+      - name: Apply database migrations
+        run: |
+          if [ -z "${{ vars.MIGRATION_JOB_NAME }}" ]; then
+            echo "No migration job is configured (vars.MIGRATION_JOB_NAME). See docs/deployment/README.md."
+            exit 1
+          fi
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
+          gcloud run jobs update ${{ vars.MIGRATION_JOB_NAME }} \
+            --image $REGISTRY/backend-api:${{ github.sha }} \
+            --command node --args dist/scripts/migrate.js \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          gcloud run jobs execute ${{ vars.MIGRATION_JOB_NAME }} --wait \
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
 
       - name: Deploy to Cloud Run
-        if: vars.GCP_PROJECT_ID != ''
         run: |
+          REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run deploy beeside-dev-backend-api \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend-api:${{ github.sha }} \
+            --image $REGISTRY/backend-api:${{ github.sha }} \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           gcloud run deploy beeside-dev-frontend-app \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/frontend-app:${{ github.sha }} \
+            --image $REGISTRY/frontend-app:${{ github.sha }} \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          if [ -n "${{ vars.WORKER_SERVICE_NAME }}" ]; then
+            gcloud run deploy ${{ vars.WORKER_SERVICE_NAME }} \
+              --image $REGISTRY/backend-api:${{ github.sha }} \
+              --command node --args dist/worker.js \
+              --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+          fi

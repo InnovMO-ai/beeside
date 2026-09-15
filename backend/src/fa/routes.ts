@@ -1,5 +1,7 @@
 import express, { NextFunction, Request, Response, Router } from "express";
+import { feedbackStatus, parseFeedbackInput, submitFeedback } from "../feedback/feedback-service";
 import { dispatchEmails } from "../operations/email-outbox";
+import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
 import { getSessionSnapshot, openSnapshotFromLink } from "../snapshot/snapshot-service";
 import { premiumContentOf } from "../premium/content";
 import { getPremiumStatus, premiumContentForProject, requestPremiumActivation } from "../premium/premium-service";
@@ -46,9 +48,22 @@ function body(req: Request): Record<string, unknown> {
  * Requests never send email themselves: they enqueue into the outbox, and delivery runs after the
  * business transaction has committed.
  */
-export function createFaRouter(deps: FaDeps): Router {
+export function createFaRouter(deps: FaDeps, security: { limiter?: RateLimiter } = {}): Router {
   const router = Router();
+  const limiter = security.limiter;
+  // Abuse prevention (Phase 13): a shared budget per client address, plus narrower budgets on the
+  // endpoints that create identities, send email or hold a session. Limits are counted in the
+  // database, so every instance shares them; no address, email or token is stored in clear.
+  router.use(rateLimit(limiter, RATE_LIMITS.faAddress));
   router.use(express.json({ limit: "64kb" }));
+
+  const emailSubject = (req: Request): string | null => {
+    const value = body(req).email;
+    return typeof value === "string" && value.trim() !== "" && value.length <= 320 ? value.trim().toLowerCase() : null;
+  };
+  const sessionSubject = (req: Request): string | null => bearerToken(req);
+  router.use("/session", rateLimit(limiter, RATE_LIMITS.sessionWrites, sessionSubject));
+  router.use("/links", rateLimit(limiter, RATE_LIMITS.linkTokenAddress));
 
   const handle = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => {
     fn(req, res).catch((error: unknown) => {
@@ -74,7 +89,7 @@ export function createFaRouter(deps: FaDeps): Router {
     res.json({ version: req.params.version, bundle: await deps.bundles.byVersion(req.params.version ?? "") });
   }));
 
-  router.post("/identity", handle(async (req, res) => {
+  router.post("/identity", rateLimit(limiter, RATE_LIMITS.identityAddress), rateLimit(limiter, RATE_LIMITS.identityEmail, emailSubject), handle(async (req, res) => {
     const result = await submitIdentity(deps, parseIdentityInput(req.body));
     await dispatchEmails(deps);
     res.status(result.status === "started" ? 201 : 202).json(result);
@@ -199,21 +214,55 @@ export function createFaRouter(deps: FaDeps): Router {
   }));
 
   // Always the same answer, whether or not the email exists (no account enumeration).
-  router.post("/links/request", handle(async (req, res) => {
+  router.post("/links/request", rateLimit(limiter, RATE_LIMITS.linkRequestAddress), rateLimit(limiter, RATE_LIMITS.linkRequestEmail, emailSubject), handle(async (req, res) => {
     await requestLinkByEmail(deps, body(req).email);
     await dispatchEmails(deps);
     res.status(202).json({ status: "accepted" });
   }));
 
-  router.post("/events", handle(async (req, res) => {
+  // ---- Post-Snapshot feedback (after the Snapshot, never before; one answer per project)
+  router.get("/session/feedback", handle(async (req, res) => {
+    const ctx = await session(req);
+    res.json(await feedbackStatus(deps.db, ctx.project.project_id));
+  }));
+
+  router.post("/session/feedback", rateLimit(limiter, RATE_LIMITS.feedbackAddress), handle(async (req, res) => {
+    const ctx = await session(req);
+    res.status(201).json(await submitFeedback(deps, ctx.project.project_id, parseFeedbackInput(req.body), "session"));
+  }));
+
+  router.post("/links/feedback", handle(async (req, res) => {
+    const { project } = await projectFromLink(deps, body(req).token);
+    res.json(await feedbackStatus(deps.db, project.project_id));
+  }));
+
+  router.post("/links/feedback/submit", rateLimit(limiter, RATE_LIMITS.feedbackAddress), handle(async (req, res) => {
+    const { project } = await projectFromLink(deps, body(req).token);
+    res.status(201).json(await submitFeedback(deps, project.project_id, parseFeedbackInput(req.body), "private_link"));
+  }));
+
+  router.post("/events", rateLimit(limiter, RATE_LIMITS.eventsAddress), handle(async (req, res) => {
     const b = body(req);
     const events = Array.isArray(b.events) ? b.events.slice(0, 50) : [];
     let ctx: SessionContext | null = null;
     if (bearerToken(req)) ctx = await session(req).catch(() => null);
+    // A respondent reading their Snapshot from the email link has no working session: the private
+    // link identifies the project so those events are not lost to "anonymous".
+    let linkProjectId: string | null = null;
+    let linkVersion: string | null = null;
+    if (!ctx && typeof b.linkToken === "string") {
+      const fromLink = await projectFromLink(deps, b.linkToken).catch(() => null);
+      linkProjectId = fromLink?.project.project_id ?? null;
+      linkVersion = fromLink?.project.question_bank_version ?? null;
+    }
     const anonymousSessionId = isUuid(b.anonymousSessionId) ? b.anonymousSessionId : null;
-    if (!ctx && !anonymousSessionId) throw new FaError("INVALID_INPUT", "anonymousSessionId is required", { fields: ["anonymousSessionId"] });
+    if (!ctx && !linkProjectId && !anonymousSessionId) throw new FaError("INVALID_INPUT", "anonymousSessionId is required", { fields: ["anonymousSessionId"] });
 
-    const source = ctx ? { version: ctx.project.question_bank_version, bundle: ctx.bundle } : await deps.bundles.current();
+    const source = ctx
+      ? { version: ctx.project.question_bank_version, bundle: ctx.bundle }
+      : linkVersion
+        ? { version: linkVersion, bundle: await deps.bundles.byVersion(linkVersion) }
+        : await deps.bundles.current();
     const knownIds = {
       steps: new Set(source.bundle.steps.map((s) => s.id)),
       questions: new Set(source.bundle.questions.map((q) => q.id)),
@@ -224,7 +273,7 @@ export function createFaRouter(deps: FaDeps): Router {
       if (!event) continue;
       await recordJourneyEvent(deps.db, {
         ...event,
-        projectId: ctx?.project.project_id ?? null,
+        projectId: ctx?.project.project_id ?? linkProjectId,
         anonymousSessionId,
         questionBankVersion: source.version,
       });

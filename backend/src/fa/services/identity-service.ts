@@ -1,3 +1,4 @@
+import { readIdentitySignals, trustStateFor } from "../../security/abuse";
 import { recordJourneyEvent, isUuid } from "./analytics";
 import { FaError } from "./errors";
 import { sendVerifiedLinkToPerson } from "./link-service";
@@ -15,6 +16,8 @@ export interface IdentityInput {
   acceptLegal: true;
   personalEmailAcknowledged: boolean;
   anonymousSessionId: string | null;
+  /** Phase 13 anti-abuse signals; never a reason to refuse a person on their own. */
+  signals: { honeypotFilled: boolean; tooFast: boolean };
 }
 
 export type IdentityResult = { status: "started"; sessionToken: string } | { status: "verification_required" };
@@ -23,6 +26,7 @@ const text = (value: unknown, max: number) => (typeof value === "string" && valu
 
 export function parseIdentityInput(body: unknown): IdentityInput {
   const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const signals = readIdentitySignals(body);
   const invalid: string[] = [];
   const firstName = text(b.firstName, 100);
   const lastName = text(b.lastName, 100);
@@ -49,6 +53,7 @@ export function parseIdentityInput(body: unknown): IdentityInput {
     acceptLegal: true,
     personalEmailAcknowledged: b.personalEmailAcknowledged === true,
     anonymousSessionId: isUuid(b.anonymousSessionId) ? b.anonymousSessionId : null,
+    signals: { honeypotFilled: signals.honeypotFilled, tooFast: signals.tooFast },
   };
 }
 
@@ -65,6 +70,18 @@ function isUniqueViolation(error: unknown): boolean {
 export async function submitIdentity(deps: FaDeps, input: IdentityInput): Promise<IdentityResult> {
   const now = deps.config.now();
   const { bundle } = await deps.bundles.current();
+
+  // A filled honeypot field is automation, not a person: nothing is stored and no email is sent,
+  // and the answer is the same one an already-known email receives, so the probe learns nothing.
+  if (input.signals.honeypotFilled) {
+    await recordJourneyEvent(deps.db, {
+      eventType: "bot_signal_detected",
+      anonymousSessionId: input.anonymousSessionId,
+      interfaceLanguage: input.interfaceLanguage,
+      properties: { signal: "honeypot" },
+    });
+    return { status: "verification_required" };
+  }
 
   const existing = await deps.db.query<{ person_id: string }>("SELECT person_id FROM person WHERE primary_email = $1", [input.email]);
   const existingPerson = existing.rows[0];
@@ -102,6 +119,12 @@ export async function submitIdentity(deps: FaDeps, input: IdentityInput): Promis
         interfaceLanguage: input.interfaceLanguage,
         now,
       });
+
+      // A form completed faster than a person could is marked for review; it is never blocked,
+      // and REVIEW changes nothing the respondent experiences (Functional Specification §12).
+      if (trustStateFor({ ...input.signals, challenge: "not_configured" }) === "REVIEW") {
+        await tx.query("UPDATE project SET trust_state = 'REVIEW', updated_at = $2 WHERE project_id = $1", [projectId, now]);
+      }
 
       if (personal && input.personalEmailAcknowledged) {
         await tx.query(
