@@ -32,6 +32,7 @@ export const CLIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "language_changed",
   "save_failed",
   "step_back_navigated",
+  "snapshot_viewed",
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

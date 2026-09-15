@@ -12,7 +12,8 @@ export type ClientEventType =
   | "question_viewed"
   | "language_changed"
   | "save_failed"
-  | "step_back_navigated";
+  | "step_back_navigated"
+  | "snapshot_viewed";
 
 export interface ClientEvent {
   type: ClientEventType;

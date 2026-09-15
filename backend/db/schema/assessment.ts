@@ -38,8 +38,19 @@ export const finding = pgTable(
     status: findingStatusEnum("status").notNull(),
     signalStrength: signalStrengthEnum("signal_strength").notNull().default("NO_SIGNAL"),
     internalSignal: text("internal_signal"),
-    reasonClient: text("reason_client").notNull(),
+    // Client-facing one-line reason in the deliverable language; NULL only for NOT_APPLICABLE (0008).
+    reasonClient: text("reason_client"),
     evidenceFieldKeys: text("evidence_field_keys").array().notNull().default(sql`'{}'::text[]`),
+    // Phase 7 explainability (Master Build Guide §9 finding record).
+    ruleTriggered: text("rule_triggered").notNull(),
+    reasonInternal: text("reason_internal").notNull(),
+    // [{field_key, answer_id, value}] — the exact answer rows the status was computed from.
+    evidence: jsonb("evidence").notNull().default(sql`'[]'::jsonb`),
+    // [{signal, strength, boosted}] — every internal service/capability signal for this area.
+    signals: jsonb("signals").notNull().default(sql`'[]'::jsonb`),
+    sourceType: text("source_type").notNull().default("DERIVED_BY_RULE"),
+    panelRank: smallint("panel_rank"),
+    includedInSnapshot: boolean("included_in_snapshot").notNull().default(false),
     rulesEngineVersion: text("rules_engine_version").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -52,6 +63,9 @@ export const priorityAlignment = pgTable("priority_alignment", {
   alignment: priorityAlignmentStatusEnum("alignment").notNull(),
   tensionAreaId: smallint("tension_area_id").references(() => rulesMatrixCategory.categoryId),
   tensionReason: text("tension_reason"),
+  // Which Rules Matrix v1 §18 tests matched (shared_commitment / shared_timing_driver / go_to_market_dependency).
+  testsMatched: text("tests_matched").array().notNull().default(sql`'{}'::text[]`),
+  ruleTriggered: text("rule_triggered"),
   rulesEngineVersion: text("rules_engine_version").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -63,6 +77,9 @@ export const capabilityRank = pgTable(
     categoryId: smallint("category_id").notNull().references(() => capabilityTaxonomyCategory.categoryId),
     rank: smallint("rank").notNull(),
     includedInSnapshot: boolean("included_in_snapshot").notNull().default(false),
+    // Rules Matrix areas whose relevance trigger made this category qualify (never their status).
+    sourceAreaIds: smallint("source_area_ids").array().notNull().default(sql`'{}'::smallint[]`),
+    rankingFactors: jsonb("ranking_factors").notNull().default(sql`'{}'::jsonb`),
     rulesEngineVersion: text("rules_engine_version").notNull(),
   },
   (t) => [

@@ -4,6 +4,7 @@ import { LegalConsent } from "../components/LegalConsent";
 import { formatDate, T } from "../copy";
 import { Bundle, ExtensionReason, LinkChoices, Locale } from "../types";
 import { RequestLink } from "./SimpleScreens";
+import { SnapshotScreen } from "./SnapshotScreen";
 
 type Mode =
   | { name: "opening" }
@@ -150,12 +151,25 @@ export function ResumeLink({ bundle, t, locale, token, onLocale, onSession }: Re
       </section>
     );
   }
+  if (choices.completed) {
+    // A completed assessment's private link opens its immutable Expansion Snapshot.
+    return (
+      <>
+        <SnapshotScreen bundle={bundle} t={t} locale={locale} load={() => api.linkSnapshot(token)} onLocale={onLocale} anotherProjectInMind={false} />
+        <section className="content snapshot-next" aria-labelledby="choices-title">
+          <h2 className="step-title" id="choices-title">
+            {t("resume", "choose_title")}
+          </h2>
+          <div className="actions">{newProjectActions}</div>
+        </section>
+      </>
+    );
+  }
   return (
     <section className="content" aria-labelledby="choices-title">
       <h1 className="display" id="choices-title">
         {t("resume", "choose_title")}
       </h1>
-      {choices.completed && <p className="lead">{t("completion", "title")}</p>}
       {errorLine}
       <div className="actions">
         {choices.canContinue && (

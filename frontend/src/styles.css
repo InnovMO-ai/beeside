@@ -413,3 +413,204 @@ fieldset.question {
   letter-spacing: -0.02em;
   max-width: 36rem;
 }
+
+/* ---------------------------------------------------------------- expansion snapshot */
+/* Status color is a secondary signal: every status is always paired with its icon and label. */
+.tone-well_defined {
+  --tone-ink: #1d6b45;
+  --tone-bg: #eaf6ef;
+  --tone-border: #bfe3cd;
+}
+.tone-needs_attention {
+  --tone-ink: #8a5300;
+  --tone-bg: #fff6e0;
+  --tone-border: #f1d49b;
+}
+.tone-resolve_early {
+  --tone-ink: #a8201a;
+  --tone-bg: #fdeeec;
+  --tone-border: #f2c4bf;
+}
+.snapshot {
+  display: grid;
+  gap: 2rem;
+  max-width: 72rem;
+}
+.snapshot-hero .display {
+  margin-bottom: 1rem;
+}
+.snapshot-summary {
+  margin: 0 0 0.5rem;
+  max-width: 46rem;
+}
+.snapshot-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  background: var(--mist);
+  border-radius: var(--radius);
+}
+.snapshot-fact dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+.snapshot-fact dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+.snapshot-fact-detail {
+  display: block;
+  font-weight: 400;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+.snapshot-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem 0.45rem 0.6rem;
+  border: 1px solid var(--tone-border);
+  border-radius: 999px;
+  background: var(--tone-bg);
+  color: var(--ink);
+  font-weight: 700;
+}
+.status-chip svg,
+.panel-title svg {
+  flex: none;
+  color: var(--tone-ink);
+}
+.status-count {
+  font-variant-numeric: tabular-nums;
+}
+.snapshot-panels,
+.snapshot-row,
+.snapshot-context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+}
+.snapshot-panel {
+  padding: 1.25rem;
+  border: 1px solid var(--tone-border);
+  border-radius: var(--radius);
+  background: var(--tone-bg);
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  color: var(--tone-ink);
+}
+.panel-intro {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+.panel-items {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.panel-items li {
+  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  background: var(--white);
+}
+.panel-item-label {
+  display: block;
+  font-weight: 700;
+}
+.panel-item-reason {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+.snapshot-card {
+  padding: 1.25rem;
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.reconcile-card {
+  background: var(--mist);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--purple-900);
+}
+.priority-value {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.verbatim {
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+}
+blockquote.verbatim {
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--purple-200);
+}
+.section-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+.capability-tags {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.capability-tag {
+  padding: 0.85rem 1rem;
+  border: 1px solid #d9d9e3;
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.capability-label {
+  display: block;
+  font-weight: 700;
+  color: var(--ink);
+}
+.capability-description {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+.plain-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+.snapshot-disclosure {
+  max-width: 46rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mist);
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+.snapshot-next {
+  margin-top: 2rem;
+}

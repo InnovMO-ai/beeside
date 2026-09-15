@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildQuestionBankBundle, FA_QUESTION_BANK_VERSION } from "../content/question-bank";
 import { validateQuestionBankBundle } from "../engine/validate-bundle";
+import { buildRulesEngineBundle, FA_RULES_ENGINE_VERSION } from "../../rules/content/rules-engine-v1";
+import { validateRulesEngineBundle } from "../../rules/validate-rules-bundle";
+import { buildSnapshotTemplateBundle, FA_SNAPSHOT_TEMPLATE_VERSION } from "../../snapshot/template";
 
 interface Queryable {
   query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
@@ -60,27 +63,28 @@ async function publishVersion(db: Queryable, registry: Registry, version: string
   return `published (${kind})`;
 }
 
+/** Placeholder bundles shipped in the repository (kept for the Phase 3 validation suite). */
+export function readPlaceholderBundle(registry: "RULES_ENGINE" | "SNAPSHOT_TEMPLATE"): unknown {
+  const file = registry === "RULES_ENGINE" ? "rules-engine.json" : "snapshot-template.json";
+  return JSON.parse(fs.readFileSync(placeholderPath(file), "utf8"));
+}
+
 /**
- * Development bootstrap: the First Assessment question bank v1 plus the minimal placeholder rules
- * engine and snapshot template needed for assessment_started pinning. The placeholders are only
- * published when their registry has no current version; Phases 7–8 publish the real ones.
+ * Development bootstrap: the First Assessment question bank v1, the Rules Engine v1 and the
+ * Expansion Snapshot template v1, each published through the Phase 3 gate. The earlier placeholder
+ * versions stay PUBLISHED (immutable history) but are no longer current. Idempotent.
  */
 export async function publishDevConfiguration(db: Queryable, adminId: string): Promise<Record<Registry, string>> {
   const bundle = buildQuestionBankBundle();
   const errors = validateQuestionBankBundle(bundle);
   if (errors.length > 0) throw new Error(`question bank bundle is invalid:\n${errors.join("\n")}`);
+  const rules = buildRulesEngineBundle();
+  const ruleErrors = validateRulesEngineBundle(rules);
+  if (ruleErrors.length > 0) throw new Error(`rules engine bundle is invalid:\n${ruleErrors.join("\n")}`);
 
   const result = {} as Record<Registry, string>;
   result.QUESTION_BANK = await publishVersion(db, "QUESTION_BANK", FA_QUESTION_BANK_VERSION, bundle, adminId);
-  for (const [registry, file] of [
-    ["RULES_ENGINE", "rules-engine.json"],
-    ["SNAPSHOT_TEMPLATE", "snapshot-template.json"],
-  ] as const) {
-    const { rows } = await db.query(`SELECT version FROM ${TABLE[registry]} WHERE is_current`);
-    const current = (rows[0] as { version: string } | undefined)?.version;
-    result[registry] = current
-      ? `kept current ${current}`
-      : await publishVersion(db, registry, PLACEHOLDER_VERSIONS[registry], JSON.parse(fs.readFileSync(placeholderPath(file), "utf8")), adminId);
-  }
+  result.RULES_ENGINE = await publishVersion(db, "RULES_ENGINE", FA_RULES_ENGINE_VERSION, rules, adminId);
+  result.SNAPSHOT_TEMPLATE = await publishVersion(db, "SNAPSHOT_TEMPLATE", FA_SNAPSHOT_TEMPLATE_VERSION, buildSnapshotTemplateBundle(), adminId);
   return result;
 }

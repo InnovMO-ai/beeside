@@ -7,7 +7,8 @@ import { makeT } from "./fa/copy";
 import { Identity } from "./fa/screens/Identity";
 import { Journey } from "./fa/screens/Journey";
 import { ResumeLink } from "./fa/screens/ResumeLink";
-import { Completion, ExistingEmail, FinishLaterConfirmation, RequestLink } from "./fa/screens/SimpleScreens";
+import { ExistingEmail, FinishLaterConfirmation, RequestLink } from "./fa/screens/SimpleScreens";
+import { SnapshotScreen } from "./fa/screens/SnapshotScreen";
 import { Welcome } from "./fa/screens/Welcome";
 import { Bundle, Locale, SessionView, StageId } from "./fa/types";
 
@@ -235,9 +236,13 @@ export function App() {
       )}
       {screen.name === "finish_later" && <FinishLaterConfirmation t={t} locale={locale} accessUntil={screen.accessUntil} onKeepGoing={() => setScreen({ name: "journey" })} />}
       {screen.name === "completion" && (
-        <Completion
+        <SnapshotScreen
+          key={sessionKey}
           bundle={bundle}
           t={t}
+          locale={locale}
+          load={api.sessionSnapshot}
+          onLocale={applyLocale}
           anotherProjectInMind={view?.anotherProjectInMind === "yes"}
           onStartAnother={async () => startSession((await api.anotherProject(true)).sessionToken)}
         />

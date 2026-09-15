@@ -67,4 +67,30 @@ export interface LinkChoices {
   accessUntil: string | null;
 }
 
+/** Client Expansion Snapshot as generated at completion (immutable; both locales pre-rendered). */
+export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
+
+export interface RenderedSnapshot {
+  eyebrow: string;
+  headline: string;
+  generatedOn: string;
+  summary: string[];
+  facts: Array<{ key: "company" | "market" | "launch" | "priority"; label: string; value: string; detail: string | null }>;
+  counts: Array<{ tone: SnapshotTone; label: string; count: number }>;
+  panels: Array<{ tone: SnapshotTone; title: string; intro: string; items: Array<{ areaId: number; label: string; reason: string | null }> }>;
+  immediatePriority: { title: string; value: string; timing: string | null; reason: string | null } | null;
+  reconcile: { title: string; text: string } | null;
+  decisionAhead: { title: string; text: string } | null;
+  shapePlan: { title: string; items: string[] } | null;
+  oneThing: { title: string; text: string } | null;
+  capabilities: { title: string; intro: string; items: Array<{ categoryId: number; label: string; description: string }> } | null;
+  disclosure: { title: string; text: string };
+}
+
+export interface SnapshotView {
+  snapshotId: string;
+  generatedAt: string;
+  content: { schema_version: 1; kind: "expansion_snapshot"; generated_at: string; deliverable_locale: Locale; locales: Record<Locale, RenderedSnapshot> };
+}
+
 export type ExtensionReason = "missing_information" | "project_not_structured" | "unsure_market_timing" | "something_else";

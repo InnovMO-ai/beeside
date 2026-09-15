@@ -118,7 +118,7 @@ DECLARE proj UUID;
 BEGIN
   proj := current_setting('beeside_test.project_id')::uuid;
   BEGIN
-    INSERT INTO finding (project_id, area_id, status, reason_client, rules_engine_version) VALUES (proj, 15, 'DEFINED', 'test', 'test-v1');
+    INSERT INTO finding (project_id, area_id, status, reason_client, rule_triggered, reason_internal, rules_engine_version) VALUES (proj, 15, 'DEFINED', 'test', 'test.rule', 'test', 'test-v1');
     RAISE EXCEPTION 'SENTINEL_FAIL: finding with area_id=15 (Other) was allowed';
   EXCEPTION
     WHEN OTHERS THEN IF SQLERRM LIKE 'SENTINEL_FAIL%' THEN RAISE; ELSE RAISE NOTICE 'T4 PASS: finding on non-finding-capable category rejected (%)', SQLERRM; END IF;
@@ -131,15 +131,15 @@ DECLARE proj UUID; affected INT;
 BEGIN
   proj := current_setting('beeside_test.project_id')::uuid;
   BEGIN
-    INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rules_engine_version)
-      VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_does_not_exist'], 'test-v1');
+    INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rule_triggered, reason_internal, rules_engine_version)
+      VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_does_not_exist'], 'test.rule', 'test', 'test-v1');
     RAISE EXCEPTION 'SENTINEL_FAIL: finding with unknown evidence_field_keys was allowed';
   EXCEPTION
     WHEN OTHERS THEN IF SQLERRM LIKE 'SENTINEL_FAIL%' THEN RAISE; ELSE RAISE NOTICE 'T5a PASS: unknown evidence_field_keys rejected (%)', SQLERRM; END IF;
   END;
 
-  INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rules_engine_version)
-    VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_priority_reason'], 'test-v1');
+  INSERT INTO finding (project_id, area_id, status, reason_client, evidence_field_keys, rule_triggered, reason_internal, rules_engine_version)
+    VALUES (proj, 1, 'DEFINED', 'test', ARRAY['fa.__test_priority_reason'], 'test.rule', 'test', 'test-v1');
   GET DIAGNOSTICS affected = ROW_COUNT;
   IF affected = 1 THEN
     RAISE NOTICE 'T5b PASS: finding with valid evidence_field_keys inserted (% row)', affected;
@@ -356,6 +356,9 @@ BEGIN
   proj := current_setting('beeside_test.project_id')::uuid;
   INSERT INTO snapshot (project_id, rules_engine_version, snapshot_template_version, content)
     VALUES (proj, 'test-v1', 'test-v1', '{"example":"frozen"}') RETURNING snapshot_id INTO snap_id;
+  -- Snapshot and Internal Assessment are generated together in one transaction (0008).
+  INSERT INTO internal_assessment (project_id, rules_engine_version, snapshot_template_version, content)
+    VALUES (proj, 'test-v1', 'test-v1', '{"example":"frozen"}');
 
   BEGIN
     UPDATE snapshot SET content = '{"tampered":true}' WHERE snapshot_id = snap_id;

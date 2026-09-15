@@ -45,11 +45,14 @@ export function Completion({
   t,
   anotherProjectInMind,
   onStartAnother,
+  intro = true,
 }: {
   bundle: Bundle;
   t: T;
   anotherProjectInMind: boolean;
   onStartAnother: () => Promise<void>;
+  /** False when rendered beneath the Snapshot, which already closes the assessment. */
+  intro?: boolean;
 }) {
   const [accept, setAccept] = useState(false);
   const [error, setError] = useState(false);
@@ -73,11 +76,15 @@ export function Completion({
   }
 
   return (
-    <section className="content" aria-labelledby="completion-title">
-      <h1 className="display" id="completion-title">
-        {t("completion", "title")}
-      </h1>
-      <p className="lead">{t("completion", "body")}</p>
+    <section className="content" aria-labelledby={intro ? "completion-title" : undefined}>
+      {intro && (
+        <>
+          <h1 className="display" id="completion-title">
+            {t("completion", "title")}
+          </h1>
+          <p className="lead">{t("completion", "body")}</p>
+        </>
+      )}
       {anotherProjectInMind && (
         <form onSubmit={start} noValidate style={{ marginTop: "3rem" }}>
           <h2 className="step-title">{t("completion", "another_title")}</h2>

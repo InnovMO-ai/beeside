@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response, Router } from "express";
+import { getSessionSnapshot, openSnapshotFromLink } from "../snapshot/snapshot-service";
 import { isExtensionDays } from "./services/access-lifecycle";
 import { isUuid, recordJourneyEvent, sanitizeClientEvent } from "./services/analytics";
 import { ISO_COUNTRY_CODES } from "./engine/iso-countries";
@@ -95,6 +96,15 @@ export function createFaRouter(deps: FaDeps): Router {
     const duration = body(req).durationMs;
     const durationMs = typeof duration === "number" && Number.isInteger(duration) && duration >= 0 && duration < 86_400_000 ? duration : null;
     res.json(await completeStep(deps, ctx, req.params.stepId ?? "", durationMs));
+  }));
+
+  router.get("/session/snapshot", handle(async (req, res) => {
+    const ctx = await session(req);
+    res.json(await getSessionSnapshot(deps, ctx.project));
+  }));
+
+  router.post("/links/snapshot", handle(async (req, res) => {
+    res.json(await openSnapshotFromLink(deps, body(req).token));
   }));
 
   router.post("/session/finish-later", handle(async (req, res) => {

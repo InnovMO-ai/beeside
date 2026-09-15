@@ -9,6 +9,7 @@ import { FaError } from "./errors";
 import { startProject } from "./project-factory";
 import { AssessmentState, FaDeps, ProjectRow, TokenRow, findUsableToken, issueToken, loadProject, loadStoredAnswers } from "./repository";
 import { looksLikeAccessToken } from "./tokens";
+import { generateAssessmentOutputs, sendSnapshotEmail } from "../../snapshot/snapshot-service";
 
 export interface SessionContext {
   token: TokenRow;
@@ -208,6 +209,9 @@ export async function completeStep(deps: FaDeps, ctx: SessionContext, stepId: st
 
     const next = computeJourney(ctx.bundle, stored, newLast);
     if (next.complete) {
+      // Phase 8: findings, Snapshot and Internal Assessment are generated synchronously, in this
+      // transaction, from the final applicable answers — before the lock makes them immutable.
+      await generateAssessmentOutputs(tx, deps, project, ctx.bundle, next.effectiveAnswers, now);
       await tx.query("UPDATE project SET assessment_state = 'COMPLETED_LOCKED', updated_at = $2 WHERE project_id = $1", [project.project_id, now]);
       await tx.query("UPDATE fa_project_lifecycle SET completed_at = $2, updated_at = $2 WHERE project_id = $1", [project.project_id, now]);
       await recordJourneyEvent(tx, {
@@ -216,6 +220,7 @@ export async function completeStep(deps: FaDeps, ctx: SessionContext, stepId: st
         questionBankVersion: project.question_bank_version,
         interfaceLanguage: project.interface_language,
       });
+      await sendSnapshotEmail(tx, deps, project.project_id, now);
     }
     const refreshed = await loadProject(tx, project.project_id);
     if (!refreshed) throw new FaError("NOT_FOUND", "project not found");
