@@ -139,7 +139,7 @@ export async function requestLinkByEmail(deps: FaDeps, rawEmail: unknown): Promi
   if (personId) await sendVerifiedLinkToPerson(deps, personId);
 }
 
-async function projectFromLink(deps: FaDeps, rawToken: unknown): Promise<{ project: ProjectRow; now: Date }> {
+export async function projectFromLink(deps: FaDeps, rawToken: unknown): Promise<{ project: ProjectRow; now: Date }> {
   const now = deps.config.now();
   const token = looksLikeAccessToken(rawToken) ? await findUsableToken(deps.db, rawToken, "RESUME", now) : null;
   const project = token ? await loadProject(deps.db, token.project_id) : null;
@@ -156,6 +156,8 @@ export interface LinkChoices {
   completed: boolean;
   anotherProjectInMind: boolean;
   accessUntil: string | null;
+  /** Technical Architecture v1.1 §7: a completed project is routed by its Premium history. */
+  premium: { everActivated: boolean; accessActive: boolean };
 }
 
 /** What the holder of a verified private link may do next. */
@@ -178,6 +180,10 @@ export async function openLink(deps: FaDeps, rawToken: unknown): Promise<LinkCho
     completed: project.assessment_state === "COMPLETED_LOCKED",
     anotherProjectInMind: another.rows[0]?.yes === true,
     accessUntil: project.access_expires_at?.toISOString() ?? null,
+    premium: {
+      everActivated: project.premium_ever_activated,
+      accessActive: (await deps.db.query<{ active: boolean }>("SELECT premium_access_active AS active FROM entitlement WHERE project_id = $1", [project.project_id])).rows[0]?.active === true,
+    },
   };
 }
 

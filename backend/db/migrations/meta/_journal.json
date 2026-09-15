@@ -64,6 +64,20 @@
       "when": 1789482156078,
       "tag": "0008_rules_snapshot_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789491014771,
+      "tag": "0009_premium_precision",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789491015283,
+      "tag": "0010_premium_precision_integrity",
+      "breakpoints": true
     }
   ]
 }

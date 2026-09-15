@@ -13,7 +13,11 @@ export type ClientEventType =
   | "language_changed"
   | "save_failed"
   | "step_back_navigated"
-  | "snapshot_viewed";
+  | "snapshot_viewed"
+  | "preview_room_clicked"
+  | "premium_continue_clicked"
+  | "premium_consideration_viewed"
+  | "premium_activation_viewed";
 
 export interface ClientEvent {
   type: ClientEventType;

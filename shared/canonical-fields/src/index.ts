@@ -11,6 +11,7 @@ export const CANONICAL_FIELDS_PACKAGE_VERSION = "1.0.0-fa-core" as const;
 
 export * from "./fields";
 export * from "./precision-context";
+export * from "./precision-handoff";
 
 /**
  * `assessment_state` — deliberately fixed to the five-value v1.1 set.

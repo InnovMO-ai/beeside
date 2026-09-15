@@ -152,16 +152,30 @@ export function ResumeLink({ bundle, t, locale, token, onLocale, onSession }: Re
     );
   }
   if (choices.completed) {
-    // A completed assessment's private link opens its immutable Expansion Snapshot.
+    // A completed assessment's private link opens its immutable Expansion Snapshot, then routes by
+    // Premium history (Technical Architecture v1.1 §7): never → Premium offer plus a separate new
+    // project; active → the Premium state; lapsed → reactivation of this same project, with no
+    // new-project prompt for the same relationship.
+    const premiumHistory = choices.premium?.everActivated === true;
     return (
       <>
-        <SnapshotScreen bundle={bundle} t={t} locale={locale} load={() => api.linkSnapshot(token)} onLocale={onLocale} anotherProjectInMind={false} />
-        <section className="content snapshot-next" aria-labelledby="choices-title">
-          <h2 className="step-title" id="choices-title">
-            {t("resume", "choose_title")}
-          </h2>
-          <div className="actions">{newProjectActions}</div>
-        </section>
+        <SnapshotScreen
+          bundle={bundle}
+          t={t}
+          locale={locale}
+          load={() => api.linkSnapshot(token)}
+          onLocale={onLocale}
+          anotherProjectInMind={false}
+          premium={{ loadStatus: () => api.linkPremium(token), activate: (acceptTerms) => api.linkPremiumActivation(token, acceptTerms) }}
+        />
+        {!premiumHistory && (
+          <section className="content snapshot-next" aria-labelledby="choices-title">
+            <h2 className="step-title" id="choices-title">
+              {t("resume", "choose_title")}
+            </h2>
+            <div className="actions">{newProjectActions}</div>
+          </section>
+        )}
       </>
     );
   }

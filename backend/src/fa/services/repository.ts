@@ -1,6 +1,7 @@
 import { Db } from "../../db/database";
 import { QuestionBankBundle } from "../engine/bundle-types";
 import { EmailTransport } from "../email/email-adapter";
+import type { CheckoutAdapter } from "../../premium/checkout";
 import { BundleStore } from "./bundle-store";
 import { generateAccessToken, hashAccessToken } from "./tokens";
 
@@ -17,6 +18,8 @@ export interface FaDeps {
   email: EmailTransport;
   bundles: BundleStore;
   config: FaConfig;
+  /** Phase 9 checkout boundary; manual confirmation (no payment provider) when absent. */
+  premium?: { checkout: CheckoutAdapter };
 }
 
 export type AssessmentState = "DRAFT" | "IN_PROGRESS" | "COMPLETED_LOCKED" | "EXPIRED" | "DELETED";

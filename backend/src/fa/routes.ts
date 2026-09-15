@@ -1,5 +1,7 @@
 import express, { NextFunction, Request, Response, Router } from "express";
 import { getSessionSnapshot, openSnapshotFromLink } from "../snapshot/snapshot-service";
+import { PREMIUM_CONTENT_VERSION, PREMIUM_COPY, PREMIUM_TERMS_URL, PREVIEW_ROOM_URL } from "../premium/content";
+import { getPremiumStatus, requestPremiumActivation } from "../premium/premium-service";
 import { isExtensionDays } from "./services/access-lifecycle";
 import { isUuid, recordJourneyEvent, sanitizeClientEvent } from "./services/analytics";
 import { ISO_COUNTRY_CODES } from "./engine/iso-countries";
@@ -13,6 +15,7 @@ import {
   finishLater,
   newProjectFromLink,
   openLink,
+  projectFromLink,
   requestLinkByEmail,
 } from "./services/link-service";
 import { FaDeps } from "./services/repository";
@@ -105,6 +108,34 @@ export function createFaRouter(deps: FaDeps): Router {
 
   router.post("/links/snapshot", handle(async (req, res) => {
     res.json(await openSnapshotFromLink(deps, body(req).token));
+  }));
+
+  // ---- Phase 9: Premium transition (after the Snapshot; no price, no payment provider).
+  router.get("/premium/content", (_req, res) => {
+    res.set("Cache-Control", "public, max-age=300").json({ version: PREMIUM_CONTENT_VERSION, previewRoomUrl: PREVIEW_ROOM_URL, termsUrl: PREMIUM_TERMS_URL, copy: PREMIUM_COPY });
+  });
+
+  router.get("/session/premium", handle(async (req, res) => {
+    const ctx = await session(req);
+    res.json(await getPremiumStatus(deps.db, ctx.project.project_id));
+  }));
+
+  router.post("/session/premium/activation", handle(async (req, res) => {
+    const ctx = await session(req);
+    res.status(201).json(
+      await requestPremiumActivation(deps, ctx.project.project_id, ctx.project.created_by_person_id, { acceptTerms: body(req).acceptTerms, interfaceLanguage: ctx.project.interface_language }),
+    );
+  }));
+
+  router.post("/links/premium", handle(async (req, res) => {
+    const { project } = await projectFromLink(deps, body(req).token);
+    res.json(await getPremiumStatus(deps.db, project.project_id));
+  }));
+
+  router.post("/links/premium/activation", handle(async (req, res) => {
+    const b = body(req);
+    const { project } = await projectFromLink(deps, b.token);
+    res.status(201).json(await requestPremiumActivation(deps, project.project_id, project.created_by_person_id, { acceptTerms: b.acceptTerms, interfaceLanguage: project.interface_language }));
   }));
 
   router.post("/session/finish-later", handle(async (req, res) => {

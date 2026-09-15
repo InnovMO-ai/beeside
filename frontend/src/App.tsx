@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flush as flushAnalytics, track } from "./fa/analytics";
 import { api, ApiError, sessionStore } from "./fa/api";
 import { SaveStatus } from "./fa/autosave";
+import { PremiumSource } from "./fa/components/PremiumTransition";
 import { Shell } from "./fa/components/Shell";
 import { makeT } from "./fa/copy";
 import { Identity } from "./fa/screens/Identity";
@@ -25,6 +26,7 @@ type Screen =
   | { name: "unavailable" };
 
 const RESUME_PATH = /^\/resume\/([A-Za-z0-9_-]{20,})\/?$/;
+const SESSION_PREMIUM: PremiumSource = { loadStatus: api.sessionPremium, activate: api.sessionPremiumActivation };
 const LOCALE_KEY = "beeside.fa.locale";
 
 function initialLocale(): Locale {
@@ -245,6 +247,7 @@ export function App() {
           onLocale={applyLocale}
           anotherProjectInMind={view?.anotherProjectInMind === "yes"}
           onStartAnother={async () => startSession((await api.anotherProject(true)).sessionToken)}
+          premium={SESSION_PREMIUM}
         />
       )}
       {screen.name === "resume" && <ResumeLink bundle={bundle} t={t} locale={locale} token={screen.token} onLocale={applyLocale} onSession={startSession} />}

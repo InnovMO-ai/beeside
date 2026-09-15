@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ExpansionSnapshot } from "../components/ExpansionSnapshot";
+import { PremiumSource, PremiumTransition } from "../components/PremiumTransition";
 import { T } from "../copy";
 import { Bundle, Locale, SnapshotView } from "../types";
 import { Completion } from "./SimpleScreens";
@@ -13,10 +14,12 @@ interface SnapshotScreenProps {
   onLocale: (locale: Locale) => void;
   anotherProjectInMind: boolean;
   onStartAnother?: () => Promise<void>;
+  /** Phase 9: the post-Snapshot Premium transition for this same project. */
+  premium?: PremiumSource;
 }
 
 /** Loads the immutable Snapshot and shows it in the respondent's deliverable language first. */
-export function SnapshotScreen({ bundle, t, locale, load, onLocale, anotherProjectInMind, onStartAnother }: SnapshotScreenProps) {
+export function SnapshotScreen({ bundle, t, locale, load, onLocale, anotherProjectInMind, onStartAnother, premium }: SnapshotScreenProps) {
   const [snapshot, setSnapshot] = useState<SnapshotView | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -54,6 +57,7 @@ export function SnapshotScreen({ bundle, t, locale, load, onLocale, anotherProje
   return (
     <>
       <ExpansionSnapshot snapshot={snapshot} locale={locale} />
+      {premium && <PremiumTransition locale={locale} source={premium} />}
       {anotherProjectInMind && onStartAnother && <Completion bundle={bundle} t={t} anotherProjectInMind onStartAnother={onStartAnother} intro={false} />}
     </>
   );

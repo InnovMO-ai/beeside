@@ -1,4 +1,4 @@
-import { Bundle, ExtensionReason, LinkChoices, SessionView, SnapshotView } from "./types";
+import { Bundle, ExtensionReason, LinkChoices, PremiumActivationResult, PremiumContent, PremiumStatus, SessionView, SnapshotView } from "./types";
 
 const BASE = "/api/fa";
 const SESSION_KEY = "beeside.fa.session";
@@ -80,6 +80,11 @@ export const api = {
     request<{ sessionToken: string }>("POST", "/links/new-project", { token, ...input }),
   sessionSnapshot: () => request<SnapshotView>("GET", "/session/snapshot", undefined, true),
   linkSnapshot: (token: string) => request<SnapshotView>("POST", "/links/snapshot", { token }),
+  premiumContent: () => request<PremiumContent>("GET", "/premium/content"),
+  sessionPremium: () => request<PremiumStatus>("GET", "/session/premium", undefined, true),
+  sessionPremiumActivation: (acceptTerms: boolean) => request<PremiumActivationResult>("POST", "/session/premium/activation", { acceptTerms }, true),
+  linkPremium: (token: string) => request<PremiumStatus>("POST", "/links/premium", { token }),
+  linkPremiumActivation: (token: string, acceptTerms: boolean) => request<PremiumActivationResult>("POST", "/links/premium/activation", { token, acceptTerms }),
   countries: () => request<{ codes: string[] }>("GET", "/reference/countries"),
   requestLink: (email: string) => request<{ status: "accepted" }>("POST", "/links/request", { email }),
   events: (payload: { anonymousSessionId: string; events: unknown[] }) => request<{ accepted: number }>("POST", "/events", payload, true),

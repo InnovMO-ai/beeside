@@ -65,6 +65,52 @@ export interface LinkChoices {
   completed: boolean;
   anotherProjectInMind: boolean;
   accessUntil: string | null;
+  /** A completed project is routed by its Premium history (never / active / lapsed). */
+  premium: { everActivated: boolean; accessActive: boolean };
+}
+
+/** Premium transition copy (premium-content-1.0.0), served by the backend; no price is ever shown. */
+export interface PremiumCopy {
+  transition: { eyebrow: string; headline: string; body: string; continue_cta: string; explore_cta: string; explore_helper: string; new_tab: string };
+  consideration: {
+    eyebrow: string;
+    title: string;
+    intro: string;
+    pillars: Array<{ key: string; title: string; body: string }>;
+    outcomes_title: string;
+    outcomes: string[];
+    candidate_line: string;
+    next_cta: string;
+    back: string;
+  };
+  activation: { title: string; points: string[]; terms_prefix: string; terms_label: string; terms_required: string; activate_cta: string; reactivate_cta: string; back: string; error: string };
+  result: { pending_title: string; pending_body: string; active_title: string; active_body: string };
+  status: { active_title: string; active_body: string; scheduled_body: string; lapsed_title: string; lapsed_body: string; pending_title: string; pending_body: string };
+}
+
+export interface PremiumContent {
+  version: string;
+  previewRoomUrl: string;
+  termsUrl: string;
+  copy: Record<Locale, PremiumCopy>;
+}
+
+export interface PremiumStatus {
+  available: boolean;
+  everActivated: boolean;
+  accessActive: boolean;
+  subscriptionStatus: "PREMIUM_ACTIVE" | "CANCELLATION_SCHEDULED" | "PREMIUM_INACTIVE" | null;
+  accessUntil: string | null;
+  pendingRequest: { kind: "activation" | "reactivation"; requestedAt: string } | null;
+  canActivate: boolean;
+  canReactivate: boolean;
+  previewRoomUrl: string;
+  termsUrl: string;
+}
+
+export interface PremiumActivationResult {
+  outcome: { kind: "pending_confirmation" } | { kind: "redirect"; url: string } | { kind: "activated" };
+  status: PremiumStatus;
 }
 
 /** Client Expansion Snapshot as generated at completion (immutable; both locales pre-rendered). */

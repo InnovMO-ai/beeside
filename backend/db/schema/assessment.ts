@@ -4,6 +4,7 @@ import { boolean } from "drizzle-orm/pg-core";
 import { findingStatusEnum, priorityAlignmentStatusEnum, signalStrengthEnum } from "./enums";
 import { project } from "./project";
 import { fieldKeyRegistry, rulesMatrixCategory, capabilityTaxonomyCategory } from "./reference";
+import { subscriptionEvent } from "./subscription";
 
 export const answer = pgTable(
   "answer",
@@ -111,4 +112,15 @@ export const precisionHandoffPackage = pgTable("precision_handoff_package", {
   projectId: uuid("project_id").notNull().unique().references(() => project.projectId),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
   content: jsonb("content").notNull(),
+  // Phase 9: materialized exactly once from these frozen records, by the first premium_activated event.
+  contractVersion: smallint("contract_version").notNull().default(1),
+  sourceSnapshotId: uuid("source_snapshot_id")
+    .notNull()
+    .references(() => snapshot.snapshotId),
+  sourceInternalAssessmentId: uuid("source_internal_assessment_id")
+    .notNull()
+    .references(() => internalAssessment.internalAssessmentId),
+  generatedByEventId: uuid("generated_by_event_id")
+    .notNull()
+    .references(() => subscriptionEvent.eventId),
 });

@@ -33,6 +33,11 @@ export const CLIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "save_failed",
   "step_back_navigated",
   "snapshot_viewed",
+  // Phase 9: the two post-Snapshot paths (no answer content, no personal data).
+  "preview_room_clicked",
+  "premium_continue_clicked",
+  "premium_consideration_viewed",
+  "premium_activation_viewed",
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
