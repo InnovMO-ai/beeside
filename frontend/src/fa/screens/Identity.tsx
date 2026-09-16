@@ -113,9 +113,19 @@ export function Identity({ bundle, t, locale, onStarted, onExistingEmail }: Iden
         {t("identity", "title")}
       </h1>
       <p className="lead">{t("identity", "intro")}</p>
+      {/* No label and hidden from assistive technology as well as from sight: a person never meets
+          this field, so it is never announced, focusable or translated. Only automation fills it. */}
       <div className="honeypot" aria-hidden="true">
-        <label htmlFor="identity-reference-code">Reference code</label>
-        <input id="identity-reference-code" name="referenceCode" type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+        <input
+          id="identity-reference-code"
+          name="referenceCode"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
       </div>
       <div className="two-col">
         {input("firstName", t("identity", "first_name"), { autoComplete: "given-name" })}
