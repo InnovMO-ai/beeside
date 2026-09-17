@@ -68,23 +68,23 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
       },
     },
   },
+  // Hero/Home (owner-approved copy, verbatim in English; ES is a faithful translation of the same
+  // approved text — no separate brand-statement line, per the approved spec).
   welcome: {
     copy: {
       en: {
         eyebrow: "beeside First Assessment",
-        headline: "Your expansion starts with a clearer picture.",
-        body: "Tell us about your project. We’ll help you see what’s already defined, what needs attention and what may be worth addressing early.",
-        cta: "Start my assessment",
-        support: "About 10–15 minutes · Save and continue later",
-        brand_statement: "Expand your business with clarity.",
+        headline: "Your expansion starts with a clearer view.",
+        body: "Tell us about your project. We’ll help you identify what’s already defined, what needs attention, and what comes next.",
+        cta: "Start your assessment",
+        support: "Around 10–15 minutes · Save and continue later",
       },
       es: {
         eyebrow: "beeside First Assessment",
         headline: "Tu expansión empieza con una visión más clara.",
-        body: "Cuéntanos sobre tu proyecto. Te ayudaremos a ver qué ya está definido, qué necesita atención y qué conviene revisar desde ahora.",
-        cta: "Iniciar mi evaluación",
+        body: "Cuéntanos sobre tu proyecto. Te ayudaremos a identificar qué ya está definido, qué necesita atención y qué sigue.",
+        cta: "Inicia tu evaluación",
         support: "Alrededor de 10–15 minutos · Guarda y continúa después",
-        brand_statement: "Expande tu negocio con claridad.",
       },
     },
   },

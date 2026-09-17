@@ -86,7 +86,7 @@ describe("App", () => {
   it("opens on the Welcome screen with copy from the published question bank", async () => {
     mockFetch((call) => (call.url.endsWith("/bundles/current") ? jsonResponse({ version: "fa-qb-1.0.0", bundle: TEST_BUNDLE }) : jsonResponse({ accepted: 1 })));
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Your expansion starts with a clearer picture." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your expansion starts with a clearer view." })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "beeside" })).toBeInTheDocument();
   });
 

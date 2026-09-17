@@ -44,7 +44,24 @@ export const TEST_BUNDLE: Bundle = {
   links: { terms_url: "https://www.beeside.you/termsandconditions", privacy_policy_url: null },
   ui: {
     common: { copy: { en: { continue: "Continue", back: "Back", required_error: "Please answer to continue.", optional: "Optional" }, es: { continue: "Continuar" } } },
-    welcome: { copy: { en: { headline: "Your expansion starts with a clearer picture.", cta: "Start my assessment" }, es: { headline: "Tu expansión empieza con una visión más clara.", cta: "Iniciar mi evaluación" } } },
+    welcome: {
+      copy: {
+        en: {
+          eyebrow: "beeside First Assessment",
+          headline: "Your expansion starts with a clearer view.",
+          body: "Tell us about your project. We’ll help you identify what’s already defined, what needs attention, and what comes next.",
+          cta: "Start your assessment",
+          support: "Around 10–15 minutes · Save and continue later",
+        },
+        es: {
+          eyebrow: "beeside First Assessment",
+          headline: "Tu expansión empieza con una visión más clara.",
+          body: "Cuéntanos sobre tu proyecto. Te ayudaremos a identificar qué ya está definido, qué necesita atención y qué sigue.",
+          cta: "Inicia tu evaluación",
+          support: "Alrededor de 10–15 minutos · Guarda y continúa después",
+        },
+      },
+    },
     assemble: { copy: { en: { headline: "Putting the pieces together.", body: "We’re assembling your Expansion Snapshot from what you shared." }, es: { headline: "Armando las piezas.", body: "Estamos preparando tu Expansion Snapshot con lo que compartiste." } } },
     virtual_snapshot: {
       copy: {

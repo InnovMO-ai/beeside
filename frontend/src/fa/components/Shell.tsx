@@ -46,7 +46,11 @@ export function Shell({ bundle, locale, t, onLocaleChange, currentStage, saveSta
         {locale === "es" ? "Saltar al contenido" : "Skip to content"}
       </a>
       <header className="shell-header">
-        <img className="logo" src={logoUrl} alt="beeside" />
+        <div className="header-brand">
+          <img className="logo" src={logoUrl} alt="beeside" />
+          {/* Product name, not a UI string — stays "First Assessment" in both locales, like "beeside" itself. */}
+          <span className="header-product-label">First Assessment</span>
+        </div>
         <div className="header-actions">
           {onFinishLater && (
             <button type="button" className="button button-text" onClick={onFinishLater}>

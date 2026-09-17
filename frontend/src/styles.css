@@ -72,12 +72,25 @@ a {
   gap: 1rem;
   padding: 1.25rem clamp(1.25rem, 5vw, 4rem);
 }
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 .logo {
   display: block;
   /* The official asset carries its own clear space; it is scaled, never cropped or recolored. */
   height: 76px;
   width: auto;
   margin: -14px 0 -14px -20px;
+}
+.header-product-label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 0.01em;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--purple-200);
 }
 .header-actions {
   display: flex;
@@ -167,6 +180,9 @@ main {
 }
 
 /* ---------------------------------------------------------------- welcome */
+/* Hero/Home (owner-approved). Desktop: copy left, artwork right. Tablet: the same two columns,
+   narrowed, for as long as they stay legible. Mobile: single column, artwork last — header, copy,
+   CTA, support, then artwork — per the approved order; nothing here reorders on mobile. */
 .welcome {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -174,10 +190,20 @@ main {
   align-items: stretch;
 }
 .welcome-visual {
-  /* Reserved for the single approved opening photograph (asset not yet supplied). */
+  /* Reserved for the single approved opening photograph (asset not yet supplied).
+     Deliberately unframed — no border, no card shadow — per the "less card-based, less framing"
+     visual direction; the faint fill is a placeholder only, not a decorative treatment. */
   min-height: 22rem;
-  border-radius: var(--radius);
   background: var(--mist);
+}
+@media (max-width: 960px) {
+  .welcome {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+  }
+  .welcome-visual {
+    min-height: 16rem;
+  }
 }
 @media (max-width: 760px) {
   .welcome {
@@ -185,7 +211,6 @@ main {
   }
   .welcome-visual {
     min-height: 12rem;
-    order: -1;
   }
 }
 
