@@ -377,6 +377,7 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
     expect(priorities.items[0]).toMatchObject({ isImmediatePriority: true, isBlocker: true, dependsOnLabel: null, owner: "Ana Rivera" });
     expect(priorities.items[1]).toMatchObject({ isImmediatePriority: false, dependsOnLabel: "Company Setup", approvalRequired: true, approvalFrom: "Finance lead" });
     expect(priorities.items[2]).toMatchObject({ isBlocker: false, dependsOnLabel: "Tax" });
+    expect(priorities).toMatchObject({ ownerLabel: "Internal owner", approvalLabel: "Needs approval from" });
   });
 
   it("buckets a three-level dependency chain into NOW → DEFINE → ENABLE, one hop per stage", () => {
@@ -389,6 +390,8 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
     ]);
     // The pathway is dependency-derived and never reorders the declared priorityRank sequence itself.
     expect(pathway.items.map((i) => i.key)).toEqual(client.locales.en.needsPriorities!.items.map((i) => i.key));
+    // Reuses the same immediate/blocker wording as needsPriorities — one set of copy, two beats.
+    expect(pathway).toMatchObject({ immediateLabel: "Immediate priority", blockerLabel: "Blocker" });
   });
 
   it("keeps two independent items in the same NOW stage as parallel paths, not a forced serial chain", () => {

@@ -45,6 +45,9 @@ export interface SnapshotTemplateCopy {
   /** Plain label, no placeholder — the frontend pairs it with the dependency's own label, the same
    *  way `facts_company` pairs with a `facts[].value` elsewhere in this Snapshot. */
   priorities_depends_on_label: string;
+  /** Plain labels, paired the same way with `items[].owner` / `items[].approvalFrom`. */
+  priorities_owner_label: string;
+  priorities_approval_label: string;
   /** "Your Initial Path" (Level 2 MVP §3.4): the reusable NOW → DEFINE → ENABLE → LAUNCH PathwayDiagram. */
   pathway_title: string;
   pathway_intro: string;
@@ -126,6 +129,8 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         priorities_next_label: "Next priorities",
         priorities_blocker_label: "Blocker",
         priorities_depends_on_label: "Depends on",
+        priorities_owner_label: "Internal owner",
+        priorities_approval_label: "Needs approval from",
         pathway_title: "Your initial path",
         pathway_intro: "A starting sequence based on what you shared — not a rigid methodology or a guarantee.",
         pathway_stage_now: "Now",
@@ -176,6 +181,8 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         priorities_next_label: "Siguientes prioridades",
         priorities_blocker_label: "Bloqueante",
         priorities_depends_on_label: "Depende de",
+        priorities_owner_label: "Responsable interno",
+        priorities_approval_label: "Necesita aprobación de",
         pathway_title: "Tu ruta inicial",
         pathway_intro: "Una secuencia de partida con base en lo que compartiste — no es una metodología rígida ni una garantía.",
         pathway_stage_now: "Ahora",

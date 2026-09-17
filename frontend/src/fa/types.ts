@@ -219,9 +219,11 @@ export interface RenderedSnapshot {
     nextLabel: string;
     blockerLabel: string;
     dependsOnLabel: string;
+    ownerLabel: string;
+    approvalLabel: string;
     items: RenderedNeedsPriority[];
   } | null;
-  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; items: RenderedPathwayItem[] } | null;
+  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; immediateLabel: string; blockerLabel: string; items: RenderedPathwayItem[] } | null;
   needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
   disclosure: { title: string; text: string };
 }

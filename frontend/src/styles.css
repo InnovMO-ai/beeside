@@ -741,6 +741,188 @@ blockquote.verbatim {
   margin-top: 2rem;
 }
 
+/* ---------------------------------------------------------------- priority list ("What Matters Now") */
+.priority-badge-immediate {
+  --tone-ink: #6d28d9;
+  --tone-bg: #f3ecff;
+  --tone-border: #dcc9fb;
+}
+.priority-badge-next {
+  --tone-ink: #475569;
+  --tone-bg: #f1f5f9;
+  --tone-border: #cbd5e1;
+}
+.priority-badge-blocker {
+  --tone-ink: #be123c;
+  --tone-bg: #fff1f3;
+  --tone-border: #fcc8d3;
+}
+.priority-items {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: priority-item;
+}
+.priority-item {
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.priority-item-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.priority-item-label {
+  font-weight: 700;
+  margin-right: auto;
+}
+.priority-item-meta {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--mist);
+}
+.priority-item-meta-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.9375rem;
+}
+.priority-item-meta-row dt {
+  color: var(--ink-soft);
+}
+.priority-item-meta-row dt::after {
+  content: ":";
+}
+.priority-item-meta-row dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- pathway diagram ("Your Initial Path") */
+.pathway-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 720px) {
+  .pathway-stages {
+    grid-template-columns: 1fr;
+  }
+}
+.pathway-stage {
+  padding: 1rem;
+  border: 1px solid var(--purple-200);
+  border-radius: var(--radius);
+  background: var(--mist);
+}
+.pathway-stage[data-empty="true"] {
+  opacity: 0.7;
+}
+.pathway-stage-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--purple-900);
+}
+.pathway-stage-ordinal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--purple-600);
+  color: var(--white);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  flex: none;
+}
+.pathway-stage-empty {
+  margin: 0;
+}
+.pathway-items {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pathway-item {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  background: var(--white);
+}
+.pathway-item-label {
+  font-weight: 700;
+}
+.pathway-item-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.pathway-item-flags:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- capability landscape */
+.needs-status-covered_internally,
+.needs-status-covered_by_provider {
+  --tone-ink: #0f766e;
+  --tone-bg: #e8f6f4;
+  --tone-border: #a9dcd5;
+}
+.needs-status-in_progress {
+  --tone-ink: #8a6800;
+  --tone-bg: #fff9db;
+  --tone-border: #f3de7a;
+}
+.needs-status-needs_resolution {
+  --tone-ink: #be123c;
+  --tone-bg: #fff1f3;
+  --tone-border: #fcc8d3;
+}
+.needs-status-needs_confirmation {
+  --tone-ink: #52525b;
+  --tone-bg: #f4f4f5;
+  --tone-border: #d4d4d8;
+}
+.capability-landscape-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.capability-landscape-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--tone-border);
+  border-radius: var(--radius);
+  background: var(--tone-bg);
+}
+.capability-landscape-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 /* ---------------------------------------------------------------- premium transition */
 .premium-transition {
   max-width: 72rem;

@@ -120,11 +120,15 @@ export interface RenderedSnapshot {
     nextLabel: string;
     blockerLabel: string;
     dependsOnLabel: string;
+    ownerLabel: string;
+    approvalLabel: string;
     items: RenderedNeedsPriority[];
   } | null;
   /** null under the same condition as `needsPriorities` — the pathway is only ever built over
-   *  prioritized needs (`fa.needs.map.dependencies` is itself scoped to `priorityRank` items only). */
-  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; items: RenderedPathwayItem[] } | null;
+   *  prioritized needs (`fa.needs.map.dependencies` is itself scoped to `priorityRank` items only).
+   *  `immediateLabel`/`blockerLabel` reuse the same copy as `needsPriorities` — one set of wording for
+   *  the same two facts wherever they appear in the Snapshot. */
+  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; immediateLabel: string; blockerLabel: string; items: RenderedPathwayItem[] } | null;
   /** null when no needs were selected at all. */
   needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
   disclosure: { title: string; text: string };
@@ -284,6 +288,8 @@ function computeNeedsPriorities(needs: NeedsMapValue | undefined, locale: Locale
     nextLabel: copy.priorities_next_label,
     blockerLabel: copy.priorities_blocker_label,
     dependsOnLabel: copy.priorities_depends_on_label,
+    ownerLabel: copy.priorities_owner_label,
+    approvalLabel: copy.priorities_approval_label,
     items,
   };
 }
@@ -312,6 +318,8 @@ function computePathway(needs: NeedsMapValue | undefined, locale: Locale, copy: 
       enable: copy.pathway_stage_enable,
       launch: copy.pathway_stage_launch,
     },
+    immediateLabel: copy.priorities_immediate_label,
+    blockerLabel: copy.priorities_blocker_label,
     items,
   };
 }
