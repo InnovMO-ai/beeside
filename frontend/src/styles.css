@@ -433,6 +433,56 @@ fieldset.question {
   --tone-bg: #fff1f3;
   --tone-border: #fcc8d3;
 }
+/* AssembleTransition — non-spinner motion into the Snapshot ("Putting the pieces together"). */
+.assemble-transition {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 4rem 1rem;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+.assemble-tiles {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.assemble-tile {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--purple-600);
+  opacity: 0;
+  transform: translateY(10px) scale(0.6);
+  animation: assemble-settle 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.assemble-tile:nth-child(3) {
+  background: var(--purple-900);
+}
+@keyframes assemble-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.assemble-headline {
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assemble-tile {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
 .snapshot {
   display: grid;
   gap: 2rem;

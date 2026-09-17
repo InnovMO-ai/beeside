@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AssembleTransition } from "../components/AssembleTransition";
 import { ExpansionSnapshot } from "../components/ExpansionSnapshot";
 import { FeedbackSource, SnapshotFeedback } from "../components/SnapshotFeedback";
 import { PremiumSource, PremiumTransition } from "../components/PremiumTransition";
@@ -51,11 +52,10 @@ export function SnapshotScreen({ bundle, t, locale, load, onLocale, anotherProje
     );
   }
   if (!snapshot) {
-    return (
-      <p className="content" role="status">
-        {t("common", "loading")}
-      </p>
-    );
+    // AssembleTransition (Design Spec build-order item 9): the non-spinner "Putting the pieces
+    // together" motion sequence, shown for however long the immutable Snapshot takes to load —
+    // never a bare "Loading…" for the single highest-stakes moment in the product.
+    return <AssembleTransition t={t} />;
   }
   return (
     <>

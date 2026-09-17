@@ -109,6 +109,16 @@ describe("SnapshotScreen", () => {
     await waitFor(() => expect(onLocale).toHaveBeenCalledWith("es"));
   });
 
+  it("shows the AssembleTransition (never a bare 'Loading…') while the Snapshot is still being generated", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    let resolveLoad!: (value: SnapshotView) => void;
+    const load = vi.fn(() => new Promise<SnapshotView>((resolve) => (resolveLoad = resolve)));
+    render(<SnapshotScreen bundle={TEST_BUNDLE} t={makeT(TEST_BUNDLE, "en")} locale="en" load={load} onLocale={() => undefined} anotherProjectInMind={false} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("Putting the pieces together.");
+    resolveLoad(snapshot(rendered()));
+    expect(await screen.findByRole("heading", { level: 1, name: "Your project, in perspective." })).toBeInTheDocument();
+  });
+
   it("reports a calm error when the Snapshot cannot be loaded", async () => {
     const load = vi.fn(async () => {
       throw new Error("offline");

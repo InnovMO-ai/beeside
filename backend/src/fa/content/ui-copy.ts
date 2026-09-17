@@ -254,6 +254,15 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
       },
     },
   },
+  // Level 2 MVP — the Assemble transition (Design Specification "AssembleTransition" component,
+  // build-order item 9): the non-spinner motion sequence shown while the locked assessment's
+  // Snapshot is being generated. Additive only, same as `level2` below.
+  assemble: {
+    copy: {
+      en: { headline: "Putting the pieces together.", body: "We’re assembling your Expansion Snapshot from what you shared." },
+      es: { headline: "Armando las piezas.", body: "Estamos preparando tu Expansion Snapshot con lo que compartiste." },
+    },
+  },
   // Level 2 MVP — grouped compositions, Needs Explorer, StructuredEcho and Review. Additive only:
   // fa-qb-1.1.0 never reads this key, so nothing here can affect a project still on that bundle.
   level2: {
