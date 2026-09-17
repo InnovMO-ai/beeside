@@ -52,6 +52,9 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
       intro: "Based on what you shared, these capabilities are relevant to your project.",
       items: [{ categoryId: 1, label: "Trade & customs", description: "Getting goods across borders" }],
     },
+    needsPriorities: null,
+    pathway: null,
+    needsLandscape: null,
     disclosure: { title: "About this Snapshot", text: "This initial interpretation is based on the information you shared with us." },
     ...overrides,
   };

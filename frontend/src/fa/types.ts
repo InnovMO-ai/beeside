@@ -156,6 +156,45 @@ export interface RenderedExpansionDimension {
   tierLabel: string;
 }
 
+/** Mirrors backend/src/fa/engine/needs-map-types.ts's NeedsMapStatus (never a purchase signal). */
+export type NeedsMapStatus = "covered_internally" | "covered_by_provider" | "in_progress" | "needs_resolution" | "needs_confirmation";
+
+/** "What Matters Now" (Level 2 MVP §3.3). Declared order (index 0 = Immediate Priority) — never
+ *  reordered by dependency data; `dependsOnLabel`/`owner`/`approvalRequired` are shown alongside. */
+export interface RenderedNeedsPriority {
+  key: string;
+  label: string;
+  isImmediatePriority: boolean;
+  isBlocker: boolean;
+  dependsOnLabel: string | null;
+  owner: string | null;
+  approvalRequired: boolean;
+  approvalFrom: string | null;
+}
+
+/** One of the four PathwayDiagram stages (§3.4): a deterministic bucket by dependency depth over the
+ *  client's own declared graph — not a rigid methodology or a guarantee. Items sharing a stage are
+ *  parallel paths, never forced into an artificial serial sequence. */
+export type PathwayStage = "now" | "define" | "enable" | "launch";
+
+export interface RenderedPathwayItem {
+  key: string;
+  label: string;
+  stage: PathwayStage;
+  isImmediatePriority: boolean;
+  isBlocker: boolean;
+  dependsOnLabel: string | null;
+}
+
+/** "Capability Landscape" (§3.5): every declared need with its coverage status — never a provider
+ *  name. `status` is a stable key for icon/tone; `statusLabel` is the only wording meant to render. */
+export interface RenderedNeedsLandscapeItem {
+  key: string;
+  label: string;
+  status: NeedsMapStatus;
+  statusLabel: string;
+}
+
 export interface RenderedSnapshot {
   eyebrow: string;
   headline: string;
@@ -171,6 +210,17 @@ export interface RenderedSnapshot {
   shapePlan: { title: string; items: string[] } | null;
   oneThing: { title: string; text: string } | null;
   capabilities: { title: string; intro: string; items: Array<{ categoryId: number; label: string; description: string }> } | null;
+  needsPriorities: {
+    title: string;
+    intro: string;
+    immediateLabel: string;
+    nextLabel: string;
+    blockerLabel: string;
+    dependsOnLabel: string;
+    items: RenderedNeedsPriority[];
+  } | null;
+  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; items: RenderedPathwayItem[] } | null;
+  needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
   disclosure: { title: string; text: string };
 }
 

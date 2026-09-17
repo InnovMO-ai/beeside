@@ -35,6 +35,32 @@ export interface SnapshotTemplateCopy {
   capabilities_intro: string;
   disclosure_title: string;
   disclosure: string;
+  /** "What Matters Now" (Level 2 MVP §3.3): declared priority order, kept separate from `pathway`'s
+   *  dependency-derived sequence — neither is ever silently reordered by the other. */
+  priorities_title: string;
+  priorities_intro: string;
+  priorities_immediate_label: string;
+  priorities_next_label: string;
+  priorities_blocker_label: string;
+  /** Plain label, no placeholder — the frontend pairs it with the dependency's own label, the same
+   *  way `facts_company` pairs with a `facts[].value` elsewhere in this Snapshot. */
+  priorities_depends_on_label: string;
+  /** "Your Initial Path" (Level 2 MVP §3.4): the reusable NOW → DEFINE → ENABLE → LAUNCH PathwayDiagram. */
+  pathway_title: string;
+  pathway_intro: string;
+  pathway_stage_now: string;
+  pathway_stage_define: string;
+  pathway_stage_enable: string;
+  pathway_stage_launch: string;
+  /** "Capability Landscape" (Level 2 MVP §3.5): every declared need with its coverage status — no
+   *  provider names, and selection is never framed as purchase intent. */
+  needs_landscape_title: string;
+  needs_landscape_intro: string;
+  needs_status_covered_internally: string;
+  needs_status_covered_by_provider: string;
+  needs_status_in_progress: string;
+  needs_status_needs_resolution: string;
+  needs_status_needs_confirmation: string;
 }
 
 export interface SnapshotPhrases {
@@ -94,6 +120,25 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         disclosure_title: "About this Snapshot",
         disclosure:
           "This initial interpretation is based on the information you shared with us. As we learn more about your project, beeside can provide greater context, precision and value to help you move forward.",
+        priorities_title: "What matters now",
+        priorities_intro: "Your declared priorities, with the dependencies and approvals they involve.",
+        priorities_immediate_label: "Immediate priority",
+        priorities_next_label: "Next priorities",
+        priorities_blocker_label: "Blocker",
+        priorities_depends_on_label: "Depends on",
+        pathway_title: "Your initial path",
+        pathway_intro: "A starting sequence based on what you shared — not a rigid methodology or a guarantee.",
+        pathway_stage_now: "Now",
+        pathway_stage_define: "Define",
+        pathway_stage_enable: "Enable",
+        pathway_stage_launch: "Launch",
+        needs_landscape_title: "Capability landscape",
+        needs_landscape_intro: "Where things stand today across what you told us your project needs.",
+        needs_status_covered_internally: "Covered internally",
+        needs_status_covered_by_provider: "Covered by an existing provider",
+        needs_status_in_progress: "In progress",
+        needs_status_needs_resolution: "Still needs to be resolved",
+        needs_status_needs_confirmation: "Need to confirm whether it applies",
       },
       es: {
         eyebrow: "Tu Expansion Snapshot",
@@ -125,6 +170,25 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         disclosure_title: "Sobre este Snapshot",
         disclosure:
           "Esta interpretación inicial se basa en la información que nos compartiste. Conforme conozcamos más sobre tu proyecto, beeside podrá aportar mayor contexto, precisión y valor para ayudarte a avanzar.",
+        priorities_title: "Lo que importa ahora",
+        priorities_intro: "Tus prioridades declaradas, con las dependencias y aprobaciones que implican.",
+        priorities_immediate_label: "Prioridad inmediata",
+        priorities_next_label: "Siguientes prioridades",
+        priorities_blocker_label: "Bloqueante",
+        priorities_depends_on_label: "Depende de",
+        pathway_title: "Tu ruta inicial",
+        pathway_intro: "Una secuencia de partida con base en lo que compartiste — no es una metodología rígida ni una garantía.",
+        pathway_stage_now: "Ahora",
+        pathway_stage_define: "Definir",
+        pathway_stage_enable: "Habilitar",
+        pathway_stage_launch: "Lanzar",
+        needs_landscape_title: "Panorama de capacidades",
+        needs_landscape_intro: "Cómo está hoy cada elemento de lo que nos dijiste que necesita tu proyecto.",
+        needs_status_covered_internally: "Cubierto internamente",
+        needs_status_covered_by_provider: "Cubierto por un proveedor existente",
+        needs_status_in_progress: "En progreso",
+        needs_status_needs_resolution: "Todavía necesita resolverse",
+        needs_status_needs_confirmation: "Falta confirmar si aplica",
       },
     },
     phrases: {

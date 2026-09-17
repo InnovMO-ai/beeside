@@ -1,11 +1,13 @@
 import { getFieldDefinition } from "@beeside/canonical-fields";
+import { needsLeafLabel } from "../fa/content/needs-explorer-taxonomy";
 import type { Locale, QuestionBankBundle } from "../fa/engine/bundle-types";
 import { isAnswered } from "../fa/engine/conditions";
 import { EXPANSION_TIER_COPY, ExpansionDimensionScore, scoreExpansionProfile } from "../fa/engine/expansion-profile";
+import type { NeedsMapDependency, NeedsMapStatus, NeedsMapValue } from "../fa/engine/needs-map-types";
 import { isNotSureValue } from "../fa/engine/values";
 import type { FindingResult, RulesEvaluation } from "../rules/engine";
 import type { RulesEngineBundle } from "../rules/types";
-import type { SnapshotTemplateBundle } from "./template";
+import type { SnapshotTemplateBundle, SnapshotTemplateCopy } from "./template";
 
 /**
  * Deterministic assembly of the two frozen records generated at COMPLETED_LOCKED:
@@ -50,6 +52,46 @@ export interface RenderedExpansionDimension {
   tierLabel: string;
 }
 
+/** "What Matters Now" (§3.3): declared order (index 0 = Immediate Priority). Never reordered by
+ *  dependency data — `dependsOnLabel`/`owner`/`approvalRequired` are shown alongside, not used to
+ *  resequence this list. */
+export interface RenderedNeedsPriority {
+  key: string;
+  label: string;
+  isImmediatePriority: boolean;
+  isBlocker: boolean;
+  dependsOnLabel: string | null;
+  owner: string | null;
+  approvalRequired: boolean;
+  approvalFrom: string | null;
+}
+
+/** One of the four PathwayDiagram stages (§3.4). Not a rigid methodology — a deterministic bucket by
+ *  dependency depth over the client's own declared `fa.needs.map` dependency graph: items with no
+ *  unresolved prerequisite are NOW, one prerequisite deep is DEFINE, two is ENABLE, three or more (or
+ *  a cyclical/unresolvable chain) is LAUNCH. Items sharing a stage are parallel paths, not a forced
+ *  serial sequence. */
+export type PathwayStage = "now" | "define" | "enable" | "launch";
+
+export interface RenderedPathwayItem {
+  key: string;
+  label: string;
+  stage: PathwayStage;
+  isImmediatePriority: boolean;
+  isBlocker: boolean;
+  dependsOnLabel: string | null;
+}
+
+/** "Capability Landscape" (§3.5): every declared need with its coverage status — never a purchase
+ *  signal, never a provider name. `status` is a stable key for icon/tone; `statusLabel` is the only
+ *  wording meant to be shown. */
+export interface RenderedNeedsLandscapeItem {
+  key: string;
+  label: string;
+  status: NeedsMapStatus;
+  statusLabel: string;
+}
+
 export interface RenderedSnapshot {
   eyebrow: string;
   headline: string;
@@ -67,6 +109,21 @@ export interface RenderedSnapshot {
   shapePlan: { title: string; items: string[] } | null;
   oneThing: { title: string; text: string } | null;
   capabilities: { title: string; intro: string; items: Array<{ categoryId: number; label: string; description: string }> } | null;
+  /** null when the respondent declared no priorityRank (Needs Explorer optional or skipped). */
+  needsPriorities: {
+    title: string;
+    intro: string;
+    immediateLabel: string;
+    nextLabel: string;
+    blockerLabel: string;
+    dependsOnLabel: string;
+    items: RenderedNeedsPriority[];
+  } | null;
+  /** null under the same condition as `needsPriorities` — the pathway is only ever built over
+   *  prioritized needs (`fa.needs.map.dependencies` is itself scoped to `priorityRank` items only). */
+  pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; items: RenderedPathwayItem[] } | null;
+  /** null when no needs were selected at all. */
+  needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
   disclosure: { title: string; text: string };
 }
 
@@ -167,6 +224,114 @@ function areaFor(rules: RulesEngineBundle, areaId: number) {
   return area;
 }
 
+const needsLabel = (key: string, locale: Locale): string => needsLeafLabel(key, locale) ?? key;
+
+const PATHWAY_STAGES: readonly PathwayStage[] = ["now", "define", "enable", "launch"];
+
+/**
+ * Dependency depth over the client's own declared graph, scoped to `priorityRank` (dependencies on
+ * an item outside the prioritized set — already excluded by the Needs Explorer's own guided flow —
+ * are treated as "no prerequisite", i.e. depth 0). A cycle (should not occur given the guided UI, but
+ * defended against here since this must stay a pure, always-terminating function) parks every member
+ * of the cycle at the deepest stage rather than looping forever.
+ */
+function pathwayDepths(priorityRank: readonly string[], dependencies: readonly NeedsMapDependency[]): Map<string, number> {
+  const dependsOn = new Map(dependencies.map((d) => [d.key, d.dependsOn]));
+  const ranked = new Set(priorityRank);
+  const depth = new Map<string, number>();
+  const inProgress = new Set<string>();
+  const maxDepth = PATHWAY_STAGES.length - 1;
+
+  function depthOf(key: string): number {
+    const cached = depth.get(key);
+    if (cached !== undefined) return cached;
+    if (inProgress.has(key)) return maxDepth; // cycle: unresolved chain lands in the last stage
+    inProgress.add(key);
+    const parent = dependsOn.get(key) ?? null;
+    const resolved = parent && ranked.has(parent) && parent !== key ? Math.min(depthOf(parent) + 1, maxDepth) : 0;
+    inProgress.delete(key);
+    depth.set(key, resolved);
+    return resolved;
+  }
+
+  for (const key of priorityRank) depthOf(key);
+  return depth;
+}
+
+function computeNeedsPriorities(needs: NeedsMapValue | undefined, locale: Locale, copy: SnapshotTemplateCopy): RenderedSnapshot["needsPriorities"] {
+  if (!needs || needs.priorityRank.length === 0) return null;
+  const byKey = new Map(needs.dependencies.map((d) => [d.key, d]));
+  const items: RenderedNeedsPriority[] = needs.priorityRank.map((key, index) => {
+    const dep = byKey.get(key);
+    return {
+      key,
+      label: needsLabel(key, locale),
+      isImmediatePriority: index === 0,
+      isBlocker: needs.blockerKeys.includes(key),
+      dependsOnLabel: dep?.dependsOn ? needsLabel(dep.dependsOn, locale) : null,
+      owner: dep?.owner ?? null,
+      approvalRequired: dep?.approvalRequired ?? false,
+      approvalFrom: dep?.approvalFrom ?? null,
+    };
+  });
+  return {
+    title: copy.priorities_title,
+    intro: copy.priorities_intro,
+    immediateLabel: copy.priorities_immediate_label,
+    nextLabel: copy.priorities_next_label,
+    blockerLabel: copy.priorities_blocker_label,
+    dependsOnLabel: copy.priorities_depends_on_label,
+    items,
+  };
+}
+
+function computePathway(needs: NeedsMapValue | undefined, locale: Locale, copy: SnapshotTemplateCopy): RenderedSnapshot["pathway"] {
+  if (!needs || needs.priorityRank.length === 0) return null;
+  const depths = pathwayDepths(needs.priorityRank, needs.dependencies);
+  const dependsOnByKey = new Map(needs.dependencies.map((d) => [d.key, d.dependsOn]));
+  const items: RenderedPathwayItem[] = needs.priorityRank.map((key, index) => {
+    const dependsOn = dependsOnByKey.get(key) ?? null;
+    return {
+      key,
+      label: needsLabel(key, locale),
+      stage: PATHWAY_STAGES[depths.get(key) ?? 0] ?? "now",
+      isImmediatePriority: index === 0,
+      isBlocker: needs.blockerKeys.includes(key),
+      dependsOnLabel: dependsOn ? needsLabel(dependsOn, locale) : null,
+    };
+  });
+  return {
+    title: copy.pathway_title,
+    intro: copy.pathway_intro,
+    stageLabels: {
+      now: copy.pathway_stage_now,
+      define: copy.pathway_stage_define,
+      enable: copy.pathway_stage_enable,
+      launch: copy.pathway_stage_launch,
+    },
+    items,
+  };
+}
+
+const NEEDS_STATUS_LABEL_KEY: Record<NeedsMapStatus, keyof SnapshotTemplateCopy> = {
+  covered_internally: "needs_status_covered_internally",
+  covered_by_provider: "needs_status_covered_by_provider",
+  in_progress: "needs_status_in_progress",
+  needs_resolution: "needs_status_needs_resolution",
+  needs_confirmation: "needs_status_needs_confirmation",
+};
+
+function computeNeedsLandscape(needs: NeedsMapValue | undefined, locale: Locale, copy: SnapshotTemplateCopy): RenderedSnapshot["needsLandscape"] {
+  if (!needs || needs.selections.length === 0) return null;
+  const items: RenderedNeedsLandscapeItem[] = needs.selections.map((s) => ({
+    key: s.key,
+    label: needsLabel(s.key, locale),
+    status: s.status,
+    statusLabel: copy[NEEDS_STATUS_LABEL_KEY[s.status]],
+  }));
+  return { title: copy.needs_landscape_title, intro: copy.needs_landscape_intro, items };
+}
+
 function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
   const { answers, questionBank: qb, rules, template, evaluation } = input;
   const copy = template.copy[locale];
@@ -265,6 +430,13 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
       return { categoryId: c.categoryId, label: category?.copy[locale].label ?? String(c.categoryId), description: category?.copy[locale].description ?? "" };
     });
 
+  // ---- Needs Landscape (fa.needs.map): declared priority order, dependency-derived pathway, and the
+  // full coverage-status grid, always kept as separate facts (Ranking & Dependency Interaction).
+  const needsMap = answers.get("fa.needs.map") as NeedsMapValue | undefined;
+  const needsPriorities = computeNeedsPriorities(needsMap, locale, copy);
+  const pathway = computePathway(needsMap, locale, copy);
+  const needsLandscape = computeNeedsLandscape(needsMap, locale, copy);
+
   return {
     eyebrow: copy.eyebrow,
     headline: copy.headline,
@@ -280,6 +452,9 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
     shapePlan: shape.length > 0 ? { title: copy.shape_title, items: shape.slice(0, SHAPE_PLAN_CEILING) } : null,
     oneThing: primaryConcern ? { title: copy.one_thing_title, text: primaryConcern } : null,
     capabilities: capabilities.length > 0 ? { title: copy.capabilities_title, intro: copy.capabilities_intro, items: capabilities } : null,
+    needsPriorities,
+    pathway,
+    needsLandscape,
     disclosure: { title: copy.disclosure_title, text: copy.disclosure },
   };
 }

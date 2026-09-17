@@ -1,6 +1,7 @@
 import { buildQuestionBankBundle } from "../fa/content/question-bank";
 import { EXPANSION_PROFILE_DIMENSIONS } from "../fa/engine/expansion-profile";
 import { computeJourney } from "../fa/engine/journey";
+import type { NeedsMapValue } from "../fa/engine/needs-map-types";
 import { buildRulesEngineBundle } from "../rules/content/rules-engine-v1";
 import { evaluateRules } from "../rules/engine";
 import { ComposeInput, composeClientSnapshot, composeInternalAssessment } from "../snapshot/compose";
@@ -21,8 +22,12 @@ function byFieldKey(persona: Record<string, unknown>): Map<string, unknown> {
   return map;
 }
 
-function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInput> = {}) {
+function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInput> = {}, extraAnswers: Record<string, unknown> = {}) {
   const answers = byFieldKey(persona);
+  // fa.needs.map (Level 2 MVP) has no question in this test file's v1 bundle at all — it is set
+  // directly by field_key here, exactly as snapshot-service.ts reads it: the compose layer only ever
+  // needs the answer value, never the question definition.
+  for (const [key, value] of Object.entries(extraAnswers)) answers.set(key, value);
   // Same derivation snapshot-service.ts uses in production: applicability comes from the journey
   // engine, not from "whatever the persona happened to set" — a persona field with no applicable
   // question in this bundle must not silently count as evidence either way.
@@ -109,7 +114,10 @@ const SAAS = {
 
 /** Every string a person can read in the rendered Snapshot (structural keys excluded). */
 function displayText(value: unknown, key = ""): string[] {
-  if (typeof value === "string") return key === "tone" || key === "key" ? [] : [value];
+  // "status"/"stage" are stable enum keys (like "tone"/"key"): NeedsMapStatus and PathwayStage
+  // values are never meant to be read as prose — their localized wording lives in the sibling
+  // "*Label" fields, which this helper does collect.
+  if (typeof value === "string") return ["tone", "key", "status", "stage"].includes(key) ? [] : [value];
   if (Array.isArray(value)) return value.flatMap((v) => displayText(v));
   if (value && typeof value === "object") return Object.entries(value).flatMap(([k, v]) => displayText(v, k));
   return [];
@@ -324,5 +332,107 @@ describe("Expansion Profile radar (owner-approved six-dimension taxonomy, 2026-0
     const { client } = compose(MANUFACTURER);
     const visible = displayText(client.locales).join(" | ").toLowerCase();
     for (const forbidden of ["probability", "score", "pass", "fail", "attractiveness", "%"]) expect(visible).not.toContain(forbidden);
+  });
+});
+
+describe("Needs Landscape (fa.needs.map): priorities kept separate from the dependency-derived pathway", () => {
+  const CHAIN: NeedsMapValue = {
+    selections: [
+      { key: "company_setup", status: "needs_resolution" },
+      { key: "tax", status: "covered_by_provider" },
+      { key: "hr_payroll_social_security", status: "needs_confirmation" },
+      { key: "audit", status: "covered_internally" }, // not prioritized: appears only in the landscape
+    ],
+    priorityRank: ["company_setup", "tax", "hr_payroll_social_security"],
+    dependencies: [
+      { key: "company_setup", dependsOn: null, owner: "Ana Rivera", approvalRequired: false, approvalFrom: null },
+      { key: "tax", dependsOn: "company_setup", owner: null, approvalRequired: true, approvalFrom: "Finance lead" },
+      { key: "hr_payroll_social_security", dependsOn: "tax", owner: null, approvalRequired: false, approvalFrom: null },
+    ],
+    blockerKeys: ["company_setup"],
+  };
+
+  it("has no priorities, pathway or landscape when the respondent declared no needs at all", () => {
+    const { client } = compose(MANUFACTURER);
+    expect(client.locales.en.needsPriorities).toBeNull();
+    expect(client.locales.en.pathway).toBeNull();
+    expect(client.locales.en.needsLandscape).toBeNull();
+  });
+
+  it("keeps the declared priority order in needsPriorities untouched by dependency data", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const priorities = client.locales.en.needsPriorities!;
+    expect(priorities.items.map((i) => i.key)).toEqual(["company_setup", "tax", "hr_payroll_social_security"]);
+    expect(priorities.items[0]).toMatchObject({ isImmediatePriority: true, isBlocker: true, dependsOnLabel: null, owner: "Ana Rivera" });
+    expect(priorities.items[1]).toMatchObject({ isImmediatePriority: false, dependsOnLabel: "Company Setup", approvalRequired: true, approvalFrom: "Finance lead" });
+    expect(priorities.items[2]).toMatchObject({ isBlocker: false, dependsOnLabel: "Tax" });
+  });
+
+  it("buckets a three-level dependency chain into NOW → DEFINE → ENABLE, one hop per stage", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const pathway = client.locales.en.pathway!;
+    expect(pathway.items.map((i) => [i.key, i.stage])).toEqual([
+      ["company_setup", "now"],
+      ["tax", "define"],
+      ["hr_payroll_social_security", "enable"],
+    ]);
+    // The pathway is dependency-derived and never reorders the declared priorityRank sequence itself.
+    expect(pathway.items.map((i) => i.key)).toEqual(client.locales.en.needsPriorities!.items.map((i) => i.key));
+  });
+
+  it("keeps two independent items in the same NOW stage as parallel paths, not a forced serial chain", () => {
+    const parallel: NeedsMapValue = {
+      selections: [
+        { key: "company_setup", status: "needs_resolution" },
+        { key: "tax", status: "needs_resolution" },
+      ],
+      priorityRank: ["company_setup", "tax"],
+      dependencies: [
+        { key: "company_setup", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
+      ],
+      blockerKeys: [],
+    };
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": parallel });
+    expect(client.locales.en.pathway!.items.map((i) => i.stage)).toEqual(["now", "now"]);
+  });
+
+  it("never hangs on a cyclical dependency and parks the cycle in the deepest stage instead", () => {
+    const cyclical: NeedsMapValue = {
+      selections: [
+        { key: "company_setup", status: "needs_resolution" },
+        { key: "tax", status: "needs_resolution" },
+      ],
+      priorityRank: ["company_setup", "tax"],
+      dependencies: [
+        { key: "company_setup", dependsOn: "tax", owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax", dependsOn: "company_setup", owner: null, approvalRequired: false, approvalFrom: null },
+      ],
+      blockerKeys: [],
+    };
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": cyclical });
+    expect(client.locales.en.pathway!.items.map((i) => i.stage)).toEqual(["launch", "launch"]);
+  });
+
+  it("lists every declared selection in the capability landscape — including ones never prioritized — with a localized status label and no provider identity", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const landscape = client.locales.en.needsLandscape!;
+    expect(landscape.items.map((i) => i.key)).toEqual(["company_setup", "tax", "hr_payroll_social_security", "audit"]);
+    expect(landscape.items.map((i) => i.statusLabel)).toEqual([
+      "Still needs to be resolved",
+      "Covered by an existing provider",
+      "Need to confirm whether it applies",
+      "Covered internally",
+    ]);
+    const serialized = JSON.stringify(landscape);
+    expect(serialized).not.toMatch(/Ana Rivera|Finance lead/); // owner/approver names stay in needsPriorities only
+  });
+
+  it("labels are in the fixed five-status / four-stage vocabulary, never a raw score or percentage", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const visible = displayText({ needsPriorities: client.locales.en.needsPriorities, pathway: client.locales.en.pathway, needsLandscape: client.locales.en.needsLandscape })
+      .join(" | ")
+      .toLowerCase();
+    for (const forbidden of ["probability", "score", "pass", "fail", "%"]) expect(visible).not.toContain(forbidden);
   });
 });
