@@ -741,6 +741,17 @@ blockquote.verbatim {
   margin-top: 2rem;
 }
 
+/* ---------------------------------------------------------------- opening recap */
+.snapshot-opening {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 72rem;
+}
+.opening-beat {
+  display: grid;
+  gap: 0.5rem;
+}
+
 /* ---------------------------------------------------------------- priority list ("What Matters Now") */
 .priority-badge-immediate {
   --tone-ink: #6d28d9;
