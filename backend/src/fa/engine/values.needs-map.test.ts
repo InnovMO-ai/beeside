@@ -9,10 +9,20 @@ const NEEDS_MAP_QUESTION: QuestionDef = {
   copy: { en: { title: "Needs" }, es: { title: "Necesidades" } },
 };
 
+// A generic tag_list question (not a real field_key) — this suite only exercises the shared
+// validator, not the canonical field registry.
 const TAG_LIST_QUESTION: QuestionDef = {
+  id: "TAGS1",
+  field_key: "test.generic_tag_list",
+  type: "tag_list",
+  required: false,
+  copy: { en: { title: "Tags" }, es: { title: "Etiquetas" } },
+};
+
+const COUNTERPARTY_LIST_QUESTION: QuestionDef = {
   id: "RESTRICTED1",
   field_key: "fa.provider.restricted_counterparties",
-  type: "tag_list",
+  type: "counterparty_list",
   required: false,
   copy: { en: { title: "Restricted counterparties" }, es: { title: "Contrapartes restringidas" } },
 };
@@ -106,6 +116,59 @@ describe("validateAnswerValue — tag_list", () => {
 
   it("clears cleanly with null when optional", () => {
     const result = validateAnswerValue(TAG_LIST_QUESTION, null, effective);
+    expect(result).toEqual({ ok: true, value: null });
+  });
+});
+
+describe("validateAnswerValue — counterparty_list (fa.provider.restricted_counterparties)", () => {
+  it("accepts well-formed entries, each with a restrictionType", () => {
+    const result = validateAnswerValue(
+      COUNTERPARTY_LIST_QUESTION,
+      [
+        { name: " Acme Corp ", restrictionType: "cannot_contract" },
+        { name: "Globex", restrictionType: "do_not_share_information" },
+      ],
+      effective,
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: [
+        { name: "Acme Corp", restrictionType: "cannot_contract" },
+        { name: "Globex", restrictionType: "do_not_share_information" },
+      ],
+    });
+  });
+
+  it("rejects an entry missing restrictionType (a bare name is not enough — unlike tag_list)", () => {
+    const result = validateAnswerValue(COUNTERPARTY_LIST_QUESTION, [{ name: "Acme Corp" }], effective);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects an unknown restrictionType", () => {
+    const result = validateAnswerValue(COUNTERPARTY_LIST_QUESTION, [{ name: "Acme Corp", restrictionType: "do_not_like_them" }], effective);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a duplicate name (case-insensitive), even with different restrictionTypes", () => {
+    const result = validateAnswerValue(
+      COUNTERPARTY_LIST_QUESTION,
+      [
+        { name: "Acme Corp", restrictionType: "cannot_contract" },
+        { name: "acme corp", restrictionType: "both" },
+      ],
+      effective,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects more entries than the 25-entry default limit", () => {
+    const entries = Array.from({ length: 26 }, (_, i) => ({ name: `Company ${i}`, restrictionType: "both" as const }));
+    const result = validateAnswerValue(COUNTERPARTY_LIST_QUESTION, entries, effective);
+    expect(result.ok).toBe(false);
+  });
+
+  it("clears cleanly with null when optional", () => {
+    const result = validateAnswerValue(COUNTERPARTY_LIST_QUESTION, null, effective);
     expect(result).toEqual({ ok: true, value: null });
   });
 });

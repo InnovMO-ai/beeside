@@ -75,6 +75,12 @@ export async function getFirstAssessmentPrecisionContext(
     if (!journey.effectiveAnswers.has(question.field_key)) continue;
     const def = getFieldDefinition(question.field_key);
     if (!def || def.binding) continue; // person-bound preferences are exposed in `person`
+    // Owner-confirmed policy (2026-09-17): a field marked `precisionExcluded` (currently only
+    // fa.provider.restricted_counterparties) never enters the FA → Precision contract at all — not
+    // even as a key name. See that field's own description in canonical-fields for the full
+    // visibility/retention rule and restricted-counterparties.ts for the one sanctioned, audited
+    // read path a Supervisor/Admin (or a conditionally authorized Strategic Advisor) uses instead.
+    if (def.precisionExcluded) continue;
     const value = journey.effectiveAnswers.get(question.field_key);
     const entry: FirstAssessmentAnswer = {
       fieldKey: question.field_key,

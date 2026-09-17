@@ -9,10 +9,17 @@
  *
  * Level 2 MVP addendum (fa-qb-2.0.0, Design Specification "beeside First Assessment — Level 2
  * MVP"): adds the Needs Landscape (`needs_map`) and Provider Profile + Resources (`tag_list`,
- * `fa.provider.*`) fields, plus a handful of new Your Company / Plan Definition / Priorities
- * fields. Every field already asked under fa-qb-1.1.0 is reused unchanged by field_key — the
- * Level 2 bundle only re-groups where those questions render, per the owner's explicit
- * instruction to reuse the existing base and change only what the new spec redefines.
+ * `counterparty_list`, `fa.provider.*`) fields, plus a handful of new Your Company / Plan
+ * Definition / Priorities fields. Every field already asked under fa-qb-1.1.0 is reused unchanged
+ * by field_key — the Level 2 bundle only re-groups where those questions render, per the owner's
+ * explicit instruction to reuse the existing base and change only what the new spec redefines.
+ *
+ * `precisionExcluded` (owner decision, 2026-09-17, resolving the Design Specification's own
+ * flagged open decision "Restricted-counterparty data — visibility and retention"): a field marked
+ * true is never included in the FA → Precision contract (first-assessment-context.ts filters it out
+ * of both `structuredAnswers` and `openTextAnswers`, the same way `binding` fields are filtered out
+ * today) — it stays inside First Assessment, readable only through the one sanctioned, audited path
+ * (see restricted-counterparties.ts).
  */
 
 export const SUPPORTED_LOCALES = ["en", "es"] as const;
@@ -32,7 +39,8 @@ export type FieldDataType =
   // Level 2 MVP additions — see structured-echo.ts / values.ts for validation, NeedsExplorer /
   // PriorityRanker / DependencyMap for rendering.
   | "tag_list"
-  | "needs_map";
+  | "needs_map"
+  | "counterparty_list";
 
 /** identity = bound to a person/company column; question_bank = stored as an `answer` row. */
 export type FieldSource = "identity" | "question_bank";
@@ -66,10 +74,12 @@ export interface CanonicalFieldDefinition {
   maxSelect?: number;
   /** country_list only: caps how many countries may be selected (default 30, existing behaviour). */
   maxCount?: number;
-  /** tag_list only: caps how many free-text entries may be stored (default 20). */
+  /** tag_list / counterparty_list: caps how many entries may be stored (default 20). */
   maxTags?: number;
-  /** tag_list only: caps the length of each free-text entry (default 200). */
+  /** tag_list / counterparty_list: caps the length of each entry / name (default 200). */
   maxTagLength?: number;
+  /** Never included in the FA → Precision contract — see the Level 2 MVP addendum above. */
+  precisionExcluded?: boolean;
 }
 
 /** Rules Matrix v1 §0 fixed category list (same order/ids as the rules_matrix_category catalog). */
@@ -255,12 +265,13 @@ export const FA_FIELDS: readonly CanonicalFieldDefinition[] = [
   field({ key: "fa.provider.required_presence_countries", dataType: "country_list", source: "question_bank", description: "Countries where provider presence is required, when fa.provider.requires_local_presence = yes." }),
   field({
     key: "fa.provider.restricted_counterparties",
-    dataType: "tag_list",
+    dataType: "counterparty_list",
     source: "question_bank",
     maxTags: 25,
     maxTagLength: 200,
+    precisionExcluded: true,
     description:
-      "Companies or groups the respondent cannot work with or share information with. Operationally and, in some cases, compliance-sensitive: never exposed to providers, excluded from matching without disclosing why, scoped to this project_id only, retained exactly as long as the project's own retention_until (fa_project_lifecycle), and any Operation Hub/admin read must be recorded as an admin_audit_event (action 'project.restricted_counterparties.viewed'). See backend/src/fa/services/restricted-counterparties.ts.",
+      "Companies or groups the respondent cannot work with (restrictionType per entry: cannot_contract / do_not_share_information / both). Operationally and, in some cases, compliance-sensitive. Owner-confirmed visibility (2026-09-17): readable by the client (their own project), the assigned Sherpa, and an authorized Supervisor/Admin; NOT exposed by default to providers, The Hive, Embassy users, BI/Revenue users, unrelated Operation Hub users, or Strategic Advisors (Strategic Advisor access is conditional, per project activity, under authorized project permissions — never automatic). Providers must never learn a restriction exists, why, or which companies are restricted: excluded before matching/RFI/provider disclosure, and excluded from the FA → Precision contract entirely (`precisionExcluded`, enforced in first-assessment-context.ts). Scoped to this project_id only — never a global blacklist. Retention rides the project's own retention_until (fa_project_lifecycle) exactly like every other answer; no field-specific policy. Any Operation Hub/admin read must be recorded as an admin_audit_event (action 'project.restricted_counterparties.viewed') — see backend/src/fa/services/restricted-counterparties.ts, the one sanctioned read path.",
   }),
   field({ key: "fa.provider.investment_range", dataType: "single_select", source: "question_bank", values: ["under_50k", "50k_150k", "150k_500k", "500k_2m", "over_2m", "not_yet_defined"], description: "Investment framework range for this expansion (USD)." }),
   field({ key: "fa.provider.resource_availability", dataType: "single_select", source: "question_bank", values: ["yes", "partially", "no", "not_sure"], description: "Whether the internal team/budget to execute is available." }),

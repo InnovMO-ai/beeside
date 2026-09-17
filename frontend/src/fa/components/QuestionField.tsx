@@ -3,7 +3,7 @@ import { T } from "../copy";
 import { NeedsExplorer } from "./NeedsExplorer";
 import { StructuredEchoChip } from "./StructuredEchoChip";
 import { STRUCTURED_ECHO_SOURCE_FIELD } from "../structured-echo";
-import { Bundle, Locale, NeedsMapValue, QuestionDef } from "../types";
+import { Bundle, CounterpartyEntry, Locale, NeedsMapValue, QuestionDef, RESTRICTION_TYPES, RestrictionType } from "../types";
 import { countryName, resolveOptions, searchCountries, TimingPrecision, timingParts, timingValue, toggleMulti } from "../values";
 
 export type ChangeMode = "now" | "debounced";
@@ -127,6 +127,12 @@ export function QuestionField(props: QuestionFieldProps) {
       return (
         <Block heading={heading} helper={helper} error={error}>
           <TagListInput {...shared} />
+        </Block>
+      );
+    case "counterparty_list":
+      return (
+        <Block heading={heading} helper={helper} error={error}>
+          <CounterpartyListInput {...shared} />
         </Block>
       );
     case "needs_map":
@@ -276,6 +282,105 @@ function TagListInput({ question, t, value, onChange, ids }: Shared) {
         </div>
       ) : (
         <p className="helper">{t("level2", "tag_limit_reached").replace("{{max}}", String(maxTags))}</p>
+      )}
+    </div>
+  );
+}
+
+const RESTRICTION_LABEL_KEY: Record<RestrictionType, string> = {
+  cannot_contract: "counterparty_restriction_cannot_contract",
+  do_not_share_information: "counterparty_restriction_do_not_share_information",
+  both: "counterparty_restriction_both",
+};
+
+/**
+ * fa.provider.restricted_counterparties (Level 2 MVP, composition 6). Rendered visually set apart
+ * from the surrounding fields — a slightly darker background, per the Design Specification's
+ * "operational-restriction weight without alarming colour" — since this is confidential,
+ * operationally/compliance-sensitive data the respondent should notice is being handled with care,
+ * without it reading as an error or a warning. Never confuse this with tag_list: every entry here
+ * always carries a restrictionType, never a bare name.
+ */
+function CounterpartyListInput({ question, t, value, onChange, ids }: Shared) {
+  const entries = Array.isArray(value) ? (value as CounterpartyEntry[]) : [];
+  const [draftName, setDraftName] = useState("");
+  const [draftType, setDraftType] = useState<RestrictionType>("cannot_contract");
+  const maxEntries = question.max_tags ?? 25;
+  const maxNameLength = question.max_tag_length ?? 200;
+  const atLimit = entries.length >= maxEntries;
+
+  const commit = (next: CounterpartyEntry[]) => onChange(next.length > 0 ? next : null, "now");
+
+  const add = () => {
+    const trimmed = draftName.trim().slice(0, maxNameLength);
+    if (!trimmed || atLimit || entries.some((e) => e.name.toLowerCase() === trimmed.toLowerCase())) return;
+    commit([...entries, { name: trimmed, restrictionType: draftType }]);
+    setDraftName("");
+    setDraftType("cannot_contract");
+  };
+
+  return (
+    <div className="field counterparty-list" style={{ marginTop: "1.5rem", background: "var(--surface-muted, rgba(0,0,0,0.035))", borderRadius: "0.5rem", padding: "1rem" }}>
+      <p className="helper" style={{ marginTop: 0 }}>
+        {t("level2", "counterparty_confidential_note")}
+      </p>
+      {entries.length > 0 && (
+        <ul className="chips" style={{ margin: "0 0 1rem", flexDirection: "column", alignItems: "stretch", gap: "0.5rem" }}>
+          {entries.map((entry) => (
+            <li key={entry.name} className="chip" style={{ justifyContent: "space-between" }}>
+              <span>
+                {entry.name} — {t("level2", RESTRICTION_LABEL_KEY[entry.restrictionType])}
+              </span>
+              <button
+                type="button"
+                aria-label={t("level2", "counterparty_remove").replace("{{name}}", entry.name)}
+                onClick={() => commit(entries.filter((e) => e.name !== entry.name))}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!atLimit ? (
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <input
+            id={`q-${question.id}-input`}
+            className="input"
+            type="text"
+            aria-labelledby={ids.title}
+            maxLength={maxNameLength}
+            placeholder={t("level2", "counterparty_name_placeholder")}
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <label className="visually-hidden" htmlFor={`q-${question.id}-restriction`}>
+            {t("level2", "counterparty_restriction_label")}
+          </label>
+          <select
+            id={`q-${question.id}-restriction`}
+            className="select"
+            value={draftType}
+            onChange={(e) => setDraftType(e.target.value as RestrictionType)}
+          >
+            {RESTRICTION_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {t("level2", RESTRICTION_LABEL_KEY[type])}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="button button-text" onClick={add} disabled={draftName.trim() === ""}>
+            {t("level2", "counterparty_add_button")}
+          </button>
+        </div>
+      ) : (
+        <p className="helper">{t("level2", "counterparty_limit_reached").replace("{{max}}", String(maxEntries))}</p>
       )}
     </div>
   );

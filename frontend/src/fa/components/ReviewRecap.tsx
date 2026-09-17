@@ -1,6 +1,6 @@
 import { T } from "../copy";
 import { countryName } from "../values";
-import { Bundle, Locale, NeedsMapValue, OptionDef, QuestionDef, SessionView, StepDef } from "../types";
+import { Bundle, CounterpartyEntry, Locale, NeedsMapValue, OptionDef, QuestionDef, SessionView, StepDef } from "../types";
 
 interface ReviewRecapProps {
   bundle: Bundle;
@@ -95,6 +95,12 @@ function renderAnswerSummary(question: QuestionDef, value: unknown, locale: Loca
       return Array.isArray(value) && value.length > 0 ? value.map((c) => countryName(String(c), locale)).join(", ") : empty;
     case "tag_list":
       return Array.isArray(value) && value.length > 0 ? value.join(", ") : empty;
+    case "counterparty_list": {
+      const entries = value as CounterpartyEntry[] | null;
+      // Shown plainly here because Review is the client's own session — the client is always an
+      // authorized viewer of their own restricted-counterparty list (see counterparty-types.ts).
+      return Array.isArray(entries) && entries.length > 0 ? entries.map((e) => e.name).join(", ") : empty;
+    }
     case "timing": {
       const v = value as { precision?: string; value?: string | null } | null;
       if (!v || v.precision === "not_sure") return t("common", "timing_not_sure");

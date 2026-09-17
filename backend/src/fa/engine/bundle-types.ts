@@ -6,11 +6,11 @@
  * outside `copy`; every localized string lives inside a `copy` object keyed by locale, so a
  * copy-only change is classified CONTENT and anything else LOGIC_SCHEMA by the database.
  *
- * Level 2 MVP addendum (fa-qb-2.0.0): adds `tag_list` / `needs_map` question types, an optional
- * `StepDef.layout` ("grouped" renders every applicable question of the step together, as one
- * composition, instead of one question per screen) and a `"review"` step kind (a no-new-questions
- * recap step). Every addition is optional / additive: a bundle that never sets `layout` or uses
- * `kind: "review"` behaves byte-identically to fa-qb-1.1.0.
+ * Level 2 MVP addendum (fa-qb-2.0.0): adds `tag_list` / `needs_map` / `counterparty_list` question
+ * types, an optional `StepDef.layout` ("grouped" renders every applicable question of the step
+ * together, as one composition, instead of one question per screen) and a `"review"` step kind (a
+ * no-new-questions recap step). Every addition is optional / additive: a bundle that never sets
+ * `layout` or uses `kind: "review"` behaves byte-identically to fa-qb-1.1.0.
  */
 
 export type Locale = "en" | "es";
@@ -29,7 +29,8 @@ export type QuestionType =
   | "locale"
   // Level 2 MVP additions.
   | "tag_list"
-  | "needs_map";
+  | "needs_map"
+  | "counterparty_list";
 
 /** Deterministic applicability over earlier DECLARED_BY_USER answers only. */
 export type Condition =
@@ -72,7 +73,7 @@ export interface QuestionDef {
   max_select?: number;
   /** country_list only: caps how many countries may be selected (default 30). */
   max_count?: number;
-  /** tag_list only: caps entry count / entry length (defaults 20 / 200). */
+  /** tag_list / counterparty_list: caps entry count / entry (name) length (defaults 20 / 200). */
   max_tags?: number;
   max_tag_length?: number;
   applies_when?: Condition;

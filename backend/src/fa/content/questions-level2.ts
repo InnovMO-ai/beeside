@@ -280,10 +280,10 @@ export const PROVIDER_QUESTIONS: QuestionDef[] = [
   q({
     id: "PV6",
     field_key: "fa.provider.restricted_counterparties",
-    type: "tag_list",
+    type: "counterparty_list",
     required: false,
     title: ["Are there any companies or groups you cannot work with or share information with?", "¿Hay empresas o grupos con los que no puedas trabajar o compartir información?"],
-    helper: ["Optional. This is kept confidential and scoped to this project.", "Opcional. Esto se mantiene confidencial y limitado a este proyecto."],
+    helper: ["Optional. This is kept confidential and scoped to this project — never shared with providers.", "Opcional. Esto se mantiene confidencial y limitado a este proyecto — nunca se comparte con proveedores."],
   }),
   q({
     id: "PV7",

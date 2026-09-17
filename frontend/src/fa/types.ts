@@ -13,7 +13,8 @@ export type QuestionType =
   | "quantity"
   | "locale"
   | "tag_list"
-  | "needs_map";
+  | "needs_map"
+  | "counterparty_list";
 
 export interface OptionDef {
   value: string;
@@ -34,7 +35,7 @@ export interface QuestionDef {
   max_select?: number;
   /** country_list only (Level 2 MVP). */
   max_count?: number;
-  /** tag_list only (Level 2 MVP). */
+  /** tag_list / counterparty_list only (Level 2 MVP). */
   max_tags?: number;
   max_tag_length?: number;
   copy: Record<Locale, { title: string; helper?: string; placeholder?: string }>;
@@ -189,3 +190,16 @@ export interface NeedsMapValue {
 }
 
 export const NEEDS_MAP_LIMITS = { maxSelections: 20, maxPriorityRank: 5, maxFreeTextLength: 200 } as const;
+
+/** Mirrors backend/src/fa/engine/counterparty-types.ts exactly — fa.provider.restricted_counterparties. */
+export const RESTRICTION_TYPES = ["cannot_contract", "do_not_share_information", "both"] as const;
+export type RestrictionType = (typeof RESTRICTION_TYPES)[number];
+
+export interface CounterpartyEntry {
+  name: string;
+  restrictionType: RestrictionType;
+}
+
+export type CounterpartyListValue = CounterpartyEntry[];
+
+export const COUNTERPARTY_LIST_LIMITS = { maxEntries: 25, maxNameLength: 200 } as const;

@@ -4,6 +4,7 @@ import { ISO_COUNTRY_CODES } from "./iso-countries";
 import { dynamicOptionValues } from "./journey";
 import { isKnownNeedsLeaf } from "../content/needs-explorer-taxonomy";
 import { NEEDS_MAP_LIMITS, NeedsMapValue, NEEDS_MAP_STATUSES } from "./needs-map-types";
+import { COUNTERPARTY_LIST_LIMITS, CounterpartyEntry, RESTRICTION_TYPES } from "./counterparty-types";
 
 export type ValidationResult = { ok: true; value: unknown } | { ok: false; error: string };
 
@@ -64,6 +65,8 @@ export function validateAnswerValue(question: QuestionDef, value: unknown, effec
       return validateQuantity(question, value);
     case "tag_list":
       return validateTagList(question, value);
+    case "counterparty_list":
+      return validateCounterpartyList(question, value);
     case "needs_map":
       return validateNeedsMap(value);
     default:
@@ -110,8 +113,8 @@ function validateQuantity(question: QuestionDef, value: unknown): ValidationResu
   return { ok: true, value: { amount, unit } };
 }
 
-/** tag_list: a free-text list (e.g. fa.provider.restricted_counterparties). Entries are stored
- *  verbatim (trimmed), never interpreted — same "open text, never parsed" rule as `text`/`short_text`. */
+/** tag_list: a free-text list. Entries are stored verbatim (trimmed), never interpreted — same
+ *  "open text, never parsed" rule as `text`/`short_text`. */
 function validateTagList(question: QuestionDef, value: unknown): ValidationResult {
   if (!Array.isArray(value)) return { ok: false, error: "invalid list" };
   const maxTags = question.max_tags ?? DEFAULT_TAG_MAX;
@@ -127,6 +130,35 @@ function validateTagList(question: QuestionDef, value: unknown): ValidationResul
   if (new Set(tags.map((t) => t.toLowerCase())).size !== tags.length) return { ok: false, error: "duplicate entry" };
   if (value.length === 0 && question.required) return { ok: false, error: "at least one entry is required" };
   return { ok: true, value: tags };
+}
+
+/**
+ * counterparty_list: fa.provider.restricted_counterparties (see counterparty-types.ts for the full
+ * shape and the owner-confirmed visibility/retention policy this supports). Each entry is a plain
+ * company/group name (open text, never parsed — same rule as tag_list) plus a closed-enum
+ * `restrictionType`, because downstream enforcement (never disclosed to providers, excluded before
+ * matching/RFI) must know which kind of restriction applies, not just that a name is on the list.
+ */
+function validateCounterpartyList(question: QuestionDef, value: unknown): ValidationResult {
+  if (!Array.isArray(value)) return { ok: false, error: "invalid list" };
+  const maxEntries = question.max_tags ?? COUNTERPARTY_LIST_LIMITS.maxEntries;
+  const maxLength = question.max_tag_length ?? COUNTERPARTY_LIST_LIMITS.maxNameLength;
+  if (value.length > maxEntries) return { ok: false, error: `at most ${maxEntries} entries are allowed` };
+  const entries: CounterpartyEntry[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, error: "each entry must be a name and restriction type" };
+    const { name, restrictionType } = raw as { name?: unknown; restrictionType?: unknown };
+    if (typeof name !== "string") return { ok: false, error: "each entry needs a name" };
+    const trimmed = name.trim();
+    if (trimmed === "" || trimmed.length > maxLength) return { ok: false, error: `each name must be 1-${maxLength} characters` };
+    if (typeof restrictionType !== "string" || !(RESTRICTION_TYPES as readonly string[]).includes(restrictionType)) {
+      return { ok: false, error: "restrictionType must be cannot_contract, do_not_share_information, or both" };
+    }
+    entries.push({ name: trimmed, restrictionType: restrictionType as CounterpartyEntry["restrictionType"] });
+  }
+  if (new Set(entries.map((e) => e.name.toLowerCase())).size !== entries.length) return { ok: false, error: "duplicate entry" };
+  if (entries.length === 0 && question.required) return { ok: false, error: "at least one entry is required" };
+  return { ok: true, value: entries };
 }
 
 /**
