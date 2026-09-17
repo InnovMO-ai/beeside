@@ -43,12 +43,15 @@ export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 const TONE: Record<PanelStatus, SnapshotTone> = { DEFINED: "well_defined", NEEDS_ATTENTION: "needs_attention", CRITICAL_GAP: "resolve_early" };
 
 /** One radar axis, fully localized and ready to render — no raw field-level detail (Sherpa-only, see
- *  composeInternalAssessment's `expansion_profile`). `value` is internal (0..1); only `tierLabel`'s
- *  qualitative wording is meant to be shown next to/instead of the axis. */
+ *  composeInternalAssessment's `expansion_profile`). `value` is internal (0..1), used only to place
+ *  the axis point — never rendered as a number/percentage. `tier` is a stable, non-localized key (for
+ *  a CSS/icon hook, same pattern as `SnapshotTone`'s `tone`); `tierLabel` is the qualitative wording
+ *  meant to be shown next to/instead of the axis. */
 export interface RenderedExpansionDimension {
   key: ExpansionDimensionScore["key"];
   label: string;
   value: number;
+  tier: ExpansionDimensionScore["tier"];
   tierLabel: string;
 }
 
@@ -343,6 +346,7 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
     key: d.key,
     label: d.label[locale],
     value: d.value,
+    tier: d.tier,
     tierLabel: EXPANSION_TIER_COPY[d.tier][locale],
   }));
 

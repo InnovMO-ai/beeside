@@ -46,6 +46,12 @@ export const TEST_BUNDLE: Bundle = {
     common: { copy: { en: { continue: "Continue", back: "Back", required_error: "Please answer to continue.", optional: "Optional" }, es: { continue: "Continuar" } } },
     welcome: { copy: { en: { headline: "Your expansion starts with a clearer picture.", cta: "Start my assessment" }, es: { headline: "Tu expansión empieza con una visión más clara.", cta: "Iniciar mi evaluación" } } },
     assemble: { copy: { en: { headline: "Putting the pieces together.", body: "We’re assembling your Expansion Snapshot from what you shared." }, es: { headline: "Armando las piezas.", body: "Estamos preparando tu Expansion Snapshot con lo que compartiste." } } },
+    virtual_snapshot: {
+      copy: {
+        en: { big_picture_title: "The big picture", big_picture_intro: "Six dimensions of your project, and how clearly each one is defined today.", radar_accessible_summary: "Definition by dimension" },
+        es: { big_picture_title: "El panorama general", big_picture_intro: "Seis dimensiones de tu proyecto, y qué tan definida está cada una hoy.", radar_accessible_summary: "Nivel de definición por dimensión" },
+      },
+    },
   },
 };
 

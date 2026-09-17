@@ -263,6 +263,23 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
       es: { headline: "Armando las piezas.", body: "Estamos preparando tu Expansion Snapshot con lo que compartiste." },
     },
   },
+  // Level 2 MVP — Virtual Snapshot narrative beats (RadarProfile first; PathwayDiagram and
+  // CapabilityLandscapeGrid follow the same reusable-component, additive-copy pattern as they are
+  // built). Additive only, same as `assemble`/`level2`.
+  virtual_snapshot: {
+    copy: {
+      en: {
+        big_picture_title: "The big picture",
+        big_picture_intro: "Six dimensions of your project, and how clearly each one is defined today.",
+        radar_accessible_summary: "Definition by dimension",
+      },
+      es: {
+        big_picture_title: "El panorama general",
+        big_picture_intro: "Seis dimensiones de tu proyecto, y qué tan definida está cada una hoy.",
+        radar_accessible_summary: "Nivel de definición por dimensión",
+      },
+    },
+  },
   // Level 2 MVP — grouped compositions, Needs Explorer, StructuredEcho and Review. Additive only:
   // fa-qb-1.1.0 never reads this key, so nothing here can affect a project still on that bundle.
   level2: {

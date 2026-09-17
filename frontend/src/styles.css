@@ -483,6 +483,80 @@ fieldset.question {
     transform: none;
   }
 }
+/* RadarProfile — "The Big Picture" (Level 2 MVP §3.1). A monochromatic purple intensity scale by
+   design: this is a qualitative *definition* level, never a pass/fail or traffic-light judgment, so
+   it deliberately does not reuse the well_defined/needs_attention/resolve_early findings palette
+   above. The legend list carries the real information — the chart is decorative (aria-hidden). */
+.radar-profile {
+  display: grid;
+  gap: 1.5rem;
+}
+.radar-profile-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+.radar-profile-chart {
+  width: 100%;
+  height: auto;
+  justify-self: center;
+}
+.radar-ring,
+.radar-outline {
+  fill: none;
+  stroke: var(--mist);
+  stroke-width: 1;
+}
+.radar-axis {
+  stroke: var(--mist);
+  stroke-width: 1;
+}
+.radar-shape {
+  fill: var(--purple-600);
+  fill-opacity: 0.22;
+  stroke: var(--purple-900);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.radar-point {
+  fill: var(--purple-900);
+}
+.radar-profile-legend {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.radar-legend-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--mist);
+  padding-bottom: 0.6rem;
+}
+.radar-legend-row dt {
+  color: var(--ink);
+}
+.radar-legend-row dd {
+  margin: 0;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.radar-tier-early-stage {
+  color: var(--ink-faint);
+}
+.radar-tier-partially-defined {
+  color: var(--purple-600);
+}
+.radar-tier-well-defined {
+  color: var(--purple-900);
+}
+@media (max-width: 640px) {
+  .radar-profile-body {
+    grid-template-columns: 1fr;
+  }
+}
 .snapshot {
   display: grid;
   gap: 2rem;

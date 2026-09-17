@@ -117,7 +117,7 @@ function displayText(value: unknown, key = ""): string[] {
   // "status"/"stage" are stable enum keys (like "tone"/"key"): NeedsMapStatus and PathwayStage
   // values are never meant to be read as prose — their localized wording lives in the sibling
   // "*Label" fields, which this helper does collect.
-  if (typeof value === "string") return ["tone", "key", "status", "stage"].includes(key) ? [] : [value];
+  if (typeof value === "string") return ["tone", "key", "status", "stage", "tier"].includes(key) ? [] : [value];
   if (Array.isArray(value)) return value.flatMap((v) => displayText(v));
   if (value && typeof value === "object") return Object.entries(value).flatMap(([k, v]) => displayText(v, k));
   return [];
@@ -287,6 +287,17 @@ describe("Expansion Profile radar (owner-approved six-dimension taxonomy, 2026-0
     expect(client.locales.en.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
     expect(client.locales.es.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
     expect(internal.expansion_profile.map((d) => d.key)).toEqual(expectedKeys);
+  });
+
+  it("carries a stable tier key alongside tierLabel (RadarProfile's CSS/icon hook — never derived from the localized label text)", () => {
+    const { client } = compose(MANUFACTURER);
+    for (const locale of ["en", "es"] as const) {
+      for (const d of client.locales[locale].expansionProfile) {
+        expect(["well_defined", "partially_defined", "early_stage"]).toContain(d.tier);
+      }
+    }
+    // The same dimension gets the same tier regardless of deliverable language.
+    expect(client.locales.en.expansionProfile.map((d) => d.tier)).toEqual(client.locales.es.expansionProfile.map((d) => d.tier));
   });
 
   it("keeps every dimension's internal value in [0,1], with defined never exceeding applicable, and tier consistent with value", () => {

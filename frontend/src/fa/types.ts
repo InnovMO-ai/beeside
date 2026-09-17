@@ -153,6 +153,8 @@ export interface RenderedExpansionDimension {
   key: "market_customer_clarity" | "commercial_validation" | "operating_model_definition" | "regulatory_compliance_definition" | "local_ecosystem_capabilities" | "execution_preparedness";
   label: string;
   value: number;
+  /** Stable, non-localized key (RadarProfile's CSS/icon hook) — never derive styling from `tierLabel`. */
+  tier: "well_defined" | "partially_defined" | "early_stage";
   tierLabel: string;
 }
 
