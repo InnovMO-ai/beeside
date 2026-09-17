@@ -48,8 +48,20 @@ export const TEST_BUNDLE: Bundle = {
     assemble: { copy: { en: { headline: "Putting the pieces together.", body: "We’re assembling your Expansion Snapshot from what you shared." }, es: { headline: "Armando las piezas.", body: "Estamos preparando tu Expansion Snapshot con lo que compartiste." } } },
     virtual_snapshot: {
       copy: {
-        en: { big_picture_title: "The big picture", big_picture_intro: "Six dimensions of your project, and how clearly each one is defined today.", radar_accessible_summary: "Definition by dimension" },
-        es: { big_picture_title: "El panorama general", big_picture_intro: "Seis dimensiones de tu proyecto, y qué tan definida está cada una hoy.", radar_accessible_summary: "Nivel de definición por dimensión" },
+        en: {
+          big_picture_title: "The big picture",
+          big_picture_intro: "Six dimensions of your project, and how clearly each one is defined today.",
+          radar_accessible_summary: "Definition by dimension",
+          stand_out_title: "What stands out",
+          stand_out_intro: "From the big picture, here is where you have a solid foundation and where to focus first.",
+        },
+        es: {
+          big_picture_title: "El panorama general",
+          big_picture_intro: "Seis dimensiones de tu proyecto, y qué tan definida está cada una hoy.",
+          radar_accessible_summary: "Nivel de definición por dimensión",
+          stand_out_title: "Lo que más destaca",
+          stand_out_intro: "Del panorama general, aquí tienes una base sólida y aquí conviene enfocarte primero.",
+        },
       },
     },
   },
