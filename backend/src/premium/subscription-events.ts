@@ -2,6 +2,7 @@ import { Db } from "../db/database";
 import { recordJourneyEvent } from "../fa/services/analytics";
 import { BundleStore } from "../fa/services/bundle-store";
 import { FaError } from "../fa/services/errors";
+import { enqueueEmail } from "../operations/email-outbox";
 import { buildPrecisionHandoffPackage } from "./precision-handoff";
 
 /**
@@ -88,8 +89,8 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
   if (Number.isNaN(input.occurredAt.getTime())) throw new FaError("INVALID_INPUT", "occurred_at must be a valid timestamp", { fields: ["occurred_at"] });
 
   // The project row lock is the same one the (Phase 11) retention job takes: activation always wins the race.
-  const projects = await tx.query<{ assessment_state: string; premium_ever_activated: boolean; precision_state: string }>(
-    "SELECT assessment_state, premium_ever_activated, precision_state FROM project WHERE project_id = $1 FOR UPDATE",
+  const projects = await tx.query<{ assessment_state: string; premium_ever_activated: boolean; precision_state: string; created_by_person_id: string }>(
+    "SELECT assessment_state, premium_ever_activated, precision_state, created_by_person_id FROM project WHERE project_id = $1 FOR UPDATE",
     [input.projectId],
   );
   const project = projects.rows[0];
@@ -145,6 +146,14 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
         [input.projectId, at],
       );
       eventId = await insertEvent(subscriptionId);
+      await enqueueEmail(tx, {
+        dedupeKey: `premium_activation_confirmed:${input.projectId}:${eventId}`,
+        projectId: input.projectId,
+        personId: project.created_by_person_id,
+        template: "premium_activation_confirmed",
+        enqueuedBy: "premium.subscription_event",
+        now: at,
+      });
       // Exactly-once initial handoff, gated by precision_state (Technical Architecture v1.1 §10).
       if (project.precision_state === "NOT_STARTED") {
         await tx.query("UPDATE project SET precision_state = 'STARTED', precision_started_at = $2, updated_at = $2 WHERE project_id = $1", [input.projectId, at]);
@@ -186,6 +195,14 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       // A new cycle on the same project_id: never reopens the ended row, never a second handoff package.
       const subscriptionId = await createSubscription();
       eventId = await insertEvent(subscriptionId);
+      await enqueueEmail(tx, {
+        dedupeKey: `premium_activation_confirmed:${input.projectId}:${eventId}`,
+        projectId: input.projectId,
+        personId: project.created_by_person_id,
+        template: "premium_activation_confirmed",
+        enqueuedBy: "premium.subscription_event",
+        now: at,
+      });
       break;
     }
   }

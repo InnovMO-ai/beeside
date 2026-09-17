@@ -74,7 +74,7 @@ describeWithDb("Rules + Snapshot at COMPLETED_LOCKED (PostgreSQL, rolled back)",
     expect(own.body.content.locales.en.panels.every((p: { items: unknown[] }) => p.items.length <= 5)).toBe(true);
 
     const delivery = h.email.messages[h.email.messages.length - 1];
-    expect(delivery).toMatchObject({ template: "snapshot_ready", locale: "en", subject: "Your beeside Expansion Snapshot is ready" });
+    expect(delivery).toMatchObject({ template: "snapshot_ready", locale: "en", subject: "Your beeside Expansion Snapshot" });
     const link = lastLinkToken(h);
     const opened = await h.api().post("/api/fa/links/open").send({ token: link });
     expect(opened.body).toMatchObject({ completed: true, canContinue: false });

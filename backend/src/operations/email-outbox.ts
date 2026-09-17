@@ -78,6 +78,35 @@ export const EMAIL_TEMPLATES = {
     lifecycle: false,
     relevance: (p) => (p.assessment_state === "COMPLETED_LOCKED" ? null : `assessment_${p.assessment_state.toLowerCase()}`),
   },
+  // Fires immediately when an immediate +15/+30 extension (or exceptional recovery) is granted —
+  // see extendFromLink in fa/services/link-service.ts. Distinct from the day-after contextual
+  // access_followup_* emails above.
+  access_extension_confirmed: { source: "question_bank", linkKind: "RESUME", language: "interaction", sentEvent: "access_extension_confirmed_sent", lifecycle: true, relevance: accessOpen },
+  // Fires once, right after premium_activated/premium_reactivated is processed — see
+  // processSubscriptionEvent in premium/subscription-events.ts. Never cancelled by later state: it
+  // confirms something that already happened, not an invitation to act before a deadline.
+  premium_activation_confirmed: { source: "snapshot_template", linkKind: null, language: "deliverable", sentEvent: "premium_activation_confirmed_sent", lifecycle: false, relevance: () => null },
+  // Two-stage warning before a free (never-Premium) project's temporary retention elapses and its
+  // client data is purged — see the temporary_retention job in operations/jobs.ts, which enqueues
+  // these directly (no fa_project_lifecycle tracking column: the email_delivery table itself is the
+  // per-template "already sent" ledger, the same pattern emailRequestedRecently already relies on).
+  // Cancelled at send time if Premium was activated or the project was already purged in the interim.
+  retention_reminder: {
+    source: "question_bank",
+    linkKind: "RESUME",
+    language: "interaction",
+    sentEvent: "retention_reminder_sent",
+    lifecycle: true,
+    relevance: (p) => (p.premium_ever_activated ? "premium_activated" : p.assessment_state === "DELETED" ? "assessment_deleted" : null),
+  },
+  retention_reminder_final: {
+    source: "question_bank",
+    linkKind: "RESUME",
+    language: "interaction",
+    sentEvent: "retention_reminder_final_sent",
+    lifecycle: true,
+    relevance: (p) => (p.premium_ever_activated ? "premium_activated" : p.assessment_state === "DELETED" ? "assessment_deleted" : null),
+  },
 } satisfies Record<string, TemplateDefinition>;
 
 export type EmailTemplate = keyof typeof EMAIL_TEMPLATES;
@@ -211,6 +240,7 @@ async function prepare(tx: Db, deps: FaDeps, delivery: DeliveryRow, now: Date): 
     access_until: project.access_expires_at ? formatDate(project.access_expires_at, locale) : "",
     days_left: project.access_expires_at ? String(daysLeft(project.access_expires_at, now)) : "",
     recoverable_until: project.access_max_until ? formatDate(project.access_max_until, locale) : "",
+    retention_until: project.retention_until ? formatDate(project.retention_until, locale) : "",
   };
 
   let rendered: { subject: string; body: string; cta: string; secondaryCta: string | null };

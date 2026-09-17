@@ -60,7 +60,7 @@ describe("Control Center", () => {
     });
     render(<AdminApp />);
     const nav = await screen.findByRole("navigation", { name: "Control Center" });
-    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Operations"]);
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Operations"]);
 
     fireEvent.change(screen.getByLabelText("Search projects"), { target: { value: "north" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -85,12 +85,46 @@ describe("Control Center", () => {
     window.history.replaceState(null, "", "/admin/operations");
     render(<AdminApp />);
     const nav = await screen.findByRole("navigation", { name: "Control Center" });
-    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Operations", "Audit", "People"]);
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Operations", "Audit", "People"]);
     fireEvent.click(await screen.findByRole("button", { name: "Run email delivery" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/email_outbox/run"))).toBe(true));
     const write = calls.find((c) => c.url.endsWith("/email_outbox/run"));
     expect(write?.method).toBe("POST");
     expect(write?.headers["X-Beeside-Admin"]).toBe("1");
+  });
+
+  it("previews email templates from the current bundles without offering to edit them", async () => {
+    mockApi({
+      "/api/admin/me": () => jsonResponse(SUPERVISOR),
+      "/api/admin/communications/templates": () =>
+        jsonResponse({
+          questionBankVersion: "fa-qb-1.2.0",
+          snapshotTemplateVersion: "st-1.0.0",
+          templates: [
+            {
+              key: "resume_link",
+              source: "question_bank",
+              active: true,
+              locales: {
+                en: {
+                  subject: "Your beeside assessment is saved",
+                  body: "Your First Assessment is saved. You can continue exactly where you left off.",
+                  cta: "Continue my assessment",
+                  secondaryCta: null,
+                },
+              },
+            },
+          ],
+        }),
+    });
+    window.history.replaceState(null, "", "/admin/communications");
+    render(<AdminApp />);
+    expect(await screen.findByRole("heading", { name: "Communications" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /resume_link/ })).toBeInTheDocument();
+    expect(screen.getByText("Your First Assessment is saved. You can continue exactly where you left off.")).toBeInTheDocument();
+    expect(screen.getByText("CTA: Continue my assessment")).toBeInTheDocument();
+    expect(screen.getByText("Question bank fa-qb-1.2.0 · Snapshot template st-1.0.0")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save|Publish|Edit/ })).not.toBeInTheDocument();
   });
 
   it("shows the immutable Snapshot without recording a respondent view", async () => {

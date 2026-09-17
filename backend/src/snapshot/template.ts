@@ -252,18 +252,38 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         },
       },
     },
+    // Owner-approved verbatim (subject, core sentence, CTA), plus the Precision-continuation
+    // sentence the owner asked this email to carry: continuing builds on what was already shared,
+    // never a restart from zero.
     emails: {
       snapshot_ready: {
         copy: {
           en: {
-            subject: "Your beeside Expansion Snapshot is ready",
-            body: "Hi {{preferred_name}}, your Expansion Snapshot is ready. You now have a first view of what looks defined, what needs attention and which areas may need to be resolved early.",
+            subject: "Your beeside Expansion Snapshot",
+            body: "Hi {{preferred_name}}, your First Assessment is complete. Your Expansion Snapshot gives you a first view of what looks defined, what needs attention and which areas may need to be resolved early. If you continue with beeside Precision, we build on what you’ve already shared — there’s no need to start over.",
             cta: "View my Expansion Snapshot",
           },
           es: {
-            subject: "Tu Expansion Snapshot de beeside está listo",
-            body: "Hola {{preferred_name}}, tu Expansion Snapshot está listo. Ya tienes una primera visión de qué parece definido, qué necesita atención y qué áreas conviene resolver desde ahora.",
+            subject: "Tu Expansion Snapshot de beeside",
+            body: "Hola {{preferred_name}}, tu First Assessment está completo. Tu Expansion Snapshot te da una primera visión de qué parece definido, qué necesita atención y qué áreas conviene resolver desde ahora. Si continúas con beeside Precision, partimos de lo que ya compartiste — no es necesario empezar de nuevo.",
             cta: "Ver mi Expansion Snapshot",
+          },
+        },
+      },
+      // COPY REVIEW — restrained provisional copy (Level 2 MVP §7, Communications). Sourced from the
+      // pinned snapshot_template_version (like snapshot_ready above) since activation only happens
+      // after a project already has a Snapshot; repeats the same no-restart-from-zero reassurance.
+      premium_activation_confirmed: {
+        copy: {
+          en: {
+            subject: "Your beeside Premium is active",
+            body: "Hi {{preferred_name}}, your beeside Premium is now active. We continue from what you already shared in your First Assessment — there’s no need to start over.",
+            cta: "Go to my Precision workspace",
+          },
+          es: {
+            subject: "Tu beeside Premium está activo",
+            body: "Hola {{preferred_name}}, tu beeside Premium ya está activo. Continuamos a partir de lo que ya compartiste en tu First Assessment — no es necesario empezar de nuevo.",
+            cta: "Ir a mi espacio de Precision",
           },
         },
       },

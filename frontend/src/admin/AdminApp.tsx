@@ -17,6 +17,7 @@ type Route =
   | { name: "projects" }
   | { name: "project"; id: string; tab: ProjectTab }
   | { name: "config" }
+  | { name: "communications" }
   | { name: "analytics" }
   | { name: "operations" }
   | { name: "audit" }
@@ -37,7 +38,7 @@ export function parseAdminRoute(pathname: string): Route {
     const tab = TABS.find((t) => t.id === parts[2])?.id ?? "overview";
     return { name: "project", id: parts[1], tab };
   }
-  if (parts[0] === "config" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
+  if (parts[0] === "config" || parts[0] === "communications" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
   return { name: "projects" };
 }
 
@@ -148,6 +149,7 @@ export function AdminApp() {
   const nav: Array<{ route: Route; label: string; show: boolean }> = [
     { route: { name: "projects" }, label: "Projects", show: can("projects.read") },
     { route: { name: "config" }, label: "Configuration", show: can("config.read") },
+    { route: { name: "communications" }, label: "Communications", show: can("operations.read") },
     { route: { name: "analytics" }, label: "Analytics", show: can("analytics.read") },
     { route: { name: "operations" }, label: "Operations", show: can("operations.read") },
     { route: { name: "audit" }, label: "Audit", show: can("audit.read") },
@@ -194,6 +196,7 @@ export function AdminApp() {
         {route.name === "projects" && <ProjectsView onOpen={(id) => navigate({ name: "project", id, tab: "overview" })} />}
         {route.name === "project" && <ProjectView id={route.id} tab={route.tab} can={can} onTab={(tab) => navigate({ ...route, tab })} onBack={() => navigate({ name: "projects" })} />}
         {route.name === "config" && <ConfigView can={can} />}
+        {route.name === "communications" && can("operations.read") && <CommunicationsView />}
         {route.name === "analytics" && can("analytics.read") && <AnalyticsView />}
         {route.name === "operations" && <OperationsView can={can} />}
         {route.name === "audit" && can("audit.read") && <AuditView />}
@@ -815,6 +818,47 @@ function VersionDetail({ registry, version, can, onChanged }: { registry: Regist
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------- communications
+// Read-only: templates live in the versioned question-bank/snapshot-template bundles and are only
+// ever changed by publishing a new version through Configuration (see communications-service.ts on
+// the backend). This view exists so Admin/Supervisor can see what a recipient sees, nothing more.
+function CommunicationsView() {
+  const overview = useLoad(() => adminApi.communicationsTemplates(), []);
+  return (
+    <section aria-labelledby="comms-title">
+      <h1 id="comms-title" className="admin-title">Communications</h1>
+      <p className="helper">
+        A preview of the email templates the platform sends, filled with sample values. To change what a
+        template says, publish a new question bank or Snapshot template version in Configuration — there
+        is nothing to edit here.
+      </p>
+      <Status data={overview.data} error={overview.error} />
+      {overview.data && (
+        <>
+          <p className="helper">
+            Question bank {text(overview.data.questionBankVersion)} · Snapshot template {text(overview.data.snapshotTemplateVersion)}
+          </p>
+          <div className="admin-grid">
+            {(overview.data.templates as Json[]).map((tpl) => (
+              <div key={String(tpl.key)} className="admin-card admin-wide">
+                <h2><code>{text(tpl.key)}</code> <span className="admin-badge">{text(tpl.source)}</span></h2>
+                {Object.entries((tpl.locales ?? {}) as Record<string, Json>).map(([locale, copy]) => (
+                  <div key={locale} className="admin-card">
+                    <h3>{locale.toUpperCase()}</h3>
+                    <p><strong>Subject:</strong> {text(copy.subject)}</p>
+                    <p>{text(copy.body)}</p>
+                    <p><strong>CTA:</strong> {text(copy.cta)}{copy.secondaryCta ? ` · ${text(copy.secondaryCta)}` : ""}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

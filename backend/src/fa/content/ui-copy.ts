@@ -425,16 +425,18 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
 };
 
 export const EMAIL_COPY: QuestionBankBundle["emails"] = {
+  // Owner-approved verbatim (subject, core sentence, CTA); the access-until clause is the only
+  // addition, needed for the functional "how long is this saved" fact this email exists to give.
   resume_link: {
     copy: {
       en: {
         subject: "Your beeside assessment is saved",
-        body: "Hi {{preferred_name}}, your progress is saved. When you’re ready, you can continue exactly where you left off — there’s no need to start again. Your First Assessment is available until {{access_until}}.",
+        body: "Hi {{preferred_name}}, your First Assessment is saved. You can continue exactly where you left off — it’s available until {{access_until}}.",
         cta: "Continue my assessment",
       },
       es: {
         subject: "Tu evaluación de beeside está guardada",
-        body: "Hola {{preferred_name}}, tu avance está guardado. Cuando estés listo, podrás continuar exactamente donde te quedaste — no necesitas empezar de nuevo. Tu First Assessment está disponible hasta el {{access_until}}.",
+        body: "Hola {{preferred_name}}, tu First Assessment está guardado. Puedes continuar exactamente donde te quedaste — está disponible hasta el {{access_until}}.",
         cta: "Continuar mi evaluación",
       },
     },
@@ -543,6 +545,57 @@ export const EMAIL_COPY: QuestionBankBundle["emails"] = {
         subject: "Tu First Assessment sigue aquí para ti",
         body: "Hola {{preferred_name}}, tu First Assessment está disponible hasta el {{access_until}}. Tu avance está guardado, así que puedes continuar cuando te convenga.",
         cta: "Continuar First Assessment",
+      },
+    },
+  },
+  // COPY REVIEW — restrained provisional copy (Level 2 MVP §7, Communications). Confirms an
+  // immediate +15/+30 extension the moment it is granted; the day-after contextual follow-up
+  // (access_followup_*, above) still applies separately.
+  access_extension_confirmed: {
+    copy: {
+      en: {
+        subject: "Your First Assessment access has been extended",
+        body: "Hi {{preferred_name}}, we’ve extended your First Assessment. It’s now available until {{access_until}} — take the time you need.",
+        cta: "Continue my assessment",
+      },
+      es: {
+        subject: "Ampliamos el acceso a tu First Assessment",
+        body: "Hola {{preferred_name}}, ampliamos tu First Assessment. Ahora está disponible hasta el {{access_until}} — tómate el tiempo que necesites.",
+        cta: "Continuar mi evaluación",
+      },
+    },
+  },
+  // COPY REVIEW — restrained provisional copy. First of two warnings before a free (never-Premium)
+  // First Assessment's temporary retention elapses and its client data is purged (Handoff v1 §18's
+  // retention lifecycle). See retention_reminder_final for the closer warning.
+  retention_reminder: {
+    copy: {
+      en: {
+        subject: "Your First Assessment data will be removed soon",
+        body: "Hi {{preferred_name}}, we keep First Assessment information for a limited time when a project hasn’t continued into Premium. Your information will be removed on {{retention_until}}. Sign in any time before then to review your options.",
+        cta: "Review my First Assessment",
+      },
+      es: {
+        subject: "La información de tu First Assessment se eliminará pronto",
+        body: "Hola {{preferred_name}}, conservamos la información de tu First Assessment por un tiempo limitado cuando el proyecto no continúa a Premium. Tu información se eliminará el {{retention_until}}. Ingresa antes de esa fecha para revisar tus opciones.",
+        cta: "Revisar mi First Assessment",
+      },
+    },
+  },
+  // COPY REVIEW — restrained provisional copy. The closer, final warning before the same purge
+  // (see retention_reminder above) — the last point at which activating Premium or continuing the
+  // First Assessment still keeps the data from being removed.
+  retention_reminder_final: {
+    copy: {
+      en: {
+        subject: "Last chance: your First Assessment data will be removed on {{retention_until}}",
+        body: "Hi {{preferred_name}}, this is a final reminder: your First Assessment information will be removed on {{retention_until}}. Sign in before then if you’d like to review your options.",
+        cta: "Review my First Assessment",
+      },
+      es: {
+        subject: "Última oportunidad: tu información se eliminará el {{retention_until}}",
+        body: "Hola {{preferred_name}}, este es un último recordatorio: la información de tu First Assessment se eliminará el {{retention_until}}. Ingresa antes de esa fecha si quieres revisar tus opciones.",
+        cta: "Revisar mi First Assessment",
       },
     },
   },

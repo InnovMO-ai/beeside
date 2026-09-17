@@ -102,6 +102,8 @@ export const adminApi = {
   jobRuns: () => call<{ runs: Json[] }>("GET", "/operations/jobs"),
   runJob: (job: string) => call<Json>("POST", `/operations/jobs/${job}/run`, {}),
 
+  communicationsTemplates: () => call<Json>("GET", "/communications/templates"),
+
   audit: (projectId?: string) => call<{ events: Json[] }>("GET", `/audit${projectId ? `?projectId=${projectId}` : ""}`),
   adminUsers: () => call<{ users: Json[] }>("GET", "/admin-users"),
   provisionAdmin: (email: string, role: AdminRole) => call<Json>("POST", "/admin-users", { email, role }),

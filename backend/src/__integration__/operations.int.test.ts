@@ -116,6 +116,29 @@ describeWithDb("Operations & lifecycle control: outbox, jobs, reminders, recover
     expect((await h.api().post("/api/fa/identity").send(identity({ email: "calendar@northwind-test.example" }))).status).toBe(201);
   });
 
+  it("sends a two-stage retention warning before the day-60 purge, each exactly once", async () => {
+    const day0 = h.clock.now.getTime();
+    await startWithLink("retention-warning@northwind-test.example");
+
+    h.clock.now = new Date(day0 + 45 * DAY);
+    expect(await run("temporary_retention")).toMatchObject({ stats: { retention_reminders_sent: 0, retention_final_reminders_sent: 0, purged: 0 } });
+
+    h.clock.now = new Date(day0 + 46 * DAY);
+    expect(await run("temporary_retention")).toMatchObject({ stats: { retention_reminders_sent: 1, retention_final_reminders_sent: 0, purged: 0 } });
+    expect(await run("temporary_retention")).toMatchObject({ stats: { retention_reminders_sent: 0 } });
+    await run("email_outbox");
+    expect(h.email.messages[h.email.messages.length - 1]?.template).toBe("retention_reminder");
+
+    h.clock.now = new Date(day0 + 57 * DAY);
+    expect(await run("temporary_retention")).toMatchObject({ stats: { retention_reminders_sent: 0, retention_final_reminders_sent: 1, purged: 0 } });
+    expect(await run("temporary_retention")).toMatchObject({ stats: { retention_final_reminders_sent: 0 } });
+    await run("email_outbox");
+    expect(h.email.messages[h.email.messages.length - 1]?.template).toBe("retention_reminder_final");
+
+    h.clock.now = new Date(day0 + 60 * DAY + 60_000);
+    expect(await run("temporary_retention")).toMatchObject({ status: "SUCCEEDED", stats: { purged: 1 } });
+  });
+
   it("gives a completed First Assessment that never emitted a private link a deterministic retention date, and purges it", async () => {
     const start = await h.api().post("/api/fa/identity").send(identity({ email: "one.sitting@northwind-test.example" }));
     const day0 = h.clock.now.getTime();

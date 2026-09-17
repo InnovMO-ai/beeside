@@ -28,6 +28,7 @@ import {
   sealLoginState,
 } from "./admin-session";
 import { listAdminUsers, provisionAdminUser, updateAdminUser } from "./admin-users";
+import { communicationsOverview } from "./communications-service";
 import { AdminAuthError, AdminIdentityProvider, pkceChallenge, randomUrlToken } from "./oidc";
 import {
   listAuditEvents,
@@ -401,6 +402,16 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     await audit(req, "integration_delivery.retry", ok ? "ALLOWED" : "FAILED", { targetType: "integration_delivery", targetId: id });
     if (!ok) throw new FaError("NOT_APPLICABLE", "this delivery cannot be retried");
     res.json({ retried: true });
+  }));
+
+  // ------------------------------------------------------------------ communications (read-only, both roles)
+  // A preview of the email template layer, not a template editor: the templates themselves live
+  // inside the versioned question-bank/snapshot-template bundles and are still changed only through
+  // Configuration's governed draft/preview/review/publish flow (see communications-service.ts).
+  router.get("/communications/templates", allow("operations.read", "communications.viewed"), handle(async (req, res) => {
+    const overview = await communicationsOverview(deps.fa.bundles, deps.configService);
+    await audit(req, "communications.viewed", "ALLOWED", { details: { question_bank_version: overview.questionBankVersion, snapshot_template_version: overview.snapshotTemplateVersion, count: overview.templates.length } });
+    res.json(overview);
   }));
 
   // ------------------------------------------------------------------ analytics (read-only, both roles)
