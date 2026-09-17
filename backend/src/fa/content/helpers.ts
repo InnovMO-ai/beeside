@@ -75,4 +75,6 @@ export const when = {
   answered: (field: string): Condition => ({ field, op: "answered" }),
   any: (...conditions: Condition[]): Condition => ({ any: conditions }),
   all: (...conditions: Condition[]): Condition => ({ all: conditions }),
+  /** Level 2 MVP addition: negation, e.g. "not already established by an earlier answer". */
+  not: (condition: Condition): Condition => ({ not: condition }),
 };

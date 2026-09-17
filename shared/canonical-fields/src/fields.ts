@@ -6,6 +6,13 @@
  * use the option values declared here; display copy lives in the versioned question bank, never
  * here. Keys are stable technical identifiers: renaming one is a breaking, versioned change.
  * Future Precision keys use the `precision.*` namespace and are not defined in this module.
+ *
+ * Level 2 MVP addendum (fa-qb-2.0.0, Design Specification "beeside First Assessment — Level 2
+ * MVP"): adds the Needs Landscape (`needs_map`) and Provider Profile + Resources (`tag_list`,
+ * `fa.provider.*`) fields, plus a handful of new Your Company / Plan Definition / Priorities
+ * fields. Every field already asked under fa-qb-1.1.0 is reused unchanged by field_key — the
+ * Level 2 bundle only re-groups where those questions render, per the owner's explicit
+ * instruction to reuse the existing base and change only what the new spec redefines.
  */
 
 export const SUPPORTED_LOCALES = ["en", "es"] as const;
@@ -21,7 +28,11 @@ export type FieldDataType =
   | "quantity"
   | "email"
   | "url"
-  | "locale";
+  | "locale"
+  // Level 2 MVP additions — see structured-echo.ts / values.ts for validation, NeedsExplorer /
+  // PriorityRanker / DependencyMap for rendering.
+  | "tag_list"
+  | "needs_map";
 
 /** identity = bound to a person/company column; question_bank = stored as an `answer` row. */
 export type FieldSource = "identity" | "question_bank";
@@ -51,6 +62,14 @@ export interface CanonicalFieldDefinition {
   openText?: boolean;
   /** Identity-sourced fields are persisted in this column instead of `answer`. */
   binding?: FieldBinding;
+  /** multi_select only: caps how many values may be selected together (e.g. "pick your top 3"). */
+  maxSelect?: number;
+  /** country_list only: caps how many countries may be selected (default 30, existing behaviour). */
+  maxCount?: number;
+  /** tag_list only: caps how many free-text entries may be stored (default 20). */
+  maxTags?: number;
+  /** tag_list only: caps the length of each free-text entry (default 200). */
+  maxTagLength?: number;
 }
 
 /** Rules Matrix v1 §0 fixed category list (same order/ids as the rules_matrix_category catalog). */
@@ -130,8 +149,8 @@ export const FA_FIELDS: readonly CanonicalFieldDefinition[] = [
   field({ key: "fa.strategic.decided_vs_open", dataType: "text", source: "question_bank", openText: true, description: "Strategic prompt 1: what is decided and what is still open (verbatim)." }),
 
   // ---------------------------------------------------------------- Business (B1–B6)
-  field({ key: "fa.business.description", dataType: "text", source: "question_bank", openText: true, description: "What the company does, in one sentence (B1, verbatim)." }),
-  field({ key: "fa.business.type", dataType: "single_select", source: "question_bank", description: "Business type / industry (B2).", values: ["manufacturing", "distribution_wholesale", "retail", "ecommerce", "professional_services", "technology_saas", "logistics", "construction_infrastructure", "financial_services", "consumer_services", "other"] }),
+  field({ key: "fa.business.description", dataType: "text", source: "question_bank", openText: true, description: "What the company does, in one sentence (B1, verbatim). Level 2: rendered as composition 1 (Your Company) 'company description'." }),
+  field({ key: "fa.business.type", dataType: "single_select", source: "question_bank", description: "Business type / industry (B2). Level 2: rendered as composition 1 (Your Company) 'industry'.", values: ["manufacturing", "distribution_wholesale", "retail", "ecommerce", "professional_services", "technology_saas", "logistics", "construction_infrastructure", "financial_services", "consumer_services", "other"] }),
   field({ key: "fa.business.customer_model", dataType: "single_select", source: "question_bank", values: ["b2b", "b2c", "b2g", "combination"], description: "Customer model (B3)." }),
   field({ key: "fa.business.revenue_model", dataType: "single_select", source: "question_bank", description: "What customers pay for (B4).", values: ["physical_products", "professional_services", "software_subscriptions", "projects", "usage_transactions", "digital_products", "combination", "other"] }),
   field({ key: "fa.business.value_chain_role", dataType: "multi_select", source: "question_bank", values: ["manufacture", "assemble", "source", "import", "distribute", "sell_direct"], description: "Role in the physical-product value chain (B5)." }),
@@ -178,6 +197,8 @@ export const FA_FIELDS: readonly CanonicalFieldDefinition[] = [
   field({ key: "fa.priority.timing", dataType: "single_select", source: "question_bank", values: ["already_in_progress", "immediately", "within_30_days", "1_3_months", "3_6_months", "later"], description: "When the priority needs to move (D3)." }),
   field({ key: "fa.priority.reason", dataType: "text", source: "question_bank", openText: true, description: "Why the priority comes first (D4, optional, verbatim)." }),
   field({ key: "fa.project.stop_go_criteria", dataType: "multi_select", source: "question_bank", description: "What could make the respondent decide not to move forward (declared context, never a finding).", values: ["economics", "demand", "regulatory_complexity", "investment_too_high", "partners_suppliers", "timeline", "internal_capacity", "nothing_specific", "other"], exclusiveValues: ["nothing_specific"] }),
+  field({ key: "fa.priority.date_flexibility", dataType: "single_select", source: "question_bank", values: ["fixed", "some_flexibility", "fully_flexible"], description: "Level 2 (composition 4, Priorities): how fixed the launch date is." }),
+  field({ key: "fa.priority.date_flexibility_reason", dataType: "text", source: "question_bank", openText: true, description: "Level 2 (composition 4): what determines the date's (in)flexibility (verbatim)." }),
 
   // ---------------------------------------------------------------- Constraints (C1–C6)
   field({ key: "fa.constraints.items", dataType: "multi_select", source: "question_bank", values: [...RULES_CATEGORY_VALUES, "not_sure"], exclusiveValues: ["not_sure"], description: "What could affect the plan (C1, fixed category list)." }),
@@ -186,13 +207,64 @@ export const FA_FIELDS: readonly CanonicalFieldDefinition[] = [
   field({ key: "fa.constraints.existing_commitments", dataType: "text", source: "question_bank", openText: true, description: "Strategic prompt 4 / C3: commitments already made (verbatim)." }),
   field({ key: "fa.constraints.commitment_areas", dataType: "multi_select", source: "question_bank", values: [...RULES_CATEGORY_VALUES, "none"], exclusiveValues: ["none"], description: "Structured companion of existing commitments (category list)." }),
   field({ key: "fa.constraints.has_customer_contract", dataType: "single_select", source: "question_bank", values: ["yes", "no"], description: "A customer contract/commitment already exists." }),
-  field({ key: "fa.constraints.non_negotiables", dataType: "text", source: "question_bank", openText: true, description: "Strategic prompt 5 / C4: what must not be compromised (verbatim)." }),
+  field({ key: "fa.constraints.non_negotiables", dataType: "text", source: "question_bank", openText: true, description: "Strategic prompt 5 / C4: what must not be compromised (verbatim). Level 2: rendered in composition 4 (Priorities)." }),
   field({ key: "fa.constraints.non_negotiable_areas", dataType: "multi_select", source: "question_bank", values: [...RULES_CATEGORY_VALUES, "none"], exclusiveValues: ["none"], description: "Structured companion of non-negotiables (category list)." }),
   field({ key: "fa.project.primary_concern", dataType: "text", source: "question_bank", openText: true, description: "What the respondent is most concerned about getting wrong (C5, verbatim)." }),
   field({ key: "fa.project.additional_context", dataType: "text", source: "question_bank", openText: true, description: "Anything else to know (C6, optional, verbatim)." }),
 
   // ---------------------------------------------------------------- Ownership & preferences
   field({ key: "fa.ownership.project_responsibility", dataType: "single_select", source: "question_bank", values: ["leading", "part_of_team", "someone_else_leading", "being_defined"], description: "Respondent's responsibility for the project (S1)." }),
+
+  // ================================================================== LEVEL 2 MVP (fa-qb-2.0.0)
+
+  // ---------------------------------------------------------------- Composition 1 — Your Company
+  field({ key: "fa.company.country", dataType: "country_list", source: "question_bank", maxCount: 1, description: "Company's own home/operating country (distinct from fa.project.target_markets, the destination)." }),
+  field({ key: "fa.company.business_models", dataType: "multi_select", source: "question_bank", description: "How the company operates today (Level 2 composition 1 second CaptureCard).", values: ["manufacturer", "distributor_wholesaler", "direct_to_consumer", "franchise_licensing", "platform_marketplace", "professional_services_firm", "other"] }),
+  field({ key: "fa.company.primary_business_model", dataType: "single_select", source: "question_bank", description: "Which selected business model matters most, shown only when 2+ are selected.", values: ["manufacturer", "distributor_wholesaler", "direct_to_consumer", "franchise_licensing", "platform_marketplace", "professional_services_firm", "other"] }),
+  field({ key: "fa.company.role_in_project", dataType: "single_select", source: "question_bank", description: "Respondent's role in this expansion project.", values: ["owner_founder", "executive_leadership", "project_lead", "functional_specialist", "advisor_consultant", "other"] }),
+  field({ key: "fa.company.job_title", dataType: "short_text", source: "question_bank", description: "Respondent's job title." }),
+
+  // ---------------------------------------------------------------- Composition 2 — Your Project (entry approach + StructuredEcho)
+  field({ key: "fa.project.entry_approach", dataType: "text", source: "question_bank", openText: true, description: "Open-first: how the respondent plans to enter the market (verbatim)." }),
+  field({ key: "fa.project.entry_approach_structured", dataType: "single_select", source: "question_bank", description: "StructuredEcho confirmation of fa.project.entry_approach; only rendered when the deterministic parser finds a plausible match.", values: ["direct_entity", "distributor_partner", "ecommerce_only", "joint_venture", "acquisition", "licensing_franchise", "representative_office", "other"] }),
+  field({ key: "fa.project.primary_driver_structured", dataType: "single_select", source: "question_bank", description: "StructuredEcho confirmation of fa.project.story_raw's primary driver; shares its value set with fa.goal.expansion_driver by design.", values: ["existing_customer_demand", "new_market_opportunity", "growth_targets", "customer_request", "supply_chain_strategy", "cost_advantage", "diversification", "competitive_pressure", "investor_board_direction", "other"] }),
+
+  // ---------------------------------------------------------------- Composition 3 — Plan Definition
+  field({ key: "fa.plan.first_customer_known", dataType: "single_select", source: "question_bank", values: ["not_defined_yet", "defined"], description: "Whether a first customer/segment is already identified." }),
+  field({ key: "fa.plan.first_customer_segment", dataType: "text", source: "question_bank", openText: true, description: "First customer or segment, when already defined (verbatim)." }),
+  field({ key: "fa.plan.route_to_market", dataType: "text", source: "question_bank", openText: true, description: "How the respondent will reach customers, only asked when fa.project.entry_approach_structured didn't already establish it (verbatim)." }),
+  field({ key: "fa.plan.demand_evidence", dataType: "text", source: "question_bank", openText: true, description: "Evidence of demand in the target market (verbatim)." }),
+  field({ key: "fa.plan.competitive_landscape", dataType: "text", source: "question_bank", openText: true, description: "Known competitors or alternatives in the target market (verbatim)." }),
+  field({ key: "fa.plan.business_case", dataType: "text", source: "question_bank", openText: true, description: "The business case for this expansion, as far as it has been worked out (verbatim)." }),
+
+  // ---------------------------------------------------------------- Composition 5 — Needs Landscape
+  field({
+    key: "fa.needs.map",
+    dataType: "needs_map",
+    source: "question_bank",
+    description:
+      "The Needs Explorer / PriorityRanker / DependencyMap composite: selected capability needs (customer-facing key + independent five-state status), the client-declared top-5 priority order, and the guided dependency flow (owner + approval) built on top of the priority order. See backend/src/fa/content/needs-explorer-taxonomy.ts for the customer-facing-to-canonical mapping every selection key must resolve against, and backend/src/fa/engine/values.ts for the full validation contract.",
+  }),
+  field({ key: "fa.needs.additional_context", dataType: "text", source: "question_bank", openText: true, description: "Closing open field for composition 5: anything else about what needs to be resolved (verbatim, optional)." }),
+
+  // ---------------------------------------------------------------- Composition 6 — Provider Profile + Resources
+  field({ key: "fa.provider.values", dataType: "multi_select", source: "question_bank", maxSelect: 3, description: "Top 3 values the respondent wants in the providers/partners beeside surfaces. Never a purchase signal by itself.", values: ["reliability", "speed", "cost_efficiency", "local_expertise", "transparency", "cultural_fit", "proven_track_record", "innovation", "compliance_rigor", "flexibility"] }),
+  field({ key: "fa.provider.requires_language", dataType: "single_select", source: "question_bank", values: ["yes", "no"], description: "Whether a specific working language is a hard requirement for providers." }),
+  field({ key: "fa.provider.required_language", dataType: "single_select", source: "question_bank", values: ["en", "es", "pt", "fr", "de", "zh", "other"], description: "Required provider working language, when fa.provider.requires_language = yes." }),
+  field({ key: "fa.provider.requires_local_presence", dataType: "single_select", source: "question_bank", values: ["yes", "no"], description: "Whether local in-country presence is a hard requirement for providers." }),
+  field({ key: "fa.provider.required_presence_countries", dataType: "country_list", source: "question_bank", description: "Countries where provider presence is required, when fa.provider.requires_local_presence = yes." }),
+  field({
+    key: "fa.provider.restricted_counterparties",
+    dataType: "tag_list",
+    source: "question_bank",
+    maxTags: 25,
+    maxTagLength: 200,
+    description:
+      "Companies or groups the respondent cannot work with or share information with. Operationally and, in some cases, compliance-sensitive: never exposed to providers, excluded from matching without disclosing why, scoped to this project_id only, retained exactly as long as the project's own retention_until (fa_project_lifecycle), and any Operation Hub/admin read must be recorded as an admin_audit_event (action 'project.restricted_counterparties.viewed'). See backend/src/fa/services/restricted-counterparties.ts.",
+  }),
+  field({ key: "fa.provider.investment_range", dataType: "single_select", source: "question_bank", values: ["under_50k", "50k_150k", "150k_500k", "500k_2m", "over_2m", "not_yet_defined"], description: "Investment framework range for this expansion (USD)." }),
+  field({ key: "fa.provider.resource_availability", dataType: "single_select", source: "question_bank", values: ["yes", "partially", "no", "not_sure"], description: "Whether the internal team/budget to execute is available." }),
+  field({ key: "fa.provider.resource_gap", dataType: "text", source: "question_bank", openText: true, description: "What resource is missing, when availability is not a plain yes (verbatim)." }),
 ];
 
 const FIELD_INDEX = new Map(FA_FIELDS.map((definition) => [definition.key, definition]));

@@ -5,6 +5,12 @@
  * project at assessment_started. Logic (ids, field keys, types, option values, applicability) lives
  * outside `copy`; every localized string lives inside a `copy` object keyed by locale, so a
  * copy-only change is classified CONTENT and anything else LOGIC_SCHEMA by the database.
+ *
+ * Level 2 MVP addendum (fa-qb-2.0.0): adds `tag_list` / `needs_map` question types, an optional
+ * `StepDef.layout` ("grouped" renders every applicable question of the step together, as one
+ * composition, instead of one question per screen) and a `"review"` step kind (a no-new-questions
+ * recap step). Every addition is optional / additive: a bundle that never sets `layout` or uses
+ * `kind: "review"` behaves byte-identically to fa-qb-1.1.0.
  */
 
 export type Locale = "en" | "es";
@@ -20,7 +26,10 @@ export type QuestionType =
   | "timing"
   | "country_list"
   | "quantity"
-  | "locale";
+  | "locale"
+  // Level 2 MVP additions.
+  | "tag_list"
+  | "needs_map";
 
 /** Deterministic applicability over earlier DECLARED_BY_USER answers only. */
 export type Condition =
@@ -59,6 +68,13 @@ export interface QuestionDef {
   /** Quantity units (value + localized label). */
   units?: OptionDef[];
   max_length?: number;
+  /** multi_select only: caps how many values may be selected together (e.g. "pick your top 3"). */
+  max_select?: number;
+  /** country_list only: caps how many countries may be selected (default 30). */
+  max_count?: number;
+  /** tag_list only: caps entry count / entry length (defaults 20 / 200). */
+  max_tags?: number;
+  max_tag_length?: number;
   applies_when?: Condition;
   copy: Record<Locale, QuestionCopy>;
 }
@@ -71,8 +87,11 @@ export interface StepCopy {
 export interface StepDef {
   id: string;
   stage: StageId;
-  kind: "questions" | "transition";
+  kind: "questions" | "transition" | "review";
   question_ids: string[];
+  /** "grouped" renders every applicable question of the step together as one composition (Level 2
+   *  MVP). Undefined preserves the existing one-question-per-screen rendering exactly. */
+  layout?: "grouped";
   applies_when?: Condition;
   copy: Record<Locale, StepCopy>;
 }

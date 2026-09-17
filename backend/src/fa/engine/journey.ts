@@ -41,6 +41,10 @@ export function dynamicOptionValues(question: QuestionDef, effective: AnswerMap)
  * that are themselves applicable, so changing a foundational answer silently makes dependent
  * answers inapplicable (they stay in the append-only history and re-appear only if the condition
  * is re-triggered). `lastCompletedStepId` is the furthest step the respondent confirmed.
+ *
+ * Level 2 MVP: a `"review"` step (composition 7, no questions of its own — a recap of everything
+ * already answered) is applicable purely on `applies_when` + step order, exactly like
+ * `"transition"`. It never gains or requires questions of its own.
  */
 export function computeJourney(
   bundle: QuestionBankBundle,
@@ -67,7 +71,7 @@ export function computeJourney(
       }
       return { question, applicable, answered };
     });
-    const applicable = stepApplies && (step.kind === "transition" || questions.some((q) => q.applicable));
+    const applicable = stepApplies && (step.kind === "transition" || step.kind === "review" || questions.some((q) => q.applicable));
     const missingRequired = questions
       .filter((q) => q.applicable && q.question.required && !q.answered)
       .map((q) => q.question.id);
