@@ -3,6 +3,8 @@ import { track } from "../analytics";
 import { api, ApiError } from "../api";
 import { saveWithRetry, SaveStatus } from "../autosave";
 import { ChangeMode, QuestionField } from "../components/QuestionField";
+import { GroupedComposition } from "../components/GroupedComposition";
+import { ReviewRecap } from "../components/ReviewRecap";
 import { T } from "../copy";
 import { Bundle, Locale, SessionView, StageId } from "../types";
 import { isAnswered } from "../values";
@@ -40,13 +42,18 @@ function isSessionLoss(error: unknown): error is ApiError {
 }
 
 /**
- * The assessment journey: one question per screen, autosaved as the client answers. Applicability
- * is always the server's (recomputed on every save), so branching and invalidation stay deterministic.
+ * The assessment journey, autosaved as the client answers. Applicability is always the server's
+ * (recomputed on every save), so branching and invalidation stay deterministic. Level 2 MVP: a step
+ * with `layout: "grouped"` renders every one of its applicable questions on one screen at once
+ * (GroupedComposition) instead of one question per screen; a `kind: "review"` step renders a
+ * read-only recap of everything answered so far (ReviewRecap). Both are additive — a step with
+ * neither still renders exactly as the original one-question-per-screen Journey always has.
  */
 export function Journey({ bundle, t, locale, view, countries, flushRef, onView, onSaveStatus, onStageChange, onCompleted, onSessionLost }: JourneyProps) {
   const [position, setPosition] = useState<Position>(() => initialPosition(view));
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [requiredError, setRequiredError] = useState(false);
+  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState(false);
   const viewRef = useRef(view);
@@ -97,13 +104,19 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
   const applicableSteps = view.steps.filter((s) => s.applicable);
   const stepState = applicableSteps.find((s) => s.id === position.stepId) ?? applicableSteps.find((s) => s.id === view.currentStepId) ?? applicableSteps[0];
   const stepDef = bundle.steps.find((s) => s.id === stepState.id);
+  const isGrouped = stepDef?.layout === "grouped";
+  const isReview = stepDef?.kind === "review";
   const questionIds = stepState.questionIds;
   const questionIndex = Math.min(position.questionIndex, Math.max(questionIds.length - 1, 0));
-  const questionId = stepDef?.kind === "questions" ? questionIds[questionIndex] : undefined;
+  const questionId = !isGrouped && stepDef?.kind === "questions" ? questionIds[questionIndex] : undefined;
   const question = questionId ? bundle.questions.find((q) => q.id === questionId) : undefined;
   const stepPosition = applicableSteps.findIndex((s) => s.id === stepState.id);
-  const canGoBack = questionIndex > 0 || stepPosition > 0;
+  const canGoBack = (!isGrouped && questionIndex > 0) || stepPosition > 0;
   const currentValue = (id: string) => (id in drafts ? drafts[id] : view.answers[id]);
+  const resolveFieldValue = (fieldKey: string) => {
+    const q = bundle.questions.find((x) => x.field_key === fieldKey);
+    return q ? currentValue(q.id) : undefined;
+  };
 
   useEffect(() => {
     onStageChange(stepDef?.stage ?? null);
@@ -131,15 +144,17 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
   }, [stepState.id]);
 
   useEffect(() => {
-    if (!questionId || lastViewed.current.question === questionId) return;
+    // Grouped/review steps don't have a single "the" question on screen — skip per-question tracking.
+    if (isGrouped || isReview || !questionId || lastViewed.current.question === questionId) return;
     lastViewed.current.question = questionId;
     track({ type: "question_viewed", stepId: stepState.id, questionId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionId]);
+  }, [questionId, isGrouped, isReview]);
 
   const go = (next: Position) => {
     if (next.stepId !== stepState.id) stepStartedAt.current = Date.now();
     setRequiredError(false);
+    setMissingIds(new Set());
     setFailure(false);
     setPosition(next);
   };
@@ -147,6 +162,12 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
   const handleChange = (id: string, required: boolean, value: unknown, mode: ChangeMode) => {
     setDrafts((d) => ({ ...d, [id]: value }));
     setRequiredError(false);
+    setMissingIds((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
     const normalized = typeof value === "string" && value.trim() === "" ? null : value;
     const previous = pending.current.get(id);
     if (previous) clearTimeout(previous.timer);
@@ -174,17 +195,31 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
         return;
       }
       const ids = step.questionIds;
-      const index = Math.min(questionIndex, Math.max(ids.length - 1, 0));
-      const id = stepDef?.kind === "questions" ? ids[index] : undefined;
-      if (id) {
-        const q = bundle.questions.find((x) => x.id === id);
-        if (q?.required && !isAnswered(id in drafts ? drafts[id] : latest.answers[id])) {
+
+      if (isGrouped) {
+        const missing = ids.filter((qid) => {
+          const q = bundle.questions.find((x) => x.id === qid);
+          return q?.required && !isAnswered(qid in drafts ? drafts[qid] : latest.answers[qid]);
+        });
+        if (missing.length > 0) {
+          setMissingIds(new Set(missing));
           setRequiredError(true);
+          document.querySelector<HTMLElement>(`[data-question-id="${missing[0]}"] h2`)?.focus({ preventScroll: false });
           return;
         }
-        if (index < ids.length - 1) {
-          go({ stepId: step.id, questionIndex: index + 1 });
-          return;
+      } else if (stepDef?.kind === "questions") {
+        const index = Math.min(questionIndex, Math.max(ids.length - 1, 0));
+        const id = ids[index];
+        if (id) {
+          const q = bundle.questions.find((x) => x.id === id);
+          if (q?.required && !isAnswered(id in drafts ? drafts[id] : latest.answers[id])) {
+            setRequiredError(true);
+            return;
+          }
+          if (index < ids.length - 1) {
+            go({ stepId: step.id, questionIndex: index + 1 });
+            return;
+          }
         }
       }
 
@@ -193,6 +228,11 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
         if (isSessionLoss(result.error)) return onSessionLost(result.error);
         const missing = result.error instanceof ApiError ? result.error.details?.missing : undefined;
         if (Array.isArray(missing) && missing.length > 0) {
+          if (isGrouped) {
+            setMissingIds(new Set(missing));
+            setRequiredError(true);
+            return;
+          }
           const target = ids.findIndex((qid) => missing.includes(qid) || missing.includes(bundle.questions.find((x) => x.id === qid)?.field_key));
           go({ stepId: step.id, questionIndex: Math.max(target, 0) });
           setRequiredError(true);
@@ -220,7 +260,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
 
   async function back() {
     await flush();
-    if (questionIndex > 0) {
+    if (!isGrouped && questionIndex > 0) {
       go({ stepId: stepState.id, questionIndex: questionIndex - 1 });
       return;
     }
@@ -237,28 +277,52 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
   return (
     <form className="content" onSubmit={next} noValidate>
       <div ref={headingRef} className="screen-heading">
-      {stepDef.kind === "transition" || !question ? (
-        <h1 className="transition-line" tabIndex={-1} style={{ outline: "none" }}>
-          {stepCopy.title}
-        </h1>
-      ) : (
-        <>
-          <p className="step-title">{stepCopy.title}</p>
-          {stepCopy.intro && questionIndex === 0 && <p className="lead">{stepCopy.intro}</p>}
-          <QuestionField
-            key={question.id}
+        {isReview ? (
+          <>
+            <h1 className="step-title" tabIndex={-1} style={{ outline: "none" }}>
+              {stepCopy.title}
+            </h1>
+            {stepCopy.intro && <p className="lead">{stepCopy.intro}</p>}
+            <ReviewRecap bundle={bundle} locale={locale} t={t} view={view} currentValue={currentValue} onEditStep={(stepId) => go({ stepId, questionIndex: 0 })} />
+          </>
+        ) : isGrouped ? (
+          <GroupedComposition
             bundle={bundle}
-            question={question}
+            questionIds={questionIds}
             locale={locale}
             t={t}
-            value={currentValue(question.id)}
-            dynamicOptions={view.dynamicOptions[question.id]}
             countries={countries}
-            showRequiredError={requiredError}
-            onChange={(value, mode) => handleChange(question.id, question.required, value, mode)}
+            view={view}
+            currentValue={currentValue}
+            resolveFieldValue={resolveFieldValue}
+            missingIds={missingIds}
+            onChange={handleChange}
+            stepTitle={stepCopy.title}
+            stepIntro={stepCopy.intro}
           />
-        </>
-      )}
+        ) : stepDef.kind === "transition" || !question ? (
+          <h1 className="transition-line" tabIndex={-1} style={{ outline: "none" }}>
+            {stepCopy.title}
+          </h1>
+        ) : (
+          <>
+            <p className="step-title">{stepCopy.title}</p>
+            {stepCopy.intro && questionIndex === 0 && <p className="lead">{stepCopy.intro}</p>}
+            <QuestionField
+              key={question.id}
+              bundle={bundle}
+              question={question}
+              locale={locale}
+              t={t}
+              value={currentValue(question.id)}
+              dynamicOptions={view.dynamicOptions[question.id]}
+              countries={countries}
+              showRequiredError={requiredError}
+              onChange={(value, mode) => handleChange(question.id, question.required, value, mode)}
+              resolveFieldValue={resolveFieldValue}
+            />
+          </>
+        )}
       </div>
       {failure && (
         <p className="field-error" role="alert">
@@ -267,7 +331,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
       )}
       <div className="actions">
         <button type="submit" className="button button-primary" disabled={busy}>
-          {t("common", "continue")}
+          {isReview ? t("level2", "review_confirm") : t("common", "continue")}
         </button>
         {canGoBack && (
           <button type="button" className="button button-text" onClick={() => void back()} disabled={busy}>

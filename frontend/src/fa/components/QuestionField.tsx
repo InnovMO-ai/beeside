@@ -1,6 +1,9 @@
 import { ReactNode, useState } from "react";
 import { T } from "../copy";
-import { Bundle, Locale, QuestionDef } from "../types";
+import { NeedsExplorer } from "./NeedsExplorer";
+import { StructuredEchoChip } from "./StructuredEchoChip";
+import { STRUCTURED_ECHO_SOURCE_FIELD } from "../structured-echo";
+import { Bundle, Locale, NeedsMapValue, QuestionDef } from "../types";
 import { countryName, resolveOptions, searchCountries, TimingPrecision, timingParts, timingValue, toggleMulti } from "../values";
 
 export type ChangeMode = "now" | "debounced";
@@ -15,14 +18,27 @@ interface QuestionFieldProps {
   countries: string[];
   showRequiredError: boolean;
   onChange: (value: unknown, mode: ChangeMode) => void;
+  /** Level 2 MVP: looks up another question's current value by field_key (draft-aware, same source
+   *  Journey.tsx uses for `value` above) — needed by StructuredEchoChip to read its source open-text
+   *  answer, since a QuestionField only otherwise knows its own question's value. Optional so any
+   *  other caller of QuestionField (there is none today) keeps compiling without it. */
+  resolveFieldValue?: (field_key: string) => unknown;
+  /** Level 2 MVP: "h2" when GroupedComposition renders several questions under its own step-level
+   *  <h1> (accessible heading hierarchy — one h1 per screen); defaults to "h1" for the original
+   *  one-question-per-screen layout, where the question IS the screen's heading. */
+  headingLevel?: "h1" | "h2";
 }
 
 const TEXT_MAX = 4000;
 const SHORT_TEXT_MAX = 200;
 
-/** One question per screen (Handoff v1 §26). "Not sure" is a normal, calm answer — never styled as an error. */
+/**
+ * One question per screen by default (Handoff v1 §26), or one of several questions rendered
+ * together by GroupedComposition.tsx (Level 2 MVP, `StepDef.layout === "grouped"`) — this component
+ * itself doesn't know or care which; it just renders one question's input.
+ */
 export function QuestionField(props: QuestionFieldProps) {
-  const { question, locale, t, showRequiredError } = props;
+  const { question, locale, t, showRequiredError, headingLevel = "h1" } = props;
   const copy = question.copy[locale] ?? question.copy.en;
   const ids = {
     title: `q-${question.id}-title`,
@@ -31,11 +47,12 @@ export function QuestionField(props: QuestionFieldProps) {
   };
   const describedBy = [copy.helper ? ids.helper : "", showRequiredError ? ids.error : ""].filter(Boolean).join(" ") || undefined;
 
+  const HeadingTag = headingLevel;
   const heading = (
-    <h1 className="question-title" id={ids.title} tabIndex={-1} style={{ outline: "none" }}>
+    <HeadingTag className="question-title" id={ids.title} tabIndex={-1} style={{ outline: "none" }}>
       {copy.title}
       {!question.required && <span className="optional-tag"> · {t("common", "optional")}</span>}
-    </h1>
+    </HeadingTag>
   );
   const helper = copy.helper ? (
     <p className="helper" id={ids.helper}>
@@ -49,6 +66,26 @@ export function QuestionField(props: QuestionFieldProps) {
   ) : null;
 
   const shared = { ...props, describedBy, ids };
+
+  // Level 2 MVP: a *_structured single_select whose source open-text field is registered in
+  // structured-echo.ts renders as a confirm/edit chip instead of a plain radio list — see
+  // StructuredEchoChip.tsx and the Progressive Disclosure Rules this implements.
+  const structuredEchoSource = STRUCTURED_ECHO_SOURCE_FIELD[question.field_key];
+  if (question.type === "single_select" && structuredEchoSource) {
+    const sourceValue = props.resolveFieldValue?.(structuredEchoSource);
+    return (
+      <Block heading={heading} helper={helper} error={error}>
+        <StructuredEchoChip
+          question={question}
+          sourceValue={sourceValue}
+          locale={locale}
+          t={t}
+          structuredValue={props.value}
+          onConfirm={(value) => props.onChange(value, "now")}
+        />
+      </Block>
+    );
+  }
 
   switch (question.type) {
     case "single_select":
@@ -86,6 +123,23 @@ export function QuestionField(props: QuestionFieldProps) {
           <CountryInput {...shared} />
         </Block>
       );
+    case "tag_list":
+      return (
+        <Block heading={heading} helper={helper} error={error}>
+          <TagListInput {...shared} />
+        </Block>
+      );
+    case "needs_map":
+      // The Needs Explorer renders its own section headings and helper text throughout — the
+      // question's own title/helper still frame it, but no extra fieldset wrapper is needed.
+      return (
+        <div className="question">
+          {heading}
+          {helper}
+          <NeedsExplorer locale={locale} t={t} value={props.value} onChange={(next: NeedsMapValue) => props.onChange(next, "now")} />
+          {error}
+        </div>
+      );
     default:
       return (
         <Block heading={heading} helper={helper} error={error}>
@@ -113,6 +167,7 @@ function ChoiceOptions({ bundle, question, locale, value, dynamicOptions, onChan
   const multi = question.type === "multi_select";
   const selected = multi ? (Array.isArray(value) ? (value as string[]) : []) : typeof value === "string" ? [value] : [];
   const order = options.map((o) => o.value);
+  const atMaxSelect = multi && typeof question.max_select === "number" && selected.length >= question.max_select;
   return (
     <div className="options">
       {options.map((option) => {
@@ -124,6 +179,7 @@ function ChoiceOptions({ bundle, question, locale, value, dynamicOptions, onChan
               name={question.id}
               value={option.value}
               checked={isSelected}
+              disabled={multi && !isSelected && atMaxSelect}
               onChange={(e) => {
                 if (!multi) return onChange(option.value, "now");
                 const next = toggleMulti(selected, option.value, e.target.checked, question.exclusive_values ?? [], order);
@@ -164,14 +220,76 @@ function TextInput({ question, locale, value, onChange, describedBy, ids, showRe
   );
 }
 
+function TagListInput({ question, t, value, onChange, ids }: Shared) {
+  const tags = Array.isArray(value) ? (value as string[]) : [];
+  const [draft, setDraft] = useState("");
+  const maxTags = question.max_tags ?? 20;
+  const maxTagLength = question.max_tag_length ?? 80;
+  const atLimit = tags.length >= maxTags;
+
+  const add = () => {
+    const trimmed = draft.trim().slice(0, maxTagLength);
+    if (!trimmed || atLimit || tags.includes(trimmed)) return;
+    onChange([...tags, trimmed], "now");
+    setDraft("");
+  };
+
+  return (
+    <div className="field" style={{ marginTop: "1.5rem" }}>
+      {tags.length > 0 && (
+        <ul className="chips" style={{ margin: "0 0 1rem" }}>
+          {tags.map((tag) => (
+            <li key={tag} className="chip">
+              <span>{tag}</span>
+              <button
+                type="button"
+                aria-label={t("level2", "tag_remove").replace("{{tag}}", tag)}
+                onClick={() => onChange(tags.filter((x) => x !== tag).length > 0 ? tags.filter((x) => x !== tag) : null, "now")}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!atLimit ? (
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input
+            id={`q-${question.id}-input`}
+            className="input"
+            type="text"
+            aria-labelledby={ids.title}
+            maxLength={maxTagLength}
+            placeholder={t("level2", "tag_add_placeholder")}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <button type="button" className="button button-text" onClick={add} disabled={draft.trim() === ""}>
+            {t("level2", "tag_add_button")}
+          </button>
+        </div>
+      ) : (
+        <p className="helper">{t("level2", "tag_limit_reached").replace("{{max}}", String(maxTags))}</p>
+      )}
+    </div>
+  );
+}
+
 function CountryInput({ question, locale, t, value, countries, onChange, describedBy, ids }: Shared) {
   const selected = Array.isArray(value) ? (value as string[]) : [];
   const [query, setQuery] = useState("");
   const matches = searchCountries(countries, query, locale, selected);
   const listId = `q-${question.id}-suggestions`;
+  const maxCount = question.max_count ?? 30;
 
   const add = (code: string) => {
-    if (selected.length >= 30) return;
+    if (selected.length >= maxCount) return;
     onChange([...selected, code], "now");
     setQuery("");
     document.getElementById(`q-${question.id}-input`)?.focus();

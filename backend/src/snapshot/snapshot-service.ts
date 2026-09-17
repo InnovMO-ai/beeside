@@ -4,6 +4,7 @@ import { recordJourneyEvent } from "../fa/services/analytics";
 import { FaError } from "../fa/services/errors";
 import { FaDeps, ProjectRow, findUsableToken, loadProject } from "../fa/services/repository";
 import { looksLikeAccessToken } from "../fa/services/tokens";
+import { deriveLegacyCapabilityAnswers } from "../fa/engine/legacy-capability-adapter";
 import { DEFAULT_SNAPSHOT_LINK_DAYS, enqueueEmail } from "../operations/email-outbox";
 import { evaluateRules } from "../rules/engine";
 import { validateRulesEngineBundle } from "../rules/validate-rules-bundle";
@@ -54,7 +55,16 @@ export async function generateAssessmentOutputs(
     [project.project_id],
   );
   const answerIds = new Map(answerRows.rows.map((r) => [r.field_key, r.answer_id]));
-  const evidence = new Map([...effectiveAnswers].map(([key, value]) => [key, { value, answerId: answerIds.get(key) ?? null }]));
+
+  // Level 2 MVP: the pre-Level-2 "capability mother question" and its two children no longer exist
+  // in the visible journey (superseded by fa.needs.map — see legacy-capability-adapter.ts for why
+  // this reconciliation exists and what it does NOT guarantee). Derived values only fill a gap —
+  // a real answer for these field_keys (a project still on fa-qb-1.1.0) always wins. This merge
+  // feeds the rules engine's evidence only; the Snapshot/Internal Assessment `answers` input below
+  // stays the real, unmodified effectiveAnswers.
+  const legacyDerived = deriveLegacyCapabilityAnswers(effectiveAnswers);
+  const evidenceSource = new Map([...legacyDerived, ...effectiveAnswers]);
+  const evidence = new Map([...evidenceSource].map(([key, value]) => [key, { value, answerId: answerIds.get(key) ?? null }]));
   const evaluation = evaluateRules(rules, evidence, now);
 
   const input = {

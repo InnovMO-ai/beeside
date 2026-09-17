@@ -3,7 +3,17 @@
 
 export type Locale = "en" | "es";
 export type StageId = "project" | "business" | "operation" | "priorities" | "snapshot";
-export type QuestionType = "single_select" | "multi_select" | "text" | "short_text" | "timing" | "country_list" | "quantity" | "locale";
+export type QuestionType =
+  | "single_select"
+  | "multi_select"
+  | "text"
+  | "short_text"
+  | "timing"
+  | "country_list"
+  | "quantity"
+  | "locale"
+  | "tag_list"
+  | "needs_map";
 
 export interface OptionDef {
   value: string;
@@ -20,13 +30,24 @@ export interface QuestionDef {
   exclusive_values?: string[];
   units?: OptionDef[];
   max_length?: number;
+  /** multi_select only (Level 2 MVP). */
+  max_select?: number;
+  /** country_list only (Level 2 MVP). */
+  max_count?: number;
+  /** tag_list only (Level 2 MVP). */
+  max_tags?: number;
+  max_tag_length?: number;
   copy: Record<Locale, { title: string; helper?: string; placeholder?: string }>;
 }
 
 export interface StepDef {
   id: string;
   stage: StageId;
-  kind: "questions" | "transition";
+  kind: "questions" | "transition" | "review";
+  /** Level 2 MVP: "grouped" renders every applicable question in this step on one screen at once,
+   *  replacing the one-question-per-screen default. Undefined (or any other value) keeps the
+   *  original per-screen behavior — existing fa-qb-1.1.0 steps are unaffected. */
+  layout?: "grouped";
   question_ids: string[];
   copy: Record<Locale, { title: string; intro?: string }>;
 }
@@ -140,3 +161,31 @@ export interface SnapshotView {
 }
 
 export type ExtensionReason = "missing_information" | "project_not_structured" | "unsure_market_timing" | "something_else";
+
+// ---------------------------------------------------------------------------- Level 2 MVP additions
+
+/** Mirrors backend/src/fa/engine/needs-map-types.ts exactly — see that file for the full rationale. */
+export const NEEDS_MAP_STATUSES = ["covered_internally", "covered_by_provider", "in_progress", "needs_resolution", "needs_confirmation"] as const;
+export type NeedsMapStatus = (typeof NEEDS_MAP_STATUSES)[number];
+
+export interface NeedsMapSelection {
+  key: string;
+  status: NeedsMapStatus;
+}
+
+export interface NeedsMapDependency {
+  key: string;
+  dependsOn: string | null;
+  owner: string | null;
+  approvalRequired: boolean;
+  approvalFrom: string | null;
+}
+
+export interface NeedsMapValue {
+  selections: NeedsMapSelection[];
+  priorityRank: string[];
+  dependencies: NeedsMapDependency[];
+  blockerKeys: string[];
+}
+
+export const NEEDS_MAP_LIMITS = { maxSelections: 20, maxPriorityRank: 5, maxFreeTextLength: 200 } as const;
