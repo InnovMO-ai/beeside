@@ -149,7 +149,7 @@ describe("PremiumTransition", () => {
 
 describe("ResumeLink for a completed project", () => {
   const rendered: RenderedSnapshot = {
-    eyebrow: "Your Expansion Snapshot", headline: "Your project, in perspective.", generatedOn: "Generated on September 15, 2026", summary: [], facts: [], counts: [], panels: [],
+    eyebrow: "Your Expansion Snapshot", headline: "Your project, in perspective.", generatedOn: "Generated on September 15, 2026", summary: [], expansionProfile: [], facts: [], counts: [], panels: [],
     immediatePriority: null, reconcile: null, decisionAhead: null, shapePlan: null, oneThing: null, capabilities: null,
     disclosure: { title: "About this Snapshot", text: "Based on what you shared." },
   };

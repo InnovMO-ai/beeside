@@ -138,11 +138,30 @@ export interface PremiumActivationResult {
 /** Client Expansion Snapshot as generated at completion (immutable; both locales pre-rendered). */
 export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 
+/**
+ * One Expansion Profile radar axis (owner-approved final six-dimension taxonomy, 2026-09-17 — see
+ * backend/src/fa/engine/expansion-profile.ts). Mirrors backend/src/snapshot/compose.ts's
+ * RenderedExpansionDimension. `value` (0..1) is for radar-axis rendering only — never shown as a
+ * number/percentage; `tierLabel` is the only qualitative wording meant to be displayed.
+ *
+ * Not yet rendered anywhere in the product (2026-09-17): ExpansionSnapshot.tsx below is the
+ * pre-Level-2 interim Snapshot page and is intentionally left untouched here — the radar's real
+ * home is the Virtual Snapshot ("The Big Picture" beat) and the PDF Snapshot, both still to be
+ * built. This field exists on the wire today so those two builds have real data to consume.
+ */
+export interface RenderedExpansionDimension {
+  key: "market_customer_clarity" | "commercial_validation" | "operating_model_definition" | "regulatory_compliance_definition" | "local_ecosystem_capabilities" | "execution_preparedness";
+  label: string;
+  value: number;
+  tierLabel: string;
+}
+
 export interface RenderedSnapshot {
   eyebrow: string;
   headline: string;
   generatedOn: string;
   summary: string[];
+  expansionProfile: RenderedExpansionDimension[];
   facts: Array<{ key: "company" | "market" | "launch" | "priority"; label: string; value: string; detail: string | null }>;
   counts: Array<{ tone: SnapshotTone; label: string; count: number }>;
   panels: Array<{ tone: SnapshotTone; title: string; intro: string; items: Array<{ areaId: number; label: string; reason: string | null }> }>;

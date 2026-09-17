@@ -13,6 +13,14 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     headline: "Your project, in perspective.",
     generatedOn: "Generated on September 15, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
+    expansionProfile: [
+      { key: "market_customer_clarity", label: "Market & Customer Clarity", value: 0.7, tierLabel: "Well defined" },
+      { key: "commercial_validation", label: "Commercial Validation", value: 0.4, tierLabel: "Partially defined" },
+      { key: "operating_model_definition", label: "Operating Model Definition", value: 0.2, tierLabel: "Early stage" },
+      { key: "regulatory_compliance_definition", label: "Regulatory & Compliance Definition", value: 0, tierLabel: "Early stage" },
+      { key: "local_ecosystem_capabilities", label: "Local Ecosystem & Capabilities", value: 0.5, tierLabel: "Partially defined" },
+      { key: "execution_preparedness", label: "Execution Preparedness", value: 0.6, tierLabel: "Partially defined" },
+    ],
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },
       { key: "priority", label: "Your immediate priority", value: "Local entity & legal setup", detail: null },
