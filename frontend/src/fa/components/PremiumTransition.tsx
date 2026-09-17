@@ -14,9 +14,13 @@ export interface PremiumSource {
 type Stage = "offer" | "consideration" | "activation" | "result";
 
 /**
- * Post-Snapshot experience (Functional Specification v1 §16): two paths — the external Preview Room
- * and "Continue with Premium" on this same project. Premium adds validation, precision, definition
- * and accompaniment; it never hides or re-reveals Snapshot results, and no price is shown.
+ * Post-Snapshot experience. Single primary action: "Continue with Premium" on this same project.
+ *
+ * Level 2 MVP owner decision (overrides the older Functional Specification v1 §16, which described
+ * two paths — the external Preview Room and "Continue with Premium"): Preview Room is not part of
+ * the Snapshot conversion funnel, and there is no second, competing primary CTA. Premium adds
+ * validation, precision, definition and accompaniment; it never hides or re-reveals Snapshot
+ * results, and no price is shown.
  */
 export function PremiumTransition({ locale, source }: { locale: Locale; source: PremiumSource }) {
   const [content, setContent] = useState<PremiumContent | null>(null);
@@ -224,18 +228,7 @@ export function PremiumTransition({ locale, source }: { locale: Locale; source: 
           >
             {copy.transition.continue_cta}
           </button>
-          <a
-            className="button button-secondary"
-            href={content.previewRoomUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => track({ type: "preview_room_clicked", interfaceLanguage: locale })}
-          >
-            {copy.transition.explore_cta}
-            <span className="visually-hidden"> {copy.transition.new_tab}</span>
-          </a>
         </div>
-        <p className="premium-helper">{copy.transition.explore_helper}</p>
       </>
     );
   }

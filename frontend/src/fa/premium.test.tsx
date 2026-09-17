@@ -13,8 +13,6 @@ const COPY: PremiumCopy = {
     headline: "You have the picture. Now let’s add precision.",
     body: "Continue with beeside Premium to validate what matters most.",
     continue_cta: "Continue with Premium",
-    explore_cta: "Explore Premium",
-    explore_helper: "Not ready yet? See examples.",
     new_tab: "(opens in a new tab)",
   },
   consideration: {
@@ -52,7 +50,6 @@ const COPY: PremiumCopy = {
 };
 const CONTENT: PremiumContent = {
   version: "premium-content-1.0.0",
-  previewRoomUrl: "https://www.beeside.you/preview",
   termsUrl: "https://www.beeside.you/termsandconditions",
   copy: { en: COPY, es: COPY },
 };
@@ -60,7 +57,7 @@ const CONTENT: PremiumContent = {
 function status(overrides: Partial<PremiumStatus> = {}): PremiumStatus {
   return {
     available: true, everActivated: false, accessActive: false, subscriptionStatus: null, accessUntil: null, pendingRequest: null,
-    canActivate: true, canReactivate: false, previewRoomUrl: CONTENT.previewRoomUrl, termsUrl: CONTENT.termsUrl, ...overrides,
+    canActivate: true, canReactivate: false, previewRoomUrl: "https://www.beeside.you/preview", termsUrl: CONTENT.termsUrl, ...overrides,
   };
 }
 
@@ -83,15 +80,13 @@ afterEach(() => {
 });
 
 describe("PremiumTransition", () => {
-  it("offers the two post-Snapshot paths without a price", async () => {
+  it("offers a single primary CTA — Continue with Premium — without a price or a Preview Room link", async () => {
     render(<PremiumTransition locale="en" source={source(status())} />);
     expect(await screen.findByRole("heading", { level: 2, name: "You have the picture. Now let’s add precision." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue with Premium" })).toBeInTheDocument();
-    const preview = screen.getByRole("link", { name: /Explore Premium/ });
-    expect(preview).toHaveAttribute("href", "https://www.beeside.you/preview");
-    expect(preview).toHaveAttribute("target", "_blank");
-    expect(preview.getAttribute("rel")).toContain("noopener");
-    expect(document.body.textContent).not.toMatch(/\$|price|USD|MXN|unlock/i);
+    expect(screen.queryByRole("link", { name: /Explore Premium/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Preview Room/i })).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/\$|price|USD|MXN|unlock|preview room/i);
   });
 
   it("walks through consideration and activation, requiring the Terms before registering the request", async () => {

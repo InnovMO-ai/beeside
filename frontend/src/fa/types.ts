@@ -93,7 +93,8 @@ export interface LinkChoices {
 
 /** Premium transition copy (premium-content-1.0.0), served by the backend; no price is ever shown. */
 export interface PremiumCopy {
-  transition: { eyebrow: string; headline: string; body: string; continue_cta: string; explore_cta: string; explore_helper: string; new_tab: string };
+  /** Single primary action: "Continue with Premium" (Level 2 MVP: no Preview Room, no second CTA). */
+  transition: { eyebrow: string; headline: string; body: string; continue_cta: string; new_tab: string };
   consideration: {
     eyebrow: string;
     title: string;
@@ -112,7 +113,6 @@ export interface PremiumCopy {
 
 export interface PremiumContent {
   version: string;
-  previewRoomUrl: string;
   termsUrl: string;
   copy: Record<Locale, PremiumCopy>;
 }
