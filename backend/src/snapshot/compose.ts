@@ -1,6 +1,7 @@
 import { getFieldDefinition } from "@beeside/canonical-fields";
 import type { Locale, QuestionBankBundle } from "../fa/engine/bundle-types";
 import { isAnswered } from "../fa/engine/conditions";
+import { EXPANSION_TIER_COPY, ExpansionDimensionScore, scoreExpansionProfile } from "../fa/engine/expansion-profile";
 import { isNotSureValue } from "../fa/engine/values";
 import type { FindingResult, RulesEvaluation } from "../rules/engine";
 import type { RulesEngineBundle } from "../rules/types";
@@ -21,6 +22,13 @@ export interface ComposeInput {
   person: { firstName: string; lastName: string; preferredName: string | null; deliverableLanguage: string; interactionLanguage: string };
   /** Effective (applicable) DECLARED_BY_USER answers by field_key. */
   answers: ReadonlyMap<string, unknown>;
+  /**
+   * field_keys whose question was applicable in this respondent's journey (JourneyState.
+   * applicableQuestionIds mapped through the pinned bundle's questions[].field_key) — a superset of
+   * `answers.keys()` that also includes applicable-but-unanswered fields. Required to score the
+   * Expansion Profile fairly: a field the respondent was never asked must not count against them.
+   */
+  applicableFieldKeys: ReadonlySet<string>;
   questionBank: QuestionBankBundle;
   rules: RulesEngineBundle;
   template: SnapshotTemplateBundle;
@@ -32,11 +40,24 @@ type PanelStatus = "DEFINED" | "NEEDS_ATTENTION" | "CRITICAL_GAP";
 export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 const TONE: Record<PanelStatus, SnapshotTone> = { DEFINED: "well_defined", NEEDS_ATTENTION: "needs_attention", CRITICAL_GAP: "resolve_early" };
 
+/** One radar axis, fully localized and ready to render — no raw field-level detail (Sherpa-only, see
+ *  composeInternalAssessment's `expansion_profile`). `value` is internal (0..1); only `tierLabel`'s
+ *  qualitative wording is meant to be shown next to/instead of the axis. */
+export interface RenderedExpansionDimension {
+  key: ExpansionDimensionScore["key"];
+  label: string;
+  value: number;
+  tierLabel: string;
+}
+
 export interface RenderedSnapshot {
   eyebrow: string;
   headline: string;
   generatedOn: string;
   summary: string[];
+  /** The six-dimension Expansion Profile radar (owner-approved final taxonomy, 2026-09-17). Fixed
+   *  order — see EXPANSION_PROFILE_DIMENSIONS in expansion-profile.ts. */
+  expansionProfile: RenderedExpansionDimension[];
   facts: Array<{ key: "company" | "market" | "launch" | "priority"; label: string; value: string; detail: string | null }>;
   counts: Array<{ tone: SnapshotTone; label: string; count: number }>;
   panels: Array<{ tone: SnapshotTone; title: string; intro: string; items: Array<{ areaId: number; label: string; reason: string | null }> }>;
@@ -152,6 +173,14 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
   const phrases = template.phrases.copy[locale];
   const findings = new Map(evaluation.findings.map((f) => [f.areaId, f]));
 
+  // ---- Expansion Profile radar (six-dimension "degree of definition", owner-approved 2026-09-17).
+  const expansionProfile: RenderedExpansionDimension[] = scoreExpansionProfile(answers, input.applicableFieldKeys).map((d) => ({
+    key: d.key,
+    label: d.label[locale],
+    value: d.value,
+    tierLabel: EXPANSION_TIER_COPY[d.tier][locale],
+  }));
+
   // ---- Header summary (Appendix C {{project_summary}}), with graceful omission.
   const summary: string[] = [];
   const goal = text(answers, "fa.goal.primary_goal");
@@ -241,6 +270,7 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
     headline: copy.headline,
     generatedOn: fill(copy.generated_on, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeZone: "UTC" }).format(input.generatedAt) }),
     summary,
+    expansionProfile,
     facts,
     counts,
     panels,
@@ -315,6 +345,9 @@ function executiveSummary(input: ComposeInput, locale: Locale, rankedUnresolved:
 
 export function composeInternalAssessment(input: ComposeInput) {
   const { answers, questionBank: qb, rules, evaluation } = input;
+  // Full detail (defined/applicable field counts per dimension) is Sherpa-only — never part of the
+  // client Snapshot payload, which only ever sees composeClientSnapshot's rounded RenderedExpansionDimension.
+  const expansionProfile = scoreExpansionProfile(answers, input.applicableFieldKeys);
   const byRank = (a: FindingResult, b: FindingResult) => (a.panelRank ?? 99) - (b.panelRank ?? 99) || a.areaId - b.areaId;
   const priorityFinding = evaluation.findings.find((f) => f.areaId === evaluation.priorityAreaId);
   const criticalRanked = [
@@ -390,6 +423,14 @@ export function composeInternalAssessment(input: ComposeInput) {
       decision_owner: null,
     }),
     company: input.company,
+    expansion_profile: expansionProfile.map((d) => ({
+      key: d.key,
+      label: d.label.en,
+      value: d.value,
+      tier: d.tier,
+      defined_field_count: d.definedFieldCount,
+      applicable_field_count: d.applicableFieldCount,
+    })),
     narrative: omitEmpty({
       project_story_raw: declared("fa.project.story_raw"),
       success_definition: declared("fa.goal.success_definition"),

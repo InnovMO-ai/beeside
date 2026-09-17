@@ -35,6 +35,7 @@ export async function generateAssessmentOutputs(
   project: ProjectRow,
   questionBank: QuestionBankBundle,
   effectiveAnswers: ReadonlyMap<string, unknown>,
+  applicableQuestionIds: ReadonlySet<string>,
   now: Date,
 ): Promise<{ snapshotId: string }> {
   const pins = await tx.query<{ rules_engine_version: string; snapshot_template_version: string; last_name: string }>(
@@ -67,6 +68,12 @@ export async function generateAssessmentOutputs(
   const evidence = new Map([...evidenceSource].map(([key, value]) => [key, { value, answerId: answerIds.get(key) ?? null }]));
   const evaluation = evaluateRules(rules, evidence, now);
 
+  // Expansion Profile (compose.ts) needs to know which fields were actually applicable to this
+  // respondent — not just which ones they answered — so an inapplicable question never counts
+  // against a dimension's "degree of definition". Derived from the same applicableQuestionIds the
+  // caller already computed via computeJourney(), mapped through this pinned bundle's field_keys.
+  const applicableFieldKeys = new Set(questionBank.questions.filter((q) => applicableQuestionIds.has(q.id)).map((q) => q.field_key));
+
   const input = {
     projectId: project.project_id,
     generatedAt: now,
@@ -80,6 +87,7 @@ export async function generateAssessmentOutputs(
       interactionLanguage: project.preferred_interaction_language,
     },
     answers: effectiveAnswers,
+    applicableFieldKeys,
     questionBank,
     rules,
     template,

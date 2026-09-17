@@ -212,7 +212,7 @@ export async function completeStep(deps: FaDeps, ctx: SessionContext, stepId: st
     if (next.complete) {
       // Phase 8: findings, Snapshot and Internal Assessment are generated synchronously, in this
       // transaction, from the final applicable answers — before the lock makes them immutable.
-      await generateAssessmentOutputs(tx, deps, project, ctx.bundle, next.effectiveAnswers, now);
+      await generateAssessmentOutputs(tx, deps, project, ctx.bundle, next.effectiveAnswers, next.applicableQuestionIds, now);
       await tx.query("UPDATE project SET assessment_state = 'COMPLETED_LOCKED', updated_at = $2 WHERE project_id = $1", [project.project_id, now]);
       await tx.query("UPDATE fa_project_lifecycle SET completed_at = $2, updated_at = $2 WHERE project_id = $1", [project.project_id, now]);
       await recordJourneyEvent(tx, {

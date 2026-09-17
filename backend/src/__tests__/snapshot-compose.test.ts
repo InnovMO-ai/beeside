@@ -1,4 +1,6 @@
 import { buildQuestionBankBundle } from "../fa/content/question-bank";
+import { EXPANSION_PROFILE_DIMENSIONS } from "../fa/engine/expansion-profile";
+import { computeJourney } from "../fa/engine/journey";
 import { buildRulesEngineBundle } from "../rules/content/rules-engine-v1";
 import { evaluateRules } from "../rules/engine";
 import { ComposeInput, composeClientSnapshot, composeInternalAssessment } from "../snapshot/compose";
@@ -21,6 +23,11 @@ function byFieldKey(persona: Record<string, unknown>): Map<string, unknown> {
 
 function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInput> = {}) {
   const answers = byFieldKey(persona);
+  // Same derivation snapshot-service.ts uses in production: applicability comes from the journey
+  // engine, not from "whatever the persona happened to set" — a persona field with no applicable
+  // question in this bundle must not silently count as evidence either way.
+  const journey = computeJourney(qb, answers, null);
+  const applicableFieldKeys = new Set(qb.questions.filter((q) => journey.applicableQuestionIds.has(q.id)).map((q) => q.field_key));
   const evaluation = evaluateRules(rules, new Map([...answers].map(([k, v]) => [k, { value: v, answerId: `a:${k}` }])));
   const input: ComposeInput = {
     projectId: "00000000-0000-4000-8000-000000000001",
@@ -29,6 +36,7 @@ function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInp
     company: { name: "Northwind Manufacturing", website: null },
     person: { firstName: "Ana", lastName: "Rivera", preferredName: "Ana", deliverableLanguage: "en", interactionLanguage: "es" },
     answers,
+    applicableFieldKeys,
     questionBank: qb,
     rules,
     template,
@@ -253,5 +261,68 @@ describe("Internal beeside Assessment", () => {
     );
     const saas = compose(SAAS).internal.executive_summary.en;
     expect(saas).not.toMatch(/Primary concern|Expansion driver/);
+  });
+});
+
+describe("Expansion Profile radar (owner-approved six-dimension taxonomy, 2026-09-17)", () => {
+  it("includes all six dimensions, in the fixed owner-approved order, on both the client Snapshot and Internal Assessment", () => {
+    const { client, internal } = compose(MANUFACTURER);
+    const expectedKeys = EXPANSION_PROFILE_DIMENSIONS.map((d) => d.key);
+    expect(expectedKeys).toEqual([
+      "market_customer_clarity",
+      "commercial_validation",
+      "operating_model_definition",
+      "regulatory_compliance_definition",
+      "local_ecosystem_capabilities",
+      "execution_preparedness",
+    ]);
+    expect(client.locales.en.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
+    expect(client.locales.es.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
+    expect(internal.expansion_profile.map((d) => d.key)).toEqual(expectedKeys);
+  });
+
+  it("keeps every dimension's internal value in [0,1], with defined never exceeding applicable, and tier consistent with value", () => {
+    for (const persona of [MANUFACTURER, SAAS]) {
+      const { internal } = compose(persona);
+      for (const d of internal.expansion_profile) {
+        expect(d.value).toBeGreaterThanOrEqual(0);
+        expect(d.value).toBeLessThanOrEqual(1);
+        expect(d.defined_field_count).toBeLessThanOrEqual(d.applicable_field_count);
+        if (d.value >= 0.7) expect(d.tier).toBe("well_defined");
+        else if (d.value >= 0.35) expect(d.tier).toBe("partially_defined");
+        else expect(d.tier).toBe("early_stage");
+      }
+    }
+  });
+
+  it("never counts a field the respondent was never asked against a dimension's denominator", () => {
+    // fa-qb-1.0.0 (this test's bundle) predates several Level 2-only canonical fields mapped into
+    // these dimensions (e.g. fa.plan.*, fa.company.business_models, fa.provider.investment_range) —
+    // they have no matching question here at all, so they must be excluded, not treated as "asked
+    // and left blank".
+    const { internal } = compose(MANUFACTURER);
+    for (const dimensionDef of EXPANSION_PROFILE_DIMENSIONS) {
+      const fieldsKnownToThisBundle = dimensionDef.fieldKeys.filter((k) => qb.questions.some((q) => q.field_key === k));
+      const scored = internal.expansion_profile.find((d) => d.key === dimensionDef.key)!;
+      expect(scored.applicable_field_count).toBeLessThanOrEqual(fieldsKnownToThisBundle.length);
+    }
+  });
+
+  it("gives a persona with concrete market/customer answers a higher Market & Customer Clarity value than a bare baseline", () => {
+    const withAnswers = compose(MANUFACTURER).internal.expansion_profile.find((d) => d.key === "market_customer_clarity")!.value;
+    const bare = compose({ S1: "leading" }).internal.expansion_profile.find((d) => d.key === "market_customer_clarity")!.value;
+    expect(withAnswers).toBeGreaterThan(bare);
+  });
+
+  it("never leaks raw field-level counts (Sherpa-only detail) into the client Snapshot", () => {
+    const { client } = compose(MANUFACTURER);
+    const serialized = JSON.stringify(client.locales);
+    expect(serialized).not.toMatch(/applicable_field_count|defined_field_count|applicableFieldCount|definedFieldCount/);
+  });
+
+  it("never renders a probability, score, pass/fail or investment-attractiveness word for a dimension", () => {
+    const { client } = compose(MANUFACTURER);
+    const visible = displayText(client.locales).join(" | ").toLowerCase();
+    for (const forbidden of ["probability", "score", "pass", "fail", "attractiveness", "%"]) expect(visible).not.toContain(forbidden);
   });
 });
