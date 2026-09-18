@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { buildQuestionBankBundle, FA_QUESTION_BANK_VERSION } from "../content/question-bank";
+import { buildQuestionBankBundleV2, FA_QUESTION_BANK_VERSION_V2 } from "../content/question-bank-v2";
 import { validateQuestionBankBundle } from "../engine/validate-bundle";
 import { buildRulesEngineBundle, FA_RULES_ENGINE_VERSION } from "../../rules/content/rules-engine-v1";
 import { validateRulesEngineBundle } from "../../rules/validate-rules-bundle";
@@ -70,12 +71,32 @@ export function readPlaceholderBundle(registry: "RULES_ENGINE" | "SNAPSHOT_TEMPL
 }
 
 /**
- * Development bootstrap: the First Assessment question bank v1, the Rules Engine v1 and the
- * Expansion Snapshot template v1, each published through the Phase 3 gate. The earlier placeholder
- * versions stay PUBLISHED (immutable history) but are no longer current. Idempotent.
+ * Development bootstrap: the First Assessment question bank (v1 by default; pass "v2" to publish
+ * the approved Level 2 bundle instead — see the `--level2` flag on the `config:publish-dev` script),
+ * the Rules Engine v1 and the Expansion Snapshot template v1, each published through the Phase 3
+ * gate. The earlier placeholder versions — and, when switching question banks, the other version's
+ * question bank — stay PUBLISHED (immutable history) but are no longer current. Idempotent.
+ *
+ * The default ("v1") is unchanged from before this parameter existed, so every existing caller that
+ * does not pass a third argument — in particular `fa-harness.ts`, shared by the whole integration
+ * test suite — keeps bootstrapping fa-qb-1.1.0 exactly as before. Only the interactive local-dev
+ * script opts into "v2".
+ *
+ * Level 2 MVP: publishing "v2" does not also make the pinned Rules Engine (re-1.0.0) evaluate
+ * fa-qb-2.0.0 — its `question_bank_versions` allowlist still lists only fa-qb-1.0.0, and the two
+ * bundles' schema fingerprints differ, so `BundleStore.questionBankCompatibleWith` currently returns
+ * false for this pair. Reaching the Virtual Snapshot step of the Level 2 journey will still fail with
+ * NOT_READY ("the pinned rules engine cannot evaluate this question bank version") until a rules
+ * engine version that is actually verified to evaluate the Level 2 schema is published as compatible
+ * — a product/content decision this function deliberately does not make on its own.
  */
-export async function publishDevConfiguration(db: Queryable, adminId: string): Promise<Record<Registry, string>> {
-  const bundle = buildQuestionBankBundle();
+export async function publishDevConfiguration(
+  db: Queryable,
+  adminId: string,
+  questionBank: "v1" | "v2" = "v1",
+): Promise<Record<Registry, string>> {
+  const bundle = questionBank === "v2" ? buildQuestionBankBundleV2() : buildQuestionBankBundle();
+  const bundleVersion = questionBank === "v2" ? FA_QUESTION_BANK_VERSION_V2 : FA_QUESTION_BANK_VERSION;
   const errors = validateQuestionBankBundle(bundle);
   if (errors.length > 0) throw new Error(`question bank bundle is invalid:\n${errors.join("\n")}`);
   const rules = buildRulesEngineBundle();
@@ -83,7 +104,7 @@ export async function publishDevConfiguration(db: Queryable, adminId: string): P
   if (ruleErrors.length > 0) throw new Error(`rules engine bundle is invalid:\n${ruleErrors.join("\n")}`);
 
   const result = {} as Record<Registry, string>;
-  result.QUESTION_BANK = await publishVersion(db, "QUESTION_BANK", FA_QUESTION_BANK_VERSION, bundle, adminId);
+  result.QUESTION_BANK = await publishVersion(db, "QUESTION_BANK", bundleVersion, bundle, adminId);
   result.RULES_ENGINE = await publishVersion(db, "RULES_ENGINE", FA_RULES_ENGINE_VERSION, rules, adminId);
   result.SNAPSHOT_TEMPLATE = await publishVersion(db, "SNAPSHOT_TEMPLATE", FA_SNAPSHOT_TEMPLATE_VERSION, buildSnapshotTemplateBundle(), adminId);
   return result;

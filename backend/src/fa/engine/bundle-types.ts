@@ -16,7 +16,27 @@
 export type Locale = "en" | "es";
 export const BUNDLE_LOCALES: readonly Locale[] = ["en", "es"];
 
-export type StageId = "project" | "business" | "operation" | "priorities" | "snapshot";
+// fa-qb-1.1.0's original five ("project" through "snapshot") plus fa-qb-2.0.0's seven Level 2 MVP
+// compositions (owner alignment pass, 2026-09-18): the visible progress structure for Level 2 is
+// meant to reflect the approved compositions themselves (Your Company, Your Project, ...) rather
+// than the legacy five-stage grouping, so each Level 2 step gets its own dedicated stage id (a 1:1
+// mapping — see question-bank-v2.ts's STAGES_V2). No `Record<StageId, ...>` exhaustive mapping
+// exists anywhere in this codebase (verified), so widening this union is additive and safe: nothing
+// that switches on StageId needs a new case, and fa-qb-1.1.0's own five ids and their behavior are
+// completely unchanged.
+export type StageId =
+  | "project"
+  | "business"
+  | "operation"
+  | "priorities"
+  | "snapshot"
+  | "l2_company"
+  | "l2_your_project"
+  | "l2_plan_definition"
+  | "l2_priorities"
+  | "l2_needs_landscape"
+  | "l2_provider_resources"
+  | "l2_review";
 
 export type QuestionType =
   | "single_select"

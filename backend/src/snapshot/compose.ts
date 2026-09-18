@@ -180,6 +180,19 @@ function list(answers: ReadonlyMap<string, unknown>, key: string, exclude: strin
   return Array.isArray(value) ? value.map(String).filter((v) => !exclude.includes(v)) : [];
 }
 
+/**
+ * Level 2 MVP (owner decision, 2026-09-18): fa-qb-2.0.0 no longer has its own client-facing
+ * question for fa.goal.expansion_driver (G6) — its value is a compatibility-mapped copy of the
+ * confirmed fa.project.primary_driver_structured answer instead (level2-compatibility-adapter.ts).
+ * The two fields share an identical value set "by design" (structured-echo.ts), so when the primary
+ * field has no matching question in this pinned bundle (only true for fa-qb-2.0.0 — a fa-qb-1.1.0
+ * bundle always has G6 itself and never reaches this fallback), the alias's own options give the
+ * correct label instead of falling through to the raw stored value.
+ */
+const OPTION_LABEL_ALIASES: Record<string, string> = {
+  "fa.goal.expansion_driver": "fa.project.primary_driver_structured",
+};
+
 /** Display label of a stored option value, from the project's pinned question bank. */
 export function optionLabel(qb: QuestionBankBundle, fieldKey: string, value: string, locale: Locale): string {
   for (const question of qb.questions) {
@@ -187,6 +200,8 @@ export function optionLabel(qb: QuestionBankBundle, fieldKey: string, value: str
     const option = (question.options ?? []).find((o) => o.value === value);
     if (option) return option.copy[locale] ?? option.copy.en;
   }
+  const alias = OPTION_LABEL_ALIASES[fieldKey];
+  if (alias) return optionLabel(qb, alias, value, locale);
   return value;
 }
 

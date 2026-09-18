@@ -2,7 +2,22 @@
 // The bundle is served by the backend from the versioned registry; copy is never hard-coded here.
 
 export type Locale = "en" | "es";
-export type StageId = "project" | "business" | "operation" | "priorities" | "snapshot";
+// Mirrors backend/src/fa/engine/bundle-types.ts exactly (kept in sync by hand — the frontend has no
+// import path into the backend package). fa-qb-1.1.0's original five plus fa-qb-2.0.0's seven Level
+// 2 MVP composition-level stage ids (owner alignment pass, 2026-09-18).
+export type StageId =
+  | "project"
+  | "business"
+  | "operation"
+  | "priorities"
+  | "snapshot"
+  | "l2_company"
+  | "l2_your_project"
+  | "l2_plan_definition"
+  | "l2_priorities"
+  | "l2_needs_landscape"
+  | "l2_provider_resources"
+  | "l2_review";
 export type QuestionType =
   | "single_select"
   | "multi_select"
