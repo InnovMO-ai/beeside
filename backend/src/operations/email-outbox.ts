@@ -12,7 +12,9 @@ import { PREVIEW_ROOM_URL } from "../premium/content";
  * link, sends through the provider-agnostic transport and records the outcome — each step in its own
  * short transaction, never holding a business transaction open across a network call. Retries are
  * bounded with exponential backoff; a delivery that is no longer relevant (the assessment completed,
- * expired or was purged) is cancelled at send time instead of being sent late.
+ * expired or was purged) is cancelled at send time instead of being sent late — and so is one whose
+ * template was switched to inactive (`bundle.emails[key].active === false`) through Communications
+ * Admin after it was already queued (see admin/communications-service.ts).
  */
 
 const DAY_MS = 86_400_000;
@@ -20,7 +22,7 @@ export const DEFAULT_SNAPSHOT_LINK_DAYS = 60;
 const LEASE_SECONDS = 300;
 const BACKOFF_SECONDS = [60, 300, 1800, 7200, 43_200];
 
-type TemplateSource = "question_bank" | "snapshot_template";
+export type TemplateSource = "question_bank" | "snapshot_template";
 
 interface TemplateDefinition {
   source: TemplateSource;
@@ -249,10 +251,12 @@ async function prepare(tx: Db, deps: FaDeps, delivery: DeliveryRow, now: Date): 
     const pin = await tx.query<{ snapshot_template_version: string }>("SELECT snapshot_template_version FROM project WHERE project_id = $1", [project.project_id]);
     const bundle = await deps.bundles.templateByVersion(pin.rows[0]?.snapshot_template_version ?? "");
     if (!bundle.emails[template]) return { kind: "cancel", reason: "template_not_configured" };
+    if (bundle.emails[template]?.active === false) return { kind: "cancel", reason: "template_inactive" };
     rendered = renderEmail(bundle, template, locale, variables);
   } else {
     const bundle = await questionBankFor(deps, project, template);
     if (!bundle) return { kind: "cancel", reason: "template_not_configured" };
+    if (bundle.emails[template]?.active === false) return { kind: "cancel", reason: "template_inactive" };
     rendered = renderEmail(bundle, template, locale, variables);
     const configured = (bundle.links as { preview_room_url?: unknown }).preview_room_url;
     if (typeof configured === "string" && configured.startsWith("https://")) previewRoomUrl = configured;

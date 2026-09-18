@@ -124,7 +124,61 @@ describe("Control Center", () => {
     expect(screen.getByText("Your First Assessment is saved. You can continue exactly where you left off.")).toBeInTheDocument();
     expect(screen.getByText("CTA: Continue my assessment")).toBeInTheDocument();
     expect(screen.getByText("Question bank fa-qb-1.2.0 · Snapshot template st-1.0.0")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Save|Publish|Edit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save|Publish|Edit|Deactivate|Activate/ })).not.toBeInTheDocument();
+  });
+
+  it("lets an ADMIN edit and publish an email template's raw copy, and deactivate it, through Communications", async () => {
+    // The write route is registered before the read route: mockApi matches by URL prefix, so the
+    // more specific path must come first or every write would be swallowed by the overview handler.
+    const calls = mockApi({
+      "/api/admin/me": () => jsonResponse(ADMIN),
+      "/api/admin/communications/templates/question_bank/resume_link": () => jsonResponse({ version: "fa-qb-1.1.1", template: { key: "resume_link" } }),
+      "/api/admin/communications/templates": () =>
+        jsonResponse({
+          questionBankVersion: "fa-qb-1.1.0",
+          snapshotTemplateVersion: "st-1.0.0",
+          templates: [
+            {
+              key: "resume_link",
+              source: "question_bank",
+              active: true,
+              locales: {
+                en: {
+                  subject: "Your beeside assessment is saved",
+                  body: "Hi {{preferred_name}}, your First Assessment is saved.",
+                  cta: "Continue my assessment",
+                  secondaryCta: null,
+                  preview: { subject: "Your beeside assessment is saved", body: "Hi Alex, your First Assessment is saved.", cta: "Continue my assessment", secondaryCta: null },
+                },
+              },
+            },
+          ],
+        }),
+    });
+    window.history.replaceState(null, "", "/admin/communications");
+    render(<AdminApp />);
+    expect(await screen.findByRole("heading", { name: "Communications" })).toBeInTheDocument();
+    // The rendered (sample-filled) preview shows, not the raw placeholder text.
+    expect(screen.getByText("Hi Alex, your First Assessment is saved.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const subjectField = screen.getByLabelText("Subject") as HTMLInputElement;
+    const bodyField = screen.getByLabelText("Body") as HTMLTextAreaElement;
+    // The edit form is pre-filled with the RAW text (placeholders intact), never the rendered sample.
+    expect(subjectField.value).toBe("Your beeside assessment is saved");
+    expect(bodyField.value).toBe("Hi {{preferred_name}}, your First Assessment is saved.");
+
+    fireEvent.change(subjectField, { target: { value: "Your beeside assessment, saved" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save & publish" }));
+
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/communications/templates/question_bank/resume_link"))).toBe(true));
+    const write = calls.find((c) => c.url.endsWith("/communications/templates/question_bank/resume_link"));
+    expect(write?.method).toBe("PUT");
+    expect(write?.headers["X-Beeside-Admin"]).toBe("1");
+    expect(await screen.findByText(/saved and published as fa-qb-1.1.1/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/communications/templates/question_bank/resume_link")).length).toBe(2));
   });
 
   it("shows the immutable Snapshot without recording a respondent view", async () => {

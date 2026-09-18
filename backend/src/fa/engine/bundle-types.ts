@@ -118,8 +118,15 @@ export interface QuestionBankBundle {
   links: { terms_url: string; privacy_policy_url: string | null; preview_room_url?: string; premium_terms_url?: string };
   /** Interface copy for non-question screens and states (nested `copy` objects keyed by locale). */
   ui: Record<string, { copy: Record<Locale, Record<string, string>> }>;
-  /** Transactional email templates (sent through the email outbox). `secondary_cta` is optional. */
-  emails: Record<string, { copy: Record<Locale, { subject: string; body: string; cta: string; secondary_cta?: string }> }>;
+  /**
+   * Transactional email templates (sent through the email outbox). `secondary_cta` is optional.
+   * `active` is optional and defaults to true (absent in every bundle published before Communications
+   * Admin existed) — false means the outbox cancels the send instead of delivering it (see `prepare`
+   * in operations/email-outbox.ts). Governed content, edited through Configuration's draft/preview/
+   * review/publish flow — directly, or through the scoped Communications Admin surface that patches
+   * only this field and `copy` (see admin/communications-service.ts).
+   */
+  emails: Record<string, { active?: boolean; copy: Record<Locale, { subject: string; body: string; cta: string; secondary_cta?: string }> }>;
   /**
    * Access / communication / temporary-retention calendar (see access-lifecycle.ts). Optional:
    * bundles published before it existed run under LIFECYCLE_POLICY_V1.

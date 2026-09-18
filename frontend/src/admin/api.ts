@@ -103,6 +103,11 @@ export const adminApi = {
   runJob: (job: string) => call<Json>("POST", `/operations/jobs/${job}/run`, {}),
 
   communicationsTemplates: () => call<Json>("GET", "/communications/templates"),
+  updateCommunicationsTemplate: (
+    source: "question_bank" | "snapshot_template",
+    key: string,
+    patch: { locale: "en" | "es"; subject: string; body: string; cta: string; secondaryCta?: string; active?: boolean },
+  ) => call<Json>("PUT", `/communications/templates/${source}/${encodeURIComponent(key)}`, patch),
 
   audit: (projectId?: string) => call<{ events: Json[] }>("GET", `/audit${projectId ? `?projectId=${projectId}` : ""}`),
   adminUsers: () => call<{ users: Json[] }>("GET", "/admin-users"),

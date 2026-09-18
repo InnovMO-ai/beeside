@@ -79,7 +79,8 @@ export interface SnapshotTemplateBundle {
   variables: string[];
   copy: Record<Locale, SnapshotTemplateCopy>;
   phrases: { copy: Record<Locale, SnapshotPhrases> };
-  emails: Record<string, { copy: Record<Locale, { subject: string; body: string; cta: string }> }>;
+  /** `active` optional, defaults true — see the matching field on QuestionBankBundle["emails"]. */
+  emails: Record<string, { active?: boolean; copy: Record<Locale, { subject: string; body: string; cta: string }> }>;
   /** Private Snapshot link validity (days from issuance). Optional: absent → 60 (policy pending). */
   links?: { snapshot_link_days?: number };
 }
