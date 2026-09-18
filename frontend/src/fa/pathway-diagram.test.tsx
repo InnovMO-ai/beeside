@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { PathwayDiagram } from "./components/PathwayDiagram";
 import { makeT } from "./copy";
@@ -22,6 +22,10 @@ const PATHWAY = {
   blockerLabel: "Blocker",
   items: ITEMS,
 };
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("PathwayDiagram", () => {
   it("lays out four stage columns in order, with every stage always visible even when empty", () => {

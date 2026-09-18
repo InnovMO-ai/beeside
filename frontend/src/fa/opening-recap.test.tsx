@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { OpeningRecap } from "./components/OpeningRecap";
 import { makeT } from "./copy";
@@ -14,6 +14,10 @@ const FACTS: RenderedSnapshot["facts"] = [
 ];
 
 const t = makeT(TEST_BUNDLE, "en");
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("OpeningRecap", () => {
   it("recaps the client's own project, objectives and requirements — no decorative imagery", () => {

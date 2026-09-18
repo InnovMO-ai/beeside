@@ -122,7 +122,12 @@ describe("Control Center", () => {
     expect(await screen.findByRole("heading", { name: "Communications" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: /resume_link/ })).toBeInTheDocument();
     expect(screen.getByText("Your First Assessment is saved. You can continue exactly where you left off.")).toBeInTheDocument();
-    expect(screen.getByText("CTA: Continue my assessment")).toBeInTheDocument();
+    // The CTA is rendered as `<p><strong>CTA:</strong> {cta text}</p>` — two sibling text nodes under
+    // one paragraph, not a single text node — so this matches on the paragraph's combined textContent
+    // rather than requiring "CTA: Continue my assessment" to be one exact node (which it isn't).
+    expect(
+      screen.getByText((_content, element) => element?.tagName.toLowerCase() === "p" && element.textContent === "CTA: Continue my assessment"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Question bank fa-qb-1.2.0 · Snapshot template st-1.0.0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Save|Publish|Edit|Deactivate|Activate/ })).not.toBeInTheDocument();
   });

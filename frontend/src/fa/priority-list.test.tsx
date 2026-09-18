@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { PriorityList } from "./components/PriorityList";
 import { RenderedNeedsPriority } from "./types";
@@ -38,6 +38,10 @@ const PRIORITIES = {
   approvalLabel: "Needs approval from",
   items: ITEMS,
 };
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("PriorityList", () => {
   it("keeps the declared order and labels each item's own status without reordering anything", () => {
