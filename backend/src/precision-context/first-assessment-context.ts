@@ -5,9 +5,21 @@ import {
   type FirstAssessmentStatus,
 } from "@beeside/canonical-fields";
 import { Db } from "../db/database";
+import type { CounterpartyListValue } from "../fa/engine/counterparty-types";
 import { computeJourney } from "../fa/engine/journey";
 import { isNotSureValue } from "../fa/engine/values";
+import type { NeedsMapValue } from "../fa/engine/needs-map-types";
 import { BundleStore } from "../fa/services/bundle-store";
+import { sanitizeNeedsMapForPrecision } from "./sanitize-needs-map";
+
+/** The one field whose value shape (NeedsMapDependency.owner/.approvalFrom) can carry respondent
+ *  free text naming a counterparty — see sanitize-needs-map.ts for why this needs its own,
+ *  narrower-than-`precisionExcluded` handling instead of exclusion. */
+const NEEDS_MAP_FIELD_KEY = "fa.needs.map";
+/** Matches the private FIELD_KEY in restricted-counterparties.ts — kept as a literal here (like
+ *  every other field_key in this file) rather than a shared export, since this file only ever reads
+ *  it for redaction comparison, never to expose or return the restricted list itself. */
+const RESTRICTED_COUNTERPARTIES_FIELD_KEY = "fa.provider.restricted_counterparties";
 
 interface ContextRow {
   project_id: string;
@@ -67,6 +79,15 @@ export async function getFirstAssessmentPrecisionContext(
   stored.set("fa.preferences.deliverable_language", row.preferred_deliverable_language);
   if (row.preferred_name) stored.set("fa.preferences.preferred_name", row.preferred_name);
 
+  // Read once here, purely as the comparison set for sanitizeNeedsMapForPrecision below — this is
+  // NOT a new read path and NOT the sanctioned admin view (restricted-counterparties.ts): `stored`
+  // already holds every project answer including this one (from the query above), and the raw list
+  // itself never leaves this function — fa.provider.restricted_counterparties still hits the
+  // `precisionExcluded` skip in the loop below like it always has, so it never appears in the
+  // returned contract under its own key either.
+  const restrictedCounterpartiesRaw = stored.get(RESTRICTED_COUNTERPARTIES_FIELD_KEY);
+  const restrictedCounterparties: CounterpartyListValue = Array.isArray(restrictedCounterpartiesRaw) ? (restrictedCounterpartiesRaw as CounterpartyListValue) : [];
+
   const journey = computeJourney(bundle, stored, row.last_completed_step);
   const structuredAnswers: Record<string, FirstAssessmentAnswer> = {};
   const openTextAnswers: Record<string, FirstAssessmentAnswer> = {};
@@ -81,7 +102,14 @@ export async function getFirstAssessmentPrecisionContext(
     // visibility/retention rule and restricted-counterparties.ts for the one sanctioned, audited
     // read path a Supervisor/Admin (or a conditionally authorized Strategic Advisor) uses instead.
     if (def.precisionExcluded) continue;
-    const value = journey.effectiveAnswers.get(question.field_key);
+    let value = journey.effectiveAnswers.get(question.field_key);
+    // Owner decision (2026-09-18, narrowest-safe-remedy): fa.needs.map's dependency owner/approvalFrom
+    // subfields are free text and are NOT precisionExcluded (the dependency structure itself is
+    // legitimate Precision context) — so redact only a restricted-counterparty mention inside those
+    // two subfields, never the field, the dependency, or the whole needs map. See sanitize-needs-map.ts.
+    if (question.field_key === NEEDS_MAP_FIELD_KEY && value) {
+      value = sanitizeNeedsMapForPrecision(value as NeedsMapValue, restrictedCounterparties);
+    }
     const entry: FirstAssessmentAnswer = {
       fieldKey: question.field_key,
       value,
