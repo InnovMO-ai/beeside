@@ -83,7 +83,7 @@ describe("buildExpansionSnapshotReport", () => {
 
   it("carries the company name into the cover's confidentiality note without hardcoding it in copy", () => {
     const doc = buildExpansionSnapshotReport(rendered(), "en", copy.en, { companyName: "Northwind", generatedAt: "2026-09-17T12:00:00Z" });
-    const cover = doc.sections[0].blocks[0] as { type: "cover"; confidentialNote: string };
+    const cover = doc.sections[0]!.blocks[0] as { type: "cover"; confidentialNote: string };
     expect(cover.confidentialNote).toBe("Confidential — prepared exclusively for Northwind.");
   });
 
@@ -122,7 +122,7 @@ describe("buildExpansionSnapshotReport", () => {
   it("builds the same document shape in Spanish from the Spanish copy bundle", () => {
     const doc = buildExpansionSnapshotReport(rendered(), "es", copy.es, { companyName: "Northwind", generatedAt: "2026-09-17T12:00:00Z" });
     expect(doc.locale).toBe("es");
-    const cover = doc.sections[0].blocks[0] as { type: "cover"; subtitle: string; confidentialNote: string };
+    const cover = doc.sections[0]!.blocks[0] as { type: "cover"; subtitle: string; confidentialNote: string };
     expect(cover.subtitle).toBe("Evaluación Estratégica de Expansión");
     expect(cover.confidentialNote).toBe("Confidencial — preparado exclusivamente para Northwind.");
   });

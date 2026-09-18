@@ -4,7 +4,7 @@ import { FaError } from "../fa/services/errors";
 import { FaDeps } from "../fa/services/repository";
 import { CheckoutAdapter, CheckoutOutcome, DevSimulatedCheckout, ManualConfirmationCheckout } from "./checkout";
 import { BundleStore } from "../fa/services/bundle-store";
-import { PremiumContent, premiumContentOf } from "./content";
+import { PREVIEW_ROOM_URL, PremiumContent, premiumContentOf } from "./content";
 import { processSubscriptionEvent } from "./subscription-events";
 
 /** Days of the simulated development period only; real periods always come from the provider event. */
@@ -69,7 +69,11 @@ export async function getPremiumStatus(db: Db, projectId: string, bundles?: Bund
     pendingRequest: pending,
     canActivate: available && !row.premium_ever_activated && !pending,
     canReactivate: available && row.premium_ever_activated && !accessActive && !pending,
-    previewRoomUrl: links.previewRoomUrl,
+    // PremiumContent (links, above) intentionally excludes previewRoomUrl — Preview Room is not
+    // part of the client-facing Snapshot conversion funnel. PremiumStatus is a separate, still-live
+    // contract (see premium.int.test.ts) that continues to expose it, sourced directly from the
+    // constant rather than through PremiumContent.
+    previewRoomUrl: PREVIEW_ROOM_URL,
     termsUrl: links.termsUrl,
   };
 }

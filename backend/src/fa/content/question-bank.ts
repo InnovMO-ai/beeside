@@ -77,7 +77,14 @@ export function buildQuestionBankBundle(): QuestionBankBundle {
     schema_version: 1,
     product: "first_assessment",
     locales: ["en", "es"],
-    variables: ["preferred_name", "access_until", "company_name", "days_left", "recoverable_until", "until"],
+    // Declared allowlist for every {{variable}} placeholder actually used across this bundle's ui/
+    // emails copy (validateQuestionBankBundle scans the whole serialized bundle). count/max/tag/name
+    // back the Needs Explorer tag_list/counterparty_list limit and removal copy (ui-copy.ts); the
+    // three lifecycle-retention email templates use retention_until.
+    variables: [
+      "preferred_name", "access_until", "company_name", "days_left", "recoverable_until", "until",
+      "retention_until", "count", "max", "tag", "name",
+    ],
     stages: STAGES,
     steps: STEPS,
     questions: [

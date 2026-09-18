@@ -15,6 +15,7 @@ const TYPE_TO_DATA_TYPE: Record<QuestionType, string> = {
   locale: "locale",
   tag_list: "tag_list",
   needs_map: "needs_map",
+  counterparty_list: "counterparty_list",
 };
 
 const sameSet = (a: readonly string[], b: readonly string[]) =>

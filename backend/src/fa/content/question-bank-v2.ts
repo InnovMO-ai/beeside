@@ -1,7 +1,7 @@
 import { QuestionDef, StageId, StepDef } from "../engine/bundle-types";
 import { LIFECYCLE_POLICY_V1, lifecyclePolicyToConfig } from "../services/access-lifecycle";
 import { PREMIUM_COPY, PREMIUM_TERMS_URL, PREVIEW_ROOM_URL } from "../../premium/content";
-import { Bi } from "./helpers";
+import { Bi, requiredQuestion } from "./helpers";
 import { BUSINESS_QUESTIONS, GOAL_QUESTIONS, PROJECT_QUESTIONS, STORY_QUESTIONS } from "./questions-project-business";
 import { CAPABILITY_QUESTIONS } from "./questions-operation";
 import { CONSTRAINT_QUESTIONS, PREFERENCE_QUESTIONS, PRIORITY_QUESTIONS } from "./questions-priorities";
@@ -85,16 +85,24 @@ function reviewStep(id: string, stage: StageId, title: Bi, intro: Bi): StepDef {
 // B1 (description) and B2 (type) move from "Your Business" into composition 1 ("Your Company"),
 // per the Design Specification's Area A grouping ("company description ... industry"). Every other
 // BUSINESS_QUESTIONS entry (B3-B6, SP2) keeps its existing relative order in "Your Business" below.
-const [B1, B2, ...REMAINING_BUSINESS_QUESTIONS] = BUSINESS_QUESTIONS;
+// (noUncheckedIndexedAccess types each destructured position as QuestionDef | undefined even though
+// BUSINESS_QUESTIONS is a fixed literal that always has these two entries — requiredQuestion fails
+// loudly, instead of silently, if that ever stops being true. See helpers.ts.)
+const [rawB1, rawB2, ...REMAINING_BUSINESS_QUESTIONS] = BUSINESS_QUESTIONS;
+const B1 = requiredQuestion(rawB1, "B1 (BUSINESS_QUESTIONS[0])");
+const B2 = requiredQuestion(rawB2, "B2 (BUSINESS_QUESTIONS[1])");
 
 // GROWTH1 is CAPABILITY_QUESTIONS' 4th and last entry (after CAP1, CAP_BANKING, CAP_INSURANCE, none
 // of which fa-qb-2.0.0 uses — see the file header). Destructured, not spread, so those three never
 // enter this bundle's `questions` array.
-const [, , , GROWTH1] = CAPABILITY_QUESTIONS;
+const [, , , rawGrowth1] = CAPABILITY_QUESTIONS;
+const GROWTH1 = requiredQuestion(rawGrowth1, "GROWTH1 (CAPABILITY_QUESTIONS[3])");
 
 // fa.needs.map itself, then every leaf-gated follow-up, then the free-text catch-all — progressive
 // disclosure within one continuous composition, exactly as NEEDS_QUESTIONS was authored.
-const [NEEDS_MAP, NEEDS_CONTEXT] = NEEDS_QUESTIONS;
+const [rawNeedsMap, rawNeedsContext] = NEEDS_QUESTIONS;
+const NEEDS_MAP = requiredQuestion(rawNeedsMap, "NEEDS_MAP (NEEDS_QUESTIONS[0])");
+const NEEDS_CONTEXT = requiredQuestion(rawNeedsContext, "NEEDS_CONTEXT (NEEDS_QUESTIONS[1])");
 
 const STEPS_V2: StepDef[] = [
   // Composition 1 — Your Company
@@ -166,7 +174,12 @@ export function buildQuestionBankBundleV2() {
     schema_version: 1 as const,
     product: "first_assessment" as const,
     locales: ["en", "es"] as const,
-    variables: ["preferred_name", "access_until", "company_name", "days_left", "recoverable_until", "until"],
+    // Same shared ui/emails copy as fa-qb-1.1.0 (question-bank.ts) — see that file's comment on
+    // this list for what each addition backs.
+    variables: [
+      "preferred_name", "access_until", "company_name", "days_left", "recoverable_until", "until",
+      "retention_until", "count", "max", "tag", "name",
+    ],
     stages: STAGES,
     steps: STEPS_V2,
     questions: [
