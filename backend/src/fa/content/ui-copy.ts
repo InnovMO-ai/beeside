@@ -289,6 +289,9 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
         works_point_1: "A single point of contact guides your project end to end.",
         works_point_2: "You approve each step before we move forward.",
         works_point_3: "Every recommendation is grounded in your own declared priorities.",
+        // Final visual polish pass — one Pathway stage can legitimately have nothing in it; a bare
+        // "—" read as an unexplained gap rather than a fact worth stating plainly.
+        pathway_stage_empty: "Nothing is placed at this stage yet.",
       },
       es: {
         big_picture_title: "El panorama general",
@@ -311,6 +314,7 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
         works_point_1: "Un único punto de contacto guía tu proyecto de principio a fin.",
         works_point_2: "Tú apruebas cada paso antes de avanzar.",
         works_point_3: "Cada recomendación se basa en tus propias prioridades declaradas.",
+        pathway_stage_empty: "Todavía no hay nada ubicado en esta etapa.",
       },
     },
   },

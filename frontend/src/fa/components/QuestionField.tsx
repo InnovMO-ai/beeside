@@ -492,7 +492,7 @@ function TimingInput({ question, locale, t, value, onChange }: Shared) {
             <span>{choice.label}</span>
           </label>
           {precision === choice.value && choice.value === "date" && (
-            <div className="field" style={{ margin: "0.75rem 0 0.5rem 2.1rem" }}>
+            <div className="field" style={{ margin: "0.75rem 0 0.5rem var(--indent)" }}>
               <label className="visually-hidden" htmlFor={`${question.id}-date`}>
                 {choice.label}
               </label>
@@ -508,7 +508,7 @@ function TimingInput({ question, locale, t, value, onChange }: Shared) {
             </div>
           )}
           {precision === choice.value && choice.value === "month" && (
-            <div className="two-col" style={{ margin: "0.75rem 0 0.5rem 2.1rem" }}>
+            <div className="two-col" style={{ margin: "0.75rem 0 0.5rem var(--indent)" }}>
               <SelectField id={`${question.id}-month`} label={choice.label} value={parts.month} onChange={(v) => update("month", { ...parts, month: v })}>
                 {Array.from({ length: 12 }, (_, i) => {
                   const mm = String(i + 1).padStart(2, "0");
@@ -529,7 +529,7 @@ function TimingInput({ question, locale, t, value, onChange }: Shared) {
             </div>
           )}
           {precision === choice.value && choice.value === "quarter" && (
-            <div className="two-col" style={{ margin: "0.75rem 0 0.5rem 2.1rem" }}>
+            <div className="two-col" style={{ margin: "0.75rem 0 0.5rem var(--indent)" }}>
               <SelectField id={`${question.id}-quarter`} label={t("common", "quarter_label")} value={parts.quarter} onChange={(v) => update("quarter", { ...parts, quarter: v })}>
                 {["1", "2", "3", "4"].map((q) => (
                   <option key={q} value={q}>

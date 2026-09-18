@@ -127,7 +127,7 @@ export function NeedsExplorer({ locale, t, value, onChange }: NeedsExplorerProps
                     <span>{leaf.label[locale] ?? leaf.label.en}</span>
                   </label>
                   {selection && (
-                    <div className="field" style={{ margin: "0.4rem 0 0.75rem 2.1rem" }}>
+                    <div className="field" style={{ margin: "0.4rem 0 0.75rem var(--indent)" }}>
                       <label htmlFor={`status-${leaf.key}`} style={{ fontWeight: 400 }}>
                         {t("level2", "needs_status_label")}
                       </label>

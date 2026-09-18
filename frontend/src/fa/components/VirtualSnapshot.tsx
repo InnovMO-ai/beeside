@@ -101,7 +101,7 @@ export function VirtualSnapshot({
       )}
       {view.needsPriorities && <PriorityList priorities={view.needsPriorities} />}
 
-      {view.pathway && <PathwayDiagram pathway={view.pathway} />}
+      {view.pathway && <PathwayDiagram pathway={view.pathway} t={t} />}
 
       {view.needsLandscape && <CapabilityLandscapeGrid landscape={view.needsLandscape} />}
 

@@ -54,11 +54,9 @@ function ReviewSection({
   if (step.kind === "transition" || step.question_ids.length === 0) return null;
   const stepCopy = step.copy[locale] ?? step.copy.en;
   return (
-    <section className="review-section" style={{ marginBottom: "2rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h2 className="question-title" style={{ fontSize: "1.05rem" }}>
-          {stepCopy.title}
-        </h2>
+    <section className="review-section">
+      <div className="review-section-header">
+        <h2 className="review-section-title">{stepCopy.title}</h2>
         <button type="button" className="button button-text" onClick={() => onEditStep(step.id)}>
           {t("level2", "review_edit")}
         </button>

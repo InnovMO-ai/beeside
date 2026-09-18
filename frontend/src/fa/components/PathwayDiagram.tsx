@@ -1,3 +1,4 @@
+import { T } from "../copy";
 import { PathwayStage, RenderedPathwayItem } from "../types";
 
 /**
@@ -24,7 +25,7 @@ type Pathway = {
   items: RenderedPathwayItem[];
 };
 
-export function PathwayDiagram({ pathway }: { pathway: Pathway }) {
+export function PathwayDiagram({ pathway, t }: { pathway: Pathway; t: T }) {
   if (pathway.items.length === 0) return null;
   const byStage = new Map<PathwayStage, RenderedPathwayItem[]>(STAGE_ORDER.map((s) => [s, []]));
   for (const item of pathway.items) byStage.get(item.stage)?.push(item);
@@ -48,7 +49,7 @@ export function PathwayDiagram({ pathway }: { pathway: Pathway }) {
                 {pathway.stageLabels[stage]}
               </h3>
               {items.length === 0 ? (
-                <p className="pathway-stage-empty helper">—</p>
+                <p className="pathway-stage-empty helper">{t("virtual_snapshot", "pathway_stage_empty")}</p>
               ) : (
                 <ul className="pathway-items">
                   {items.map((item) => (

@@ -16,7 +16,15 @@
   --ink-faint: #75767c;
   --white: #ffffff;
   --mist: #f1f1fa;
+  /* Neutral structural border — for a boundary that is purely structural (a divider, a plain
+     container edge), not a deliberate brand/accent signal. Purple stays reserved for genuine
+     accent moments: hover/selected states, primary actions, links, emphasis rules. Matches the
+     literal value already used by .admin-card's border, now named instead of repeated ad hoc. */
+  --border: #e3e3ea;
   --radius: 10px;
+  /* Shared indent for a sub-field nested under a selected option (used identically in three places
+     across QuestionField.tsx and NeedsExplorer.tsx — token instead of a repeated magic number). */
+  --indent: 2.1rem;
   --font: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
@@ -95,7 +103,7 @@ a {
   color: var(--ink-soft);
   letter-spacing: 0.01em;
   padding-left: 0.75rem;
-  border-left: 1px solid var(--purple-200);
+  border-left: 1px solid var(--border);
 }
 .header-actions {
   display: flex;
@@ -107,7 +115,7 @@ a {
   font-size: 0.9375rem;
   color: var(--ink);
   background: var(--white);
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--ink-faint);
   border-radius: var(--radius);
   padding: 0.35rem 0.6rem;
 }
@@ -124,6 +132,11 @@ a {
 }
 .progress-rail li {
   flex: 1;
+  /* Without this, a flex item's implicit min-width is its content's min intrinsic width — for a
+     longer single-word stage label (e.g. "Prioridades") that can force the whole rail wider than a
+     narrow phone viewport instead of wrapping. min-width: 0 lets it shrink and wrap like any other
+     text instead of pushing the row into horizontal overflow. */
+  min-width: 0;
   font-size: 0.8125rem;
   letter-spacing: 0.02em;
   color: var(--ink-soft);
@@ -143,6 +156,14 @@ a {
 .progress-rail li[data-state="current"] {
   color: var(--ink);
   font-weight: 700;
+}
+@media (max-width: 480px) {
+  .progress-rail ol {
+    gap: 0.3rem;
+  }
+  .progress-rail li {
+    font-size: 0.75rem;
+  }
 }
 
 main {
@@ -276,6 +297,9 @@ main {
   gap: 0.75rem;
   align-items: flex-start;
   margin: 0.75rem 0 0;
+  /* ~44px usable interaction height for the whole clickable row (label wraps the input and its
+     text), matching .option/.button — the visible glyph below stays its original 1.25rem size. */
+  min-height: 2.75rem;
 }
 .check input {
   width: 1.25rem;
@@ -308,7 +332,9 @@ fieldset.question {
   font-size: clamp(1.6rem, 3.4vw, 2.4rem);
   line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  /* Aligned with .display/.premium-headline (both -0.02em) — the three large-headline treatments
+     now share the same letter-spacing, one small piece of the same hierarchy system. */
+  letter-spacing: -0.02em;
 }
 .question-title .optional-tag {
   font-size: 1rem;
@@ -325,7 +351,9 @@ fieldset.question {
   gap: 0.85rem;
   min-height: 3.25rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--purple-200);
+  /* Neutral at rest — purple is reserved for the deliberate moments below (hover, selected), not
+     the default resting state of every choosable row. */
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--white);
   cursor: pointer;
@@ -385,7 +413,7 @@ fieldset.question {
   list-style: none;
   margin: 0.5rem 0 0;
   padding: 0;
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   max-height: 16rem;
   overflow: auto;
@@ -580,11 +608,17 @@ fieldset.question {
 }
 .radar-legend-row dt {
   color: var(--ink);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .radar-legend-row dd {
   margin: 0;
-  white-space: nowrap;
+  /* No nowrap: a longer localized tier label (either language) wraps within its own share of the
+     row instead of clipping or forcing overflow. */
   font-weight: 600;
+  text-align: right;
+  flex: 0 1 auto;
+  max-width: 55%;
 }
 .radar-tier-early-stage {
   color: var(--ink-faint);
@@ -670,6 +704,8 @@ fieldset.question {
   gap: 1rem;
 }
 .snapshot-panel {
+  /* Kept bordered/tinted — this boundary communicates a real semantic state (well-defined / needs
+     attention / resolve early), exactly the case Section 1's "keep" rule protects. */
   padding: 1.25rem;
   border: 1px solid var(--tone-border);
   border-radius: var(--radius);
@@ -696,9 +732,12 @@ fieldset.question {
   list-style: none;
 }
 .panel-items li {
-  padding: 0.7rem 0.85rem;
-  border-radius: 8px;
-  background: var(--white);
+  /* Flattened: a white box nested inside the already-tinted .snapshot-panel was a box-in-box with
+     no further meaning of its own — the outer panel's tone boundary already carries the state, so
+     each item is plain text on that same tint, separated by the list's own grid gap. */
+  padding: 0;
+  border-radius: 0;
+  background: none;
 }
 .panel-item-label {
   display: block;
@@ -710,14 +749,21 @@ fieldset.question {
   font-size: 0.9375rem;
   color: var(--ink-soft);
 }
+/* A single free-standing beat of prose/quote, not a grid of many — softened from a four-sided
+   boxed card to the same left-rule idiom already used by blockquote.verbatim, so the two
+   previously-different "emphasis block" treatments in this journey become one. */
 .snapshot-card {
-  padding: 1.25rem;
-  border: 1px solid var(--purple-200);
-  border-radius: var(--radius);
-  background: var(--white);
+  padding: 0 0 0 1.25rem;
+  border: 0;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
 }
 .reconcile-card {
-  background: var(--mist);
+  /* The one deliberate exception: a discrepancy worth flagging gets the brand-accent rule instead
+     of the neutral one, a purposeful signal rather than a filled box. */
+  border-left-color: var(--purple-600);
+  background: none;
 }
 .card-title {
   display: flex;
@@ -725,6 +771,7 @@ fieldset.question {
   gap: 0.5rem;
   margin: 0 0 0.5rem;
   font-size: 1rem;
+  font-weight: 700;
   color: var(--purple-900);
 }
 .priority-value {
@@ -743,6 +790,7 @@ blockquote.verbatim {
 .section-title {
   margin: 0 0 0.25rem;
   font-size: 1.35rem;
+  font-weight: 700;
 }
 .capability-tags {
   display: grid;
@@ -796,10 +844,15 @@ blockquote.verbatim {
 }
 
 /* ---------------------------------------------------------------- priority list ("What Matters Now") */
+/* "Immediate Priority" is a deliberate brand-accent emphasis on the client's own single
+   most-featured item — not a coverage-quality semantic state like the tones elsewhere in this
+   file — so it now reuses the approved --purple-900/--mist/--purple-200 brand tokens directly,
+   replacing an undocumented ad hoc purple (#6d28d9) that matched no token and had no rationale of
+   its own. */
 .priority-badge-immediate {
-  --tone-ink: #6d28d9;
-  --tone-bg: #f3ecff;
-  --tone-border: #dcc9fb;
+  --tone-ink: var(--purple-900);
+  --tone-bg: var(--mist);
+  --tone-border: var(--purple-200);
 }
 .priority-badge-next {
   --tone-ink: #475569;
@@ -820,10 +873,18 @@ blockquote.verbatim {
   counter-reset: priority-item;
 }
 .priority-item {
-  padding: 1rem 1.15rem;
-  border: 1px solid var(--purple-200);
-  border-radius: var(--radius);
-  background: var(--white);
+  /* Flattened from a bordered box to a plain divided row — an editorial list of the client's own
+     declared priorities, not a grid of dashboard cards. The badges already carry each item's
+     status, so the outer box added framing without adding meaning. */
+  padding: 0.85rem 0;
+  border: 0;
+  border-top: 1px solid var(--mist);
+  border-radius: 0;
+  background: none;
+}
+.priority-item:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 .priority-item-header {
   display: flex;
@@ -867,6 +928,14 @@ blockquote.verbatim {
   padding: 0;
   list-style: none;
 }
+/* Intermediate tablet step: 4 columns straight to 1 compressed every stage into a very narrow
+   track just above the old single breakpoint. A 2x2 step in between keeps NOW -> DEFINE -> ENABLE
+   -> LAUNCH readable in the same top-to-bottom, left-to-right order without changing it. */
+@media (max-width: 960px) {
+  .pathway-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 720px) {
   .pathway-stages {
     grid-template-columns: 1fr;
@@ -874,7 +943,9 @@ blockquote.verbatim {
 }
 .pathway-stage {
   padding: 1rem;
-  border: 1px solid var(--purple-200);
+  /* Border removed — the tinted background alone is enough to read as a separate lane, and
+     dropping the purple edge keeps the brand accent reserved for genuine accent moments. */
+  border: 0;
   border-radius: var(--radius);
   background: var(--mist);
 }
@@ -913,11 +984,18 @@ blockquote.verbatim {
   list-style: none;
 }
 .pathway-item {
+  /* Flattened from a white box nested inside the tinted stage lane (box-in-box) to a plain divided
+     row within that lane, matching the same treatment applied to .priority-item. */
   display: grid;
   gap: 0.4rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: 8px;
-  background: var(--white);
+  padding: 0.5rem 0 0;
+  border-radius: 0;
+  background: none;
+  border-top: 1px solid rgba(23, 24, 27, 0.08);
+}
+.pathway-item:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 .pathway-item-label {
   font-weight: 700;
@@ -992,7 +1070,15 @@ blockquote.verbatim {
   max-width: 44rem;
   font-size: clamp(1.75rem, 3.6vw, 2.6rem);
   line-height: 1.12;
+  font-weight: 700;
   letter-spacing: -0.02em;
+}
+/* Reserves the Premium block's approximate footprint while its content is still loading, so it
+   does not pop into place and shove the page's remaining content down once the fetch resolves.
+   No spinner/shimmer — this is inert space, not loading theatrics. */
+.premium-transition-placeholder {
+  min-height: 22rem;
+  margin-top: 3.5rem;
 }
 .premium-body {
   max-width: 44rem;
@@ -1020,8 +1106,11 @@ a.button {
   list-style: none;
 }
 .premium-pillar {
+  /* Neutral border kept (three pillars side by side still benefit from a visible boundary between
+     them), but no longer purple by default — the purple accent stays reserved for genuine brand
+     moments elsewhere on this same screen (headings, the primary CTA). */
   padding: 1.25rem;
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--white);
 }
@@ -1070,10 +1159,13 @@ a.button {
   max-width: 44rem;
 }
 .premium-status {
+  /* Same left-rule idiom as .snapshot-card/.reconcile-card — a single status callout reads as a
+     deliberate emphasis, not a boxed dashboard tile. */
   max-width: 44rem;
-  padding: 1.5rem;
-  border: 1px solid var(--purple-200);
-  border-radius: var(--radius);
+  padding: 0 0 0 1.25rem;
+  border: 0;
+  border-left: 2px solid var(--purple-600);
+  border-radius: 0;
 }
 .premium-status .premium-headline {
   font-size: clamp(1.4rem, 2.8vw, 1.9rem);
@@ -1084,6 +1176,24 @@ a.button {
 }
 .premium-status p + p {
   margin-top: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- review recap */
+.review-section {
+  margin-bottom: 2rem;
+}
+.review-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+.review-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------------- control center (internal) */
