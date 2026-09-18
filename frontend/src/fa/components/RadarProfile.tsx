@@ -41,13 +41,11 @@ export function RadarProfile({ dimensions, t }: { dimensions: RenderedExpansionD
       <p className="lead">{t("virtual_snapshot", "big_picture_intro")}</p>
 
       <div className="radar-profile-body">
-        <svg
-          className="radar-profile-chart"
-          viewBox={`0 0 ${SIZE} ${SIZE}`}
-          role="img"
-          aria-hidden="true"
-          focusable="false"
-        >
+        {/* Purely decorative — aria-hidden removes it from the accessibility tree entirely, so it
+            carries no role (role="img" alongside aria-hidden is a contradiction: a role announces
+            an element that aria-hidden then hides). The <dl> below is the one real accessible
+            alternative for this chart's data. */}
+        <svg className="radar-profile-chart" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true" focusable="false">
           {RINGS.map((ring) => (
             <polygon key={ring} className="radar-ring" points={polygonPoints(dimensions.map(() => ring))} />
           ))}

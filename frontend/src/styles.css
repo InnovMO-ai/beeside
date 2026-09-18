@@ -8,7 +8,12 @@
   --purple-200: #b9aedd;
   --ink: #17181b;
   --ink-soft: #54555c;
-  --ink-faint: #96979c;
+  /* Verified against its two actual usages (input/textarea/select border; the radar's
+     "early-stage" tier label) — both on a white background: #96979c measured ~2.92:1, failing
+     both WCAG 1.4.3 (4.5:1, normal text) and 1.4.11 (3:1, UI component boundaries). #75767c
+     keeps the same near-neutral hue and stays visibly lighter than --ink-soft, while measuring
+     ~4.53:1 against white. */
+  --ink-faint: #75767c;
   --white: #ffffff;
   --mist: #f1f1fa;
   --radius: 10px;
@@ -367,6 +372,14 @@ fieldset.question {
   font: inherit;
   cursor: pointer;
   padding: 0.1rem 0.35rem;
+  /* ~44px touch target (shared by Needs Explorer's priority reorder/remove chips and every other
+     tag/counterparty-list chip that reuses .chip) — the visible glyph stays the same size, this
+     only enlarges the hit area, matching the min-height already used by .button/.option. */
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .suggestions {
   list-style: none;
@@ -1173,6 +1186,13 @@ a.button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   gap: 1rem;
+}
+/* minmax(22rem, ...) can't shrink its track below 22rem (352px) on its own, so a track this narrow
+   forces horizontal scroll below that width. Drop to a single column before that happens. */
+@media (max-width: 480px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .admin-card {
   padding: 1rem 1.25rem;

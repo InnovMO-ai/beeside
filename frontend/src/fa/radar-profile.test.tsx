@@ -36,6 +36,9 @@ describe("RadarProfile", () => {
     const { container } = render(<RadarProfile dimensions={DIMENSIONS} t={t} />);
     const svg = container.querySelector("svg.radar-profile-chart");
     expect(svg).toHaveAttribute("aria-hidden", "true");
+    // No role="img" alongside aria-hidden — that pairing is contradictory (a role announces an
+    // element that aria-hidden then removes from the tree); the <dl> below is the sole alternative.
+    expect(svg).not.toHaveAttribute("role");
     const legend = container.querySelector("dl.radar-profile-legend");
     expect(legend).toHaveAttribute("aria-label", "Definition by dimension");
     expect(legend?.querySelectorAll("dt")).toHaveLength(DIMENSIONS.length);

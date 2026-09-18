@@ -917,7 +917,13 @@ function CommunicationsView({ can }: { can: (p: Permission) => boolean }) {
                   </h2>
                   {canEdit && (
                     <div className="admin-actions">
-                      <button type="button" className="button button-text" disabled={saving} onClick={() => toggleActive(source, key, active, anyLocale)}>
+                      <button
+                        type="button"
+                        className="button button-text"
+                        disabled={saving}
+                        aria-pressed={active}
+                        onClick={() => toggleActive(source, key, active, anyLocale)}
+                      >
                         {active ? "Deactivate" : "Activate"}
                       </button>
                     </div>

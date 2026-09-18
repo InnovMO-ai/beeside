@@ -177,6 +177,10 @@ describe("Control Center", () => {
     expect(write?.headers["X-Beeside-Admin"]).toBe("1");
     expect(await screen.findByText(/saved and published as fa-qb-1.1.1/)).toBeInTheDocument();
 
+    // The button exposes the template's current active state programmatically, not just via its
+    // own changing label — aria-pressed=true while the template is still active.
+    expect(screen.getByRole("button", { name: "Deactivate" })).toHaveAttribute("aria-pressed", "true");
+
     fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
     await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/communications/templates/question_bank/resume_link")).length).toBe(2));
   });
