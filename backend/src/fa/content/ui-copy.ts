@@ -292,6 +292,21 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
         // Final visual polish pass — one Pathway stage can legitimately have nothing in it; a bare
         // "—" read as an unexplained gap rather than a fact worth stating plainly.
         pathway_stage_empty: "Nothing is placed at this stage yet.",
+        // Dual Expansion Profile (Macroblock 7) — chrome-only strings for the dumbbell track view and
+        // the dual-series radar view, both rendered together over the same six dimensions. Per-project
+        // title/intro/series-legend text is on RenderedSnapshot.dualProfile, not here.
+        dual_profile_accessible_summary: "Definition & Evidence and Execution Demand by dimension",
+        dual_profile_not_evaluable: "Not yet evaluable",
+        dual_profile_scale_less: "Less defined",
+        dual_profile_scale_more: "More defined",
+        dual_profile_radar_eyebrow: "Radar view — the same six dimensions, plotted as one shape per series",
+        // Narrative Interpretation Library (Macroblock 7 — Final Gap Closure) section titles. These
+        // are structural labels only (verbatim the frozen artifact's own section kickers), never the
+        // interpretive sentence itself — that text is on RenderedSnapshot.keyReading/
+        // marketEvidenceNarrative/executionPressureNarrative, Product-Owner-approved verbatim.
+        key_reading_title: "Key Reading",
+        market_evidence_title: "Market Evidence",
+        execution_pressure_title: "Execution Pressure",
       },
       es: {
         big_picture_title: "El panorama general",
@@ -315,6 +330,14 @@ export const UI_COPY: QuestionBankBundle["ui"] = {
         works_point_2: "Tú apruebas cada paso antes de avanzar.",
         works_point_3: "Cada recomendación se basa en tus propias prioridades declaradas.",
         pathway_stage_empty: "Todavía no hay nada ubicado en esta etapa.",
+        dual_profile_accessible_summary: "Definición y Evidencia, y Demanda de Ejecución, por dimensión",
+        dual_profile_not_evaluable: "Todavía no evaluable",
+        dual_profile_scale_less: "Menos definido",
+        dual_profile_scale_more: "Más definido",
+        dual_profile_radar_eyebrow: "Vista de radar — las mismas seis dimensiones, graficadas como una forma por serie",
+        key_reading_title: "Lectura Clave",
+        market_evidence_title: "Evidencia de Mercado",
+        execution_pressure_title: "Presión de Ejecución",
       },
     },
   },

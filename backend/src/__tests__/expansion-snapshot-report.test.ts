@@ -10,9 +10,13 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     headline: "Northwind, in perspective.",
     generatedOn: "Generated on September 17, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
+    dualProfile: { title: "Definition & Evidence vs. Execution Demand", intro: "…", definitionLabel: "Definition & Evidence", demandLabel: "Execution Demand" },
+    keyReading: null,
+    marketEvidenceNarrative: null,
+    executionPressureNarrative: null,
     expansionProfile: [
-      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
-      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined", demand: null, demandNote: null },
+      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined", demand: null, demandNote: null },
     ],
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },
@@ -52,6 +56,7 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
       items: [{ key: "company_setup", label: "Company Setup", status: "covered_internally", statusLabel: "Covered internally" }],
     },
     disclosure: { title: "About this Snapshot", text: "This initial interpretation is based on the information you shared with us." },
+    valueBridges: [],
     ...overrides,
   };
 }

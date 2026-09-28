@@ -1,4 +1,5 @@
 import type { Locale } from "../fa/engine/bundle-types";
+import type { ValueBridgeKey } from "./value-bridges";
 
 /**
  * Expansion Snapshot template — schema_version 1 (Functional Specification v1 §6, Master Build Guide
@@ -64,6 +65,33 @@ export interface SnapshotTemplateCopy {
   needs_status_in_progress: string;
   needs_status_needs_resolution: string;
   needs_status_needs_confirmation: string;
+  /** Dual Expansion Profile (Macroblock 7, Snapshot Runtime Convergence): the merged dumbbell/radar
+   *  section carrying both series — Definition & Evidence (already-existing tier copy) and its new
+   *  Execution Demand series. */
+  dual_profile_title: string;
+  dual_profile_intro: string;
+  definition_series_label: string;
+  demand_series_label: string;
+  /** One line of client-facing context per NOT_EVALUABLE reason (execution-demand.ts's
+   *  `NotEvaluableReason`) — shown next to a dimension's Execution Demand exactly when it has no
+   *  value, the same axis-note pattern the frozen artifact uses for Activation Planning. */
+  demand_note_no_defensible_signal: string;
+  demand_note_project_path_not_confirmed: string;
+  demand_note_insufficient_evidence: string;
+  demand_note_not_applicable: string;
+  /** Value Bridges ("beeside can help") shared eyebrow — per-bridge heading/body live in
+   *  `valueBridges.copy` below, approved verbatim in `snapshot-etapa2-value-bridges-ronda-final.md`. */
+  value_bridge_eyebrow: string;
+}
+
+/** Approved Value Bridge copy (`snapshot-etapa2-value-bridges-ronda-final.md`, Product Owner decision
+ *  2026-09-24, formally closed) — verbatim, never generated. Keyed by `ValueBridgeKey`
+ *  (`./value-bridges.ts`); the approved document itself gives the client-facing bridge text in
+ *  English only, so the Spanish translations below are this bundle's own (same convention as every
+ *  other `copy.es` string in this file). */
+export interface SnapshotValueBridgeCopy {
+  heading: string;
+  body: string;
 }
 
 export interface SnapshotPhrases {
@@ -79,13 +107,19 @@ export interface SnapshotTemplateBundle {
   variables: string[];
   copy: Record<Locale, SnapshotTemplateCopy>;
   phrases: { copy: Record<Locale, SnapshotPhrases> };
+  /** Approved Value Bridge library (Macroblock 7) — see `SnapshotValueBridgeCopy` above. */
+  valueBridges: { copy: Record<Locale, Record<ValueBridgeKey, SnapshotValueBridgeCopy>> };
   /** `active` optional, defaults true — see the matching field on QuestionBankBundle["emails"]. */
   emails: Record<string, { active?: boolean; copy: Record<Locale, { subject: string; body: string; cta: string }> }>;
   /** Private Snapshot link validity (days from issuance). Optional: absent → 60 (policy pending). */
   links?: { snapshot_link_days?: number };
 }
 
-export const FA_SNAPSHOT_TEMPLATE_VERSION = "st-1.0.0";
+/** Bumped to st-1.1.0 (Macroblock 7): adds the Dual Expansion Profile / demand-note copy and the
+ *  Value Bridge library. Existing stored Snapshots keep whichever version they were generated with
+ *  (`ComposeInput.versions.snapshotTemplate`, recorded at generation time) — this bump only affects
+ *  Snapshots generated from this point forward. */
+export const FA_SNAPSHOT_TEMPLATE_VERSION = "st-1.1.0";
 
 export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
   return {
@@ -145,6 +179,16 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         needs_status_in_progress: "In progress",
         needs_status_needs_resolution: "Still needs to be resolved",
         needs_status_needs_confirmation: "Need to confirm whether it applies",
+        dual_profile_title: "Definition & Evidence vs. Execution Demand",
+        dual_profile_intro: "See where your expansion plan is well defined and where execution will demand more from the business.",
+        definition_series_label: "Definition & Evidence",
+        demand_series_label: "Execution Demand",
+        demand_note_no_defensible_signal:
+          "There isn't yet a structured way to measure execution demand for this area — shown as not evaluable rather than assumed.",
+        demand_note_project_path_not_confirmed: "Sequencing demand for this axis depends on your declared priority order, which isn't confirmed yet — shown as not evaluable rather than assumed.",
+        demand_note_insufficient_evidence: "Not enough of this area has been answered yet to show execution demand — shown as not evaluable rather than assumed.",
+        demand_note_not_applicable: "This didn't apply to your project, so execution demand isn't shown for it.",
+        value_bridge_eyebrow: "beeside can help",
       },
       es: {
         eyebrow: "Tu Expansion Snapshot",
@@ -197,6 +241,16 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
         needs_status_in_progress: "En progreso",
         needs_status_needs_resolution: "Todavía necesita resolverse",
         needs_status_needs_confirmation: "Falta confirmar si aplica",
+        dual_profile_title: "Definición y Evidencia vs. Demanda de Ejecución",
+        dual_profile_intro: "Aquí ves qué tan definido está tu plan de expansión y dónde la ejecución exigirá más del negocio.",
+        definition_series_label: "Definición y Evidencia",
+        demand_series_label: "Demanda de Ejecución",
+        demand_note_no_defensible_signal:
+          "Todavía no existe una forma estructurada de medir la demanda de ejecución en esta área — se muestra como no evaluable en lugar de asumirla.",
+        demand_note_project_path_not_confirmed: "La demanda de secuenciación de este eje depende de tu orden de prioridades declarado, que aún no está confirmado — se muestra como no evaluable en lugar de asumirla.",
+        demand_note_insufficient_evidence: "Todavía no se ha respondido lo suficiente en esta área para mostrar la demanda de ejecución — se muestra como no evaluable en lugar de asumirla.",
+        demand_note_not_applicable: "Esto no aplicó a tu proyecto, así que no se muestra demanda de ejecución para este eje.",
+        value_bridge_eyebrow: "beeside puede ayudarte",
       },
     },
     phrases: {
@@ -249,6 +303,66 @@ export function buildSnapshotTemplateBundle(): SnapshotTemplateBundle {
             firm_commitment: ", con un compromiso firme para {{launch}}",
             target_date: ", con {{launch}} como objetivo",
             approximate_timeframe: ", con un plazo aproximado de {{launch}}",
+          },
+        },
+      },
+    },
+    // Approved verbatim from snapshot-etapa2-value-bridges-ronda-final.md (Product Owner decision
+    // 2026-09-24, formally closed) for `en`. The `es` copy is this bundle's own translation — the
+    // approved document only gives English client-facing bridge text, matching the convention every
+    // other `copy.es` block in this file already follows for its own translations.
+    valueBridges: {
+      copy: {
+        en: {
+          sherpa: {
+            heading: "Your Sherpa",
+            body: "Your Sherpa guides and coordinates the path to service activation — acting as your point of contact with the provider ecosystem, and helping reduce the operational burden and need for local presence during the process.",
+          },
+          operation_hub_productivity: {
+            heading: "Operation Hub",
+            body: "Operation Hub brings the work of your expansion into one place — tasks, documents, conversations, goals, calendars and deliverables — so your team can manage the project with greater visibility and continuity.",
+          },
+          operation_hub_secure: {
+            heading: "Operation Hub",
+            body: "Operation Hub gives your team a secure, protected environment to share sensitive project information and collaborate with confidence throughout the expansion.",
+          },
+          the_hive: {
+            heading: "The Hive",
+            body: "The Hive gives you access to beeside's curated ecosystem of trusted local providers — matched to the capabilities your project requires, so you don't have to source and vet them on your own.",
+          },
+          beeside_verified: {
+            heading: "beeside Verified",
+            body: "Already have a provider in mind? beeside Verified can assess its capabilities, credentials, local presence and compliance against the requirements you've defined for this project.",
+          },
+          strategic_advisory: {
+            heading: "Strategic Advisory",
+            body: "Some expansion decisions require more than coordination. Strategic Advisory brings in expertise focused on the specific issue — framing the question, weighing the options and supporting a better-informed decision.",
+          },
+        },
+        es: {
+          sherpa: {
+            heading: "Tu Sherpa",
+            body: "Tu Sherpa guía y coordina el camino hacia la activación de servicios — actuando como tu punto de contacto con el ecosistema de proveedores, y ayudando a reducir la carga operativa y la necesidad de presencia local durante el proceso.",
+          },
+          operation_hub_productivity: {
+            heading: "Operation Hub",
+            body: "Operation Hub reúne el trabajo de tu expansión en un solo lugar — tareas, documentos, conversaciones, objetivos, calendarios y entregables — para que tu equipo gestione el proyecto con mayor visibilidad y continuidad.",
+          },
+          operation_hub_secure: {
+            heading: "Operation Hub",
+            body: "Operation Hub le da a tu equipo un entorno seguro y protegido para compartir información sensible del proyecto y colaborar con confianza durante toda la expansión.",
+          },
+          the_hive: {
+            heading: "The Hive",
+            body: "The Hive te da acceso al ecosistema curado de proveedores locales de confianza de beeside — emparejados con las capacidades que tu proyecto requiere, para que no tengas que buscarlos y evaluarlos por tu cuenta.",
+          },
+          beeside_verified: {
+            heading: "beeside Verified",
+            body: "¿Ya tienes un proveedor en mente? beeside Verified puede evaluar sus capacidades, credenciales, presencia local y cumplimiento frente a los requisitos que definiste para este proyecto.",
+          },
+          strategic_advisory: {
+            heading: "Strategic Advisory",
+            body: "Algunas decisiones de expansión requieren más que coordinación. Strategic Advisory aporta experiencia enfocada en el tema específico — enmarcando la pregunta, evaluando las opciones y apoyando una decisión mejor informada.",
           },
         },
       },

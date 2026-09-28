@@ -10,28 +10,47 @@ import { PathwayDiagram } from "./PathwayDiagram";
 import { CapabilityLandscapeGrid } from "./CapabilityLandscapeGrid";
 import { PrecisionTransition } from "./PrecisionTransition";
 import { HowBeesideWorks } from "./HowBeesideWorks";
+import { ValueBridges } from "./ValueBridges";
 
 /**
  * VirtualSnapshot (Level 2 MVP §3): the narrative Virtual Snapshot — specific → general → specific →
- * action — assembling the storyboard beats built across this build-order phase:
- *   1. Opening (OpeningRecap)              5. Your Initial Path (PathwayDiagram)
- *   2. The Big Picture (RadarProfile)       6. Capability Landscape (CapabilityLandscapeGrid)
- *   3. What Stands Out (StandOutPanels)     7. What to Expect in Precision (PrecisionTransition)
- *   4. What Matters Now (PriorityList)      8. How beeside Works With You (HowBeesideWorks)
- * Beat 9, the Final CTA, is intentionally NOT rendered here — the caller (SnapshotScreen) renders
+ * action — assembling the storyboard beats built across this build-order phase.
+ *
+ * Section order (Macroblock 7, Snapshot Runtime Convergence + Final Gap Closure, 2026-09-28): aligned
+ * to the frozen Snapshot's own macro-flow (`snapshot_etapa4_FROZEN_v8-night-shift.html`) wherever this
+ * runtime already has the equivalent, already-approved content:
+ *   1. Opening (OpeningRecap)                          — frozen "project-profile"
+ *   2. Dual Expansion Profile (RadarProfile)            — frozen "radar" (now both series, both views)
+ *   3. Key Reading                                      — frozen "key-reading" (Narrative Interpretation
+ *      Library, deterministic/rule-based — see narrative-interpretation.ts)
+ *   4. What Matters Now (PriorityList)                  — frozen "what-matters"
+ *   5. Market Evidence narrative                        — frozen "market-evidence" (same library)
+ *   6. Capability Landscape (CapabilityLandscapeGrid)   — frozen "capability-footprint"
+ *   7. Your Initial Path (PathwayDiagram)               — frozen "project-path"
+ *   8. Execution Pressure narrative                     — frozen "execution-pressure" (same library)
+ *   9. What Stands Out (StandOutPanels)                 — frozen "what-deserves-definition"
+ *  10. Next decisions (reconcile/priority/decision/oneThing cards) — frozen "next-decisions"
+ *  11. What to Expect in Precision (PrecisionTransition) — frozen "precision-transition"
+ *  12. How beeside Works With You (HowBeesideWorks)      — general "how it works" context, kept as-is
+ *  13. Value Bridges (ValueBridges)                      — frozen "beeside-value" (selective form; see
+ *      ValueBridges.tsx's docblock for why this deliberately isn't the frozen mockup's fixed 4-pillar
+ *      block plus comparison table — that block is Premium-activation content in `PremiumTransition`,
+ *      a distinct, pre-existing, coexisting concept, out of this macroblock's scope)
+ * The Final CTA is intentionally NOT rendered here — the caller (SnapshotScreen) renders
  * PremiumTransition as a sibling afterward, exactly as before, so this component owns the story only.
+ *
+ * Key Reading / Market Evidence / Execution Pressure (Macroblock 7 — Final Gap Closure) render only
+ * when the narrative engine returns text (it always does in practice — every branch, including the
+ * "not enough data yet" ones, has approved copy) — never a raw radar/track number restated as prose.
  *
  * Replaces ExpansionSnapshot's role for the respondent-facing SnapshotScreen. ExpansionSnapshot.tsx
  * itself is untouched and stays in use by the admin Control Center's reviewer preview (AdminApp.tsx) —
  * a separate, internal-facing view this change does not touch.
  *
- * `immediatePriority`, `reconcile`, `decisionAhead` and `oneThing` are richer, narrower cuts of facts
- * that are also carried by the beats above (the client's own declared priority, the rules engine's
- * findings) or that add specific color between beats; each is folded into the beat it belongs to
- * rather than given its own dashboard card. `capabilities` (rules-engine category recommendations,
- * distinct from the client's own declared Capability Landscape) is deliberately left unrendered here,
- * the same way the radar sat unrendered before its own beat existed — surfacing it risks reading as a
- * provider/purchase recommendation, which Level 2 MVP explicitly reserves against for this screen.
+ * `capabilities` (rules-engine category recommendations, distinct from the client's own declared
+ * Capability Landscape) is deliberately left unrendered here, the same way the radar sat unrendered
+ * before its own beat existed — surfacing it risks reading as a provider/purchase recommendation,
+ * which Level 2 MVP explicitly reserves against for this screen.
  */
 export function VirtualSnapshot({
   snapshot,
@@ -67,46 +86,74 @@ export function VirtualSnapshot({
         t={t}
       />
 
-      <RadarProfile dimensions={view.expansionProfile} t={t} />
+      <RadarProfile dimensions={view.expansionProfile} dualProfile={view.dualProfile} t={t} />
 
-      <StandOutPanels counts={view.counts} panels={view.panels} t={t} />
-
-      {view.reconcile && (
-        <section className="snapshot-card reconcile-card" aria-labelledby="snapshot-reconcile">
-          <h2 className="card-title" id="snapshot-reconcile">
-            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span>{view.reconcile.title}</span>
+      {view.keyReading && (
+        <section className="snapshot-section key-reading-section" aria-labelledby="key-reading-title">
+          <h2 className="section-title" id="key-reading-title">
+            {t("virtual_snapshot", "key_reading_title")}
           </h2>
-          <p>{view.reconcile.text}</p>
+          <p className="lead">{view.keyReading}</p>
         </section>
       )}
 
-      {view.immediatePriority && (
-        <section className="snapshot-card priority-card" aria-labelledby="snapshot-priority">
-          <h2 className="card-title" id="snapshot-priority">
-            {view.immediatePriority.title}
-          </h2>
-          <p className="priority-value">{view.immediatePriority.value}</p>
-          {view.immediatePriority.timing && <p className="helper">{view.immediatePriority.timing}</p>}
-          {view.immediatePriority.reason && <blockquote className="verbatim">“{view.immediatePriority.reason}”</blockquote>}
-        </section>
-      )}
       {view.needsPriorities && <PriorityList priorities={view.needsPriorities} />}
 
-      {view.pathway && <PathwayDiagram pathway={view.pathway} t={t} />}
+      {view.marketEvidenceNarrative && (
+        <section className="snapshot-section market-evidence-section" aria-labelledby="market-evidence-title">
+          <h2 className="section-title" id="market-evidence-title">
+            {t("virtual_snapshot", "market_evidence_title")}
+          </h2>
+          <p className="helper">{view.marketEvidenceNarrative}</p>
+        </section>
+      )}
 
       {view.needsLandscape && <CapabilityLandscapeGrid landscape={view.needsLandscape} />}
 
-      {(view.decisionAhead || view.oneThing) && (
+      {view.pathway && <PathwayDiagram pathway={view.pathway} t={t} />}
+
+      {view.executionPressureNarrative && (
+        <section className="snapshot-section execution-pressure-section" aria-labelledby="execution-pressure-title">
+          <h2 className="section-title" id="execution-pressure-title">
+            {t("virtual_snapshot", "execution_pressure_title")}
+          </h2>
+          <p className="helper">{view.executionPressureNarrative}</p>
+        </section>
+      )}
+
+      <StandOutPanels counts={view.counts} panels={view.panels} t={t} />
+
+      {(view.reconcile || view.immediatePriority || view.decisionAhead || view.oneThing) && (
         <div className="snapshot-context">
+          {view.reconcile && (
+            <section className="snapshot-card reconcile-card" aria-labelledby="snapshot-reconcile">
+              <h2 className="card-title" id="snapshot-reconcile">
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span>{view.reconcile.title}</span>
+              </h2>
+              <p>{view.reconcile.text}</p>
+            </section>
+          )}
+
+          {view.immediatePriority && (
+            <section className="snapshot-card priority-card" aria-labelledby="snapshot-priority">
+              <h2 className="card-title" id="snapshot-priority">
+                {view.immediatePriority.title}
+              </h2>
+              <p className="priority-value">{view.immediatePriority.value}</p>
+              {view.immediatePriority.timing && <p className="helper">{view.immediatePriority.timing}</p>}
+              {view.immediatePriority.reason && <blockquote className="verbatim">“{view.immediatePriority.reason}”</blockquote>}
+            </section>
+          )}
+
           {view.decisionAhead && (
             <section className="snapshot-card" aria-labelledby="snapshot-decision">
               <h2 className="card-title" id="snapshot-decision">
@@ -128,6 +175,7 @@ export function VirtualSnapshot({
 
       <PrecisionTransition t={t} />
       <HowBeesideWorks t={t} />
+      <ValueBridges bridges={view.valueBridges} />
 
       <footer className="snapshot-disclosure">
         <h2 className="card-title">{view.disclosure.title}</h2>

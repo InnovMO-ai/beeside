@@ -153,16 +153,31 @@ export interface PremiumActivationResult {
 /** Client Expansion Snapshot as generated at completion (immutable; both locales pre-rendered). */
 export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 
+/** Execution Demand tier vocabulary (Macroblock 7) — deliberately distinct from Definition & Evidence's
+ *  `well_defined`/`partially_defined`/`early_stage` tiers so the two series are never visually conflated
+ *  into one scale. Mirrors backend/src/fa/engine/execution-demand.ts's `ExecutionDemandTier`. */
+export type ExecutionDemandTier = "low" | "low_medium" | "medium" | "medium_high" | "high";
+
+/** Execution Demand for one Expansion Profile dimension — the frozen artifact's second dumbbell/radar
+ *  series (`.marker.dem` / `.radar-dem`). `null` (absent, via `RenderedExpansionDimension.demand`)
+ *  means NOT_EVALUABLE — the axis genuinely has no defensible signal, never rendered as zero. */
+export interface RenderedExecutionDemand {
+  value: number;
+  tier: ExecutionDemandTier;
+  tierLabel: string;
+}
+
 /**
  * One Expansion Profile radar axis (Macroblock 7 Snapshot Runtime Convergence taxonomy, 2026-09-28, superseding the prior
  * 2026-09-17 set — see backend/src/fa/engine/expansion-profile.ts). Mirrors backend/src/snapshot/compose.ts's
  * RenderedExpansionDimension. `value` (0..1) is for radar-axis rendering only — never shown as a
  * number/percentage; `tierLabel` is the only qualitative wording meant to be displayed.
  *
- * Not yet rendered anywhere in the product (2026-09-17): ExpansionSnapshot.tsx below is the
- * pre-Level-2 interim Snapshot page and is intentionally left untouched here — the radar's real
- * home is the Virtual Snapshot ("The Big Picture" beat) and the PDF Snapshot, both still to be
- * built. This field exists on the wire today so those two builds have real data to consume.
+ * Dual Expansion Profile (Macroblock 7): `demand`/`demandNote` carry the second Execution Demand
+ * series alongside this dimension's existing Definition & Evidence value/tier — both series are
+ * rendered together (dumbbell track view + radar view), never one replacing the other. `demand` is
+ * `null` when the dimension's Execution Demand is NOT_EVALUABLE, in which case `demandNote` carries
+ * the one line of client-facing context for why (never silently omitted, never shown as zero).
  */
 export interface RenderedExpansionDimension {
   key: "market_evidence" | "commercial_ambition_differentiation" | "local_capability_base" | "governance_constraints" | "financial_framework" | "activation_planning";
@@ -171,6 +186,20 @@ export interface RenderedExpansionDimension {
   /** Stable, non-localized key (RadarProfile's CSS/icon hook) — never derive styling from `tierLabel`. */
   tier: "well_defined" | "partially_defined" | "early_stage";
   tierLabel: string;
+  demand: RenderedExecutionDemand | null;
+  demandNote: string | null;
+}
+
+/** Value Bridges ("beeside can help") — Macroblock 7, wiring the approved library
+ *  (`snapshot-etapa2-value-bridges-ronda-final.md`) into the live Snapshot. Mirrors
+ *  backend/src/snapshot/value-bridges.ts's `ValueBridgeKey`. */
+export type ValueBridgeKey = "strategic_advisory" | "operation_hub_secure" | "the_hive" | "beeside_verified" | "sherpa" | "operation_hub_productivity";
+
+export interface RenderedValueBridge {
+  key: ValueBridgeKey;
+  eyebrow: string;
+  heading: string;
+  body: string;
 }
 
 /** "What Matters Now" (Level 2 MVP §3.3). Declared order (index 0 = Immediate Priority) — never
@@ -215,6 +244,14 @@ export interface RenderedSnapshot {
   generatedOn: string;
   summary: string[];
   expansionProfile: RenderedExpansionDimension[];
+  /** Dual Expansion Profile section copy (Macroblock 7) — title/intro/series legend shared by both the
+   *  dumbbell track view and the radar view, both rendered together over `expansionProfile`. */
+  dualProfile: { title: string; intro: string; definitionLabel: string; demandLabel: string };
+  /** Narrative Interpretation Library (Macroblock 7 — Final Gap Closure) — deterministic, rule-based
+   *  copy; see backend narrative-interpretation.ts for the full ruleset. */
+  keyReading: string | null;
+  marketEvidenceNarrative: string | null;
+  executionPressureNarrative: string | null;
   facts: Array<{ key: "company" | "market" | "launch" | "priority"; label: string; value: string; detail: string | null }>;
   counts: Array<{ tone: SnapshotTone; label: string; count: number }>;
   panels: Array<{ tone: SnapshotTone; title: string; intro: string; items: Array<{ areaId: number; label: string; reason: string | null }> }>;
@@ -237,6 +274,9 @@ export interface RenderedSnapshot {
   } | null;
   pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; immediateLabel: string; blockerLabel: string; items: RenderedPathwayItem[] } | null;
   needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
+  /** Selective, contextual "beeside can help" microblocks (Macroblock 7) — at most 3, never one per
+   *  section, never the same institutional component twice; see value-bridges.ts for trigger logic. */
+  valueBridges: RenderedValueBridge[];
   disclosure: { title: string; text: string };
 }
 

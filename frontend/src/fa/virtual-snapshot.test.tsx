@@ -13,13 +13,33 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     generatedOn: "Generated on September 17, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
     expansionProfile: [
-      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
-      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
-      { key: "local_capability_base", label: "Local Capability Base", value: 0.2, tier: "early_stage", tierLabel: "Early stage" },
-      { key: "governance_constraints", label: "Governance & Constraints", value: 0, tier: "early_stage", tierLabel: "Early stage" },
-      { key: "financial_framework", label: "Financial Framework", value: 0.5, tier: "partially_defined", tierLabel: "Partially defined" },
-      { key: "activation_planning", label: "Activation Planning", value: 0.6, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined", demand: { value: 0.5, tier: "medium", tierLabel: "Medium" }, demandNote: null },
+      {
+        key: "commercial_ambition_differentiation",
+        label: "Commercial Ambition & Differentiation",
+        value: 0.4,
+        tier: "partially_defined",
+        tierLabel: "Partially defined",
+        demand: null,
+        demandNote: "There isn't yet a structured way to measure execution demand for this area — shown as not evaluable rather than assumed.",
+      },
+      { key: "local_capability_base", label: "Local Capability Base", value: 0.2, tier: "early_stage", tierLabel: "Early stage", demand: { value: 0.7, tier: "medium_high", tierLabel: "Medium–High" }, demandNote: null },
+      { key: "governance_constraints", label: "Governance & Constraints", value: 0, tier: "early_stage", tierLabel: "Early stage", demand: { value: 0.55, tier: "medium", tierLabel: "Medium" }, demandNote: null },
+      { key: "financial_framework", label: "Financial Framework", value: 0.5, tier: "partially_defined", tierLabel: "Partially defined", demand: { value: 0.82, tier: "high", tierLabel: "High" }, demandNote: null },
+      { key: "activation_planning", label: "Activation Planning", value: 0.6, tier: "partially_defined", tierLabel: "Partially defined", demand: { value: 0.52, tier: "medium", tierLabel: "Medium" }, demandNote: null },
     ],
+    dualProfile: {
+      title: "Definition & Evidence vs. Execution Demand",
+      intro: "See where your expansion plan is well defined and where execution will demand more from the business.",
+      definitionLabel: "Definition & Evidence",
+      demandLabel: "Execution Demand",
+    },
+    keyReading:
+      "Your expansion direction is clear, but execution will require coordinated work across several fronts. The challenge is not deciding where to go, but sequencing and activating the right capabilities.",
+    marketEvidenceNarrative:
+      "The target market is supported by a comparatively clear commercial rationale. The remaining work is primarily about validating and executing the chosen path.",
+    executionPressureNarrative:
+      "Execution pressure is concentrated primarily in financial_framework. This is the area most likely to require early coordination and specialist support.",
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },
       { key: "priority", label: "Your immediate priority", value: "Local entity & legal setup", detail: null },
@@ -60,6 +80,7 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
       intro: "Where things stand today across what you told us your project needs.",
       items: [{ key: "company_setup", label: "Company Setup", status: "covered_internally", statusLabel: "Covered internally" }],
     },
+    valueBridges: [],
     disclosure: { title: "About this Snapshot", text: "This initial interpretation is based on the information you shared with us." },
     ...overrides,
   };
@@ -81,30 +102,63 @@ afterEach(() => {
 });
 
 describe("VirtualSnapshot", () => {
-  it("assembles every beat in story order — Opening, Big Picture, What Stands Out, What Matters Now, Your Initial Path, Capability Landscape, Precision, How beeside Works", () => {
+  it("assembles every beat in the frozen-artifact-aligned story order (Macroblock 7): Opening, Dual Expansion Profile, Key Reading, What Matters Now, Market Evidence, Capability Landscape, Your Initial Path, Execution Pressure, What Stands Out, Precision, How beeside Works", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(<VirtualSnapshot snapshot={snapshotView(rendered())} locale="en" t={t} />);
 
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     const openingIndex = headings.indexOf("Your project");
-    const bigPictureIndex = headings.indexOf("The big picture");
-    const standOutIndex = headings.indexOf("What stands out");
+    const dualProfileIndex = headings.indexOf("Definition & Evidence vs. Execution Demand");
+    const keyReadingIndex = headings.indexOf("Key Reading");
     const mattersNowIndex = headings.indexOf("What matters now");
-    const pathIndex = headings.indexOf("Your initial path");
+    const marketEvidenceIndex = headings.indexOf("Market Evidence");
     const landscapeIndex = headings.indexOf("Capability landscape");
+    const pathIndex = headings.indexOf("Your initial path");
+    const executionPressureIndex = headings.indexOf("Execution Pressure");
+    const standOutIndex = headings.indexOf("What stands out");
     const precisionIndex = headings.indexOf("What to expect in Precision Assessment");
     const worksIndex = headings.indexOf("How beeside works with you");
 
-    for (const index of [openingIndex, bigPictureIndex, standOutIndex, mattersNowIndex, pathIndex, landscapeIndex, precisionIndex, worksIndex]) {
+    for (const index of [
+      openingIndex,
+      dualProfileIndex,
+      keyReadingIndex,
+      mattersNowIndex,
+      marketEvidenceIndex,
+      landscapeIndex,
+      pathIndex,
+      executionPressureIndex,
+      standOutIndex,
+      precisionIndex,
+      worksIndex,
+    ]) {
       expect(index).toBeGreaterThan(-1);
     }
-    expect(openingIndex).toBeLessThan(bigPictureIndex);
-    expect(bigPictureIndex).toBeLessThan(standOutIndex);
-    expect(standOutIndex).toBeLessThan(mattersNowIndex);
-    expect(mattersNowIndex).toBeLessThan(pathIndex);
-    expect(pathIndex).toBeLessThan(landscapeIndex);
-    expect(landscapeIndex).toBeLessThan(precisionIndex);
+    expect(openingIndex).toBeLessThan(dualProfileIndex);
+    expect(dualProfileIndex).toBeLessThan(keyReadingIndex);
+    expect(keyReadingIndex).toBeLessThan(mattersNowIndex);
+    expect(mattersNowIndex).toBeLessThan(marketEvidenceIndex);
+    expect(marketEvidenceIndex).toBeLessThan(landscapeIndex);
+    expect(landscapeIndex).toBeLessThan(pathIndex);
+    expect(pathIndex).toBeLessThan(executionPressureIndex);
+    expect(executionPressureIndex).toBeLessThan(standOutIndex);
+    expect(standOutIndex).toBeLessThan(precisionIndex);
     expect(precisionIndex).toBeLessThan(worksIndex);
+  });
+
+  it("hides Key Reading, Market Evidence narrative and Execution Pressure narrative sections when the compose layer returns null (e.g. insufficient data)", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(
+      <VirtualSnapshot
+        snapshot={snapshotView(rendered({ keyReading: null, marketEvidenceNarrative: null, executionPressureNarrative: null }))}
+        locale="en"
+        t={t}
+      />,
+    );
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).not.toContain("Key Reading");
+    expect(headings).not.toContain("Market Evidence");
+    expect(headings).not.toContain("Execution Pressure");
   });
 
   it("folds immediatePriority/reconcile/decisionAhead/oneThing into the story instead of a separate dashboard grid", () => {
@@ -126,5 +180,36 @@ describe("VirtualSnapshot", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(<VirtualSnapshot snapshot={snapshotView(rendered())} locale="en" t={t} />);
     expect(screen.getByText("About this Snapshot")).toBeInTheDocument();
+  });
+
+  it("renders no Value Bridges section when nothing triggered one", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(<VirtualSnapshot snapshot={snapshotView(rendered({ valueBridges: [] }))} locale="en" t={t} />);
+    expect(screen.queryByText("beeside can help")).not.toBeInTheDocument();
+  });
+
+  it("renders the triggered Value Bridges, each with its approved heading and body, placed after How beeside Works", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(
+      <VirtualSnapshot
+        snapshot={snapshotView(
+          rendered({
+            valueBridges: [
+              { key: "the_hive", eyebrow: "beeside can help", heading: "The Hive", body: "The Hive gives you access to beeside's curated ecosystem of trusted local providers." },
+              { key: "sherpa", eyebrow: "beeside can help", heading: "Your Sherpa", body: "Your Sherpa guides and coordinates the path to service activation." },
+            ],
+          }),
+        )}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText("The Hive")).toBeInTheDocument();
+    expect(screen.getByText("Your Sherpa")).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    const worksIndex = headings.indexOf("How beeside works with you");
+    const bridgesIndex = headings.indexOf("beeside can help");
+    expect(worksIndex).toBeGreaterThan(-1);
+    expect(bridgesIndex).toBeGreaterThan(worksIndex);
   });
 });

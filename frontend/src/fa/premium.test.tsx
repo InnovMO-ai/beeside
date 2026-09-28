@@ -144,9 +144,12 @@ describe("PremiumTransition", () => {
 
 describe("ResumeLink for a completed project", () => {
   const rendered: RenderedSnapshot = {
-    eyebrow: "Your Expansion Snapshot", headline: "Your project, in perspective.", generatedOn: "Generated on September 15, 2026", summary: [], expansionProfile: [], facts: [], counts: [], panels: [],
+    eyebrow: "Your Expansion Snapshot", headline: "Your project, in perspective.", generatedOn: "Generated on September 15, 2026", summary: [], expansionProfile: [],
+    dualProfile: { title: "Definition & Evidence vs. Execution Demand", intro: "", definitionLabel: "Definition & Evidence", demandLabel: "Execution Demand" },
+    keyReading: null, marketEvidenceNarrative: null, executionPressureNarrative: null,
+    facts: [], counts: [], panels: [],
     immediatePriority: null, reconcile: null, decisionAhead: null, shapePlan: null, oneThing: null, capabilities: null,
-    needsPriorities: null, pathway: null, needsLandscape: null,
+    needsPriorities: null, pathway: null, needsLandscape: null, valueBridges: [],
     disclosure: { title: "About this Snapshot", text: "Based on what you shared." },
   };
   const snapshotView: SnapshotView = {

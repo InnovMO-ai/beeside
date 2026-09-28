@@ -6,6 +6,12 @@
   --purple-900: #2e0879;
   --purple-600: #7357c1;
   --purple-200: #b9aedd;
+  /* Dual Expansion Profile (Macroblock 7): the ONE deliberate second accent, reserved exclusively
+     for the Execution Demand series so it never reads as the same signal as purple's Definition &
+     Evidence — the frozen Snapshot's own precedent (`--teal` there). #0f766e measures ~4.54:1
+     against white, meeting WCAG 1.4.3 for the tier-label text that uses it directly. */
+  --teal-700: #0f766e;
+  --teal-100: #ccece8;
   --ink: #17181b;
   --ink-soft: #54555c;
   /* Verified against its two actual usages (input/textarea/select border; the radar's
@@ -583,15 +589,35 @@ fieldset.question {
   stroke: var(--mist);
   stroke-width: 1;
 }
-.radar-shape {
+.radar-shape-definition {
   fill: var(--purple-600);
   fill-opacity: 0.22;
   stroke: var(--purple-900);
   stroke-width: 2;
   stroke-linejoin: round;
 }
-.radar-point {
+.radar-shape-demand {
+  fill: var(--teal-700);
+  fill-opacity: 0.16;
+  stroke: var(--teal-700);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+  stroke-linejoin: round;
+}
+.radar-point-definition {
   fill: var(--purple-900);
+}
+.radar-point-demand {
+  fill: var(--teal-700);
+}
+/* A dimension whose Execution Demand is NOT_EVALUABLE reuses its Definition & Evidence point's
+   coordinates for geometry only (see RadarProfile.tsx docblock) — this hollow/dashed treatment is
+   what visually marks that specific point as "no data", never a fabricated low score. */
+.radar-point-not-evaluable {
+  fill: var(--white);
+  stroke: var(--teal-700);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 1.5;
 }
 .radar-profile-legend {
   display: grid;
@@ -599,17 +625,15 @@ fieldset.question {
   margin: 0;
 }
 .radar-legend-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 1rem;
   border-bottom: 1px solid var(--mist);
   padding-bottom: 0.6rem;
 }
 .radar-legend-row dt {
   color: var(--ink);
-  flex: 1 1 auto;
-  min-width: 0;
+  grid-column: 1 / -1;
 }
 .radar-legend-row dd {
   margin: 0;
@@ -617,8 +641,7 @@ fieldset.question {
      row instead of clipping or forcing overflow. */
   font-weight: 600;
   text-align: right;
-  flex: 0 1 auto;
-  max-width: 55%;
+  grid-column: 2;
 }
 .radar-tier-early-stage {
   color: var(--ink-faint);
@@ -629,10 +652,159 @@ fieldset.question {
 .radar-tier-well-defined {
   color: var(--purple-900);
 }
+.radar-demand-tier-not-evaluable {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.radar-demand-tier-low {
+  color: var(--ink-faint);
+}
+.radar-demand-tier-low-medium,
+.radar-demand-tier-medium {
+  color: var(--teal-700);
+}
+.radar-demand-tier-medium-high,
+.radar-demand-tier-high {
+  color: var(--teal-700);
+  font-weight: 700;
+}
 @media (max-width: 640px) {
   .radar-profile-body {
     grid-template-columns: 1fr;
   }
+}
+
+/* Dual Expansion Profile — dumbbell "track" view (Macroblock 7). Rendered ABOVE the radar view, both
+   together, per the corrected frozen decision (never one replacing the other). Purely decorative
+   (aria-hidden) — the accessible content is the <dl> legend inside RadarProfile's radar-profile-body,
+   which already states both series' qualitative tiers in text. */
+.dual-profile-track {
+  display: grid;
+  gap: 1.5rem;
+}
+.dual-profile-legend {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.dual-profile-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dual-profile-legend-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dual-profile-legend-dot-definition {
+  background: var(--purple-600);
+}
+.dual-profile-legend-dot-demand {
+  background: var(--teal-700);
+}
+.dual-profile-row {
+  display: grid;
+  gap: 0.5rem;
+}
+.dual-profile-axis-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+.dual-profile-track-line {
+  position: relative;
+  height: 2.75rem;
+  background: var(--mist);
+  border-radius: 999px;
+}
+.dual-profile-connector {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  background: var(--ink-faint);
+  transform: translateY(-50%);
+}
+.dual-profile-marker {
+  position: absolute;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--white);
+}
+.dual-profile-marker-definition {
+  background: var(--purple-900);
+  z-index: 2;
+}
+.dual-profile-marker-demand {
+  background: var(--teal-700);
+  z-index: 1;
+}
+.dual-profile-marker-tag {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -2.1rem);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dual-profile-tag-definition {
+  color: var(--purple-900);
+}
+.dual-profile-tag-demand {
+  color: var(--teal-700);
+  transform: translate(-50%, 1.4rem);
+}
+.dual-profile-not-evaluable {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+.dual-profile-axis-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.dual-profile-scale-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+.dual-profile-radar-eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* Value Bridges — "beeside can help" (Macroblock 7). Selective, evidence-triggered microblocks, never
+   a purchase CTA — a restrained card grid, not a pricing/comparison layout. */
+.value-bridge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+.value-bridge-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  background: var(--mist);
+}
+.value-bridge-heading {
+  margin: 0 0 0.5rem;
+  color: var(--purple-900);
+  font-size: 1.05rem;
+}
+.value-bridge-body {
+  margin: 0;
+  color: var(--ink-soft);
 }
 .snapshot {
   display: grid;

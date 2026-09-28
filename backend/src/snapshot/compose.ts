@@ -2,12 +2,18 @@ import { getFieldDefinition } from "@beeside/canonical-fields";
 import { needsLeafLabel } from "../fa/content/needs-explorer-taxonomy";
 import type { Locale, QuestionBankBundle } from "../fa/engine/bundle-types";
 import { isAnswered } from "../fa/engine/conditions";
+import { EXECUTION_DEMAND_TIER_COPY, ExecutionDemandTier, NotEvaluableReason, scoreExecutionDemand } from "../fa/engine/execution-demand";
 import { EXPANSION_TIER_COPY, ExpansionDimensionScore, scoreExpansionProfile } from "../fa/engine/expansion-profile";
-import type { NeedsMapDependency, NeedsMapStatus, NeedsMapValue } from "../fa/engine/needs-map-types";
+import { pathwayDepths, PathwayStage, PATHWAY_STAGES } from "../fa/engine/needs-map-pathway";
+import type { NeedsMapStatus, NeedsMapValue } from "../fa/engine/needs-map-types";
 import { isNotSureValue } from "../fa/engine/values";
 import type { FindingResult, RulesEvaluation } from "../rules/engine";
 import type { RulesEngineBundle } from "../rules/types";
 import type { SnapshotTemplateBundle, SnapshotTemplateCopy } from "./template";
+import { computeValueBridgeKeys, ValueBridgeKey } from "./value-bridges";
+import { composeNarrativeInterpretation } from "../fa/engine/narrative-interpretation";
+
+export type { PathwayStage };
 
 /**
  * Deterministic assembly of the two frozen records generated at COMPLETED_LOCKED:
@@ -42,17 +48,36 @@ type PanelStatus = "DEFINED" | "NEEDS_ATTENTION" | "CRITICAL_GAP";
 export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 const TONE: Record<PanelStatus, SnapshotTone> = { DEFINED: "well_defined", NEEDS_ATTENTION: "needs_attention", CRITICAL_GAP: "resolve_early" };
 
+/** One "Definition & Evidence" reading of Execution Demand for the same axis — `null` when the
+ *  dimension is NOT_EVALUABLE (see `demandNote` on the parent for why). Same "never a raw number to
+ *  the client" discipline as `RenderedExpansionDimension.value`; `tierLabel` uses a deliberately
+ *  different five-point vocabulary (Low…High) from Definition & Evidence's three-tier copy, matching
+ *  the frozen artifact's own two-legend dumbbell/radar design. */
+export interface RenderedExecutionDemand {
+  value: number;
+  tier: ExecutionDemandTier;
+  tierLabel: string;
+}
+
 /** One radar axis, fully localized and ready to render — no raw field-level detail (Sherpa-only, see
  *  composeInternalAssessment's `expansion_profile`). `value` is internal (0..1), used only to place
  *  the axis point — never rendered as a number/percentage. `tier` is a stable, non-localized key (for
  *  a CSS/icon hook, same pattern as `SnapshotTone`'s `tone`); `tierLabel` is the qualitative wording
- *  meant to be shown next to/instead of the axis. */
+ *  meant to be shown next to/instead of the axis.
+ *
+ * `demand` (Macroblock 7, Snapshot Runtime Convergence) is this same axis's second Dual Expansion
+ * Profile series — Execution Demand, `execution-demand.ts` — plotted as the frozen artifact's second
+ * dumbbell marker / second radar polygon. `null` exactly when that dimension is NOT_EVALUABLE, in
+ * which case `demandNote` carries the one line of client-facing context the frozen artifact's own
+ * axis note pattern uses (e.g. Activation Planning's "depends on Project Path (Q13) data"). */
 export interface RenderedExpansionDimension {
   key: ExpansionDimensionScore["key"];
   label: string;
   value: number;
   tier: ExpansionDimensionScore["tier"];
   tierLabel: string;
+  demand: RenderedExecutionDemand | null;
+  demandNote: string | null;
 }
 
 /** "What Matters Now" (§3.3): declared order (index 0 = Immediate Priority). Never reordered by
@@ -69,13 +94,11 @@ export interface RenderedNeedsPriority {
   approvalFrom: string | null;
 }
 
-/** One of the four PathwayDiagram stages (§3.4). Not a rigid methodology — a deterministic bucket by
- *  dependency depth over the client's own declared `fa.needs.map` dependency graph: items with no
- *  unresolved prerequisite are NOW, one prerequisite deep is DEFINE, two is ENABLE, three or more (or
- *  a cyclical/unresolvable chain) is LAUNCH. Items sharing a stage are parallel paths, not a forced
- *  serial sequence. */
-export type PathwayStage = "now" | "define" | "enable" | "launch";
-
+/** `PathwayStage` (one of the four PathwayDiagram stages, §3.4) is now defined in
+ *  `../fa/engine/needs-map-pathway.ts` — Macroblock 7 moved it there, alongside `pathwayDepths()`,
+ *  so the Activation Planning Execution Demand formula can reuse the exact same dependency-depth
+ *  computation this file's Pathway diagram already used, instead of re-deriving it. Re-exported
+ *  above (`export type { PathwayStage }`) so nothing importing it from this module breaks. */
 export interface RenderedPathwayItem {
   key: string;
   label: string;
@@ -95,6 +118,16 @@ export interface RenderedNeedsLandscapeItem {
   statusLabel: string;
 }
 
+/** "Beeside can help" — one Value Bridge microblock (approved library, `value-bridges.ts`). `key` is
+ *  a stable, non-localized hook (icon/analytics); `eyebrow`/`heading`/`body` are the only wording
+ *  meant to be shown, verbatim from the approved copy table — never generated, never a purchase CTA. */
+export interface RenderedValueBridge {
+  key: ValueBridgeKey;
+  eyebrow: string;
+  heading: string;
+  body: string;
+}
+
 export interface RenderedSnapshot {
   eyebrow: string;
   headline: string;
@@ -103,6 +136,18 @@ export interface RenderedSnapshot {
   /** The six-dimension Expansion Profile radar (owner-approved final taxonomy, 2026-09-17). Fixed
    *  order — see EXPANSION_PROFILE_DIMENSIONS in expansion-profile.ts. */
   expansionProfile: RenderedExpansionDimension[];
+  /** Dual Expansion Profile section copy (Macroblock 7) — title/intro/series legend shared by both
+   *  the dumbbell track view and the radar view, both rendered together over `expansionProfile`. */
+  dualProfile: { title: string; intro: string; definitionLabel: string; demandLabel: string };
+  /** Narrative Interpretation Library (Macroblock 7 — Final Gap Closure), deterministic and
+   *  rule-based — see narrative-interpretation.ts. `null` only when too few Execution Demand
+   *  dimensions are evaluable to support the corresponding pattern (each field's own not-enough-data
+   *  branch is still a real, approved sentence in that case — see that file — so in practice these
+   *  are non-null far more often than null; kept nullable only to mirror the rest of this interface's
+   *  own-null-when-absent convention). */
+  keyReading: string | null;
+  marketEvidenceNarrative: string | null;
+  executionPressureNarrative: string | null;
   facts: Array<{ key: "company" | "market" | "launch" | "priority"; label: string; value: string; detail: string | null }>;
   counts: Array<{ tone: SnapshotTone; label: string; count: number }>;
   panels: Array<{ tone: SnapshotTone; title: string; intro: string; items: Array<{ areaId: number; label: string; reason: string | null }> }>;
@@ -131,6 +176,10 @@ export interface RenderedSnapshot {
   pathway: { title: string; intro: string; stageLabels: Record<PathwayStage, string>; immediateLabel: string; blockerLabel: string; items: RenderedPathwayItem[] } | null;
   /** null when no needs were selected at all. */
   needsLandscape: { title: string; intro: string; items: RenderedNeedsLandscapeItem[] } | null;
+  /** At most 3 (Etapa 2 approved library, `snapshot-etapa2-value-bridges-ronda-final.md`), each
+   *  triggered by real structured evidence — never one per section, never the same institutional
+   *  component shown twice. Empty array when nothing in this project's answers triggers one. */
+  valueBridges: RenderedValueBridge[];
   disclosure: { title: string; text: string };
 }
 
@@ -248,38 +297,6 @@ function areaFor(rules: RulesEngineBundle, areaId: number) {
 
 const needsLabel = (key: string, locale: Locale): string => needsLeafLabel(key, locale) ?? key;
 
-const PATHWAY_STAGES: readonly PathwayStage[] = ["now", "define", "enable", "launch"];
-
-/**
- * Dependency depth over the client's own declared graph, scoped to `priorityRank` (dependencies on
- * an item outside the prioritized set — already excluded by the Needs Explorer's own guided flow —
- * are treated as "no prerequisite", i.e. depth 0). A cycle (should not occur given the guided UI, but
- * defended against here since this must stay a pure, always-terminating function) parks every member
- * of the cycle at the deepest stage rather than looping forever.
- */
-function pathwayDepths(priorityRank: readonly string[], dependencies: readonly NeedsMapDependency[]): Map<string, number> {
-  const dependsOn = new Map(dependencies.map((d) => [d.key, d.dependsOn]));
-  const ranked = new Set(priorityRank);
-  const depth = new Map<string, number>();
-  const inProgress = new Set<string>();
-  const maxDepth = PATHWAY_STAGES.length - 1;
-
-  function depthOf(key: string): number {
-    const cached = depth.get(key);
-    if (cached !== undefined) return cached;
-    if (inProgress.has(key)) return maxDepth; // cycle: unresolved chain lands in the last stage
-    inProgress.add(key);
-    const parent = dependsOn.get(key) ?? null;
-    const resolved = parent && ranked.has(parent) && parent !== key ? Math.min(depthOf(parent) + 1, maxDepth) : 0;
-    inProgress.delete(key);
-    depth.set(key, resolved);
-    return resolved;
-  }
-
-  for (const key of priorityRank) depthOf(key);
-  return depth;
-}
-
 function computeNeedsPriorities(needs: NeedsMapValue | undefined, locale: Locale, copy: SnapshotTemplateCopy): RenderedSnapshot["needsPriorities"] {
   if (!needs || needs.priorityRank.length === 0) return null;
   const byKey = new Map(needs.dependencies.map((d) => [d.key, d]));
@@ -358,20 +375,60 @@ function computeNeedsLandscape(needs: NeedsMapValue | undefined, locale: Locale,
   return { title: copy.needs_landscape_title, intro: copy.needs_landscape_intro, items };
 }
 
+/** Stable key → template copy key, for the one line of client-facing context shown when a dimension's
+ *  Execution Demand is NOT_EVALUABLE (frozen artifact's own axis-note pattern, e.g. Activation
+ *  Planning's "depends on Project Path (Q13) data"). */
+const DEMAND_NOTE_COPY: Record<NotEvaluableReason, keyof SnapshotTemplateCopy> = {
+  no_defensible_signal: "demand_note_no_defensible_signal",
+  project_path_not_confirmed: "demand_note_project_path_not_confirmed",
+  insufficient_evidence: "demand_note_insufficient_evidence",
+  not_applicable: "demand_note_not_applicable",
+};
+
 function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
   const { answers, questionBank: qb, rules, template, evaluation } = input;
   const copy = template.copy[locale];
   const phrases = template.phrases.copy[locale];
   const findings = new Map(evaluation.findings.map((f) => [f.areaId, f]));
 
-  // ---- Expansion Profile radar (six-dimension "degree of definition", owner-approved 2026-09-17).
-  const expansionProfile: RenderedExpansionDimension[] = scoreExpansionProfile(answers, input.applicableFieldKeys).map((d) => ({
-    key: d.key,
-    label: d.label[locale],
-    value: d.value,
-    tier: d.tier,
-    tierLabel: EXPANSION_TIER_COPY[d.tier][locale],
-  }));
+  // ---- Needs Landscape (fa.needs.map) is read here, once, so both the Execution Demand formula
+  // below (Activation Planning) and the Needs Landscape/Pathway/Priorities blocks further down share
+  // the same parsed value.
+  const needsMap = answers.get("fa.needs.map") as NeedsMapValue | undefined;
+
+  // ---- Dual Expansion Profile: Definition & Evidence (owner-approved taxonomy, 2026-09-17) plus its
+  // Execution Demand series (Macroblock 7, approved methodology — see execution-demand.ts's own
+  // docblock for the governing documents). Same six dimensions, same fixed order, zipped by key.
+  const demandByKey = new Map(scoreExecutionDemand(answers, input.applicableFieldKeys, needsMap).map((d) => [d.key, d]));
+  const expansionScores = scoreExpansionProfile(answers, input.applicableFieldKeys);
+  const expansionProfile: RenderedExpansionDimension[] = expansionScores.map((d) => {
+    const demand = demandByKey.get(d.key);
+    const demandRendered: RenderedExecutionDemand | null =
+      demand && demand.value !== null ? { value: demand.value, tier: demand.tier as ExecutionDemandTier, tierLabel: EXECUTION_DEMAND_TIER_COPY[demand.tier as ExecutionDemandTier][locale] } : null;
+    return {
+      key: d.key,
+      label: d.label[locale],
+      value: d.value,
+      tier: d.tier,
+      tierLabel: EXPANSION_TIER_COPY[d.tier][locale],
+      demand: demandRendered,
+      demandNote: demand && demand.notEvaluableReason ? copy[DEMAND_NOTE_COPY[demand.notEvaluableReason]] : null,
+    };
+  });
+
+  const dualProfile = {
+    title: copy.dual_profile_title,
+    intro: copy.dual_profile_intro,
+    definitionLabel: copy.definition_series_label,
+    demandLabel: copy.demand_series_label,
+  };
+
+  // ---- Narrative Interpretation Library (Macroblock 7 — Final Gap Closure): Key Reading, the Market
+  // Evidence narrative, and the Execution Pressure narrative — deterministic, rule-based, every
+  // sentence Product-Owner-approved verbatim. See narrative-interpretation.ts for the full ruleset.
+  const marketEvidenceScore = expansionScores.find((d) => d.key === "market_evidence");
+  const marketEvidenceNotApplicable = (marketEvidenceScore?.applicableFieldCount ?? 0) === 0;
+  const { keyReading, marketEvidenceNarrative, executionPressureNarrative } = composeNarrativeInterpretation(expansionProfile, marketEvidenceNotApplicable, locale);
 
   // ---- Header summary (Appendix C {{project_summary}}), with graceful omission.
   const summary: string[] = [];
@@ -459,10 +516,18 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
 
   // ---- Needs Landscape (fa.needs.map): declared priority order, dependency-derived pathway, and the
   // full coverage-status grid, always kept as separate facts (Ranking & Dependency Interaction).
-  const needsMap = answers.get("fa.needs.map") as NeedsMapValue | undefined;
   const needsPriorities = computeNeedsPriorities(needsMap, locale, copy);
   const pathway = computePathway(needsMap, locale, copy);
   const needsLandscape = computeNeedsLandscape(needsMap, locale, copy);
+
+  // ---- Value Bridges ("beeside can help"): at most 3, each triggered by real structured evidence —
+  // see value-bridges.ts for the approved-copy-to-trigger mapping and its documented reasoning.
+  const valueBridges: RenderedValueBridge[] = computeValueBridgeKeys({ answers, needsMap }).map((key) => ({
+    key,
+    eyebrow: copy.value_bridge_eyebrow,
+    heading: template.valueBridges.copy[locale][key].heading,
+    body: template.valueBridges.copy[locale][key].body,
+  }));
 
   return {
     eyebrow: copy.eyebrow,
@@ -470,6 +535,10 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
     generatedOn: fill(copy.generated_on, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeZone: "UTC" }).format(input.generatedAt) }),
     summary,
     expansionProfile,
+    dualProfile,
+    keyReading,
+    marketEvidenceNarrative,
+    executionPressureNarrative,
     facts,
     counts,
     panels,
@@ -482,6 +551,7 @@ function renderLocale(input: ComposeInput, locale: Locale): RenderedSnapshot {
     needsPriorities,
     pathway,
     needsLandscape,
+    valueBridges,
     disclosure: { title: copy.disclosure_title, text: copy.disclosure },
   };
 }

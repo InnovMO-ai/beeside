@@ -35,15 +35,19 @@ import { isNotSureValue } from "./values";
  *
  * KNOWN, DISCLOSED SCOPE LIMITS OF THIS CONVERGENCE PASS (flagged, not silently absorbed —
  * reported to the Product Owner alongside this change):
- *   - This scores ONE series per dimension ("Definition & Evidence") using the same proven
- *     defined/applicable ratio method the prior taxonomy used. The frozen Snapshot's dumbbell and
- *     radar both plot a SECOND series per axis ("Execution Demand" — how much execution burden the
- *     respondent's declared scope implies). That second series requires a weighted-aggregation
- *     formula that a prior Etapa 2 methodology review (2026-09-24) found still open on several
- *     material points (ordinal-value validity per field, a documented investment_range double-count
- *     across dimensions, no minimum-evaluable threshold) and that was never subsequently finalized.
- *     Rather than invent that formula unilaterally, it is not implemented here — see the Macroblock
- *     7 report for the explicit decision this blocks.
+ *   - This module scores only the "Definition & Evidence" series (defined/applicable ratio). The
+ *     frozen Snapshot's dumbbell and radar also plot a SECOND series per axis — "Execution Demand"
+ *     (how much execution burden the respondent's declared scope implies) — approved by the Product
+ *     Owner in the Macroblock 7 Execution Demand methodology addendum (2026-09-28) after the open
+ *     points flagged in the 2026-09-24 Etapa 2 review (ordinal-value validity per field, the
+ *     investment_range double-count risk, no minimum-evaluable threshold) were resolved: unweighted
+ *     averaging, shared applicability/not-sure-exclusion rules, mechanical minimum-evaluable
+ *     thresholds per dimension, and investment_range confined to exactly one dimension (Financial
+ *     Framework). That series is implemented separately in `execution-demand.ts`
+ *     (`scoreExecutionDemand`) rather than in this file, and composed alongside this module's output
+ *     in `snapshot/compose.ts` — kept as a distinct module because it is a genuinely different
+ *     scoring concept (execution burden, not definition completeness) with its own NOT_EVALUABLE
+ *     reasons, not a variant of this file's method.
  *   - Commercial Ambition & Differentiation has no canonical field for "differentiators" yet
  *     (fa.* registry checked directly, 2026-09-28) — the axis is scored from success-objective and
  *     expansion-driver evidence only, documented as a partial-fidelity axis.
