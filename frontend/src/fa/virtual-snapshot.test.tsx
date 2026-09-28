@@ -13,12 +13,12 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     generatedOn: "Generated on September 17, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
     expansionProfile: [
-      { key: "market_customer_clarity", label: "Market & Customer Clarity", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
-      { key: "commercial_validation", label: "Commercial Validation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
-      { key: "operating_model_definition", label: "Operating Model Definition", value: 0.2, tier: "early_stage", tierLabel: "Early stage" },
-      { key: "regulatory_compliance_definition", label: "Regulatory & Compliance Definition", value: 0, tier: "early_stage", tierLabel: "Early stage" },
-      { key: "local_ecosystem_capabilities", label: "Local Ecosystem & Capabilities", value: 0.5, tier: "partially_defined", tierLabel: "Partially defined" },
-      { key: "execution_preparedness", label: "Execution Preparedness", value: 0.6, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
+      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "local_capability_base", label: "Local Capability Base", value: 0.2, tier: "early_stage", tierLabel: "Early stage" },
+      { key: "governance_constraints", label: "Governance & Constraints", value: 0, tier: "early_stage", tierLabel: "Early stage" },
+      { key: "financial_framework", label: "Financial Framework", value: 0.5, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "activation_planning", label: "Activation Planning", value: 0.6, tier: "partially_defined", tierLabel: "Partially defined" },
     ],
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },

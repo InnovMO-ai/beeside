@@ -272,17 +272,17 @@ describe("Internal beeside Assessment", () => {
   });
 });
 
-describe("Expansion Profile radar (owner-approved six-dimension taxonomy, 2026-09-17)", () => {
+describe("Expansion Profile radar (Macroblock 7 six-dimension taxonomy, 2026-09-28)", () => {
   it("includes all six dimensions, in the fixed owner-approved order, on both the client Snapshot and Internal Assessment", () => {
     const { client, internal } = compose(MANUFACTURER);
     const expectedKeys = EXPANSION_PROFILE_DIMENSIONS.map((d) => d.key);
     expect(expectedKeys).toEqual([
-      "market_customer_clarity",
-      "commercial_validation",
-      "operating_model_definition",
-      "regulatory_compliance_definition",
-      "local_ecosystem_capabilities",
-      "execution_preparedness",
+      "market_evidence",
+      "commercial_ambition_differentiation",
+      "local_capability_base",
+      "governance_constraints",
+      "financial_framework",
+      "activation_planning",
     ]);
     expect(client.locales.en.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
     expect(client.locales.es.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
@@ -327,9 +327,9 @@ describe("Expansion Profile radar (owner-approved six-dimension taxonomy, 2026-0
     }
   });
 
-  it("gives a persona with concrete market/customer answers a higher Market & Customer Clarity value than a bare baseline", () => {
-    const withAnswers = compose(MANUFACTURER).internal.expansion_profile.find((d) => d.key === "market_customer_clarity")!.value;
-    const bare = compose({ S1: "leading" }).internal.expansion_profile.find((d) => d.key === "market_customer_clarity")!.value;
+  it("gives a persona with concrete market/customer answers a higher Market Evidence value than a bare baseline", () => {
+    const withAnswers = compose(MANUFACTURER).internal.expansion_profile.find((d) => d.key === "market_evidence")!.value;
+    const bare = compose({ S1: "leading" }).internal.expansion_profile.find((d) => d.key === "market_evidence")!.value;
     expect(withAnswers).toBeGreaterThan(bare);
   });
 

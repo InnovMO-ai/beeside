@@ -13,7 +13,7 @@ import { isAnswered } from "./conditions";
  *     sufficiently covered by `fa.goal.success_definition` (G2), and the respondent should not
  *     answer the same "what does success look like" question twice. Any downstream consumer that
  *     still reads `fa.strategic.commercial_success` (snapshot/compose.ts's strategic_prompts,
- *     fa/engine/expansion-profile.ts's commercial_validation dimension) is served a deterministic,
+ *     fa/engine/expansion-profile.ts's market_evidence dimension) is served a deterministic,
  *     verbatim copy of the respondent's own G2 answer — never a reworded or summarized version, and
  *     never a guess when G2 itself is unanswered.
  *   - `fa.goal.expansion_driver` (G6) is no longer a client-facing question — PR_DRIVER_STRUCTURED

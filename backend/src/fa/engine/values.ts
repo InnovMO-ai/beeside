@@ -13,7 +13,14 @@ const SHORT_TEXT_MAX = 200;
 const DEFAULT_COUNTRY_MAX = 30;
 const DEFAULT_TAG_MAX = 20;
 const DEFAULT_TAG_LENGTH_MAX = 200;
-const NOT_SURE_VALUES = new Set(["not_sure", "not_sure_required"]);
+const NOT_SURE_VALUES = new Set([
+  "not_sure",
+  "not_sure_required",
+  // fa.provider.investment_range only (unique value, checked 2026-09-28) — "financial framework not yet
+  // defined" is the same evidentiary signal as "not sure" for Expansion Profile scoring purposes
+  // (Macroblock 7, Financial Framework dimension): it must not count as answered/defined evidence.
+  "not_yet_defined",
+]);
 
 /**
  * Validates a submitted answer for a question and returns the canonical value to store.

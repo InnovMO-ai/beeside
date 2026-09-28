@@ -2,55 +2,71 @@ import { isAnswered } from "./conditions";
 import { isNotSureValue } from "./values";
 
 /**
- * Expansion Profile — the six-dimension radar of "degree of definition and supporting evidence
- * currently available" (owner-approved FINAL taxonomy, 2026-09-17, resolving the Design
- * Specification's own flagged open decision "Expansion Profile — six radar dimensions as a
- * permanent taxonomy"). Do not re-litigate the six dimension names/keys below — the owner was
- * explicit that this taxonomy is permanent and reused/validated again in Precision Assessment; the
- * per-dimension field mapping and scoring method ARE an internal, reversible implementation detail
- * and may be recalibrated later without a new approval gate.
+ * Expansion Profile — the six-dimension "degree of definition and supporting evidence currently
+ * available" axis set.
  *
- * Product meaning (owner's own words, verbatim, must not drift): these dimensions do NOT represent
- * probability of success, viability, pass/fail, investment attractiveness, or a customer-facing
- * readiness score. They represent how defined each area is and how much supporting evidence the
- * respondent has already provided for it. `value` below is a continuous 0..1 internal number,
- * useful for rendering a radar axis — it is never shown to the client as a percentage, a score, or
- * any pass/fail framing. `tier` is the only thing a customer-facing surface may render directly,
- * and even then only with qualitative, evidence-based wording (see the *_TIER copy at the bottom).
+ * MACROBLOCK 7 (Snapshot Runtime Convergence, 2026-09-28) SUPERSEDES the prior "owner-approved
+ * FINAL taxonomy, 2026-09-17" comment that used to sit here. Per the Product Owner's explicit
+ * Macroblock 7 governing decisions, cross-checked directly against the frozen Snapshot artifact
+ * (`snapshot_etapa4_FROZEN_v8-night-shift.html`), the six dimensions are renamed and remapped to:
+ * Market Evidence, Commercial Ambition & Differentiation, Local Capability Base, Governance &
+ * Constraints, Financial Framework, Activation Planning. This replaces the six dimensions this file
+ * previously called permanent (Market & Customer Clarity, Commercial Validation, Operating Model
+ * Definition, Regulatory & Compliance Definition, Local Ecosystem & Capabilities, Execution
+ * Preparedness) — Operating Model Definition in particular is retired outright (Macroblock 7
+ * decision #4), not renamed. Do not re-litigate this new set without going back to the Product
+ * Owner and the frozen Snapshot artifact — the same "do not silently redrift" discipline that
+ * governed the previous taxonomy now governs this one.
  *
- * Method: each dimension lists the canonical `fa.*` field_keys (shared/canonical-fields/src/fields.ts)
- * that carry its evidence, per the owner's own conceptual mapping (2026-09-17 message). A field
- * counts toward a dimension only when it is BOTH (a) applicable to this respondent's actual journey
- * — i.e. present in `applicableFieldKeys`, never merely "exists somewhere in the bundle" — and (b)
- * answered with a real, resolved value (`isAnswered` and not an explicit "not sure"). A field the
- * respondent was never even asked (conditionally inapplicable, or absent from an older/newer pinned
- * bundle version entirely) is excluded from that dimension's denominator rather than counted
- * against them — nobody is penalized for a question they were never shown. This mirrors the
- * "no-guessing, evidence-only" approach already used for the restricted-counterparties leak fix and
- * the legacy-capability adapter: only real, verifiable evidence moves the needle.
+ * Product meaning (unchanged, still must not drift): these dimensions do NOT represent probability
+ * of success, viability, pass/fail, investment attractiveness, or a customer-facing readiness
+ * score. They represent how defined each area is and how much supporting evidence the respondent
+ * has already provided for it. `value` below is a continuous 0..1 internal number, useful for
+ * rendering a radar axis — it is never shown to the client as a percentage, a score, or any
+ * pass/fail framing. `tier` is the only thing a customer-facing surface may render directly, and
+ * even then only with qualitative, evidence-based wording (see the *_TIER copy at the bottom).
  *
- * Known, disclosed scope limits of this first cut (non-blocking; flagged the same way
- * legacy-capability-adapter.ts flags its own gap, not silently):
- *   - `fa.needs.map`'s per-leaf selections/status and its dependency/blocker/approval structure are
- *     rich, directly relevant evidence for several dimensions (Local Ecosystem & Capabilities,
- *     Execution Preparedness in particular) but are NOT factored in here yet. Reason: an unselected
- *     leaf is genuinely ambiguous evidence (it can mean "not needed" or "didn't think of it"), and
- *     folding a composite, multi-shape field into a simple per-field completeness count would mean
- *     guessing at that distinction rather than measuring it. Left as a documented follow-up.
- *   - Regulatory & Compliance Definition has only two directly-mapped canonical fields
- *     (`fa.operation.regulated.permits_status` / `permits_which`) because First Assessment's
- *     canonical registry does not yet model tax/legal/certifications as separate fields from
- *     permits — that finer detail is deferred to Precision by design. Not a bug; documented so a
- *     future reviewer doesn't "fix" it by inventing fields that don't exist.
+ * Method (unchanged from the prior taxonomy, still an internal/reversible implementation detail):
+ * each dimension lists the canonical `fa.*` field_keys (shared/canonical-fields/src/fields.ts) that
+ * carry its evidence. A field counts toward a dimension only when it is BOTH (a) applicable to this
+ * respondent's actual journey — i.e. present in `applicableFieldKeys` — and (b) answered with a
+ * real, resolved value (`isAnswered` and not an explicit "not sure"). A field the respondent was
+ * never even asked is excluded from that dimension's denominator rather than counted against them.
+ *
+ * KNOWN, DISCLOSED SCOPE LIMITS OF THIS CONVERGENCE PASS (flagged, not silently absorbed —
+ * reported to the Product Owner alongside this change):
+ *   - This scores ONE series per dimension ("Definition & Evidence") using the same proven
+ *     defined/applicable ratio method the prior taxonomy used. The frozen Snapshot's dumbbell and
+ *     radar both plot a SECOND series per axis ("Execution Demand" — how much execution burden the
+ *     respondent's declared scope implies). That second series requires a weighted-aggregation
+ *     formula that a prior Etapa 2 methodology review (2026-09-24) found still open on several
+ *     material points (ordinal-value validity per field, a documented investment_range double-count
+ *     across dimensions, no minimum-evaluable threshold) and that was never subsequently finalized.
+ *     Rather than invent that formula unilaterally, it is not implemented here — see the Macroblock
+ *     7 report for the explicit decision this blocks.
+ *   - Commercial Ambition & Differentiation has no canonical field for "differentiators" yet
+ *     (fa.* registry checked directly, 2026-09-28) — the axis is scored from success-objective and
+ *     expansion-driver evidence only, documented as a partial-fidelity axis.
+ *   - Financial Framework has no canonical field for the qualitative APPROVED/ESTIMATED/IN
+ *     DEFINITION/NOT ANALYZED/PREFER NOT TO SHARE state model the Etapa 2 methodology specifies —
+ *     only `fa.provider.investment_range` exists, an amount-bucket field. Per the Product Owner's
+ *     own instruction that amount must never drive this axis's score, this dimension scores only
+ *     whether a financial reference was given at all (any bucket other than "not_yet_defined"
+ *     counts as defined), never which bucket. This is a documented proxy, not the full state model.
+ *   - Governance & Constraints now absorbs the non-negotiables/restricted-areas fields that used to
+ *     sit under Execution Preparedness (Activation Planning's predecessor), because the frozen
+ *     Snapshot's Value Bridge trigger rules (Operation Hub — secure) explicitly key off "Governance
+ *     & Constraints findings (non-negotiable areas, restrictions, compliance requirements)" —
+ *     confirmed in project doc snapshot-etapa2-value-bridges-ronda-final.md, 2026-09-24.
  */
 
 export type ExpansionDimensionKey =
-  | "market_customer_clarity"
-  | "commercial_validation"
-  | "operating_model_definition"
-  | "regulatory_compliance_definition"
-  | "local_ecosystem_capabilities"
-  | "execution_preparedness";
+  | "market_evidence"
+  | "commercial_ambition_differentiation"
+  | "local_capability_base"
+  | "governance_constraints"
+  | "financial_framework"
+  | "activation_planning";
 
 export interface ExpansionDimensionDef {
   key: ExpansionDimensionKey;
@@ -61,8 +77,8 @@ export interface ExpansionDimensionDef {
 
 export const EXPANSION_PROFILE_DIMENSIONS: readonly ExpansionDimensionDef[] = [
   {
-    key: "market_customer_clarity",
-    label: { en: "Market & Customer Clarity", es: "Claridad de Mercado y Cliente" },
+    key: "market_evidence",
+    label: { en: "Market Evidence", es: "Evidencia de Mercado" },
     fieldKeys: [
       "fa.project.destination_status",
       "fa.project.target_markets",
@@ -70,6 +86,8 @@ export const EXPANSION_PROFILE_DIMENSIONS: readonly ExpansionDimensionDef[] = [
       "fa.plan.first_customer_known",
       "fa.plan.first_customer_segment",
       "fa.plan.route_to_market",
+      "fa.plan.demand_evidence",
+      "fa.plan.competitive_landscape",
       "fa.business.customer_model",
       "fa.company.primary_business_model",
       "fa.company.business_models",
@@ -77,46 +95,19 @@ export const EXPANSION_PROFILE_DIMENSIONS: readonly ExpansionDimensionDef[] = [
     ],
   },
   {
-    key: "commercial_validation",
-    label: { en: "Commercial Validation", es: "Validación Comercial" },
+    key: "commercial_ambition_differentiation",
+    label: { en: "Commercial Ambition & Differentiation", es: "Ambición Comercial y Diferenciación" },
     fieldKeys: [
-      "fa.plan.demand_evidence",
-      "fa.plan.competitive_landscape",
-      "fa.plan.business_case",
-      "fa.constraints.has_customer_contract",
-      "fa.provider.investment_range",
+      "fa.goal.success_definition",
       "fa.strategic.commercial_success",
+      "fa.goal.expansion_driver",
+      "fa.project.primary_driver_structured",
+      "fa.plan.business_case",
     ],
   },
   {
-    key: "operating_model_definition",
-    label: { en: "Operating Model Definition", es: "Definición del Modelo Operativo" },
-    fieldKeys: [
-      "fa.project.entry_approach",
-      "fa.project.entry_approach_structured",
-      "fa.operation.components",
-      "fa.operation.facilities.facility_required",
-      "fa.operation.facilities.location_selected",
-      "fa.operation.warehousing.current_model",
-      "fa.operation.warehousing.local_expected",
-      "fa.operation.freight.frequency",
-      "fa.operation.freight.type",
-      "fa.operation.last_mile.local_expected",
-      "fa.operation.import_export.cross_border_expected",
-      "fa.operation.technology.critical_systems",
-      "fa.operation.technology.integration_expected",
-      "fa.operation.workforce.local_hiring_expected",
-      "fa.operation.workforce.first_year_headcount",
-    ],
-  },
-  {
-    key: "regulatory_compliance_definition",
-    label: { en: "Regulatory & Compliance Definition", es: "Definición Regulatoria y de Cumplimiento" },
-    fieldKeys: ["fa.operation.regulated.permits_status", "fa.operation.regulated.permits_which"],
-  },
-  {
-    key: "local_ecosystem_capabilities",
-    label: { en: "Local Ecosystem & Capabilities", es: "Ecosistema Local y Capacidades" },
+    key: "local_capability_base",
+    label: { en: "Local Capability Base", es: "Base de Capacidades Locales" },
     fieldKeys: [
       "fa.operation.partners.dependency",
       "fa.operation.partners.relationship_status",
@@ -130,8 +121,29 @@ export const EXPANSION_PROFILE_DIMENSIONS: readonly ExpansionDimensionDef[] = [
     ],
   },
   {
-    key: "execution_preparedness",
-    label: { en: "Execution Preparedness", es: "Preparación para la Ejecución" },
+    key: "governance_constraints",
+    label: { en: "Governance & Constraints", es: "Gobernanza y Restricciones" },
+    fieldKeys: [
+      "fa.operation.regulated.permits_status",
+      "fa.operation.regulated.permits_which",
+      "fa.constraints.non_negotiables",
+      "fa.constraints.non_negotiable_areas",
+      "fa.constraints.items",
+      "fa.constraints.critical",
+      "fa.provider.requires_language",
+      "fa.provider.required_language",
+      "fa.provider.requires_local_presence",
+      "fa.provider.required_presence_countries",
+    ],
+  },
+  {
+    key: "financial_framework",
+    label: { en: "Financial Framework", es: "Marco Financiero" },
+    fieldKeys: ["fa.provider.investment_range"],
+  },
+  {
+    key: "activation_planning",
+    label: { en: "Activation Planning", es: "Planeación de Activación" },
     fieldKeys: [
       "fa.project.next_decision",
       "fa.goal.launch_timing_status",
@@ -147,11 +159,7 @@ export const EXPANSION_PROFILE_DIMENSIONS: readonly ExpansionDimensionDef[] = [
       "fa.strategic.decided_vs_open",
       "fa.strategic.slowdown_concern",
       "fa.constraints.existing_commitments",
-      "fa.constraints.non_negotiables",
       "fa.constraints.commitment_areas",
-      "fa.constraints.non_negotiable_areas",
-      "fa.constraints.items",
-      "fa.constraints.critical",
       "fa.project.stop_go_criteria",
       "fa.project.primary_concern",
     ],

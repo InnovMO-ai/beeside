@@ -11,8 +11,8 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     generatedOn: "Generated on September 17, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
     expansionProfile: [
-      { key: "market_customer_clarity", label: "Market & Customer Clarity", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
-      { key: "commercial_validation", label: "Commercial Validation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
+      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined" },
+      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined" },
     ],
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },

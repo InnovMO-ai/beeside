@@ -154,8 +154,8 @@ export interface PremiumActivationResult {
 export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
 
 /**
- * One Expansion Profile radar axis (owner-approved final six-dimension taxonomy, 2026-09-17 — see
- * backend/src/fa/engine/expansion-profile.ts). Mirrors backend/src/snapshot/compose.ts's
+ * One Expansion Profile radar axis (Macroblock 7 Snapshot Runtime Convergence taxonomy, 2026-09-28, superseding the prior
+ * 2026-09-17 set — see backend/src/fa/engine/expansion-profile.ts). Mirrors backend/src/snapshot/compose.ts's
  * RenderedExpansionDimension. `value` (0..1) is for radar-axis rendering only — never shown as a
  * number/percentage; `tierLabel` is the only qualitative wording meant to be displayed.
  *
@@ -165,7 +165,7 @@ export type SnapshotTone = "well_defined" | "needs_attention" | "resolve_early";
  * built. This field exists on the wire today so those two builds have real data to consume.
  */
 export interface RenderedExpansionDimension {
-  key: "market_customer_clarity" | "commercial_validation" | "operating_model_definition" | "regulatory_compliance_definition" | "local_ecosystem_capabilities" | "execution_preparedness";
+  key: "market_evidence" | "commercial_ambition_differentiation" | "local_capability_base" | "governance_constraints" | "financial_framework" | "activation_planning";
   label: string;
   value: number;
   /** Stable, non-localized key (RadarProfile's CSS/icon hook) — never derive styling from `tierLabel`. */
