@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { RadarProfile } from "./components/RadarProfile";
 import { makeT } from "./copy";
@@ -53,8 +53,41 @@ describe("RadarProfile", () => {
   });
 
   it("shows a plain not-evaluable note in the track view instead of fabricating a demand marker", () => {
-    render(<RadarProfile dimensions={DIMENSIONS} dualProfile={DUAL_PROFILE} t={t} />);
-    expect(screen.getByText("Not yet evaluable")).toBeInTheDocument();
+    // Derived from the fixture rather than assumed — this must hold regardless of how many
+    // dimensions happen to be NOT_EVALUABLE (today exactly one, DIMENSIONS[1], but the assertion
+    // below never hardcodes that count). Scoped per-row so it verifies the actual track-view
+    // behavior for each NOT_EVALUABLE dimension, rather than counting a string that also, correctly,
+    // appears a second time in the separate accessible <dl> legend for the same dimension.
+    const { container } = render(<RadarProfile dimensions={DIMENSIONS} dualProfile={DUAL_PROFILE} t={t} />);
+    const notEvaluableDimensions = DIMENSIONS.filter((d) => d.demand === null);
+    expect(notEvaluableDimensions.length).toBeGreaterThan(0);
+
+    for (const d of notEvaluableDimensions) {
+      const axisLabel = screen.getByText(d.label, { selector: ".dual-profile-axis-label" });
+      const row = axisLabel.closest(".dual-profile-row");
+      if (!row) throw new Error(`no .dual-profile-row found for ${d.key}`);
+      const rowScope = within(row as HTMLElement);
+      // The plain not-evaluable note is present…
+      expect(rowScope.getByText("Not yet evaluable")).toBeInTheDocument();
+      // …and no Execution Demand marker or tag is fabricated for this row.
+      expect(row.querySelector(".dual-profile-marker-demand")).not.toBeInTheDocument();
+      expect(row.querySelector(".dual-profile-tag-demand")).not.toBeInTheDocument();
+    }
+
+    // Every dimension that DOES have Execution Demand gets exactly one real marker, never the
+    // not-evaluable note — the two treatments are mutually exclusive per row.
+    const evaluableDimensions = DIMENSIONS.filter((d) => d.demand !== null);
+    for (const d of evaluableDimensions) {
+      const axisLabel = screen.getByText(d.label, { selector: ".dual-profile-axis-label" });
+      const row = axisLabel.closest(".dual-profile-row");
+      if (!row) throw new Error(`no .dual-profile-row found for ${d.key}`);
+      expect(row.querySelector(".dual-profile-marker-demand")).toBeInTheDocument();
+      expect(within(row as HTMLElement).queryByText("Not yet evaluable")).not.toBeInTheDocument();
+    }
+
+    // Sanity check on the container as a whole: the total number of not-evaluable track notes
+    // matches the fixture's own count — not hardcoded to 1.
+    expect(container.querySelectorAll(".dual-profile-not-evaluable")).toHaveLength(notEvaluableDimensions.length);
   });
 
   it("hides the decorative track and chart from assistive tech and keeps the legend as the real accessible content", () => {
