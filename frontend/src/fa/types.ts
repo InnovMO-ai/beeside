@@ -173,9 +173,6 @@ export interface RenderedExpansionDimension {
   tierLabel: string;
 }
 
-/** Mirrors backend/src/fa/engine/needs-map-types.ts's NeedsMapStatus (never a purchase signal). */
-export type NeedsMapStatus = "covered_internally" | "covered_by_provider" | "in_progress" | "needs_resolution" | "needs_confirmation";
-
 /** "What Matters Now" (Level 2 MVP §3.3). Declared order (index 0 = Immediate Priority) — never
  *  reordered by dependency data; `dependsOnLabel`/`owner`/`approvalRequired` are shown alongside. */
 export interface RenderedNeedsPriority {
