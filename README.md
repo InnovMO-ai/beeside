@@ -86,6 +86,29 @@ npm run test
 
 Note: `npm install`/`npm ci` over a cloud-synced folder (e.g. iCloud Drive) is unreliable — large `node_modules` trees can hit spurious rename/rmdir errors from the sync engine mid-install. Prefer a local, non-synced clone (or a `node_modules`-excluded sync rule) for actually running the toolchain.
 
+### QA'ing a feature branch's frontend against Cloud Run dev's backend
+
+`deploy-dev.yml` only deploys to Cloud Run dev after CI passes **on `main`** (see CI/CD below), so a feature branch's frontend changes are never visible on the deployed dev frontend until it's merged. Merging just to QA a Snapshot/UI change is not the answer — instead, run the frontend locally, straight off the branch, against the real Cloud Run dev backend.
+
+The backend's origin guard (`backend/src/security/http-hardening.ts`) rejects any state-changing request whose `Origin` header isn't in that environment's `ALLOWED_ORIGINS` allow-list — by design, and this path does not change that guard, that allow-list, or any Cloud Run security policy. A local dev server's real browser Origin is `http://localhost:<port>`, which is correctly never on that list, so pointing the local frontend straight at the Cloud Run dev backend gets a 200 on GETs but a `403 ORIGIN_REJECTED` on anything state-changing.
+
+Two dev-only, opt-in environment variables on the Vite dev server close that gap, on the proxy side only, without touching the backend at all:
+
+- `VITE_DEV_API_TARGET` — the Cloud Run dev backend URL to proxy `/api` to (already supported).
+- `VITE_DEV_API_ORIGIN` — when set, the local dev proxy rewrites the outgoing `Origin` header (on requests to that target only) to this value, which must be the dev frontend origin already present in the backend's own `ALLOWED_ORIGINS`. A real browser can never set its own `Origin` header, so this only ever takes effect inside this local, explicitly-configured proxy — nothing here is reachable from `vite build` or the deployed app.
+
+Neither variable is required for normal local development: leave both unset and `npm run dev` proxies to a locally-running backend on `:8080` exactly as before.
+
+To QA the current branch's frontend against Cloud Run dev:
+
+```
+VITE_DEV_API_TARGET=https://beeside-dev-backend-api-640247497574.northamerica-south1.run.app VITE_DEV_API_ORIGIN=https://beeside-dev-frontend-app-640247497574.northamerica-south1.run.app npm run dev --workspace=frontend
+```
+
+(equivalently: `cd frontend && VITE_DEV_API_TARGET=... VITE_DEV_API_ORIGIN=... npm run dev` — the root has no bare `dev` script under this repo's npm workspaces, so `--workspace=frontend` or running from inside `frontend/` is required.)
+
+then open the local dev server URL Vite prints (typically `http://localhost:5173`) — every request goes to the real Cloud Run dev backend and its real dev data, while the frontend code is whatever is checked out locally, no merge required.
+
 ## Infrastructure (GCP)
 
 Requires Terraform >= 1.7 with the `hashicorp/google` provider. For dev, `project_id` and `region` default to Mike's confirmed values in `infra/terraform/envs/dev/main.tf`. Staging and production still carry `REPLACE-WITH-*` placeholders, since those projects don't exist yet. Modules: `network` (VPC), `database` (Cloud SQL for PostgreSQL), `secrets` (Secret Manager), `queue` (Pub/Sub — defined, not yet recommended to apply), `observability` (Cloud Logging), `artifact-registry`, `cloud-run`.
