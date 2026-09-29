@@ -93,6 +93,22 @@ resource "google_cloud_run_v2_job" "migrate" {
   name     = "beeside-${var.environment}-migrate"
   location = var.region
 
+  # Explicit — the job's implicit dependency graph does NOT cover this.
+  # var.migration_database_url_secret_id is a plain string (the secret's
+  # id), not the IAM member resource's own attribute, so referencing it in
+  # the env block below creates zero ordering edge to
+  # migration_runner_secret_access. Same for cloudsql.client: the volume
+  # block below references var.cloudsql_instance_connection_name, a string
+  # from modules/database, never migration_runner_cloudsql_client. Without
+  # this depends_on, Terraform is free to create this job in parallel with,
+  # or before, either grant becoming effective — which is exactly what
+  # produced the "Permission denied on secret ... roles/secretmanager.secretAccessor
+  # required" failure on the first real apply.
+  depends_on = [
+    google_secret_manager_secret_iam_member.migration_runner_secret_access,
+    google_project_iam_member.migration_runner_cloudsql_client,
+  ]
+
   template {
     template {
       service_account = google_service_account.migration_runner.email

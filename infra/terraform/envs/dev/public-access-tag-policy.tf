@@ -86,6 +86,30 @@ resource "google_org_policy_policy" "domain_restricted_sharing_dev" {
   }
 }
 
+# Terraform's depends_on only orders the API *calls* below (tag binding /
+# org policy creation, then the allUsers grant) - it does not wait for GCP to
+# finish propagating a tag binding or an org-policy exception through its
+# policy-evaluation layer, which is well-documented as taking longer than
+# the create call itself returning "success". The first real apply hit this
+# exact gap: both allUsers grants below failed with "One or more users named
+# in the policy do not belong to a permitted customer, perhaps due to an
+# organization policy" even though the tag bindings and the conditional
+# policy exception had already been created moments earlier in the same
+# apply. This does not use a new provider - terraform_data is built into
+# Terraform core (>= 1.4, already required by this environment) - so it
+# needs no `terraform init` provider download.
+resource "terraform_data" "public_access_propagation_delay" {
+  depends_on = [
+    google_tags_location_tag_binding.backend_public,
+    google_tags_location_tag_binding.frontend_public,
+    google_org_policy_policy.domain_restricted_sharing_dev,
+  ]
+
+  provisioner "local-exec" {
+    command = "sleep 60"
+  }
+}
+
 resource "google_cloud_run_v2_service_iam_member" "backend_public" {
   location = var.region
   name     = module.backend_service.service_name
@@ -98,6 +122,7 @@ resource "google_cloud_run_v2_service_iam_member" "backend_public" {
   depends_on = [
     google_tags_location_tag_binding.backend_public,
     google_org_policy_policy.domain_restricted_sharing_dev,
+    terraform_data.public_access_propagation_delay,
   ]
 }
 
@@ -110,5 +135,6 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
   depends_on = [
     google_tags_location_tag_binding.frontend_public,
     google_org_policy_policy.domain_restricted_sharing_dev,
+    terraform_data.public_access_propagation_delay,
   ]
 }
