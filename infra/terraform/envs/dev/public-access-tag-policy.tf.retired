@@ -1,3 +1,34 @@
+# RETIRED — renamed from public-access-tag-policy.tf so Terraform no longer
+# loads it (Terraform only reads *.tf / *.tf.json; this .tf.retired
+# extension is inert). Kept in the repo, not deleted, purely for history/
+# audit — nothing here is applied.
+#
+# Why this approach was abandoned: the second real terraform apply proved
+# the failure below was not a propagation-delay issue (a 60s terraform_data
+# sleep, tried first, made no difference) but the mechanism itself.
+# Google's own guidance is that granting roles/run.invoker to allUsers is
+# not the supported path for a Cloud Run service once Domain Restricted
+# Sharing is enforced - which matches exactly what both
+# google_cloud_run_v2_service_iam_member resources below hit:
+#   Error 400: "One or more users named in the policy do not belong to a
+#   permitted customer, perhaps due to an organization policy."
+# regardless of how long Terraform waited after creating the tag bindings
+# and the conditional policy exception.
+#
+# Replaced by: modules/cloud-run's `allow_unauthenticated` flag now sets the
+# run.googleapis.com/invoker-iam-disabled service annotation directly
+# (Google's documented mechanism for exactly this scenario). That needs no
+# org-policy exception at all - it bypasses IAM policy evaluation for
+# invocation entirely, so this file's entire premise (a project-level,
+# tag-scoped exception to Domain Restricted Sharing) is unnecessary. The
+# org policy itself is untouched by this change; the custom project-level
+# exception resource below (domain_restricted_sharing_dev) will show as a
+# planned destroy, and nothing takes its place - the project reverts to
+# purely inheriting beeside.you's org-level policy, no exception, no
+# broadening.
+#
+# ---- original file content below, unmodified ----
+#
 # Narrow, tag-scoped exception to beeside.you's organization-level Domain
 # Restricted Sharing policy (constraints/iam.allowedPolicyMemberDomains),
 # limited to exactly the two Cloud Run services below. The organization's
@@ -86,6 +117,30 @@ resource "google_org_policy_policy" "domain_restricted_sharing_dev" {
   }
 }
 
+# Terraform's depends_on only orders the API *calls* below (tag binding /
+# org policy creation, then the allUsers grant) - it does not wait for GCP to
+# finish propagating a tag binding or an org-policy exception through its
+# policy-evaluation layer, which is well-documented as taking longer than
+# the create call itself returning "success". The first real apply hit this
+# exact gap: both allUsers grants below failed with "One or more users named
+# in the policy do not belong to a permitted customer, perhaps due to an
+# organization policy" even though the tag bindings and the conditional
+# policy exception had already been created moments earlier in the same
+# apply. This does not use a new provider - terraform_data is built into
+# Terraform core (>= 1.4, already required by this environment) - so it
+# needs no `terraform init` provider download.
+resource "terraform_data" "public_access_propagation_delay" {
+  depends_on = [
+    google_tags_location_tag_binding.backend_public,
+    google_tags_location_tag_binding.frontend_public,
+    google_org_policy_policy.domain_restricted_sharing_dev,
+  ]
+
+  provisioner "local-exec" {
+    command = "sleep 60"
+  }
+}
+
 resource "google_cloud_run_v2_service_iam_member" "backend_public" {
   location = var.region
   name     = module.backend_service.service_name
@@ -98,6 +153,7 @@ resource "google_cloud_run_v2_service_iam_member" "backend_public" {
   depends_on = [
     google_tags_location_tag_binding.backend_public,
     google_org_policy_policy.domain_restricted_sharing_dev,
+    terraform_data.public_access_propagation_delay,
   ]
 }
 
@@ -110,5 +166,6 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
   depends_on = [
     google_tags_location_tag_binding.frontend_public,
     google_org_policy_policy.domain_restricted_sharing_dev,
+    terraform_data.public_access_propagation_delay,
   ]
 }
