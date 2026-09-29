@@ -94,13 +94,26 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # --no-invoker-iam-check: beeside-dev-backend-api and
+          # beeside-dev-frontend-app are meant to be publicly reachable, but
+          # this project enforces Domain Restricted Sharing, which rejects a
+          # roles/run.invoker grant to allUsers outright (see
+          # docs/deployment/README.md). Cloud Run's own invoker-IAM-check
+          # disable is Google's documented mechanism for exactly this case;
+          # it needs no org-policy exception and never touches Domain
+          # Restricted Sharing. Terraform cannot express this yet (no
+          # provider support for the v2-native field), so it's applied here.
+          # The worker service below is intentionally NOT public and does
+          # not get this flag.
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run deploy beeside-dev-backend-api \
             --image $REGISTRY/backend-api:${{ github.sha }} \
-            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet \
+            --no-invoker-iam-check
           gcloud run deploy beeside-dev-frontend-app \
             --image $REGISTRY/frontend-app:${{ github.sha }} \
-            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
+            --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet \
+            --no-invoker-iam-check
           if [ -n "${{ vars.WORKER_SERVICE_NAME }}" ]; then
             gcloud run deploy ${{ vars.WORKER_SERVICE_NAME }} \
               --image $REGISTRY/backend-api:${{ github.sha }} \

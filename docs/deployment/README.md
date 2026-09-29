@@ -68,6 +68,34 @@ Fixed in this block (code and configuration only, nothing deployed):
   already ignored `image` for the same reason): CI/manual `gcloud run deploy`/`services update` calls
   set values Terraform does not declare, and without this a `terraform apply` unrelated to those
   values would plan to strip them back to just `NODE_ENV`.
+- **Public access for `beeside-dev-backend-api` and `beeside-dev-frontend-app`, under Domain
+  Restricted Sharing.** This project enforces the org policy `constraints/iam.allowedPolicyMemberDomains`
+  (Domain Restricted Sharing). Two approaches were tried and rejected before landing on the current
+  one:
+  - Granting `roles/run.invoker` to `allUsers`, via a project-level tag-scoped conditional exception
+    to Domain Restricted Sharing (`infra/terraform/envs/dev/public-access-tag-policy.tf`, now
+    **retired** — renamed to `.tf.retired` so Terraform never loads it, kept only for history). This
+    failed outright, with or without an added propagation delay: `Error 400: "One or more users
+    named in the policy do not belong to a permitted customer, perhaps due to an organization
+    policy."` Google's own guidance confirms the `allUsers` route is not the supported path under
+    Domain Restricted Sharing, so this was never a timing problem.
+  - Cloud Run's `run.googleapis.com/invoker-iam-disabled` **annotation** — Google's documented
+    mechanism for exactly this scenario, and the one that needs no org-policy exception at all (it
+    bypasses IAM policy evaluation for invocation entirely, so Domain Restricted Sharing is never
+    touched). This was rejected outright by the Cloud Run **v2** API itself: `"system annotations are
+    not supported in Cloud Run API v2"` — that mechanism only ever worked against the v1 API.
+  - **Current state**: the v2-native replacement is a typed `invoker_iam_disabled` field on
+    `google_cloud_run_v2_service` — but as of this writing it does not exist in any released
+    `hashicorp/google` provider version (an open upstream feature request, no merged fix; checked up
+    through recent 7.x releases). Until the provider supports it, both services have the invoker IAM
+    check disabled directly via `gcloud run deploy ... --no-invoker-iam-check` in `deploy-dev.yml`
+    (also available as `gcloud run services update <service> --no-invoker-iam-check` for a one-time
+    change outside a deploy). This is Cloud Run's own supported mechanism, GA, not a workaround
+    layered on top of it — Terraform simply can't express it yet. **Domain Restricted Sharing is
+    unmodified**: no org-policy exception, no `allUsers` grant, nothing project-level. `allow_unauthenticated`
+    in `infra/terraform/modules/cloud-run` remains a documentation-only variable (the module takes no
+    action on it) until `hashicorp/google` ships the native field, at which point this control moves
+    back into Terraform and this bullet gets removed.
 
 Still missing (infrastructure, not code):
 

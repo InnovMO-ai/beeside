@@ -55,7 +55,7 @@ variable "max_instances" {
 }
 
 variable "allow_unauthenticated" {
-  description = "When true, disables Cloud Run's own invoker IAM check for this service (the run.googleapis.com/invoker-iam-disabled annotation - Google's documented mechanism for public Cloud Run access, and the one it recommends specifically when the project enforces Domain Restricted Sharing). This replaces an earlier design that granted roles/run.invoker to allUsers via a project-level tag-scoped Domain Restricted Sharing exception (envs/dev/public-access-tag-policy.tf, now removed): that IAM-binding approach failed outright under this project's org policy, with or without a propagation delay, which matches Google's own guidance that the allUsers route is not the supported path under Domain Restricted Sharing. The invoker-IAM-disabled annotation needs no org-policy exception at all - it bypasses IAM policy evaluation for invocation entirely, so Domain Restricted Sharing itself is never touched, weakened, or exempted at the project level."
+  description = "Documents intent only (true for the frontend app and the backend's public health-check) - this module does not act on it. Two mechanisms were tried and rejected: granting roles/run.invoker to allUsers (envs/dev/public-access-tag-policy.tf, retired - fails outright under this project's Domain Restricted Sharing org policy, regardless of propagation delay, matching Google's own guidance that allUsers is not the supported path under DRS); and the run.googleapis.com/invoker-iam-disabled annotation (rejected outright by the Cloud Run v2 API itself: \"system annotations are not supported in Cloud Run API v2\" - that mechanism is v1-only). The v2-native replacement, invoker_iam_disabled as a typed field on google_cloud_run_v2_service, does not exist in any hashicorp/google provider version as of this writing (open upstream issue, no released fix) - see docs/deployment/README.md. Until it lands, both dev services have the invoker IAM check disabled directly via `gcloud run deploy ... --no-invoker-iam-check` in deploy-dev.yml. Domain Restricted Sharing itself is never touched by this - no org-policy exception, no allUsers grant, nothing project-level."
   type    = bool
   default = true
 }
@@ -71,19 +71,13 @@ resource "google_cloud_run_v2_service" "this" {
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
-  # Service-level metadata annotation (not a template/revision annotation -
-  # Google documents run.googleapis.com/invoker-iam-disabled as a
-  # service-level setting). Confirmed against the installed
-  # hashicorp/google 5.45.2 provider binary: google_cloud_run_v2_service
-  # has a genuine top-level `annotations` argument (expand/flatten
-  # functions exist for it, distinct from the template-level annotations
-  # function) - this is not routed through any provider-specific typed
-  # field for this key (none exists as of this provider version), just the
-  # same generic annotations map Cloud Run's API already accepts arbitrary
-  # recognized keys through.
-  annotations = var.allow_unauthenticated ? {
-    "run.googleapis.com/invoker-iam-disabled" = "true"
-  } : {}
+  # No annotations block here: the Cloud Run v2 API rejects
+  # run.googleapis.com/* system annotations outright ("system annotations
+  # are not supported in Cloud Run API v2"), and google_cloud_run_v2_service
+  # has no typed invoker_iam_disabled field in any current provider version.
+  # See the allow_unauthenticated variable above and
+  # docs/deployment/README.md for how public access is actually granted
+  # today (gcloud, outside Terraform, until provider support lands).
 
   template {
     scaling {
