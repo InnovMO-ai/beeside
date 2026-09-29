@@ -54,8 +54,6 @@ concurrency:
   group: deploy-dev
   cancel-in-progress: false
 
-  workflow_dispatch:
-
 permissions:
   id-token: write # required for Workload Identity Federation
   contents: read
