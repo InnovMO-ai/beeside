@@ -151,6 +151,21 @@ resource "google_cloud_run_v2_job_iam_member" "deployers" {
   member   = "serviceAccount:${each.value}"
 }
 
+# roles/run.developer alone is not sufficient: this job runs as a
+# non-default service account (migration_runner, above), and GCP requires
+# the deploying identity to hold iam.serviceAccountUser on whatever service
+# account a revision/execution will run as, checked on every
+# `gcloud run jobs update` (it creates a new job revision), not only at
+# first creation. Scoped to this one service account only — never
+# project-wide iam.serviceAccountUser, which would let the deployer
+# impersonate every service account in the project.
+resource "google_service_account_iam_member" "deployers_can_act_as_migration_runner" {
+  for_each            = toset(var.deployer_service_accounts)
+  service_account_id  = google_service_account.migration_runner.name
+  role                = "roles/iam.serviceAccountUser"
+  member              = "serviceAccount:${each.value}"
+}
+
 output "job_name" {
   value = google_cloud_run_v2_job.migrate.name
 }
