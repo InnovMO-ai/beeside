@@ -78,10 +78,11 @@ module "network" {
 }
 
 module "artifact_registry" {
-  source      = "../../modules/artifact-registry"
-  environment = "dev"
-  region      = var.region
-  depends_on  = [google_project_service.apis]
+  source                   = "../../modules/artifact-registry"
+  environment              = "dev"
+  region                   = var.region
+  writer_service_accounts  = [google_service_account.ci_deployer.email]
+  depends_on               = [google_project_service.apis]
 }
 
 module "secrets" {
@@ -108,14 +109,16 @@ module "backend_service" {
   service_name                       = "backend-api"
   cloudsql_instance_connection_name  = module.database.instance_connection_name
   allow_unauthenticated              = true # the /health endpoint is meant to be publicly reachable
+  deployer_service_accounts          = [google_service_account.ci_deployer.email]
 }
 
 module "frontend_service" {
-  source                 = "../../modules/cloud-run"
-  environment            = "dev"
-  region                 = var.region
-  service_name           = "frontend-app"
-  allow_unauthenticated  = true
+  source                     = "../../modules/cloud-run"
+  environment                = "dev"
+  region                     = var.region
+  service_name               = "frontend-app"
+  allow_unauthenticated      = true
+  deployer_service_accounts  = [google_service_account.ci_deployer.email]
 }
 
 # --- CI/CD identity (GitHub Actions -> GCP), no long-lived key ---
