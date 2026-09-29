@@ -123,7 +123,19 @@ resource "google_cloud_run_v2_service" "this" {
     # deploy after that is `gcloud run deploy` (or an equivalent CI step)
     # updating the image directly. Without this, the next `terraform apply`
     # would silently revert a real deploy back to the placeholder image.
-    ignore_changes = [template[0].containers[0].image]
+    #
+    # Same reasoning for env: `gcloud run deploy`/`services update` calls
+    # made directly against this service (outside Terraform, e.g. while
+    # docs/deployment's runtime env vars are wired in ahead of Terraform
+    # managing them) set values this resource does not declare. Without
+    # ignoring drift here too, the next `terraform apply` would plan to
+    # strip every one of those live values back down to just NODE_ENV —
+    # exactly the risk that blocked applying the IAM changes safely.
+    # Terraform still fully owns env on the very first create of a service.
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].containers[0].env,
+    ]
   }
 }
 

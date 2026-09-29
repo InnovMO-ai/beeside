@@ -120,6 +120,26 @@ resource "google_secret_manager_secret_version" "db_password" {
   secret_data = random_password.master.result
 }
 
+# A second, purpose-built secret: the same migration user's credential
+# (beeside_app keeps ownership of every object — see docs/deployment's
+# "Database privilege separation" note), pre-composed into the one
+# connection-string shape backend/src/scripts/migrate.ts expects from
+# MIGRATION_DATABASE_URL. This does not introduce a new credential — it is
+# the existing password above, formatted for the migration job to consume
+# directly as a single secret, addressed through Cloud Run's built-in Cloud
+# SQL connector (the /cloudsql unix-socket path) rather than a public host.
+resource "google_secret_manager_secret" "migration_database_url" {
+  secret_id = "beeside-${var.environment}-migration-database-url"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "migration_database_url" {
+  secret = google_secret_manager_secret.migration_database_url.id
+  secret_data = "postgresql://${google_sql_user.app.name}:${random_password.master.result}@/${google_sql_database.beeside.name}?host=/cloudsql/${google_sql_database_instance.canonical.connection_name}"
+}
+
 output "instance_connection_name" {
   description = "Used by Cloud Run's built-in Cloud SQL integration (no VPC connector needed)."
   value       = google_sql_database_instance.canonical.connection_name
@@ -131,4 +151,9 @@ output "database_name" {
 
 output "db_password_secret_id" {
   value = google_secret_manager_secret.db_password.secret_id
+}
+
+output "migration_database_url_secret_id" {
+  description = "Consumed by modules/migration-job: the migration user's full connection string, ready to use as MIGRATION_DATABASE_URL."
+  value       = google_secret_manager_secret.migration_database_url.secret_id
 }

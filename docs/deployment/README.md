@@ -52,11 +52,33 @@ Fixed in this block (code and configuration only, nothing deployed):
   `node dist/scripts/migrate.js` from the backend image with `MIGRATION_DATABASE_URL`.
 - `/health/ready` reports ready only when the database is reachable and every migration shipped in
   the image is applied.
+- **dev**: the Cloud Run job itself now exists as Terraform (`infra/terraform/modules/migration-job`,
+  instantiated from `infra/terraform/envs/dev/main.tf`). It runs under its own minimal service
+  account (`roles/cloudsql.client` on the project — the only scope Cloud SQL's IAM model offers for
+  that role — plus `roles/secretmanager.secretAccessor` on exactly one secret), never the backend
+  service's identity. `MIGRATION_DATABASE_URL` is supplied as a Cloud-Run-native secret-backed env
+  var from a new secret, `modules/database`'s `migration_database_url` — the **same migration user
+  this document already names above (`beeside_app`, which "keeps ownership of every object")**, just
+  pre-composed into the one connection-string shape `migrate.ts` expects. No new database principal
+  was introduced and nothing about the open runtime-user decision below was resolved or assumed — the
+  job simply uses the migration privilege level that already exists today. `vars.MIGRATION_JOB_NAME`
+  in GitHub Actions must be set to the exact value of this module's `job_name` output —
+  `beeside-dev-migrate` for dev.
+- `infra/terraform/modules/cloud-run` now also ignores drift on each service's `env` block (it
+  already ignored `image` for the same reason): CI/manual `gcloud run deploy`/`services update` calls
+  set values Terraform does not declare, and without this a `terraform apply` unrelated to those
+  values would plan to strip them back to just `NODE_ENV`.
 
 Still missing (infrastructure, not code):
 
-- A Cloud Run **job** per environment for migrations (`vars.MIGRATION_JOB_NAME`), with the migration
-  user's secret attached.
+- The dev migration job above still runs as `beeside_app`, not a dedicated least-privilege migration
+  role — because `beeside_app` already **is** the documented migration user today, this is not a new
+  gap, but it is also not the end state: once `beeside_runtime` (below) exists and starts owning
+  runtime traffic, migration `0014`'s `beeside_runtime_role` grants become meaningful and the two
+  connections (migration vs. runtime) are genuinely separated in practice, not just in code intent.
+- staging/production: the same `modules/migration-job` module can be instantiated from
+  `infra/terraform/envs/staging` and `envs/production` the same way dev does — not done here, out of
+  this change's scope (dev only).
 - A Cloud Run **service** (or scheduled job) for the background worker `node dist/worker.js`.
 - The routing decision for one browser origin: either a load balancer in front of both services, or
   the frontend service's `API_UPSTREAM_URL` proxy. `TRUST_PROXY_HOPS` must be set to match

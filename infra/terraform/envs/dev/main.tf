@@ -121,6 +121,16 @@ module "frontend_service" {
   deployer_service_accounts  = [google_service_account.ci_deployer.email]
 }
 
+module "migration_job" {
+  source                             = "../../modules/migration-job"
+  environment                        = "dev"
+  region                             = var.region
+  project_id                         = var.project_id
+  cloudsql_instance_connection_name  = module.database.instance_connection_name
+  migration_database_url_secret_id   = module.database.migration_database_url_secret_id
+  deployer_service_accounts          = [google_service_account.ci_deployer.email]
+}
+
 # --- CI/CD identity (GitHub Actions -> GCP), no long-lived key ---
 # Workload Identity Federation lets GitHub Actions authenticate as this
 # environment's deploy service account using a short-lived, per-run token —
@@ -174,4 +184,9 @@ output "backend_url" {
 
 output "frontend_url" {
   value = module.frontend_service.url
+}
+
+output "migration_job_name" {
+  description = "The exact value the GitHub Actions variable MIGRATION_JOB_NAME must receive."
+  value       = module.migration_job.job_name
 }
