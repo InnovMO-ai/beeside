@@ -55,15 +55,29 @@ variable "max_instances" {
 }
 
 variable "allow_unauthenticated" {
-  description = "Documents intent only (true for the frontend app and the backend's public health-check). The module itself no longer grants roles/run.invoker to allUsers based on this flag: in a project where public IAM bindings require a conditional org-policy exception (see envs/dev/public-access-tag-policy.tf), the binding must live at the root, outside this shared module, so it can carry an explicit depends_on the policy and its tag binding without creating a dependency cycle back onto this module. An environment that does not need such an exception (no Domain Restricted Sharing, or an equivalent already-permissive org policy) would instead grant this directly against module.<name>.service_name/location at its own root."
+  description = "Documents intent only (true for the frontend app and the backend's public health-check) - this module does not act on it. Two mechanisms were tried and rejected: granting roles/run.invoker to allUsers (envs/dev/public-access-tag-policy.tf, retired - fails outright under this project's Domain Restricted Sharing org policy, regardless of propagation delay, matching Google's own guidance that allUsers is not the supported path under DRS); and the run.googleapis.com/invoker-iam-disabled annotation (rejected outright by the Cloud Run v2 API itself: \"system annotations are not supported in Cloud Run API v2\" - that mechanism is v1-only). The v2-native replacement, invoker_iam_disabled as a typed field on google_cloud_run_v2_service, does not exist in any hashicorp/google provider version as of this writing (open upstream issue, no released fix) - see docs/deployment/README.md. Until it lands, both dev services have the invoker IAM check disabled directly via `gcloud run deploy ... --no-invoker-iam-check` in deploy-dev.yml. Domain Restricted Sharing itself is never touched by this - no org-policy exception, no allUsers grant, nothing project-level."
   type    = bool
   default = true
+}
+
+variable "deployer_service_accounts" {
+  description = "Service account emails granted roles/run.developer on this specific Cloud Run service only (least-privilege: the CI/CD identity that deploys new revisions here, nothing project-wide, and nothing on any other service)."
+  type        = list(string)
+  default     = []
 }
 
 resource "google_cloud_run_v2_service" "this" {
   name     = "beeside-${var.environment}-${var.service_name}"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
+
+  # No annotations block here: the Cloud Run v2 API rejects
+  # run.googleapis.com/* system annotations outright ("system annotations
+  # are not supported in Cloud Run API v2"), and google_cloud_run_v2_service
+  # has no typed invoker_iam_disabled field in any current provider version.
+  # See the allow_unauthenticated variable above and
+  # docs/deployment/README.md for how public access is actually granted
+  # today (gcloud, outside Terraform, until provider support lands).
 
   template {
     scaling {
@@ -117,8 +131,33 @@ resource "google_cloud_run_v2_service" "this" {
     # deploy after that is `gcloud run deploy` (or an equivalent CI step)
     # updating the image directly. Without this, the next `terraform apply`
     # would silently revert a real deploy back to the placeholder image.
-    ignore_changes = [template[0].containers[0].image]
+    #
+    # Same reasoning for env: `gcloud run deploy`/`services update` calls
+    # made directly against this service (outside Terraform, e.g. while
+    # docs/deployment's runtime env vars are wired in ahead of Terraform
+    # managing them) set values this resource does not declare. Without
+    # ignoring drift here too, the next `terraform apply` would plan to
+    # strip every one of those live values back down to just NODE_ENV —
+    # exactly the risk that blocked applying the IAM changes safely.
+    # Terraform still fully owns env on the very first create of a service.
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].containers[0].env,
+    ]
   }
+}
+
+# Workload Identity Federation (see envs/*/main.tf) lets GitHub Actions
+# authenticate as the CI deploy service account, but authentication alone
+# grants no permissions: without this binding `gcloud run deploy` against
+# this service fails with a permission-denied error, since the service
+# account otherwise holds no resource-level role at all.
+resource "google_cloud_run_v2_service_iam_member" "deployers" {
+  for_each = toset(var.deployer_service_accounts)
+  name     = google_cloud_run_v2_service.this.name
+  location = google_cloud_run_v2_service.this.location
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${each.value}"
 }
 
 output "url" {
