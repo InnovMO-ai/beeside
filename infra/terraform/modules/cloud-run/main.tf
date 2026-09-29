@@ -60,6 +60,12 @@ variable "allow_unauthenticated" {
   default = true
 }
 
+variable "deployer_service_accounts" {
+  description = "Service account emails granted roles/run.developer on this specific Cloud Run service only (least-privilege: the CI/CD identity that deploys new revisions here, nothing project-wide, and nothing on any other service)."
+  type        = list(string)
+  default     = []
+}
+
 resource "google_cloud_run_v2_service" "this" {
   name     = "beeside-${var.environment}-${var.service_name}"
   location = var.region
@@ -119,6 +125,19 @@ resource "google_cloud_run_v2_service" "this" {
     # would silently revert a real deploy back to the placeholder image.
     ignore_changes = [template[0].containers[0].image]
   }
+}
+
+# Workload Identity Federation (see envs/*/main.tf) lets GitHub Actions
+# authenticate as the CI deploy service account, but authentication alone
+# grants no permissions: without this binding `gcloud run deploy` against
+# this service fails with a permission-denied error, since the service
+# account otherwise holds no resource-level role at all.
+resource "google_cloud_run_v2_service_iam_member" "deployers" {
+  for_each = toset(var.deployer_service_accounts)
+  name     = google_cloud_run_v2_service.this.name
+  location = google_cloud_run_v2_service.this.location
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${each.value}"
 }
 
 output "url" {
