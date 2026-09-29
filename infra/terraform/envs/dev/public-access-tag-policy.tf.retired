@@ -1,3 +1,34 @@
+# RETIRED — renamed from public-access-tag-policy.tf so Terraform no longer
+# loads it (Terraform only reads *.tf / *.tf.json; this .tf.retired
+# extension is inert). Kept in the repo, not deleted, purely for history/
+# audit — nothing here is applied.
+#
+# Why this approach was abandoned: the second real terraform apply proved
+# the failure below was not a propagation-delay issue (a 60s terraform_data
+# sleep, tried first, made no difference) but the mechanism itself.
+# Google's own guidance is that granting roles/run.invoker to allUsers is
+# not the supported path for a Cloud Run service once Domain Restricted
+# Sharing is enforced - which matches exactly what both
+# google_cloud_run_v2_service_iam_member resources below hit:
+#   Error 400: "One or more users named in the policy do not belong to a
+#   permitted customer, perhaps due to an organization policy."
+# regardless of how long Terraform waited after creating the tag bindings
+# and the conditional policy exception.
+#
+# Replaced by: modules/cloud-run's `allow_unauthenticated` flag now sets the
+# run.googleapis.com/invoker-iam-disabled service annotation directly
+# (Google's documented mechanism for exactly this scenario). That needs no
+# org-policy exception at all - it bypasses IAM policy evaluation for
+# invocation entirely, so this file's entire premise (a project-level,
+# tag-scoped exception to Domain Restricted Sharing) is unnecessary. The
+# org policy itself is untouched by this change; the custom project-level
+# exception resource below (domain_restricted_sharing_dev) will show as a
+# planned destroy, and nothing takes its place - the project reverts to
+# purely inheriting beeside.you's org-level policy, no exception, no
+# broadening.
+#
+# ---- original file content below, unmodified ----
+#
 # Narrow, tag-scoped exception to beeside.you's organization-level Domain
 # Restricted Sharing policy (constraints/iam.allowedPolicyMemberDomains),
 # limited to exactly the two Cloud Run services below. The organization's
