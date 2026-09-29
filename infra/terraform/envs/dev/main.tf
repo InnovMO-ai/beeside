@@ -170,6 +170,28 @@ resource "google_service_account_iam_member" "ci_deployer_wif" {
   member              = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/InnovMO-ai/beeside"
 }
 
+# backend_service and frontend_service (modules/cloud-run) declare no
+# service_account of their own — confirmed by inspecting the module: it
+# exposes no such variable, and the google_cloud_run_v2_service resource
+# sets no such field. Left unset, Cloud Run runs both revisions as the
+# project's default compute service account (the same one for both
+# services, since neither overrides it). roles/run.developer (granted per
+# service, above) is not enough on its own: GCP additionally requires the
+# deploying identity to hold iam.serviceAccountUser on whatever service
+# account a revision will run as, checked on every deploy, not only the
+# first. ci_deployer has no broad role (like Editor) that would grant this
+# implicitly, so without this binding `gcloud run deploy` for either
+# service fails with permission-denied the same way the migration job's
+# update call would have. Scoped to just this one service account, not
+# project-wide.
+data "google_compute_default_service_account" "default" {}
+
+resource "google_service_account_iam_member" "ci_deployer_can_act_as_default_compute_sa" {
+  service_account_id = data.google_compute_default_service_account.default.name
+  role                = "roles/iam.serviceAccountUser"
+  member              = "serviceAccount:${google_service_account.ci_deployer.email}"
+}
+
 output "vpc_id" {
   value = module.network.network_id
 }
