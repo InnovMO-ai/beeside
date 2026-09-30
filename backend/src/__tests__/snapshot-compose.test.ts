@@ -350,15 +350,15 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
   const CHAIN: NeedsMapValue = {
     selections: [
       { key: "company_setup", status: "needs_resolution" },
-      { key: "tax", status: "covered_by_provider" },
+      { key: "tax_accounting", status: "covered_by_provider" },
       { key: "hr_payroll_social_security", status: "needs_confirmation" },
-      { key: "audit", status: "covered_internally" }, // not prioritized: appears only in the landscape
+      { key: "banking", status: "covered_internally" }, // not prioritized: appears only in the landscape
     ],
-    priorityRank: ["company_setup", "tax", "hr_payroll_social_security"],
+    priorityRank: ["company_setup", "tax_accounting", "hr_payroll_social_security"],
     dependencies: [
       { key: "company_setup", dependsOn: null, owner: "Ana Rivera", approvalRequired: false, approvalFrom: null },
-      { key: "tax", dependsOn: "company_setup", owner: null, approvalRequired: true, approvalFrom: "Finance lead" },
-      { key: "hr_payroll_social_security", dependsOn: "tax", owner: null, approvalRequired: false, approvalFrom: null },
+      { key: "tax_accounting", dependsOn: "company_setup", owner: null, approvalRequired: true, approvalFrom: "Finance lead" },
+      { key: "hr_payroll_social_security", dependsOn: "tax_accounting", owner: null, approvalRequired: false, approvalFrom: null },
     ],
     blockerKeys: ["company_setup"],
   };
@@ -373,10 +373,10 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
   it("keeps the declared priority order in needsPriorities untouched by dependency data", () => {
     const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
     const priorities = client.locales.en.needsPriorities!;
-    expect(priorities.items.map((i) => i.key)).toEqual(["company_setup", "tax", "hr_payroll_social_security"]);
+    expect(priorities.items.map((i) => i.key)).toEqual(["company_setup", "tax_accounting", "hr_payroll_social_security"]);
     expect(priorities.items[0]).toMatchObject({ isImmediatePriority: true, isBlocker: true, dependsOnLabel: null, owner: "Ana Rivera" });
-    expect(priorities.items[1]).toMatchObject({ isImmediatePriority: false, dependsOnLabel: "Company Setup", approvalRequired: true, approvalFrom: "Finance lead" });
-    expect(priorities.items[2]).toMatchObject({ isBlocker: false, dependsOnLabel: "Tax" });
+    expect(priorities.items[1]).toMatchObject({ isImmediatePriority: false, dependsOnLabel: "Company setup / legal structure", approvalRequired: true, approvalFrom: "Finance lead" });
+    expect(priorities.items[2]).toMatchObject({ isBlocker: false, dependsOnLabel: "Tax & accounting" });
     expect(priorities).toMatchObject({ ownerLabel: "Internal owner", approvalLabel: "Needs approval from" });
   });
 
@@ -385,7 +385,7 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
     const pathway = client.locales.en.pathway!;
     expect(pathway.items.map((i) => [i.key, i.stage])).toEqual([
       ["company_setup", "now"],
-      ["tax", "define"],
+      ["tax_accounting", "define"],
       ["hr_payroll_social_security", "enable"],
     ]);
     // The pathway is dependency-derived and never reorders the declared priorityRank sequence itself.
@@ -398,12 +398,12 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
     const parallel: NeedsMapValue = {
       selections: [
         { key: "company_setup", status: "needs_resolution" },
-        { key: "tax", status: "needs_resolution" },
+        { key: "tax_accounting", status: "needs_resolution" },
       ],
-      priorityRank: ["company_setup", "tax"],
+      priorityRank: ["company_setup", "tax_accounting"],
       dependencies: [
         { key: "company_setup", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
-        { key: "tax", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax_accounting", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
       ],
       blockerKeys: [],
     };
@@ -415,12 +415,12 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
     const cyclical: NeedsMapValue = {
       selections: [
         { key: "company_setup", status: "needs_resolution" },
-        { key: "tax", status: "needs_resolution" },
+        { key: "tax_accounting", status: "needs_resolution" },
       ],
-      priorityRank: ["company_setup", "tax"],
+      priorityRank: ["company_setup", "tax_accounting"],
       dependencies: [
-        { key: "company_setup", dependsOn: "tax", owner: null, approvalRequired: false, approvalFrom: null },
-        { key: "tax", dependsOn: "company_setup", owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "company_setup", dependsOn: "tax_accounting", owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax_accounting", dependsOn: "company_setup", owner: null, approvalRequired: false, approvalFrom: null },
       ],
       blockerKeys: [],
     };
@@ -431,7 +431,7 @@ describe("Needs Landscape (fa.needs.map): priorities kept separate from the depe
   it("lists every declared selection in the capability landscape — including ones never prioritized — with a localized status label and no provider identity", () => {
     const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
     const landscape = client.locales.en.needsLandscape!;
-    expect(landscape.items.map((i) => i.key)).toEqual(["company_setup", "tax", "hr_payroll_social_security", "audit"]);
+    expect(landscape.items.map((i) => i.key)).toEqual(["company_setup", "tax_accounting", "hr_payroll_social_security", "banking"]);
     expect(landscape.items.map((i) => i.statusLabel)).toEqual([
       "Still needs to be resolved",
       "Covered by an existing provider",

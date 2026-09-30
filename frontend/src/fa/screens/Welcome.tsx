@@ -1,4 +1,5 @@
 import { T } from "../copy";
+import heroWorldBee from "../../assets/hero-world-bee.png";
 
 export function Welcome({ t, onStart }: { t: T; onStart: () => void }) {
   return (
@@ -16,7 +17,9 @@ export function Welcome({ t, onStart }: { t: T; onStart: () => void }) {
         </div>
         <p className="helper">{t("welcome", "support")}</p>
       </div>
-      <div className="welcome-visual" aria-hidden="true" />
+      <div className="welcome-visual" aria-hidden="true">
+        <img className="welcome-visual-img" src={heroWorldBee} alt="" />
+      </div>
     </section>
   );
 }

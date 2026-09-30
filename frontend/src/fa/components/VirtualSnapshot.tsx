@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { track } from "../analytics";
 import { T } from "../copy";
-import { Locale, SnapshotView } from "../types";
+import { Locale, RenderedValueBridge, SnapshotView } from "../types";
 import { OpeningRecap } from "./OpeningRecap";
 import { RadarProfile } from "./RadarProfile";
 import { StandOutPanels } from "./StandOutPanels";
@@ -9,35 +9,54 @@ import { PriorityList } from "./PriorityList";
 import { PathwayDiagram } from "./PathwayDiagram";
 import { CapabilityLandscapeGrid } from "./CapabilityLandscapeGrid";
 import { PrecisionTransition } from "./PrecisionTransition";
-import { HowBeesideWorks } from "./HowBeesideWorks";
-import { ValueBridges } from "./ValueBridges";
+import { ValueBridgeCard } from "./ValueBridgeCard";
+import { SnapshotValueCase } from "./SnapshotValueCase";
+import { NightShiftToggle } from "./NightShiftToggle";
+
+function findBridge(bridges: RenderedValueBridge[], key: RenderedValueBridge["key"]): RenderedValueBridge | undefined {
+  return bridges.find((b) => b.key === key);
+}
 
 /**
  * VirtualSnapshot (Level 2 MVP §3): the narrative Virtual Snapshot — specific → general → specific →
  * action — assembling the storyboard beats built across this build-order phase.
  *
- * Section order (Macroblock 7, Snapshot Runtime Convergence + Final Gap Closure, 2026-09-28): aligned
- * to the frozen Snapshot's own macro-flow (`snapshot_etapa4_FROZEN_v8-night-shift.html`) wherever this
- * runtime already has the equivalent, already-approved content:
+ * Section order (2026-09-30 Product Owner authorization, "FINAL PRE-DEPLOY IMPLEMENTATION PASS", item
+ * 1 — converges exactly to the frozen `snapshot_etapa4_FROZEN_v8.1-contrast-cta-fix.html`'s own
+ * macro-flow, superseding the 2026-09-28 Macroblock 7 ordering note this docblock previously carried):
  *   1. Opening (OpeningRecap)                          — frozen "project-profile"
- *   2. Dual Expansion Profile (RadarProfile)            — frozen "radar" (now both series, both views)
- *   3. Key Reading                                      — frozen "key-reading" (Narrative Interpretation
- *      Library, deterministic/rule-based — see narrative-interpretation.ts)
+ *   2. Dual Expansion Profile (RadarProfile)            — frozen "radar"
+ *   3. Key Reading                                      — frozen "key-reading"
  *   4. What Matters Now (PriorityList)                  — frozen "what-matters"
- *   5. Market Evidence narrative                        — frozen "market-evidence" (same library)
+ *   5. Market Evidence narrative                        — frozen "market-evidence"
  *   6. Capability Landscape (CapabilityLandscapeGrid)   — frozen "capability-footprint"
+ *      + threaded bridges: The Hive / beeside Verified, paired side by side (frozen `.bridge-pair`)
  *   7. Your Initial Path (PathwayDiagram)               — frozen "project-path"
- *   8. Execution Pressure narrative                     — frozen "execution-pressure" (same library)
+ *      + threaded bridge: Operation Hub
+ *   8. Execution Pressure narrative                     — frozen "execution-pressure"
  *   9. What Stands Out (StandOutPanels)                 — frozen "what-deserves-definition"
+ *      + threaded bridge: Strategic Advisory
  *  10. Next decisions (reconcile/priority/decision/oneThing cards) — frozen "next-decisions"
- *  11. What to Expect in Precision (PrecisionTransition) — frozen "precision-transition"
- *  12. How beeside Works With You (HowBeesideWorks)      — general "how it works" context, kept as-is
- *  13. Value Bridges (ValueBridges)                      — frozen "beeside-value" (selective form; see
- *      ValueBridges.tsx's docblock for why this deliberately isn't the frozen mockup's fixed 4-pillar
- *      block plus comparison table — that block is Premium-activation content in `PremiumTransition`,
- *      a distinct, pre-existing, coexisting concept, out of this macroblock's scope)
- * The Final CTA is intentionally NOT rendered here — the caller (SnapshotScreen) renders
- * PremiumTransition as a sibling afterward, exactly as before, so this component owns the story only.
+ *      + threaded bridge: beeside Sherpa (large badge, `.bridge-icon-badge-lg`)
+ *  11. What to Expect in Precision — "What's next" 3-icon grid (PrecisionTransition) — frozen
+ *      "precision-transition"
+ *  12. Why continue with beeside — What beeside gives you / gain strip / A-D comparison / banner /
+ *      final CTA (SnapshotValueCase) — frozen "beeside-value". Coexists with the pre-existing,
+ *      separate PremiumTransition (rendered as a sibling afterward by SnapshotScreen, unchanged) — see
+ *      SnapshotValueCase's own docblock for how the two relate.
+ *
+ * HowBeesideWorks (a general "how it works" block with no frozen-artifact counterpart) is retired —
+ * removed entirely per item 1 ("remove or reconcile any extra non-canonical Snapshot sections").
+ *
+ * The five Value Bridges are no longer a single end-of-page grid (the pre-2026-09-30 `ValueBridges`
+ * component): each of the (at most 3, per the approved Etapa 2 selection rule in
+ * `value-bridges.ts` — unchanged by this pass) triggered bridges now renders inline via
+ * `ValueBridgeCard` at the exact point in the story its trigger concerns, matching the frozen
+ * artifact's threading exactly. A bridge whose trigger did not fire for this project simply does not
+ * render at that spot — nothing is invented to fill a slot.
+ *
+ * Night Shift (`NightShiftToggle`): a purely additive dark-mode toggle for this screen, matching the
+ * frozen artifact's `.night-toggle` — see that component's own docblock.
  *
  * Key Reading / Market Evidence / Execution Pressure (Macroblock 7 — Final Gap Closure) render only
  * when the narrative engine returns text (it always does in practice — every branch, including the
@@ -74,8 +93,17 @@ export function VirtualSnapshot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const bridges = view.valueBridges;
+  const hiveBridge = findBridge(bridges, "the_hive");
+  const verifiedBridge = findBridge(bridges, "beeside_verified");
+  const operationHubBridge = findBridge(bridges, "operation_hub_secure") ?? findBridge(bridges, "operation_hub_productivity");
+  const strategicAdvisoryBridge = findBridge(bridges, "strategic_advisory");
+  const sherpaBridge = findBridge(bridges, "sherpa");
+
   return (
     <article className="snapshot virtual-snapshot" aria-labelledby="opening-headline">
+      <NightShiftToggle t={t} />
+
       <OpeningRecap
         eyebrow={view.eyebrow}
         headline={view.headline}
@@ -109,8 +137,15 @@ export function VirtualSnapshot({
       )}
 
       {view.needsLandscape && <CapabilityLandscapeGrid landscape={view.needsLandscape} />}
+      {(hiveBridge || verifiedBridge) && (
+        <div className="value-bridge-pair">
+          {hiveBridge && <ValueBridgeCard bridge={hiveBridge} />}
+          {verifiedBridge && <ValueBridgeCard bridge={verifiedBridge} />}
+        </div>
+      )}
 
       {view.pathway && <PathwayDiagram pathway={view.pathway} t={t} />}
+      {operationHubBridge && <ValueBridgeCard bridge={operationHubBridge} />}
 
       {view.executionPressureNarrative && (
         <section className="snapshot-section execution-pressure-section" aria-labelledby="execution-pressure-title">
@@ -122,8 +157,9 @@ export function VirtualSnapshot({
       )}
 
       <StandOutPanels counts={view.counts} panels={view.panels} t={t} />
+      {strategicAdvisoryBridge && <ValueBridgeCard bridge={strategicAdvisoryBridge} />}
 
-      {(view.reconcile || view.immediatePriority || view.decisionAhead || view.oneThing) && (
+      {(view.reconcile || view.immediatePriority || view.decisionAhead || view.oneThing || sherpaBridge) && (
         <div className="snapshot-context">
           {view.reconcile && (
             <section className="snapshot-card reconcile-card" aria-labelledby="snapshot-reconcile">
@@ -150,7 +186,7 @@ export function VirtualSnapshot({
               </h2>
               <p className="priority-value">{view.immediatePriority.value}</p>
               {view.immediatePriority.timing && <p className="helper">{view.immediatePriority.timing}</p>}
-              {view.immediatePriority.reason && <blockquote className="verbatim">“{view.immediatePriority.reason}”</blockquote>}
+              {view.immediatePriority.reason && <blockquote className="verbatim">"{view.immediatePriority.reason}"</blockquote>}
             </section>
           )}
 
@@ -159,7 +195,7 @@ export function VirtualSnapshot({
               <h2 className="card-title" id="snapshot-decision">
                 {view.decisionAhead.title}
               </h2>
-              <p className="verbatim">“{view.decisionAhead.text}”</p>
+              <p className="verbatim">"{view.decisionAhead.text}"</p>
             </section>
           )}
           {view.oneThing && (
@@ -167,15 +203,16 @@ export function VirtualSnapshot({
               <h2 className="card-title" id="snapshot-one-thing">
                 {view.oneThing.title}
               </h2>
-              <p className="verbatim">“{view.oneThing.text}”</p>
+              <p className="verbatim">"{view.oneThing.text}"</p>
             </section>
           )}
+
+          {sherpaBridge && <ValueBridgeCard bridge={sherpaBridge} large />}
         </div>
       )}
 
       <PrecisionTransition t={t} />
-      <HowBeesideWorks t={t} />
-      <ValueBridges bridges={view.valueBridges} />
+      <SnapshotValueCase t={t} />
 
       <footer className="snapshot-disclosure">
         <h2 className="card-title">{view.disclosure.title}</h2>

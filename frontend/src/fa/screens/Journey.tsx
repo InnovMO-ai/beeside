@@ -60,6 +60,11 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
   const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; commit: () => void }>());
   const queue = useRef<Promise<void>>(Promise.resolve());
   const stepStartedAt = useRef(Date.now());
+  // Set when a step is entered via an Edit link from Review (see ReviewRecap below); when the
+  // edited step's Continue completes successfully, we return straight to Review instead of
+  // advancing to the next step in the normal sequence (Design Freeze: "edit block -> save ->
+  // automatically return to Review").
+  const returnToReviewRef = useRef<string | null>(null);
 
   useEffect(() => {
     viewRef.current = view;
@@ -191,6 +196,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
       const latest = viewRef.current;
       const step = latest.steps.find((s) => s.id === stepState.id);
       if (!step || !step.applicable) {
+        returnToReviewRef.current = null;
         go(initialPosition(latest));
         return;
       }
@@ -250,6 +256,12 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
         onCompleted(result.value);
         return;
       }
+      if (returnToReviewRef.current) {
+        const reviewStepId = returnToReviewRef.current;
+        returnToReviewRef.current = null;
+        go({ stepId: reviewStepId, questionIndex: 0 });
+        return;
+      }
       const order = result.value.steps.filter((s) => s.applicable);
       const following = order[order.findIndex((s) => s.id === step.id) + 1];
       if (following) go({ stepId: following.id, questionIndex: 0 });
@@ -260,6 +272,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
 
   async function back() {
     await flush();
+    returnToReviewRef.current = null;
     if (!isGrouped && questionIndex > 0) {
       go({ stepId: stepState.id, questionIndex: questionIndex - 1 });
       return;
@@ -283,7 +296,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
               {stepCopy.title}
             </h1>
             {stepCopy.intro && <p className="lead">{stepCopy.intro}</p>}
-            <ReviewRecap bundle={bundle} locale={locale} t={t} view={view} currentValue={currentValue} onEditStep={(stepId) => go({ stepId, questionIndex: 0 })} />
+            <ReviewRecap bundle={bundle} locale={locale} t={t} view={view} currentValue={currentValue} onEditStep={(stepId) => { returnToReviewRef.current = stepState.id; go({ stepId, questionIndex: 0 }); }} />
           </>
         ) : isGrouped ? (
           <GroupedComposition
@@ -299,6 +312,7 @@ export function Journey({ bundle, t, locale, view, countries, flushRef, onView, 
             onChange={handleChange}
             stepTitle={stepCopy.title}
             stepIntro={stepCopy.intro}
+            noteFieldId={stepDef.note_field_id}
           />
         ) : stepDef.kind === "transition" || !question ? (
           <h1 className="transition-line" tabIndex={-1} style={{ outline: "none" }}>

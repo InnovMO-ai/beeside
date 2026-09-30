@@ -53,6 +53,11 @@ function ReviewSection({
 }) {
   if (step.kind === "transition" || step.question_ids.length === 0) return null;
   const stepCopy = step.copy[locale] ?? step.copy.en;
+  // "Leave a note" (step.note_field_id) is shown as its own highlighted callout, not as a plain
+  // dt/dd row — matching the frozen Review design's "📝 Note on file: ..." treatment — and only
+  // when the client actually wrote something (an empty optional note is simply omitted).
+  const noteValue = step.note_field_id ? currentValue(step.note_field_id) : undefined;
+  const noteText = typeof noteValue === "string" ? noteValue.trim() : "";
   return (
     <section className="review-section">
       <div className="review-section-header">
@@ -62,19 +67,26 @@ function ReviewSection({
         </button>
       </div>
       <dl>
-        {step.question_ids.map((id) => {
-          const question = bundle.questions.find((q) => q.id === id);
-          if (!question) return null;
-          const value = currentValue(id);
-          const copy = question.copy[locale] ?? question.copy.en;
-          return (
-            <div key={id} style={{ margin: "0.5rem 0" }}>
-              <dt style={{ fontWeight: 500 }}>{copy.title}</dt>
-              <dd style={{ margin: "0.1rem 0 0" }}>{renderAnswerSummary(question, value, locale, t)}</dd>
-            </div>
-          );
-        })}
+        {step.question_ids
+          .filter((id) => id !== step.note_field_id)
+          .map((id) => {
+            const question = bundle.questions.find((q) => q.id === id);
+            if (!question) return null;
+            const value = currentValue(id);
+            const copy = question.copy[locale] ?? question.copy.en;
+            return (
+              <div key={id} style={{ margin: "0.5rem 0" }}>
+                <dt style={{ fontWeight: 500 }}>{copy.title}</dt>
+                <dd style={{ margin: "0.1rem 0 0" }}>{renderAnswerSummary(question, value, locale, t)}</dd>
+              </div>
+            );
+          })}
       </dl>
+      {noteText && (
+        <p className="review-note">
+          {t("level2", "review_note_prefix")} "{noteText}"
+        </p>
+      )}
     </section>
   );
 }

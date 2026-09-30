@@ -102,7 +102,7 @@ afterEach(() => {
 });
 
 describe("VirtualSnapshot", () => {
-  it("assembles every beat in the frozen-artifact-aligned story order (Macroblock 7): Opening, Dual Expansion Profile, Key Reading, What Matters Now, Market Evidence, Capability Landscape, Your Initial Path, Execution Pressure, What Stands Out, Precision, How beeside Works", () => {
+  it("assembles every beat in the frozen v8.1 macro-flow order (2026-09-30 Product Owner authorization, item 1): Opening, Dual Expansion Profile, Key Reading, What Matters Now, Market Evidence, Capability Landscape, Your Initial Path, Execution Pressure, What Stands Out, What's next (Precision Transition), Why continue with beeside (SnapshotValueCase)", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(<VirtualSnapshot snapshot={snapshotView(rendered())} locale="en" t={t} />);
 
@@ -116,8 +116,8 @@ describe("VirtualSnapshot", () => {
     const pathIndex = headings.indexOf("Your initial path");
     const executionPressureIndex = headings.indexOf("Execution Pressure");
     const standOutIndex = headings.indexOf("What stands out");
-    const precisionIndex = headings.indexOf("What to expect in Precision Assessment");
-    const worksIndex = headings.indexOf("How beeside works with you");
+    const whatsNextIndex = headings.indexOf("What's next");
+    const valueCaseIndex = headings.indexOf("The value of one coordinated expansion.");
 
     for (const index of [
       openingIndex,
@@ -129,8 +129,8 @@ describe("VirtualSnapshot", () => {
       pathIndex,
       executionPressureIndex,
       standOutIndex,
-      precisionIndex,
-      worksIndex,
+      whatsNextIndex,
+      valueCaseIndex,
     ]) {
       expect(index).toBeGreaterThan(-1);
     }
@@ -142,8 +142,8 @@ describe("VirtualSnapshot", () => {
     expect(landscapeIndex).toBeLessThan(pathIndex);
     expect(pathIndex).toBeLessThan(executionPressureIndex);
     expect(executionPressureIndex).toBeLessThan(standOutIndex);
-    expect(standOutIndex).toBeLessThan(precisionIndex);
-    expect(precisionIndex).toBeLessThan(worksIndex);
+    expect(standOutIndex).toBeLessThan(whatsNextIndex);
+    expect(whatsNextIndex).toBeLessThan(valueCaseIndex);
   });
 
   it("hides Key Reading, Market Evidence narrative and Execution Pressure narrative sections when the compose layer returns null (e.g. insufficient data)", () => {
@@ -176,19 +176,19 @@ describe("VirtualSnapshot", () => {
     expect(screen.queryByText("Relevant capabilities for your expansion")).not.toBeInTheDocument();
   });
 
-  it("shows the disclosure as the closing footer", () => {
+  it("shows the disclosure as the closing footer, followed by nothing else", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(<VirtualSnapshot snapshot={snapshotView(rendered())} locale="en" t={t} />);
     expect(screen.getByText("About this Snapshot")).toBeInTheDocument();
   });
 
-  it("renders no Value Bridges section when nothing triggered one", () => {
+  it("renders no Value Bridge card when nothing triggered one", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(<VirtualSnapshot snapshot={snapshotView(rendered({ valueBridges: [] }))} locale="en" t={t} />);
     expect(screen.queryByText("beeside can help")).not.toBeInTheDocument();
   });
 
-  it("renders the triggered Value Bridges, each with its approved heading and body, placed after How beeside Works", () => {
+  it("threads The Hive and beeside Verified as a paired card group right after Capability Landscape, before Your Initial Path (2026-09-30 authorization, item 1 — replaces the retired end-of-page ValueBridges grid)", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
     render(
       <VirtualSnapshot
@@ -196,7 +196,7 @@ describe("VirtualSnapshot", () => {
           rendered({
             valueBridges: [
               { key: "the_hive", eyebrow: "beeside can help", heading: "The Hive", body: "The Hive gives you access to beeside's curated ecosystem of trusted local providers." },
-              { key: "sherpa", eyebrow: "beeside can help", heading: "Your Sherpa", body: "Your Sherpa guides and coordinates the path to service activation." },
+              { key: "beeside_verified", eyebrow: "beeside can help", heading: "beeside Verified", body: "beeside Verified confirms who you are dealing with before you commit." },
             ],
           }),
         )}
@@ -205,11 +205,81 @@ describe("VirtualSnapshot", () => {
       />,
     );
     expect(screen.getByText("The Hive")).toBeInTheDocument();
-    expect(screen.getByText("Your Sherpa")).toBeInTheDocument();
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    const worksIndex = headings.indexOf("How beeside works with you");
-    const bridgesIndex = headings.indexOf("beeside can help");
-    expect(worksIndex).toBeGreaterThan(-1);
-    expect(bridgesIndex).toBeGreaterThan(worksIndex);
+    expect(screen.getByText("beeside Verified")).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    const landscapeIndex = headings.indexOf("Capability landscape");
+    const hiveIndex = headings.indexOf("The Hive");
+    const verifiedIndex = headings.indexOf("beeside Verified");
+    const pathIndex = headings.indexOf("Your initial path");
+    expect(landscapeIndex).toBeLessThan(hiveIndex);
+    expect(landscapeIndex).toBeLessThan(verifiedIndex);
+    expect(hiveIndex).toBeLessThan(pathIndex);
+    expect(verifiedIndex).toBeLessThan(pathIndex);
+  });
+
+  it("threads Operation Hub right after Your Initial Path, before Execution Pressure", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(
+      <VirtualSnapshot
+        snapshot={snapshotView(
+          rendered({
+            valueBridges: [{ key: "operation_hub_secure", eyebrow: "beeside can help", heading: "Operation Hub", body: "Operation Hub keeps every task and document in one place." }],
+          }),
+        )}
+        locale="en"
+        t={t}
+      />,
+    );
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    const pathIndex = headings.indexOf("Your initial path");
+    const ohIndex = headings.indexOf("Operation Hub");
+    const executionPressureIndex = headings.indexOf("Execution Pressure");
+    expect(pathIndex).toBeLessThan(ohIndex);
+    expect(ohIndex).toBeLessThan(executionPressureIndex);
+  });
+
+  it("threads Strategic Advisory right after What Stands Out, before the Next Decisions context cards", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(
+      <VirtualSnapshot
+        snapshot={snapshotView(
+          rendered({
+            valueBridges: [{ key: "strategic_advisory", eyebrow: "beeside can help", heading: "Strategic Advisory", body: "Strategic Advisory supports the bigger decisions." }],
+          }),
+        )}
+        locale="en"
+        t={t}
+      />,
+    );
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    const standOutIndex = headings.indexOf("What stands out");
+    const advisoryIndex = headings.indexOf("Strategic Advisory");
+    const reconcileIndex = headings.indexOf("Something to reconcile");
+    expect(standOutIndex).toBeLessThan(advisoryIndex);
+    expect(advisoryIndex).toBeLessThan(reconcileIndex);
+  });
+
+  it("threads beeside Sherpa inside the Next Decisions context block, with the large badge treatment, before What's next", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    render(
+      <VirtualSnapshot
+        snapshot={snapshotView(
+          rendered({
+            valueBridges: [{ key: "sherpa", eyebrow: "beeside can help", heading: "beeside Sherpa", body: "Your Sherpa guides and coordinates the path to service activation." }],
+          }),
+        )}
+        locale="en"
+        t={t}
+      />,
+    );
+    const sherpaHeading = screen.getByText("beeside Sherpa");
+    const badge = sherpaHeading.closest(".value-bridge-card")?.querySelector(".value-bridge-icon-badge-lg");
+    expect(badge).not.toBeNull();
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    const reconcileIndex = headings.indexOf("Something to reconcile");
+    const sherpaIndex = headings.indexOf("beeside Sherpa");
+    const whatsNextIndex = headings.indexOf("What's next");
+    expect(reconcileIndex).toBeLessThan(sherpaIndex);
+    expect(sherpaIndex).toBeLessThan(whatsNextIndex);
   });
 });

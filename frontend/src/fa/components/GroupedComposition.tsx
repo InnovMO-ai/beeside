@@ -1,4 +1,5 @@
 import { ChangeMode, QuestionField } from "./QuestionField";
+import { LeaveANote } from "./LeaveANote";
 import { T } from "../copy";
 import { Bundle, Locale, SessionView } from "../types";
 
@@ -17,6 +18,9 @@ interface GroupedCompositionProps {
    *  individual QuestionField below renders at <h2> instead (accessible heading hierarchy). */
   stepTitle: string;
   stepIntro?: string;
+  /** StepDef.note_field_id — one of `questionIds`, rendered as a collapsed "Leave a note" post-it
+   *  in the corner instead of inline with the rest. Undefined = no note affordance (unchanged). */
+  noteFieldId?: string;
 }
 
 /**
@@ -41,14 +45,23 @@ export function GroupedComposition({
   onChange,
   stepTitle,
   stepIntro,
+  noteFieldId,
 }: GroupedCompositionProps) {
+  const noteQuestion = noteFieldId ? bundle.questions.find((q) => q.id === noteFieldId) : undefined;
   return (
-    <div className="grouped-composition">
+    <div className="grouped-composition" style={{ position: "relative" }}>
+      {noteQuestion && (
+        <LeaveANote
+          value={currentValue(noteQuestion.id)}
+          t={t}
+          onChange={(value, mode) => onChange(noteQuestion.id, false, value, mode)}
+        />
+      )}
       <h1 className="step-title" tabIndex={-1} style={{ outline: "none" }}>
         {stepTitle}
       </h1>
       {stepIntro && <p className="lead">{stepIntro}</p>}
-      {questionIds.map((id) => {
+      {questionIds.filter((id) => id !== noteFieldId).map((id) => {
         const question = bundle.questions.find((q) => q.id === id);
         if (!question) return null;
         return (

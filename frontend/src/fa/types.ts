@@ -17,7 +17,17 @@ export type StageId =
   | "l2_priorities"
   | "l2_needs_landscape"
   | "l2_provider_resources"
-  | "l2_review";
+  | "l2_review"
+  // fa-qb-2.1.0 (Product Owner decision 2026-09-30, "Decision A"): the canonical 8-stage rail from
+  // the frozen PRE-SNAPSHOT Design Freeze (Identity pre-rail, then these seven, then Snapshot —
+  // "snapshot" above is reused, not redeclared). See question-bank-v2-1.ts for the full mapping.
+  | "l3_company"
+  | "l3_project"
+  | "l3_objectives_market"
+  | "l3_needs"
+  | "l3_activation"
+  | "l3_rules"
+  | "l3_resources_review";
 export type QuestionType =
   | "single_select"
   | "multi_select"
@@ -64,6 +74,9 @@ export interface StepDef {
    *  replacing the one-question-per-screen default. Undefined (or any other value) keeps the
    *  original per-screen behavior — existing fa-qb-1.1.0 steps are unaffected. */
   layout?: "grouped";
+  /** "Leave a note" affordance — id of one of this step's own `question_ids` rendered as a collapsed
+   *  post-it instead of inline. See the backend StepDef's own comment for the full rationale. */
+  note_field_id?: string;
   question_ids: string[];
   copy: Record<Locale, { title: string; intro?: string }>;
 }
