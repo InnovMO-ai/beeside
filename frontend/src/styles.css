@@ -26,6 +26,7 @@
      against white, meeting WCAG 1.4.3 for the tier-label text that uses it directly. */
   --teal-700: #0f766e;
   --teal-100: #ccece8;
+  --teal: #01b1a9; /* frozen v8.1's brand turquoise — precision-transition/value-case elements only; teal-700/teal-100 above are a separate, pre-existing, already-validated token used by the dumbbell/radar chart, left untouched */
   --ink: #17181b;
   --ink-soft: #54555c;
   /* Verified against its two actual usages (input/textarea/select border; the radar's
@@ -1869,7 +1870,7 @@ a.button {
   background: var(--purple-200);
 }
 .precision-route .pt.dest {
-  background: var(--teal-700);
+  background: var(--teal);
 }
 .precision-route .ln {
   width: 80px;
@@ -1877,7 +1878,7 @@ a.button {
   background: repeating-linear-gradient(to right, var(--purple-200) 0 4px, transparent 4px 8px);
 }
 .precision-transition .next-heading {
-  color: var(--teal-700);
+  color: var(--teal);
   font-size: 1.625rem;
   max-width: none;
   margin: 0 0 2.125rem;
@@ -1938,8 +1939,8 @@ a.button {
 .precision-cta-btn {
   display: inline-block;
   background: transparent;
-  border: 1.5px solid var(--teal-700);
-  color: var(--teal-700);
+  border: 1.5px solid var(--teal);
+  color: var(--teal);
 }
 
 /* ================================================================================================
@@ -2026,7 +2027,7 @@ a.button {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--teal-700);
+  background: var(--teal);
 }
 .compare-caption {
   font-size: 0.7813rem;
@@ -2237,9 +2238,15 @@ a.button {
   text-align: center;
 }
 .value-cta-btn {
+  /* Frozen v8.1 itself uses color:var(--heading) here, which is fine in light mode (heading ==
+     purple-900) but was never given a [data-theme="dark"] exception the way .value-banner-chips
+     span was for the identical situation (text on an always-bright, non-themed surface) — in dark
+     mode --heading flips to #C9B8F0, which on the still-bright, non-themed --teal background drops
+     to 1.47:1. Pinned to the literal purple-900 instead, same value in light mode (zero visual
+     change there), same fix pattern already used by .value-banner-chips span. */
   display: inline-block;
-  background: var(--teal-700);
-  color: var(--white);
+  background: var(--teal);
+  color: var(--purple-900);
   border: none;
   padding: 0.8125rem 1.875rem;
   border-radius: 100px;
@@ -2294,6 +2301,16 @@ a.button {
   --ink-faint: #8b8894;
   --border: #3a3346;
   --mist: #241f2d;
+  /* Gap found in contrast review: --bridge-bg/--value-shell-bg were only ever defined as static
+     :root values (frozen v8.1's own light-mode --gray-100/--value-shell-bg hex codes), never
+     retargeted here — so both cards stayed the light-mode medium-gray even in dark mode. In the
+     frozen source these ARE theme-aware (--gray-100 #585f6a -> #201E23, --value-shell-bg
+     #F2F1EE-equivalent -> #1B1920), which is also why .value-bridge-heading (--heading, now light
+     lavender) reads at only 3.56:1 against the un-retargeted #585f6a — under the un-retargeted
+     background, not over it. Retargeting to frozen's own dark hex codes fixes both the fidelity gap
+     and the contrast (8.6:1+ against the near-black values below). */
+  --bridge-bg: #201e23;
+  --value-shell-bg: #1b1920;
 }
 /* .pathway-stage-ordinal is the one pre-existing rule in this subtree pairing `color: var(--white)`
    with a `background: var(--purple-600)` fill that stays constant in dark mode — restored explicitly
@@ -2302,7 +2319,12 @@ a.button {
   color: #ffffff;
 }
 [data-theme="dark"] .virtual-snapshot .compare-row {
-  background: var(--ink-faint);
+  /* --ink-faint is a faint-TEXT token (meant to sit on the body background), not a card surface —
+     using it as a background here made .tier-name/.tier-sub (--ink/--ink-soft) fail WCAG AA against
+     it (as low as 1.71:1). --mist is this subtree's actual "darker card surface" token (already used
+     the same way by .pdf-tag/.tier-letter's own default background) and keeps every child text color
+     at 7.9:1+ against it. */
+  background: var(--mist);
 }
 [data-theme="dark"] .virtual-snapshot .compare-bar-track {
   background: #332f3b;
@@ -2323,10 +2345,13 @@ a.button {
   filter: invert(1);
 }
 [data-theme="dark"] .virtual-snapshot .value-banner {
-  background: var(--ink-faint);
+  /* Same --ink-faint-as-background fix as .compare-row above: .value-banner-copy h3 (--heading) was
+     down to 1.92:1 against it. --mist keeps h3/p at 8.9:1 / 14.2:1. */
+  background: var(--mist);
 }
 [data-theme="dark"] .virtual-snapshot .pdf-block {
-  background: var(--ink-faint);
+  /* Same fix: .pdf-block p (--ink-soft) was down to 1.71:1 against --ink-faint; --mist keeps it at 7.9:1. */
+  background: var(--mist);
 }
 [data-theme="dark"] .virtual-snapshot .tier-letter {
   background: var(--purple-900);
@@ -2356,7 +2381,14 @@ a.button {
   height: 15px;
   flex-shrink: 0;
 }
-[data-theme="dark"] .night-toggle {
+[data-theme="dark"] .virtual-snapshot .night-toggle {
+  /* Bug found in contrast review: background stayed the fixed --white (never retargeted) while
+     `color` followed --heading, which goes light-lavender in dark mode — 1.81:1 against white,
+     making the toggle itself nearly unreadable. The frozen artifact's own .night-toggle instead
+     backs onto its theme-aware --card token (white -> #1D1B22), so card+heading invert together;
+     --mist is this subtree's equivalent dark surface (8.86:1 against --heading here). Border-color
+     fix (pre-existing) kept alongside it. */
+  background: var(--mist);
   border-color: var(--border);
 }
 @media (max-width: 640px) {
