@@ -2295,6 +2295,15 @@ a.button {
   background: #131217;
 }
 [data-theme="dark"] .virtual-snapshot {
+  /* Root-cause fix (live visual QA, Macroblock F): redefining --ink/--heading as custom properties
+     here only helps elements that explicitly write `color: var(--ink)` in their OWN rule. Anything
+     relying on inherited `color` (most headings and labels, e.g. .display, "Your objectives") was
+     still inheriting body's color, which resolves `var(--ink)` at body's own scope — an ANCESTOR of
+     this element, outside this override — so it kept the light-mode dark-ink value even against the
+     new black background, rendering near-invisible. Setting `color` explicitly here, using the
+     now-locally-overridden --ink, re-establishes the inheritance root at this element so every
+     descendant without its own explicit color correctly cascades to the dark-mode value. */
+  color: var(--ink);
   --heading: #c9b8f0;
   --ink: #f1f0f5;
   --ink-soft: #b7b4c2;
@@ -2317,6 +2326,32 @@ a.button {
    since --white itself is deliberately left untouched above (see docblock). */
 [data-theme="dark"] .virtual-snapshot .pathway-stage-ordinal {
   color: #ffffff;
+}
+/* Live visual QA (Macroblock F) follow-up: .status-chip, .snapshot-panel and
+   .capability-landscape-item all keep their light-mode --tone-bg tint in dark mode too (a semantic
+   status color, never inverted — same category as --teal/--rose/--semaphore in the docblock above).
+   Their text either references --ink/--ink-soft directly (.status-chip, .capability-landscape-label,
+   .panel-intro/.panel-item-reason) or has no explicit color at all (.panel-item-label) and inherits
+   it — both cases need the LIGHT-mode ink values pinned back locally, or the base --ink/--ink-soft
+   overrides above (correctly meant for the black page background) make this fixed-light text
+   unreadable (white-on-mint) instead. */
+[data-theme="dark"] .virtual-snapshot .status-chip,
+[data-theme="dark"] .virtual-snapshot .snapshot-panel,
+[data-theme="dark"] .virtual-snapshot .capability-landscape-item {
+  --ink: #17181b;
+  --ink-soft: #54555c;
+  color: var(--ink);
+}
+/* .priority-badge-immediate is the one .status-chip variant whose own background is already
+   theme-aware (--mist, retargeted dark above) rather than a fixed light tint like the other five
+   badge/panel variants the rule above assumes — so pinning it to the same literal dark ink text
+   (#17181b on a now-dark #241f2d mist) collapsed to an unreadable 1.09:1. Its --tone-ink
+   (var(--purple-900), deliberately constant — see docblock) was never meant to sit on a dark
+   surface either. Restoring it to --heading (the subtree's own "brand purple, readable in dark
+   mode" token, already 8.9:1+ on --mist elsewhere in this file) fixes it without touching the
+   light-mode value, which is untouched by this dark-only rule. */
+[data-theme="dark"] .virtual-snapshot .status-chip.priority-badge-immediate {
+  color: var(--heading);
 }
 [data-theme="dark"] .virtual-snapshot .compare-row {
   /* --ink-faint is a faint-TEXT token (meant to sit on the body background), not a card surface —
