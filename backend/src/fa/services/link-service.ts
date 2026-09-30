@@ -222,6 +222,15 @@ export async function extendFromLink(
       questionBankVersion: project.question_bank_version,
       properties: { days, reason },
     });
+    // Confirms the new date immediately; the contextual help below still follows the day after.
+    await enqueueEmail(tx, {
+      dedupeKey: `access_extension_confirmed:${project.project_id}:${now.getTime()}`,
+      projectId: project.project_id,
+      personId: project.created_by_person_id,
+      template: "access_extension_confirmed",
+      enqueuedBy: outcome.wasExpired ? "fa.access_recovered" : "fa.access_extended",
+      now,
+    });
     await enqueueEmail(tx, {
       dedupeKey: `access_followup:${project.project_id}:${reason}`,
       projectId: project.project_id,

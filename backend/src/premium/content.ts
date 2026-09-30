@@ -1,10 +1,16 @@
 /**
- * Premium transition copy (Master Build Guide v2 §12, Functional Specification v1 §16.1–§16.7).
+ * Premium transition copy (Master Build Guide v2 §12).
  *
  * The consideration experience is not part of the immutable Snapshot, so its copy is versioned here
  * (premium-content-1.0.0) until the Admin Control Center (Phase 10) governs editable content. It
  * describes only the approved Premium operating model, never shows a price, and never frames
  * Premium as unlocking hidden results: the Snapshot already delivered value.
+ *
+ * Level 2 MVP owner decision (overrides the older Functional Specification v1 §16, which described
+ * two post-Snapshot paths — the external Preview Room and "Continue with Premium"): the Snapshot's
+ * final CTA is "Continue with Premium" alone. Preview Room is not part of the Snapshot conversion
+ * funnel and must not be reintroduced here; `PREVIEW_ROOM_URL` remains exported only because the
+ * unrelated access-followup email lifecycle (operations/email-outbox.ts) still links to it.
  */
 
 export const PREMIUM_CONTENT_VERSION = "premium-content-1.0.0";
@@ -14,7 +20,6 @@ export const PREMIUM_TERMS_URL = "https://www.beeside.you/termsandconditions";
 export interface PremiumContent {
   /** `question-bank:<version>` when governed by the versioned configuration, else the code default. */
   version: string;
-  previewRoomUrl: string;
   termsUrl: string;
   copy: Record<"en" | "es", PremiumCopy>;
 }
@@ -30,14 +35,14 @@ export function premiumContentOf(
 ): PremiumContent {
   return {
     version: bundle?.premium && bundleVersion ? `question-bank:${bundleVersion}` : PREMIUM_CONTENT_VERSION,
-    previewRoomUrl: bundle?.links?.preview_room_url ?? PREVIEW_ROOM_URL,
     termsUrl: bundle?.links?.premium_terms_url ?? PREMIUM_TERMS_URL,
     copy: bundle?.premium?.copy ?? PREMIUM_COPY,
   };
 }
 
 export interface PremiumCopy {
-  transition: { eyebrow: string; headline: string; body: string; continue_cta: string; explore_cta: string; explore_helper: string; new_tab: string };
+  /** Single primary action: "Continue with Premium". No second, competing CTA. */
+  transition: { eyebrow: string; headline: string; body: string; continue_cta: string; new_tab: string };
   consideration: {
     eyebrow: string;
     title: string;
@@ -79,8 +84,6 @@ export const PREMIUM_COPY: Record<"en" | "es", PremiumCopy> = {
       headline: "You have the picture. Now let’s add precision.",
       body: "Continue with beeside Premium to validate what matters most, define your requirements and turn this first picture into clear next steps.",
       continue_cta: "Continue with Premium",
-      explore_cta: "Explore Premium",
-      explore_helper: "Not ready yet? See examples of the strategic products, analyses and deliverables beeside prepares.",
       new_tab: "(opens in a new tab)",
     },
     consideration: {
@@ -169,8 +172,6 @@ export const PREMIUM_COPY: Record<"en" | "es", PremiumCopy> = {
       headline: "Ya tienes la visión general. Ahora sumemos precisión.",
       body: "Continúa con beeside Premium para validar lo más importante, definir tus requerimientos y convertir esta primera visión en próximos pasos claros.",
       continue_cta: "Continuar con Premium",
-      explore_cta: "Explorar Premium",
-      explore_helper: "¿Todavía no estás listo? Conoce ejemplos de los productos estratégicos, análisis y entregables que prepara beeside.",
       new_tab: "(se abre en una pestaña nueva)",
     },
     consideration: {

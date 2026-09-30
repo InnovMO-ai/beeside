@@ -4,7 +4,7 @@ import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journ
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
 import { createConfigVersioningRouter } from "../config-versioning/router";
-import { ConfigVersioningService } from "../config-versioning/service";
+import { ConfigVersioningError, ConfigVersioningErrorCode, ConfigVersioningService } from "../config-versioning/service";
 import { FaError } from "../fa/services/errors";
 import { resendPrivateLinkForProject } from "../fa/services/link-service";
 import { FaDeps } from "../fa/services/repository";
@@ -28,6 +28,7 @@ import {
   sealLoginState,
 } from "./admin-session";
 import { listAdminUsers, provisionAdminUser, updateAdminUser } from "./admin-users";
+import { communicationsOverview, saveAndPublishTemplate } from "./communications-service";
 import { AdminAuthError, AdminIdentityProvider, pkceChallenge, randomUrlToken } from "./oidc";
 import {
   listAuditEvents,
@@ -54,6 +55,15 @@ type AdminRequest = Request & { admin?: AdminPrincipal; requestId?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const API_PATH = "/api/admin";
+
+const CONFIG_VERSIONING_HTTP_STATUS: Record<ConfigVersioningErrorCode, number> = {
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  INVALID_TRANSITION: 409,
+  GATE_REFUSED: 409,
+  CONFLICT: 409,
+  VALIDATION_FAILED: 422,
+};
 
 /**
  * Admin/Supervisor Control Center API (Build Plan v1.1 Phase 10). Mounted only when the Admin API
@@ -93,6 +103,11 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
   const sendError = (res: Response, error: unknown, next: NextFunction) => {
     if (error instanceof FaError) {
       res.status(error.status).json({ error: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) });
+    } else if (error instanceof ConfigVersioningError) {
+      // Communications' write path (saveAndPublishTemplate) throws the same error type the generic
+      // /config/* router already translates — mirrored here rather than imported so this route's
+      // error mapping doesn't depend on that router's internal, unexported table.
+      res.status(CONFIG_VERSIONING_HTTP_STATUS[error.code]).json({ error: error.code, message: error.message });
     } else {
       next(error);
     }
@@ -401,6 +416,39 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     await audit(req, "integration_delivery.retry", ok ? "ALLOWED" : "FAILED", { targetType: "integration_delivery", targetId: id });
     if (!ok) throw new FaError("NOT_APPLICABLE", "this delivery cannot be retried");
     res.json({ retried: true });
+  }));
+
+  // ------------------------------------------------------------------ communications
+  // Governed template management for email content, not a general-purpose CMS: every template lives
+  // inside the versioned question-bank/snapshot-template bundles, and the write route below is a
+  // scoped surface onto the SAME draft/preview/review/publish flow Configuration uses generically —
+  // it can only ever change a template's copy/active flag, never questions, scoring, canonical field
+  // definitions or branching (see communications-service.ts for exactly how that's enforced).
+  router.get("/communications/templates", allow("operations.read", "communications.viewed"), handle(async (req, res) => {
+    const overview = await communicationsOverview(db, deps.fa.bundles, deps.configService);
+    await audit(req, "communications.viewed", "ALLOWED", { details: { question_bank_version: overview.questionBankVersion, snapshot_template_version: overview.snapshotTemplateVersion, count: overview.templates.length } });
+    res.json(overview);
+  }));
+
+  // ADMIN only (Supervisor stays read-only, matching the rest of Configuration): saves and
+  // immediately publishes a new bundle version carrying just this one template's edit. Every
+  // governed step (draft, preview, content review, publish) still runs — see saveAndPublishTemplate.
+  router.put("/communications/templates/:source/:key", allow("config.write", "communications.updated"), handle(async (req, res) => {
+    const source = req.params.source;
+    if (source !== "question_bank" && source !== "snapshot_template") throw new FaError("NOT_FOUND", "unknown template source");
+    const key = req.params.key ?? "";
+    const principal = req.admin as AdminPrincipal;
+    const requestBody = body(req);
+    const result = await saveAndPublishTemplate(db, deps.fa.bundles, deps.configService, principal.adminUserId, source, key, {
+      locale: requestBody.locale as "en" | "es",
+      subject: requestBody.subject as string,
+      body: requestBody.body as string,
+      cta: requestBody.cta as string,
+      secondaryCta: typeof requestBody.secondaryCta === "string" ? requestBody.secondaryCta : undefined,
+      active: typeof requestBody.active === "boolean" ? requestBody.active : undefined,
+    });
+    await audit(req, "communications.updated", "ALLOWED", { targetType: "email_template", targetId: `${source}:${key}`, details: { version: result.version, locale: requestBody.locale } });
+    res.json(result);
   }));
 
   // ------------------------------------------------------------------ analytics (read-only, both roles)

@@ -13,6 +13,18 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
     headline: "Your project, in perspective.",
     generatedOn: "Generated on September 15, 2026",
     summary: ["Northwind is looking to set up a local operation in Mexico."],
+    expansionProfile: [
+      { key: "market_evidence", label: "Market Evidence", value: 0.7, tier: "well_defined", tierLabel: "Well defined", demand: null, demandNote: null },
+      { key: "commercial_ambition_differentiation", label: "Commercial Ambition & Differentiation", value: 0.4, tier: "partially_defined", tierLabel: "Partially defined", demand: null, demandNote: null },
+      { key: "local_capability_base", label: "Local Capability Base", value: 0.2, tier: "early_stage", tierLabel: "Early stage", demand: null, demandNote: null },
+      { key: "governance_constraints", label: "Governance & Constraints", value: 0, tier: "early_stage", tierLabel: "Early stage", demand: null, demandNote: null },
+      { key: "financial_framework", label: "Financial Framework", value: 0.5, tier: "partially_defined", tierLabel: "Partially defined", demand: null, demandNote: null },
+      { key: "activation_planning", label: "Activation Planning", value: 0.6, tier: "partially_defined", tierLabel: "Partially defined", demand: null, demandNote: null },
+    ],
+    dualProfile: { title: "Definition & Evidence vs. Execution Demand", intro: "See where your expansion plan is well defined and where execution will demand more from the business.", definitionLabel: "Definition & Evidence", demandLabel: "Execution Demand" },
+    keyReading: null,
+    marketEvidenceNarrative: null,
+    executionPressureNarrative: null,
     facts: [
       { key: "company", label: "Company", value: "Northwind", detail: "Manufacturing" },
       { key: "priority", label: "Your immediate priority", value: "Local entity & legal setup", detail: null },
@@ -44,6 +56,10 @@ function rendered(overrides: Partial<RenderedSnapshot> = {}): RenderedSnapshot {
       intro: "Based on what you shared, these capabilities are relevant to your project.",
       items: [{ categoryId: 1, label: "Trade & customs", description: "Getting goods across borders" }],
     },
+    needsPriorities: null,
+    pathway: null,
+    needsLandscape: null,
+    valueBridges: [],
     disclosure: { title: "About this Snapshot", text: "This initial interpretation is based on the information you shared with us." },
     ...overrides,
   };
@@ -99,6 +115,16 @@ describe("SnapshotScreen", () => {
     render(<SnapshotScreen bundle={TEST_BUNDLE} t={makeT(TEST_BUNDLE, "en")} locale="en" load={load} onLocale={onLocale} anotherProjectInMind={false} />);
     expect(await screen.findByRole("heading", { level: 1, name: "Your project, in perspective." })).toBeInTheDocument();
     await waitFor(() => expect(onLocale).toHaveBeenCalledWith("es"));
+  });
+
+  it("shows the AssembleTransition (never a bare 'Loading…') while the Snapshot is still being generated", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } })));
+    let resolveLoad!: (value: SnapshotView) => void;
+    const load = vi.fn(() => new Promise<SnapshotView>((resolve) => (resolveLoad = resolve)));
+    render(<SnapshotScreen bundle={TEST_BUNDLE} t={makeT(TEST_BUNDLE, "en")} locale="en" load={load} onLocale={() => undefined} anotherProjectInMind={false} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("Putting the pieces together.");
+    resolveLoad(snapshot(rendered()));
+    expect(await screen.findByRole("heading", { level: 1, name: "Your project, in perspective." })).toBeInTheDocument();
   });
 
   it("reports a calm error when the Snapshot cannot be loaded", async () => {

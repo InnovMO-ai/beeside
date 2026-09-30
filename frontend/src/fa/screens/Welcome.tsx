@@ -1,4 +1,5 @@
 import { T } from "../copy";
+import heroWorldBee from "../../assets/hero-world-bee.png";
 
 export function Welcome({ t, onStart }: { t: T; onStart: () => void }) {
   return (
@@ -15,11 +16,10 @@ export function Welcome({ t, onStart }: { t: T; onStart: () => void }) {
           </button>
         </div>
         <p className="helper">{t("welcome", "support")}</p>
-        <p className="helper" style={{ marginTop: "2.5rem", color: "var(--ink)" }}>
-          {t("welcome", "brand_statement")}
-        </p>
       </div>
-      <div className="welcome-visual" aria-hidden="true" />
+      <div className="welcome-visual" aria-hidden="true">
+        <img className="welcome-visual-img" src={heroWorldBee} alt="" />
+      </div>
     </section>
   );
 }

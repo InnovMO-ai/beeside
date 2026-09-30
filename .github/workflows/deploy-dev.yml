@@ -1,11 +1,22 @@
 name: Deploy — dev
 
-# Automatic on every merge to main, once CI has passed — but only when the dev
-# environment is explicitly opened for deployment (vars.DEPLOY_DEV_ENABLED ==
-# 'true'). Until the deployment prerequisites recorded in docs/deployment are in
-# place (migration job, runtime database user, routing), merging to main must not
-# change a running service, so the gate is off by default. staging and production
-# require an explicit promotion (see deploy-staging.yml / deploy-production.yml).
+# Two ways to deploy to dev, both gated by vars.DEPLOY_DEV_ENABLED == 'true':
+#
+# 1. Automatic — on every merge to main, once CI has passed on main. Until the
+#    deployment prerequisites recorded in docs/deployment are in place (migration
+#    job, runtime database user, routing), merging to main must not change a
+#    running service, so the gate is off by default.
+#
+# 2. Manual — workflow_dispatch, run by a human from the Actions tab against
+#    whichever branch they select there (typically a feature branch under QA).
+#    It deploys the exact commit the run was dispatched from -- backend and
+#    frontend together, from the same SHA -- through the identical
+#    build -> migrate -> deploy steps as the automatic path. It does not merge
+#    anything to main and cannot touch staging or production: those are
+#    separate workflows targeting separate Cloud Run services.
+#
+# staging and production require an explicit promotion (see deploy-staging.yml /
+# deploy-production.yml).
 #
 # Vendor: GCP. Authentication uses Workload Identity Federation (see
 # infra/terraform/envs/dev/main.tf) — no long-lived key is ever stored in GitHub.
@@ -14,14 +25,34 @@ name: Deploy — dev
 # user, in its own Cloud Run job) -> deploy the services. A revision never serves
 # traffic against a schema that is behind it: /health/ready fails until the
 # migrations shipped in the image are applied.
+#
+# NOTE ON ENVIRONMENT PROTECTION: this job runs under the GitHub "dev"
+# Environment (environment: dev, below). If that Environment's own
+# "Deployment branches and tags" setting is restricted to main, a manual
+# workflow_dispatch run from a feature branch will still be blocked by GitHub
+# itself before this file's own logic ever runs, with an error like "Branch
+# <name> is not allowed to deploy to dev due to environment protection rules".
+# That setting lives in GitHub (Settings -> Environments -> dev), not in this
+# file, and is outside what this workflow can grant on its own -- see
+# docs/deployment/README.md and the repo's Settings -> Environments -> dev page.
 
 on:
   workflow_run:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
-
   workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this manual dev deploy is needed (shows in the run log)"
+        required: false
+        default: "Manual QA deploy of the current branch"
+
+# Only one dev deploy runs at a time -- a manual dispatch and an automatic
+# post-merge deploy must never race against the same Cloud Run services.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
 
 permissions:
   id-token: write # required for Workload Identity Federation
@@ -39,17 +70,30 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Build succeeded. Deployment to dev is not enabled:"
+            echo "Deployment to dev is not enabled:"
             echo "  - GCP_PROJECT_ID and the other GCP_* variables must be set (README.md)"
             echo "  - DEPLOY_DEV_ENABLED must be 'true' (see docs/deployment/README.md)"
           fi
 
   deploy:
     needs: gate
-    if: ${{ github.event.workflow_run.conclusion == 'success' && needs.gate.outputs.enabled == 'true' }}
+    if: |
+      needs.gate.outputs.enabled == 'true' &&
+      (
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     environment: dev
     steps:
+      - name: Log manual dispatch context
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Manual dev deploy requested by ${{ github.actor }}"
+          echo "Branch/ref: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -69,6 +113,11 @@ jobs:
 
       # Both images build from the repository root: the backend depends on the
       # @beeside/canonical-fields workspace and ships backend/db/migrations.
+      # github.sha is always the commit this run actually checked out -- the
+      # head of main on the automatic path, the head of the dispatched branch
+      # on a manual run -- so the backend image, the frontend image, the
+      # migration job and both Cloud Run deploys below are guaranteed to come
+      # from that same single SHA.
       - name: Build and push images
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet

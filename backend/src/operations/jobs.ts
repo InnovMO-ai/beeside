@@ -179,12 +179,67 @@ const accessLifecycle: Handler = async (deps, { now, heartbeat }) => {
 };
 
 /**
+ * Two-stage warning before a free (never-Premium) project's temporary retention elapses (Level 2
+ * MVP §7, Communications). A cadence decision, not part of the pinned LifecyclePolicy calendar, so
+ * it needs no versioned config or schema change: `email_delivery` itself is the "already sent"
+ * ledger (NOT EXISTS by project + template), the same trick emailRequestedRecently already relies
+ * on elsewhere — no new fa_project_lifecycle tracking column. Relevance (cancel if Premium was
+ * activated or the project was purged in the meantime) is re-checked at send time by the outbox
+ * itself (see EMAIL_TEMPLATES.retention_reminder/.retention_reminder_final in email-outbox.ts).
+ */
+const RETENTION_REMINDER_LEAD_DAYS = 14;
+const RETENTION_FINAL_REMINDER_LEAD_DAYS = 3;
+
+async function sendRetentionReminders(
+  deps: FaDeps,
+  now: Date,
+  template: "retention_reminder" | "retention_reminder_final",
+  leadDays: number,
+  heartbeat: () => Promise<void>,
+): Promise<number> {
+  const { rows } = await deps.db.query<{ project_id: string; created_by_person_id: string }>(
+    `SELECT l.project_id, p.created_by_person_id
+       FROM fa_project_lifecycle l JOIN project p ON p.project_id = l.project_id
+      WHERE NOT p.premium_ever_activated AND p.assessment_state <> 'DELETED'
+        AND l.retention_until IS NOT NULL AND l.retention_until > $1
+        AND l.retention_until <= $1::timestamptz + make_interval(days => $2)
+        AND NOT EXISTS (SELECT 1 FROM email_delivery ed WHERE ed.project_id = l.project_id AND ed.template = $3)
+      ORDER BY l.retention_until LIMIT $4`,
+    [now, leadDays, template, MAX_ITEMS],
+  );
+  let sent = 0;
+  for (const candidate of rows) {
+    await deps.db.transaction((tx) =>
+      enqueueEmail(tx, {
+        dedupeKey: `${template}:${candidate.project_id}`,
+        projectId: candidate.project_id,
+        personId: candidate.created_by_person_id,
+        template,
+        enqueuedBy: "job.temporary_retention",
+        now,
+      }),
+    );
+    sent += 1;
+    if (sent % 50 === 0) await heartbeat();
+  }
+  return sent;
+}
+
+/**
  * Temporary retention: every free First Assessment whose retention has elapsed is transitioned to
  * EXPIRED and purged to a DELETED tombstone in one transaction each. The purge re-checks under the
  * row lock, so a Premium activation (or a pending Premium request) always wins.
  */
 const temporaryRetention: Handler = async (deps, { now, runId, heartbeat }) => {
-  const stats: { candidates: number; purged: number; skipped: Record<string, number> } = { candidates: 0, purged: 0, skipped: {} };
+  const stats: { candidates: number; purged: number; skipped: Record<string, number>; retention_reminders_sent: number; retention_final_reminders_sent: number } = {
+    candidates: 0,
+    purged: 0,
+    skipped: {},
+    retention_reminders_sent: 0,
+    retention_final_reminders_sent: 0,
+  };
+  stats.retention_reminders_sent = await sendRetentionReminders(deps, now, "retention_reminder", RETENTION_REMINDER_LEAD_DAYS, heartbeat);
+  stats.retention_final_reminders_sent = await sendRetentionReminders(deps, now, "retention_reminder_final", RETENTION_FINAL_REMINDER_LEAD_DAYS, heartbeat);
   const candidates = await deps.db.transaction(async (tx: Db) => {
     const { rows } = await tx.query<{ project_id: string }>("SELECT project_id FROM fa_temporary_retention_candidates($1) LIMIT $2", [now, MAX_ITEMS]);
     return rows.map((r) => r.project_id);

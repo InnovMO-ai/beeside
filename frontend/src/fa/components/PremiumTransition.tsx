@@ -14,13 +14,20 @@ export interface PremiumSource {
 type Stage = "offer" | "consideration" | "activation" | "result";
 
 /**
- * Post-Snapshot experience (Functional Specification v1 §16): two paths — the external Preview Room
- * and "Continue with Premium" on this same project. Premium adds validation, precision, definition
- * and accompaniment; it never hides or re-reveals Snapshot results, and no price is shown.
+ * Post-Snapshot experience. Single primary action: "Continue with Premium" on this same project.
+ *
+ * Level 2 MVP owner decision (overrides the older Functional Specification v1 §16, which described
+ * two paths — the external Preview Room and "Continue with Premium"): Preview Room is not part of
+ * the Snapshot conversion funnel, and there is no second, competing primary CTA. Premium adds
+ * validation, precision, definition and accompaniment; it never hides or re-reveals Snapshot
+ * results, and no price is shown.
  */
 export function PremiumTransition({ locale, source }: { locale: Locale; source: PremiumSource }) {
   const [content, setContent] = useState<PremiumContent | null>(null);
   const [status, setStatus] = useState<PremiumStatus | null>(null);
+  // Distinguishes "still fetching" (reserve space so nothing jumps once it resolves) from "fetch
+  // finished and Premium is genuinely unavailable" (render nothing at all, permanently).
+  const [settled, setSettled] = useState(false);
   const [stage, setStage] = useState<Stage>("offer");
   const [activated, setActivated] = useState(false);
   const [accept, setAccept] = useState(false);
@@ -39,7 +46,10 @@ export function PremiumTransition({ locale, source }: { locale: Locale; source: 
         setStatus(loadedStatus);
       })
       // Premium is an optional next step: if it cannot load, the Snapshot stays exactly as it is.
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setSettled(true);
+      });
     return () => {
       active = false;
     };
@@ -54,7 +64,11 @@ export function PremiumTransition({ locale, source }: { locale: Locale; source: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  if (!content || !status || !status.available) return null;
+  if (!content || !status || !status.available) {
+    // Still loading: reserve roughly the space the block will occupy so the rest of the page
+    // doesn't jump once it resolves. Confirmed unavailable (settled): render truly nothing.
+    return settled ? null : <div className="premium-transition-placeholder" aria-hidden="true" />;
+  }
   const copy = content.copy[locale];
   const reactivation = status.canReactivate;
 
@@ -224,18 +238,7 @@ export function PremiumTransition({ locale, source }: { locale: Locale; source: 
           >
             {copy.transition.continue_cta}
           </button>
-          <a
-            className="button button-secondary"
-            href={content.previewRoomUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => track({ type: "preview_room_clicked", interfaceLanguage: locale })}
-          >
-            {copy.transition.explore_cta}
-            <span className="visually-hidden"> {copy.transition.new_tab}</span>
-          </a>
         </div>
-        <p className="premium-helper">{copy.transition.explore_helper}</p>
       </>
     );
   }

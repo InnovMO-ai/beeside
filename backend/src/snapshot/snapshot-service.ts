@@ -4,6 +4,8 @@ import { recordJourneyEvent } from "../fa/services/analytics";
 import { FaError } from "../fa/services/errors";
 import { FaDeps, ProjectRow, findUsableToken, loadProject } from "../fa/services/repository";
 import { looksLikeAccessToken } from "../fa/services/tokens";
+import { deriveLegacyCapabilityAnswers } from "../fa/engine/legacy-capability-adapter";
+import { deriveLevel2CompatibilityAnswers } from "../fa/engine/level2-compatibility-adapter";
 import { DEFAULT_SNAPSHOT_LINK_DAYS, enqueueEmail } from "../operations/email-outbox";
 import { evaluateRules } from "../rules/engine";
 import { validateRulesEngineBundle } from "../rules/validate-rules-bundle";
@@ -34,6 +36,7 @@ export async function generateAssessmentOutputs(
   project: ProjectRow,
   questionBank: QuestionBankBundle,
   effectiveAnswers: ReadonlyMap<string, unknown>,
+  applicableQuestionIds: ReadonlySet<string>,
   now: Date,
 ): Promise<{ snapshotId: string }> {
   const pins = await tx.query<{ rules_engine_version: string; snapshot_template_version: string; last_name: string }>(
@@ -54,8 +57,32 @@ export async function generateAssessmentOutputs(
     [project.project_id],
   );
   const answerIds = new Map(answerRows.rows.map((r) => [r.field_key, r.answer_id]));
-  const evidence = new Map([...effectiveAnswers].map(([key, value]) => [key, { value, answerId: answerIds.get(key) ?? null }]));
+
+  // Level 2 MVP: the pre-Level-2 "capability mother question" and its two children no longer exist
+  // in the visible journey (superseded by fa.needs.map — see legacy-capability-adapter.ts for why
+  // this reconciliation exists and what it does NOT guarantee). Derived values only fill a gap —
+  // a real answer for these field_keys (a project still on fa-qb-1.1.0) always wins. This one feeds
+  // the rules engine's evidence only, as before — it never affects Snapshot/Internal Assessment
+  // content directly.
+  const legacyDerived = deriveLegacyCapabilityAnswers(effectiveAnswers);
+  // Owner decisions (2026-09-18): fa.strategic.commercial_success and fa.goal.expansion_driver are
+  // no longer client-facing questions in fa-qb-2.0.0 (see level2-compatibility-adapter.ts and
+  // question-bank-v2.ts's file header). Unlike legacyDerived, this DOES need to reach compose.ts —
+  // both fields are read directly in the Snapshot narrative and the Internal Assessment profile, not
+  // just by the rules engine — so it is merged into `compatAnswers` below, which both the rules
+  // engine evidence and the Snapshot/Internal Assessment `answers` input are built from. A real
+  // stored answer for either field_key always wins (merge order: derived first, real second).
+  const level2Derived = deriveLevel2CompatibilityAnswers(effectiveAnswers);
+  const compatAnswers = new Map([...level2Derived, ...effectiveAnswers]);
+  const evidenceSource = new Map([...legacyDerived, ...compatAnswers]);
+  const evidence = new Map([...evidenceSource].map(([key, value]) => [key, { value, answerId: answerIds.get(key) ?? null }]));
   const evaluation = evaluateRules(rules, evidence, now);
+
+  // Expansion Profile (compose.ts) needs to know which fields were actually applicable to this
+  // respondent — not just which ones they answered — so an inapplicable question never counts
+  // against a dimension's "degree of definition". Derived from the same applicableQuestionIds the
+  // caller already computed via computeJourney(), mapped through this pinned bundle's field_keys.
+  const applicableFieldKeys = new Set(questionBank.questions.filter((q) => applicableQuestionIds.has(q.id)).map((q) => q.field_key));
 
   const input = {
     projectId: project.project_id,
@@ -69,7 +96,12 @@ export async function generateAssessmentOutputs(
       deliverableLanguage: project.preferred_deliverable_language,
       interactionLanguage: project.preferred_interaction_language,
     },
-    answers: effectiveAnswers,
+    // compatAnswers (real answers, with the two Level 2 owner-decision gaps filled deterministically
+    // — see above) rather than the raw effectiveAnswers, so composeClientSnapshot/
+    // composeInternalAssessment see fa.strategic.commercial_success / fa.goal.expansion_driver
+    // exactly as fa-qb-1.1.0 projects always have, for a Level 2 project too.
+    answers: compatAnswers,
+    applicableFieldKeys,
     questionBank,
     rules,
     template,

@@ -93,8 +93,10 @@ describeWithDb("End-to-end journeys (PostgreSQL, rolled back)", () => {
 
     // --- Premium transition: content, request, then beeside's confirmation ---------------------------
     const premiumContent = await h.api().get("/api/fa/session/premium/content").set(auth(resumedToken));
-    expect(premiumContent.body.previewRoomUrl).toBe("https://www.beeside.you/preview");
-    expect(JSON.stringify(premiumContent.body)).not.toMatch(/\$|USD|MXN|precio|price/i);
+    // Level 2 MVP: Preview Room is not part of the Snapshot conversion funnel — single primary CTA only.
+    expect(premiumContent.body.previewRoomUrl).toBeUndefined();
+    expect(premiumContent.body.copy.en.transition.explore_cta).toBeUndefined();
+    expect(JSON.stringify(premiumContent.body)).not.toMatch(/\$|USD|MXN|precio|price|preview.?room/i);
     expect((await h.api().get("/api/fa/session/premium").set(auth(resumedToken))).body).toMatchObject({ available: true, canActivate: true, accessActive: false });
 
     const requested = await h.api().post("/api/fa/session/premium/activation").set(auth(resumedToken)).send({ acceptTerms: true });

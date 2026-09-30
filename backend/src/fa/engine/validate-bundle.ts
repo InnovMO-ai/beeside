@@ -2,6 +2,7 @@ import { getFieldDefinition } from "@beeside/canonical-fields";
 import { BUNDLE_LOCALES, OptionDef, QuestionBankBundle, QuestionType } from "./bundle-types";
 import { conditionFields } from "./conditions";
 import { validateLifecyclePolicyConfig } from "../services/access-lifecycle";
+import { isKnownNeedsLeaf } from "../content/needs-explorer-taxonomy";
 
 const TYPE_TO_DATA_TYPE: Record<QuestionType, string> = {
   single_select: "single_select",
@@ -12,6 +13,9 @@ const TYPE_TO_DATA_TYPE: Record<QuestionType, string> = {
   country_list: "country_list",
   quantity: "quantity",
   locale: "locale",
+  tag_list: "tag_list",
+  needs_map: "needs_map",
+  counterparty_list: "counterparty_list",
 };
 
 const sameSet = (a: readonly string[], b: readonly string[]) =>
@@ -22,6 +26,10 @@ const sameSet = (a: readonly string[], b: readonly string[]) =>
  * (shared/canonical-fields). Complements the database's generic bundle validation (Phase 3):
  * keys, types, option values and exclusivity must match the canonical definitions exactly, every
  * question belongs to exactly one step, and conditions only read answers asked earlier.
+ *
+ * Level 2 MVP: a `"review"` step is validated exactly like `"transition"` (no question_ids of its
+ * own); `needs_map` questions are checked for `options`/`options_from` misuse (neither applies to
+ * a composite type) rather than against a canonical `values` set.
  */
 export function validateQuestionBankBundle(bundle: QuestionBankBundle): string[] {
   const errors: string[] = [];
@@ -49,19 +57,28 @@ export function validateQuestionBankBundle(bundle: QuestionBankBundle): string[]
     if (def.source === "identity" && !def.binding?.startsWith("person.")) {
       err(`${question.id}: identity field ${question.field_key} cannot be asked as a journey question`);
     }
-    const optionValues = (list?: OptionDef[]) => (list ?? []).map((o) => o.value);
-    if (question.type === "single_select" || question.type === "multi_select" || question.type === "locale") {
-      if (question.options_from) {
-        if (question.options) err(`${question.id}: options and options_from are mutually exclusive`);
-      } else if (!sameSet(optionValues(question.options), def.values ?? [])) {
-        err(`${question.id}: option values differ from canonical values of ${question.field_key}`);
+    if (question.type === "needs_map") {
+      if (question.options || question.options_from || question.units) {
+        err(`${question.id}: needs_map cannot declare options, options_from or units`);
       }
-    }
-    if (question.type === "quantity" && question.units && !sameSet(optionValues(question.units), def.values ?? [])) {
-      err(`${question.id}: unit values differ from canonical values of ${question.field_key}`);
-    }
-    if (!sameSet(question.exclusive_values ?? [], def.exclusiveValues ?? [])) {
-      err(`${question.id}: exclusive values differ from canonical definition`);
+    } else {
+      const optionValues = (list?: OptionDef[]) => (list ?? []).map((o) => o.value);
+      if (question.type === "single_select" || question.type === "multi_select" || question.type === "locale") {
+        if (question.options_from) {
+          if (question.options) err(`${question.id}: options and options_from are mutually exclusive`);
+        } else if (!sameSet(optionValues(question.options), def.values ?? [])) {
+          err(`${question.id}: option values differ from canonical values of ${question.field_key}`);
+        }
+      }
+      if (question.type === "quantity" && question.units && !sameSet(optionValues(question.units), def.values ?? [])) {
+        err(`${question.id}: unit values differ from canonical values of ${question.field_key}`);
+      }
+      if (!sameSet(question.exclusive_values ?? [], def.exclusiveValues ?? [])) {
+        err(`${question.id}: exclusive values differ from canonical definition`);
+      }
+      if (question.type === "multi_select" && def.maxSelect !== undefined && question.max_select !== def.maxSelect) {
+        err(`${question.id}: max_select ${String(question.max_select)} differs from canonical ${def.maxSelect}`);
+      }
     }
     for (const locale of BUNDLE_LOCALES) {
       if (!question.copy[locale]?.title?.trim()) err(`${question.id}: missing ${locale} title`);
@@ -79,7 +96,9 @@ export function validateQuestionBankBundle(bundle: QuestionBankBundle): string[]
     if (stepIds.has(step.id)) err(`duplicate step id ${step.id}`);
     stepIds.add(step.id);
     if (!bundle.stages.some((s) => s.id === step.stage)) err(`step ${step.id}: unknown stage ${step.stage}`);
-    if (step.kind === "transition" && step.question_ids.length > 0) err(`transition ${step.id} cannot contain questions`);
+    if ((step.kind === "transition" || step.kind === "review") && step.question_ids.length > 0) {
+      err(`${step.kind} step ${step.id} cannot contain questions`);
+    }
     if (step.kind === "questions" && step.question_ids.length === 0) err(`step ${step.id} has no questions`);
     for (const field of step.applies_when ? conditionFields(step.applies_when) : []) {
       if (!askedSoFar.has(field)) err(`step ${step.id}: condition reads ${field} before it is asked`);
@@ -132,6 +151,13 @@ export function validateQuestionBankBundle(bundle: QuestionBankBundle): string[]
       const copy = def.copy[locale];
       if (!copy?.subject?.trim() || !copy.body?.trim() || !copy.cta?.trim()) err(`emails.${template}: missing ${locale} subject, body or cta`);
     }
+  }
+
+  // Level 2 MVP: every needs_map question referencing a fixed selectable set is sanity-checked
+  // against the live taxonomy file's non-emptiness (a broken/empty taxonomy would silently make
+  // the whole Needs Explorer unusable rather than fail loudly at bundle-publish time).
+  if (bundle.questions.some((q) => q.type === "needs_map") && !isKnownNeedsLeaf("company_setup")) {
+    err("needs-explorer-taxonomy.ts appears empty or corrupted (company_setup leaf not found)");
   }
 
   return errors;

@@ -33,8 +33,8 @@ export const CLIENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "save_failed",
   "step_back_navigated",
   "snapshot_viewed",
-  // Phase 9: the two post-Snapshot paths (no answer content, no personal data).
-  "preview_room_clicked",
+  // Phase 9: the post-Snapshot path (no answer content, no personal data). Preview Room is not part
+  // of the Snapshot conversion funnel (Level 2 MVP owner decision), so it has no client event.
   "premium_continue_clicked",
   "premium_consideration_viewed",
   "premium_activation_viewed",

@@ -6,12 +6,46 @@
   --purple-900: #2e0879;
   --purple-600: #7357c1;
   --purple-200: #b9aedd;
+  /* Night Shift (2026-09-30 authorization, item 1) indirection token: --purple-900 is also used as a
+     solid BACKGROUND fill in several places (buttons, value-cta, compare-chip) that must stay the same
+     deep purple in both themes — exactly the frozen v8.1 artifact's own reasoning for introducing this
+     same token. Only HEADING TEXT color rules read --heading; backgrounds keep reading --purple-900
+     directly and are unaffected by the dark override below. Defaults to --purple-900, so nothing
+     changes visually until dark mode overrides it. */
+  --heading: var(--purple-900);
+  /* New surfaces introduced by the frozen v8.1 convergence (2026-09-30 authorization, item 1): the
+     "beeside can help" bridge cards' warm dark-gray background, and the "What beeside gives you"
+     value-shell's background — both literal frozen v8.1 values (`--gray-100` / `--value-shell-bg`
+     there), kept as their own tokens (not reusing --ink or --purple-900) since dark mode retargets
+     them independently, exactly as the frozen file itself does. */
+  --bridge-bg: #585f6a;
+  --value-shell-bg: #585f6a;
+  /* Dual Expansion Profile (Macroblock 7): the ONE deliberate second accent, reserved exclusively
+     for the Execution Demand series so it never reads as the same signal as purple's Definition &
+     Evidence — the frozen Snapshot's own precedent (`--teal` there). #0f766e measures ~4.54:1
+     against white, meeting WCAG 1.4.3 for the tier-label text that uses it directly. */
+  --teal-700: #0f766e;
+  --teal-100: #ccece8;
+  --teal: #01b1a9; /* frozen v8.1's brand turquoise — precision-transition/value-case elements only; teal-700/teal-100 above are a separate, pre-existing, already-validated token used by the dumbbell/radar chart, left untouched */
   --ink: #17181b;
   --ink-soft: #54555c;
-  --ink-faint: #96979c;
+  /* Verified against its two actual usages (input/textarea/select border; the radar's
+     "early-stage" tier label) — both on a white background: #96979c measured ~2.92:1, failing
+     both WCAG 1.4.3 (4.5:1, normal text) and 1.4.11 (3:1, UI component boundaries). #75767c
+     keeps the same near-neutral hue and stays visibly lighter than --ink-soft, while measuring
+     ~4.53:1 against white. */
+  --ink-faint: #75767c;
   --white: #ffffff;
   --mist: #f1f1fa;
+  /* Neutral structural border — for a boundary that is purely structural (a divider, a plain
+     container edge), not a deliberate brand/accent signal. Purple stays reserved for genuine
+     accent moments: hover/selected states, primary actions, links, emphasis rules. Matches the
+     literal value already used by .admin-card's border, now named instead of repeated ad hoc. */
+  --border: #e3e3ea;
   --radius: 10px;
+  /* Shared indent for a sub-field nested under a selected option (used identically in three places
+     across QuestionField.tsx and NeedsExplorer.tsx — token instead of a repeated magic number). */
+  --indent: 2.1rem;
   --font: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
@@ -72,12 +106,25 @@ a {
   gap: 1rem;
   padding: 1.25rem clamp(1.25rem, 5vw, 4rem);
 }
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 .logo {
   display: block;
   /* The official asset carries its own clear space; it is scaled, never cropped or recolored. */
   height: 76px;
   width: auto;
   margin: -14px 0 -14px -20px;
+}
+.header-product-label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 0.01em;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--border);
 }
 .header-actions {
   display: flex;
@@ -89,7 +136,7 @@ a {
   font-size: 0.9375rem;
   color: var(--ink);
   background: var(--white);
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--ink-faint);
   border-radius: var(--radius);
   padding: 0.35rem 0.6rem;
 }
@@ -106,6 +153,11 @@ a {
 }
 .progress-rail li {
   flex: 1;
+  /* Without this, a flex item's implicit min-width is its content's min intrinsic width — for a
+     longer single-word stage label (e.g. "Prioridades") that can force the whole rail wider than a
+     narrow phone viewport instead of wrapping. min-width: 0 lets it shrink and wrap like any other
+     text instead of pushing the row into horizontal overflow. */
+  min-width: 0;
   font-size: 0.8125rem;
   letter-spacing: 0.02em;
   color: var(--ink-soft);
@@ -125,6 +177,14 @@ a {
 .progress-rail li[data-state="current"] {
   color: var(--ink);
   font-weight: 700;
+}
+@media (max-width: 480px) {
+  .progress-rail ol {
+    gap: 0.3rem;
+  }
+  .progress-rail li {
+    font-size: 0.75rem;
+  }
 }
 
 main {
@@ -167,6 +227,9 @@ main {
 }
 
 /* ---------------------------------------------------------------- welcome */
+/* Hero/Home (owner-approved). Desktop: copy left, artwork right. Tablet: the same two columns,
+   narrowed, for as long as they stay legible. Mobile: single column, artwork last — header, copy,
+   CTA, support, then artwork — per the approved order; nothing here reorders on mobile. */
 .welcome {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -174,10 +237,31 @@ main {
   align-items: stretch;
 }
 .welcome-visual {
-  /* Reserved for the single approved opening photograph (asset not yet supplied). */
+  /* Approved static beeside world + bee illustration (2026-09-30): the world illustration, the
+     official beeside bee, and international landmarks/environmental elements, used as supplied.
+     Static image only: no globe rotation, no WebGL, no recreation/recoloring/redrawing of the
+     artwork, no additional bee, no stock photography. Deliberately unframed — no border, no card
+     shadow — per the "less card-based, less framing" visual direction. */
   min-height: 22rem;
-  border-radius: var(--radius);
-  background: var(--mist);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.welcome-visual-img {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+@media (max-width: 960px) {
+  .welcome {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+  }
+  .welcome-visual {
+    min-height: 16rem;
+  }
 }
 @media (max-width: 760px) {
   .welcome {
@@ -185,7 +269,6 @@ main {
   }
   .welcome-visual {
     min-height: 12rem;
-    order: -1;
   }
 }
 
@@ -241,6 +324,9 @@ main {
   gap: 0.75rem;
   align-items: flex-start;
   margin: 0.75rem 0 0;
+  /* ~44px usable interaction height for the whole clickable row (label wraps the input and its
+     text), matching .option/.button — the visible glyph below stays its original 1.25rem size. */
+  min-height: 2.75rem;
 }
 .check input {
   width: 1.25rem;
@@ -273,7 +359,9 @@ fieldset.question {
   font-size: clamp(1.6rem, 3.4vw, 2.4rem);
   line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  /* Aligned with .display/.premium-headline (both -0.02em) — the three large-headline treatments
+     now share the same letter-spacing, one small piece of the same hierarchy system. */
+  letter-spacing: -0.02em;
 }
 .question-title .optional-tag {
   font-size: 1rem;
@@ -290,7 +378,9 @@ fieldset.question {
   gap: 0.85rem;
   min-height: 3.25rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--purple-200);
+  /* Neutral at rest — purple is reserved for the deliberate moments below (hover, selected), not
+     the default resting state of every choosable row. */
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--white);
   cursor: pointer;
@@ -337,12 +427,20 @@ fieldset.question {
   font: inherit;
   cursor: pointer;
   padding: 0.1rem 0.35rem;
+  /* ~44px touch target (shared by Needs Explorer's priority reorder/remove chips and every other
+     tag/counterparty-list chip that reuses .chip) — the visible glyph stays the same size, this
+     only enlarges the hit area, matching the min-height already used by .button/.option. */
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .suggestions {
   list-style: none;
   margin: 0.5rem 0 0;
   padding: 0;
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   max-height: 16rem;
   overflow: auto;
@@ -433,6 +531,357 @@ fieldset.question {
   --tone-bg: #fff1f3;
   --tone-border: #fcc8d3;
 }
+/* AssembleTransition — non-spinner motion into the Snapshot ("Putting the pieces together"). */
+.assemble-transition {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 4rem 1rem;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+.assemble-tiles {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.assemble-tile {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--purple-600);
+  opacity: 0;
+  transform: translateY(10px) scale(0.6);
+  animation: assemble-settle 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.assemble-tile:nth-child(3) {
+  background: var(--purple-900);
+}
+@keyframes assemble-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.assemble-headline {
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assemble-tile {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+/* RadarProfile — "The Big Picture" (Level 2 MVP §3.1). A monochromatic purple intensity scale by
+   design: this is a qualitative *definition* level, never a pass/fail or traffic-light judgment, so
+   it deliberately does not reuse the well_defined/needs_attention/resolve_early findings palette
+   above. The legend list carries the real information — the chart is decorative (aria-hidden). */
+.radar-profile {
+  display: grid;
+  gap: 1.5rem;
+}
+.radar-profile-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+.radar-profile-chart {
+  width: 100%;
+  height: auto;
+  justify-self: center;
+}
+.radar-ring,
+.radar-outline {
+  fill: none;
+  stroke: var(--mist);
+  stroke-width: 1;
+}
+.radar-axis {
+  stroke: var(--mist);
+  stroke-width: 1;
+}
+.radar-shape-definition {
+  fill: var(--purple-600);
+  fill-opacity: 0.22;
+  stroke: var(--purple-900);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.radar-shape-demand {
+  fill: var(--teal-700);
+  fill-opacity: 0.16;
+  stroke: var(--teal-700);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+  stroke-linejoin: round;
+}
+.radar-point-definition {
+  fill: var(--purple-900);
+}
+.radar-point-demand {
+  fill: var(--teal-700);
+}
+/* A dimension whose Execution Demand is NOT_EVALUABLE reuses its Definition & Evidence point's
+   coordinates for geometry only (see RadarProfile.tsx docblock) — this hollow/dashed treatment is
+   what visually marks that specific point as "no data", never a fabricated low score. */
+.radar-point-not-evaluable {
+  fill: var(--white);
+  stroke: var(--teal-700);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 1.5;
+}
+.radar-profile-legend {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.radar-legend-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 1rem;
+  border-bottom: 1px solid var(--mist);
+  padding-bottom: 0.6rem;
+}
+.radar-legend-row dt {
+  color: var(--ink);
+  grid-column: 1 / -1;
+}
+.radar-legend-row dd {
+  margin: 0;
+  /* No nowrap: a longer localized tier label (either language) wraps within its own share of the
+     row instead of clipping or forcing overflow. */
+  font-weight: 600;
+  text-align: right;
+  grid-column: 2;
+}
+.radar-tier-early-stage {
+  color: var(--ink-faint);
+}
+.radar-tier-partially-defined {
+  color: var(--purple-600);
+}
+.radar-tier-well-defined {
+  color: var(--purple-900);
+}
+.radar-demand-tier-not-evaluable {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.radar-demand-tier-low {
+  color: var(--ink-faint);
+}
+.radar-demand-tier-low-medium,
+.radar-demand-tier-medium {
+  color: var(--teal-700);
+}
+.radar-demand-tier-medium-high,
+.radar-demand-tier-high {
+  color: var(--teal-700);
+  font-weight: 700;
+}
+@media (max-width: 640px) {
+  .radar-profile-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dual Expansion Profile — dumbbell "track" view (Macroblock 7). Rendered ABOVE the radar view, both
+   together, per the corrected frozen decision (never one replacing the other). Purely decorative
+   (aria-hidden) — the accessible content is the <dl> legend inside RadarProfile's radar-profile-body,
+   which already states both series' qualitative tiers in text. */
+.dual-profile-track {
+  display: grid;
+  gap: 1.5rem;
+}
+.dual-profile-legend {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.dual-profile-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dual-profile-legend-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dual-profile-legend-dot-definition {
+  background: var(--purple-600);
+}
+.dual-profile-legend-dot-demand {
+  background: var(--teal-700);
+}
+.dual-profile-row {
+  display: grid;
+  gap: 0.5rem;
+}
+.dual-profile-axis-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+.dual-profile-track-line {
+  position: relative;
+  height: 2.75rem;
+  background: var(--mist);
+  border-radius: 999px;
+}
+.dual-profile-connector {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  background: var(--ink-faint);
+  transform: translateY(-50%);
+}
+.dual-profile-marker {
+  position: absolute;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--white);
+}
+.dual-profile-marker-definition {
+  background: var(--purple-900);
+  z-index: 2;
+}
+.dual-profile-marker-demand {
+  background: var(--teal-700);
+  z-index: 1;
+}
+.dual-profile-marker-tag {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -2.1rem);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dual-profile-tag-definition {
+  color: var(--purple-900);
+}
+.dual-profile-tag-demand {
+  color: var(--teal-700);
+  transform: translate(-50%, 1.4rem);
+}
+.dual-profile-not-evaluable {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+.dual-profile-axis-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.dual-profile-scale-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+.dual-profile-radar-eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* Value Bridges — "beeside can help" (2026-09-30 authorization, item 1: converge to the frozen v8.1
+   `.bridge`/`.bridge-icon-badge` pattern exactly, threaded inline by VirtualSnapshot.tsx at each
+   trigger's own point in the story — The Hive + beeside Verified paired in Capability Footprint,
+   Operation Hub in Project Path, Strategic Advisory in Findings, beeside Sherpa (large badge) in Next
+   Decisions. Supersedes the retired end-of-page `.value-bridge-grid` (old ValueBridges.tsx, deleted). */
+.value-bridge-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+@media (max-width: 640px) {
+  .value-bridge-pair {
+    grid-template-columns: 1fr;
+  }
+}
+.value-bridge-card {
+  background: var(--bridge-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.625rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+.value-bridge-eyebrow {
+  font-family: var(--font);
+  font-size: 0.6563rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--white);
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+.value-bridge-head-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 0.75rem;
+  width: 100%;
+}
+.value-bridge-icon-badge {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(23, 24, 27, 0.09);
+}
+.value-bridge-icon-badge-lg {
+  width: 4.375rem;
+  height: 4.375rem;
+}
+.value-bridge-icon {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  display: block;
+}
+.value-bridge-icon-lg {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.value-bridge-heading {
+  margin: 0;
+  color: var(--heading);
+  font-size: 1.1875rem;
+  font-weight: 600;
+}
+.value-bridge-body {
+  margin: 0;
+  color: var(--white);
+  font-size: 0.8438rem;
+  line-height: 1.55;
+}
 .snapshot {
   display: grid;
   gap: 2rem;
@@ -503,6 +952,8 @@ fieldset.question {
   gap: 1rem;
 }
 .snapshot-panel {
+  /* Kept bordered/tinted — this boundary communicates a real semantic state (well-defined / needs
+     attention / resolve early), exactly the case Section 1's "keep" rule protects. */
   padding: 1.25rem;
   border: 1px solid var(--tone-border);
   border-radius: var(--radius);
@@ -529,9 +980,12 @@ fieldset.question {
   list-style: none;
 }
 .panel-items li {
-  padding: 0.7rem 0.85rem;
-  border-radius: 8px;
-  background: var(--white);
+  /* Flattened: a white box nested inside the already-tinted .snapshot-panel was a box-in-box with
+     no further meaning of its own — the outer panel's tone boundary already carries the state, so
+     each item is plain text on that same tint, separated by the list's own grid gap. */
+  padding: 0;
+  border-radius: 0;
+  background: none;
 }
 .panel-item-label {
   display: block;
@@ -543,14 +997,21 @@ fieldset.question {
   font-size: 0.9375rem;
   color: var(--ink-soft);
 }
+/* A single free-standing beat of prose/quote, not a grid of many — softened from a four-sided
+   boxed card to the same left-rule idiom already used by blockquote.verbatim, so the two
+   previously-different "emphasis block" treatments in this journey become one. */
 .snapshot-card {
-  padding: 1.25rem;
-  border: 1px solid var(--purple-200);
-  border-radius: var(--radius);
-  background: var(--white);
+  padding: 0 0 0 1.25rem;
+  border: 0;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
 }
 .reconcile-card {
-  background: var(--mist);
+  /* The one deliberate exception: a discrepancy worth flagging gets the brand-accent rule instead
+     of the neutral one, a purposeful signal rather than a filled box. */
+  border-left-color: var(--purple-600);
+  background: none;
 }
 .card-title {
   display: flex;
@@ -558,7 +1019,8 @@ fieldset.question {
   gap: 0.5rem;
   margin: 0 0 0.5rem;
   font-size: 1rem;
-  color: var(--purple-900);
+  font-weight: 700;
+  color: var(--heading);
 }
 .priority-value {
   margin: 0;
@@ -576,6 +1038,7 @@ blockquote.verbatim {
 .section-title {
   margin: 0 0 0.25rem;
   font-size: 1.35rem;
+  font-weight: 700;
 }
 .capability-tags {
   display: grid;
@@ -617,6 +1080,229 @@ blockquote.verbatim {
   margin-top: 2rem;
 }
 
+/* ---------------------------------------------------------------- opening recap */
+.snapshot-opening {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 72rem;
+}
+.opening-beat {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- priority list ("What Matters Now") */
+/* "Immediate Priority" is a deliberate brand-accent emphasis on the client's own single
+   most-featured item — not a coverage-quality semantic state like the tones elsewhere in this
+   file — so it now reuses the approved --purple-900/--mist/--purple-200 brand tokens directly,
+   replacing an undocumented ad hoc purple (#6d28d9) that matched no token and had no rationale of
+   its own. */
+.priority-badge-immediate {
+  --tone-ink: var(--purple-900);
+  --tone-bg: var(--mist);
+  --tone-border: var(--purple-200);
+}
+.priority-badge-next {
+  --tone-ink: #475569;
+  --tone-bg: #f1f5f9;
+  --tone-border: #cbd5e1;
+}
+.priority-badge-blocker {
+  --tone-ink: #be123c;
+  --tone-bg: #fff1f3;
+  --tone-border: #fcc8d3;
+}
+.priority-items {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: priority-item;
+}
+.priority-item {
+  /* Flattened from a bordered box to a plain divided row — an editorial list of the client's own
+     declared priorities, not a grid of dashboard cards. The badges already carry each item's
+     status, so the outer box added framing without adding meaning. */
+  padding: 0.85rem 0;
+  border: 0;
+  border-top: 1px solid var(--mist);
+  border-radius: 0;
+  background: none;
+}
+.priority-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.priority-item-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.priority-item-label {
+  font-weight: 700;
+  margin-right: auto;
+}
+.priority-item-meta {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--mist);
+}
+.priority-item-meta-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.9375rem;
+}
+.priority-item-meta-row dt {
+  color: var(--ink-soft);
+}
+.priority-item-meta-row dt::after {
+  content: ":";
+}
+.priority-item-meta-row dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- pathway diagram ("Your Initial Path") */
+.pathway-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* Intermediate tablet step: 4 columns straight to 1 compressed every stage into a very narrow
+   track just above the old single breakpoint. A 2x2 step in between keeps NOW -> DEFINE -> ENABLE
+   -> LAUNCH readable in the same top-to-bottom, left-to-right order without changing it. */
+@media (max-width: 960px) {
+  .pathway-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .pathway-stages {
+    grid-template-columns: 1fr;
+  }
+}
+.pathway-stage {
+  padding: 1rem;
+  /* Border removed — the tinted background alone is enough to read as a separate lane, and
+     dropping the purple edge keeps the brand accent reserved for genuine accent moments. */
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--mist);
+}
+.pathway-stage[data-empty="true"] {
+  opacity: 0.7;
+}
+.pathway-stage-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--purple-900);
+}
+.pathway-stage-ordinal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--purple-600);
+  color: var(--white);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  flex: none;
+}
+.pathway-stage-empty {
+  margin: 0;
+}
+.pathway-items {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pathway-item {
+  /* Flattened from a white box nested inside the tinted stage lane (box-in-box) to a plain divided
+     row within that lane, matching the same treatment applied to .priority-item. */
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.5rem 0 0;
+  border-radius: 0;
+  background: none;
+  border-top: 1px solid rgba(23, 24, 27, 0.08);
+}
+.pathway-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.pathway-item-label {
+  font-weight: 700;
+}
+.pathway-item-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.pathway-item-flags:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- capability landscape */
+.needs-status-covered_internally,
+.needs-status-covered_by_provider {
+  --tone-ink: #0f766e;
+  --tone-bg: #e8f6f4;
+  --tone-border: #a9dcd5;
+}
+.needs-status-in_progress {
+  --tone-ink: #8a6800;
+  --tone-bg: #fff9db;
+  --tone-border: #f3de7a;
+}
+.needs-status-needs_resolution {
+  --tone-ink: #be123c;
+  --tone-bg: #fff1f3;
+  --tone-border: #fcc8d3;
+}
+.needs-status-needs_confirmation {
+  --tone-ink: #52525b;
+  --tone-bg: #f4f4f5;
+  --tone-border: #d4d4d8;
+}
+.capability-landscape-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.capability-landscape-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--tone-border);
+  border-radius: var(--radius);
+  background: var(--tone-bg);
+}
+.capability-landscape-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 /* ---------------------------------------------------------------- premium transition */
 .premium-transition {
   max-width: 72rem;
@@ -632,7 +1318,15 @@ blockquote.verbatim {
   max-width: 44rem;
   font-size: clamp(1.75rem, 3.6vw, 2.6rem);
   line-height: 1.12;
+  font-weight: 700;
   letter-spacing: -0.02em;
+}
+/* Reserves the Premium block's approximate footprint while its content is still loading, so it
+   does not pop into place and shove the page's remaining content down once the fetch resolves.
+   No spinner/shimmer — this is inert space, not loading theatrics. */
+.premium-transition-placeholder {
+  min-height: 22rem;
+  margin-top: 3.5rem;
 }
 .premium-body {
   max-width: 44rem;
@@ -660,8 +1354,11 @@ a.button {
   list-style: none;
 }
 .premium-pillar {
+  /* Neutral border kept (three pillars side by side still benefit from a visible boundary between
+     them), but no longer purple by default — the purple accent stays reserved for genuine brand
+     moments elsewhere on this same screen (headings, the primary CTA). */
   padding: 1.25rem;
-  border: 1px solid var(--purple-200);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--white);
 }
@@ -710,10 +1407,13 @@ a.button {
   max-width: 44rem;
 }
 .premium-status {
+  /* Same left-rule idiom as .snapshot-card/.reconcile-card — a single status callout reads as a
+     deliberate emphasis, not a boxed dashboard tile. */
   max-width: 44rem;
-  padding: 1.5rem;
-  border: 1px solid var(--purple-200);
-  border-radius: var(--radius);
+  padding: 0 0 0 1.25rem;
+  border: 0;
+  border-left: 2px solid var(--purple-600);
+  border-radius: 0;
 }
 .premium-status .premium-headline {
   font-size: clamp(1.4rem, 2.8vw, 1.9rem);
@@ -724,6 +1424,113 @@ a.button {
 }
 .premium-status p + p {
   margin-top: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- review recap */
+.review-section {
+  margin-bottom: 2rem;
+}
+.review-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+.review-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  min-width: 0;
+}
+.review-note {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  background: #fff9db;
+  border: 1px solid #f3de7a;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  color: #8a6800;
+}
+
+/* ---------------------------------------------------------------- "Leave a note" affordance
+   Small collapsed post-it in the corner of a grouped composition screen (Design Freeze). Warm
+   yellow/cream, not purple — per the beeside visual-identity rule that "Leave a note" should read
+   as a note/post-it, never another purple surface. */
+.note-tab {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #8a6800;
+  background: #fff9db;
+  border: 1px solid #f3de7a;
+  border-radius: 0.3rem 0.7rem 0.7rem 0.7rem;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  z-index: 1;
+}
+.note-tab-filled {
+  border-color: var(--purple-600);
+  color: var(--purple-900);
+}
+.note-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(20rem, 100%);
+  background: #fffdf3;
+  border: 1px solid #f3de7a;
+  border-radius: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  z-index: 2;
+  box-shadow: 0 4px 16px rgba(23, 24, 27, 0.08);
+}
+.note-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+.note-panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #8a6800;
+}
+.note-panel-close {
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: #8a6800;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+}
+.note-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #f3de7a;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--white);
+  resize: vertical;
+}
+@media (max-width: 640px) {
+  .note-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    border-radius: 0.7rem 0.7rem 0 0;
+  }
 }
 
 /* ---------------------------------------------------------------- control center (internal) */
@@ -826,6 +1633,13 @@ a.button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   gap: 1rem;
+}
+/* minmax(22rem, ...) can't shrink its track below 22rem (352px) on its own, so a track this narrow
+   forces horizontal scroll below that width. Drop to a single column before that happens. */
+@media (max-width: 480px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .admin-card {
   padding: 1rem 1.25rem;
@@ -1027,4 +1841,607 @@ a.button {
   max-width: 34rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+
+/* ================================================================================================
+   Precision Transition — "What's next" 3-icon grid (2026-09-30 authorization, item 1: converge to
+   the frozen v8.1 `#precision-transition` exactly, replacing the previous plain-bullet-list render).
+   ================================================================================================ */
+.precision-transition {
+  background: var(--purple-900);
+  color: var(--white);
+  border-radius: var(--radius);
+  padding: 3.5rem 3rem;
+  text-align: center;
+}
+.precision-route {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.7;
+}
+.precision-route .pt {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--purple-200);
+}
+.precision-route .pt.dest {
+  background: var(--teal);
+}
+.precision-route .ln {
+  width: 80px;
+  height: 1px;
+  background: repeating-linear-gradient(to right, var(--purple-200) 0 4px, transparent 4px 8px);
+}
+.precision-transition .next-heading {
+  color: var(--teal);
+  font-size: 1.625rem;
+  max-width: none;
+  margin: 0 0 2.125rem;
+}
+.next-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  text-align: left;
+  max-width: 57.5rem;
+  margin: 0 auto;
+}
+@media (max-width: 760px) {
+  .next-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 1.75rem;
+  }
+}
+.next-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+@media (max-width: 760px) {
+  .next-item {
+    align-items: center;
+  }
+}
+.next-icon {
+  width: 4.125rem;
+  height: 4.125rem;
+  border-radius: 50%;
+  background: var(--purple-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+.next-icon .next-logo {
+  width: 2.125rem;
+  height: 2.125rem;
+  object-fit: contain;
+  display: block;
+}
+.next-item p {
+  color: var(--white);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+  max-width: none;
+}
+.precision-cta {
+  text-align: center;
+  margin-top: 2.5rem;
+}
+.precision-cta-btn {
+  display: inline-block;
+  background: transparent;
+  border: 1.5px solid var(--teal);
+  color: var(--teal);
+}
+
+/* ================================================================================================
+   SnapshotValueCase — "Why continue with beeside" (2026-09-30 authorization, item 1: converge to the
+   frozen v8.1 `#beeside-value` section exactly — What beeside gives you pillar grid, gain strip, A-D
+   comparison table, banner, Executive PDF block, final CTA). Static institutional content, identical
+   on every Snapshot.
+   ================================================================================================ */
+.snapshot-value-case .lead {
+  max-width: 40rem;
+}
+.value-shell {
+  background: var(--value-shell-bg);
+  border-radius: var(--radius);
+  padding: 2.75rem 2.5rem;
+}
+@media (max-width: 640px) {
+  .value-shell {
+    padding: 2rem 1.5rem;
+  }
+}
+.value-shell-kicker {
+  color: var(--white);
+}
+.pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+@media (max-width: 700px) {
+  .pillar-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.pillar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.pillar-mark {
+  width: 2.875rem;
+  height: 2.875rem;
+  margin-bottom: 0.75rem;
+}
+.pillar-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.pillar-head {
+  font-weight: 700;
+  color: var(--white);
+  font-size: 0.9375rem;
+  margin-bottom: 0.375rem;
+}
+.pillar-card p {
+  color: var(--white);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.gain-strip {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem 1.5rem;
+  margin-top: 1.75rem;
+}
+@media (max-width: 700px) {
+  .gain-strip {
+    grid-template-columns: 1fr;
+  }
+}
+.gain-item {
+  font-size: 0.8125rem;
+  color: var(--white);
+  padding-left: 0.9375rem;
+  position: relative;
+}
+.gain-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.375rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+.compare-caption {
+  font-size: 0.7813rem;
+  color: var(--white);
+  font-weight: 600;
+  margin: 0 0 1rem;
+  border-top: 1px solid var(--purple-200);
+  padding-top: 1.5rem;
+}
+.compare-table {
+  margin: 1.625rem 0 0.25rem;
+}
+.compare-row {
+  background: var(--white);
+  border-radius: 0.625rem;
+  padding: 1rem 1.125rem;
+  margin-bottom: 0.5rem;
+}
+.compare-row-top {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  margin-bottom: 0.625rem;
+}
+@media (max-width: 640px) {
+  .compare-row-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+.compare-tier {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 0 0 14.375rem;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .compare-tier {
+    flex: 1 1 auto;
+  }
+}
+.tier-letter {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--mist);
+  color: var(--heading);
+  font-weight: 700;
+  font-size: 0.75rem;
+  align-items: center;
+  justify-content: center;
+}
+.tier-name {
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  display: block;
+}
+.tier-sub {
+  font-size: 0.6875rem;
+  color: var(--ink-soft);
+}
+.compare-bar-track {
+  background: var(--mist);
+  border-radius: 6px;
+  height: 7px;
+  overflow: hidden;
+  flex: 1;
+}
+@media (max-width: 640px) {
+  .compare-bar-track {
+    width: 100%;
+    flex: none;
+  }
+}
+.compare-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+}
+.compare-bar-fill[data-tier="A"] {
+  background: var(--purple-900);
+}
+.compare-bar-fill[data-tier="B"] {
+  background: var(--purple-600);
+}
+.compare-bar-fill[data-tier="C"] {
+  background: #54555c;
+}
+.compare-bar-fill[data-tier="D"] {
+  background: var(--ink);
+}
+.compare-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4375rem;
+  padding-left: 2.125rem;
+}
+@media (max-width: 640px) {
+  .compare-chips {
+    padding-left: 0;
+  }
+}
+.compare-chip {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--white);
+  background: var(--purple-900);
+  padding: 0.375rem 0.8125rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.value-banner {
+  display: flex;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 1.875rem 0;
+  background: var(--purple-200);
+}
+@media (max-width: 640px) {
+  .value-banner {
+    flex-direction: column;
+  }
+}
+.value-banner-photo {
+  width: 36%;
+  object-fit: cover;
+  display: block;
+}
+@media (max-width: 640px) {
+  .value-banner-photo {
+    width: 100%;
+    height: 9.375rem;
+  }
+}
+.value-banner-copy {
+  flex: 1;
+  padding: 1.625rem 1.875rem;
+}
+.value-banner-copy h3 {
+  color: var(--heading);
+  font-size: 1.125rem;
+  margin-bottom: 0.625rem;
+}
+.value-banner-copy p {
+  color: var(--ink);
+  font-size: 0.8438rem;
+  margin-bottom: 0.875rem;
+}
+.value-banner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.value-banner-chips span {
+  background: var(--white);
+  border-radius: 100px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--heading);
+}
+.pdf-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.pdf-block h3 {
+  color: var(--heading);
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+.pdf-block p {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  margin: 0;
+  max-width: 34rem;
+}
+.pdf-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--heading);
+  background: var(--mist);
+  padding: 0.5rem 0.875rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.value-cta {
+  text-align: center;
+  background: var(--purple-900);
+  border-radius: var(--radius);
+  padding: 2.5rem 2.25rem;
+  color: var(--white);
+}
+.value-cta h2 {
+  color: var(--white);
+  font-size: 1.375rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.value-cta-btn {
+  /* Frozen v8.1 itself uses color:var(--heading) here, which is fine in light mode (heading ==
+     purple-900) but was never given a [data-theme="dark"] exception the way .value-banner-chips
+     span was for the identical situation (text on an always-bright, non-themed surface) — in dark
+     mode --heading flips to #C9B8F0, which on the still-bright, non-themed --teal background drops
+     to 1.47:1. Pinned to the literal purple-900 instead, same value in light mode (zero visual
+     change there), same fix pattern already used by .value-banner-chips span. */
+  display: inline-block;
+  background: var(--teal);
+  color: var(--purple-900);
+  border: none;
+  padding: 0.8125rem 1.875rem;
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  font-family: var(--font);
+  cursor: pointer;
+}
+.value-cta .cta-disclosure {
+  color: var(--purple-200);
+  font-size: 0.6875rem;
+  margin: 1rem auto 0;
+  max-width: 32.5rem;
+}
+
+/* Shared kicker used by SnapshotValueCase's own eyebrow (the four other `.kicker` mentions above are
+   inherited by .value-shell-kicker for the darker surface it sits on). */
+.kicker {
+  font-family: var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--purple-600);
+  margin: 0 0 0.875rem;
+}
+
+/* ================================================================================================
+   Night Shift — dark-mode toggle (2026-09-30 authorization, item 1: converge to the frozen v8.1
+   `.night-toggle` exactly). Purely additive: toggling sets/clears `data-theme="dark"` on the root
+   <html> element only while the Snapshot screen is mounted (NightShiftToggle.tsx clears it on
+   unmount), so nothing here ever reaches any other screen. The dark tokens below are scoped to
+   `.virtual-snapshot`'s own subtree via the CSS custom-property cascade (only --ink/--ink-soft/
+   --ink-faint/--border/--mist/--heading are retargeted — never --white or --purple-900/--purple-600,
+   both of which also serve as literal BACKGROUND fills or text-on-color pairings elsewhere in this
+   subtree, e.g. PathwayDiagram's `.pathway-stage-ordinal`, exactly the dual-role problem the frozen
+   artifact's own --heading/--value-shell-bg indirection tokens exist to avoid). The body background
+   goes dark globally (safe: only ever set while the Snapshot screen is the visible route). Scope note
+   (flagged, not silently decided): PremiumTransition/SnapshotFeedback render as separate siblings
+   after VirtualSnapshot, not inside `.virtual-snapshot`'s own subtree, so Night Shift covers the full
+   narrative Snapshot document exactly through its closing disclosure footer and does not extend into
+   the Premium activation flow or feedback form that follow it — a deliberate boundary between the
+   read-only Snapshot narrative and the transactional flows after it, called out in the Final Pre-Deploy
+   Report rather than assumed. */
+[data-theme="dark"] body {
+  background: #131217;
+}
+[data-theme="dark"] .virtual-snapshot {
+  /* Root-cause fix (live visual QA, Macroblock F): redefining --ink/--heading as custom properties
+     here only helps elements that explicitly write `color: var(--ink)` in their OWN rule. Anything
+     relying on inherited `color` (most headings and labels, e.g. .display, "Your objectives") was
+     still inheriting body's color, which resolves `var(--ink)` at body's own scope — an ANCESTOR of
+     this element, outside this override — so it kept the light-mode dark-ink value even against the
+     new black background, rendering near-invisible. Setting `color` explicitly here, using the
+     now-locally-overridden --ink, re-establishes the inheritance root at this element so every
+     descendant without its own explicit color correctly cascades to the dark-mode value. */
+  color: var(--ink);
+  --heading: #c9b8f0;
+  --ink: #f1f0f5;
+  --ink-soft: #b7b4c2;
+  --ink-faint: #8b8894;
+  --border: #3a3346;
+  --mist: #241f2d;
+  /* Gap found in contrast review: --bridge-bg/--value-shell-bg were only ever defined as static
+     :root values (frozen v8.1's own light-mode --gray-100/--value-shell-bg hex codes), never
+     retargeted here — so both cards stayed the light-mode medium-gray even in dark mode. In the
+     frozen source these ARE theme-aware (--gray-100 #585f6a -> #201E23, --value-shell-bg
+     #F2F1EE-equivalent -> #1B1920), which is also why .value-bridge-heading (--heading, now light
+     lavender) reads at only 3.56:1 against the un-retargeted #585f6a — under the un-retargeted
+     background, not over it. Retargeting to frozen's own dark hex codes fixes both the fidelity gap
+     and the contrast (8.6:1+ against the near-black values below). */
+  --bridge-bg: #201e23;
+  --value-shell-bg: #1b1920;
+}
+/* .pathway-stage-ordinal is the one pre-existing rule in this subtree pairing `color: var(--white)`
+   with a `background: var(--purple-600)` fill that stays constant in dark mode — restored explicitly
+   since --white itself is deliberately left untouched above (see docblock). */
+[data-theme="dark"] .virtual-snapshot .pathway-stage-ordinal {
+  color: #ffffff;
+}
+/* Live visual QA (Macroblock F) follow-up: .status-chip, .snapshot-panel and
+   .capability-landscape-item all keep their light-mode --tone-bg tint in dark mode too (a semantic
+   status color, never inverted — same category as --teal/--rose/--semaphore in the docblock above).
+   Their text either references --ink/--ink-soft directly (.status-chip, .capability-landscape-label,
+   .panel-intro/.panel-item-reason) or has no explicit color at all (.panel-item-label) and inherits
+   it — both cases need the LIGHT-mode ink values pinned back locally, or the base --ink/--ink-soft
+   overrides above (correctly meant for the black page background) make this fixed-light text
+   unreadable (white-on-mint) instead. */
+[data-theme="dark"] .virtual-snapshot .status-chip,
+[data-theme="dark"] .virtual-snapshot .snapshot-panel,
+[data-theme="dark"] .virtual-snapshot .capability-landscape-item {
+  --ink: #17181b;
+  --ink-soft: #54555c;
+  color: var(--ink);
+}
+/* .priority-badge-immediate is the one .status-chip variant whose own background is already
+   theme-aware (--mist, retargeted dark above) rather than a fixed light tint like the other five
+   badge/panel variants the rule above assumes — so pinning it to the same literal dark ink text
+   (#17181b on a now-dark #241f2d mist) collapsed to an unreadable 1.09:1. Its --tone-ink
+   (var(--purple-900), deliberately constant — see docblock) was never meant to sit on a dark
+   surface either. Restoring it to --heading (the subtree's own "brand purple, readable in dark
+   mode" token, already 8.9:1+ on --mist elsewhere in this file) fixes it without touching the
+   light-mode value, which is untouched by this dark-only rule. */
+[data-theme="dark"] .virtual-snapshot .status-chip.priority-badge-immediate {
+  color: var(--heading);
+}
+[data-theme="dark"] .virtual-snapshot .compare-row {
+  /* --ink-faint is a faint-TEXT token (meant to sit on the body background), not a card surface —
+     using it as a background here made .tier-name/.tier-sub (--ink/--ink-soft) fail WCAG AA against
+     it (as low as 1.71:1). --mist is this subtree's actual "darker card surface" token (already used
+     the same way by .pdf-tag/.tier-letter's own default background) and keeps every child text color
+     at 7.9:1+ against it. */
+  background: var(--mist);
+}
+[data-theme="dark"] .virtual-snapshot .compare-bar-track {
+  background: #332f3b;
+}
+[data-theme="dark"] .virtual-snapshot .compare-bar-fill[data-tier="C"] {
+  background: #8b8c96 !important;
+}
+[data-theme="dark"] .virtual-snapshot .compare-bar-fill[data-tier="D"] {
+  background: #d6d6dc !important;
+}
+[data-theme="dark"] .virtual-snapshot .next-icon {
+  background: #ffffff;
+}
+[data-theme="dark"] .virtual-snapshot .value-banner-chips span {
+  color: var(--purple-900);
+}
+[data-theme="dark"] .virtual-snapshot .pillar-mark-mono img {
+  filter: invert(1);
+}
+[data-theme="dark"] .virtual-snapshot .value-banner {
+  /* Same --ink-faint-as-background fix as .compare-row above: .value-banner-copy h3 (--heading) was
+     down to 1.92:1 against it. --mist keeps h3/p at 8.9:1 / 14.2:1. */
+  background: var(--mist);
+}
+[data-theme="dark"] .virtual-snapshot .pdf-block {
+  /* Same fix: .pdf-block p (--ink-soft) was down to 1.71:1 against --ink-faint; --mist keeps it at 7.9:1. */
+  background: var(--mist);
+}
+[data-theme="dark"] .virtual-snapshot .tier-letter {
+  background: var(--purple-900);
+}
+
+.night-toggle {
+  position: fixed;
+  top: 1.125rem;
+  right: 1.125rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  background: var(--white);
+  color: var(--heading);
+  border: 1.5px solid var(--mist);
+  border-radius: 100px;
+  padding: 0.5625rem 1rem 0.5625rem 0.8125rem;
+  font-family: var(--font);
+  font-size: 0.7813rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(23, 24, 27, 0.12);
+}
+.night-toggle svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .virtual-snapshot .night-toggle {
+  /* Bug found in contrast review: background stayed the fixed --white (never retargeted) while
+     `color` followed --heading, which goes light-lavender in dark mode — 1.81:1 against white,
+     making the toggle itself nearly unreadable. The frozen artifact's own .night-toggle instead
+     backs onto its theme-aware --card token (white -> #1D1B22), so card+heading invert together;
+     --mist is this subtree's equivalent dark surface (8.86:1 against --heading here). Border-color
+     fix (pre-existing) kept alongside it. */
+  background: var(--mist);
+  border-color: var(--border);
+}
+@media (max-width: 640px) {
+  .night-toggle {
+    top: auto;
+    bottom: 1.125rem;
+    right: 1rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .night-toggle span {
+    display: none;
+  }
+  .night-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
 }

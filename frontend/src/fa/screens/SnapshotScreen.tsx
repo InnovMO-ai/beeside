@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ExpansionSnapshot } from "../components/ExpansionSnapshot";
+import { AssembleTransition } from "../components/AssembleTransition";
+import { VirtualSnapshot } from "../components/VirtualSnapshot";
 import { FeedbackSource, SnapshotFeedback } from "../components/SnapshotFeedback";
 import { PremiumSource, PremiumTransition } from "../components/PremiumTransition";
 import { T } from "../copy";
@@ -51,15 +52,17 @@ export function SnapshotScreen({ bundle, t, locale, load, onLocale, anotherProje
     );
   }
   if (!snapshot) {
-    return (
-      <p className="content" role="status">
-        {t("common", "loading")}
-      </p>
-    );
+    // AssembleTransition (Design Spec build-order item 9): the non-spinner "Putting the pieces
+    // together" motion sequence, shown for however long the immutable Snapshot takes to load —
+    // never a bare "Loading…" for the single highest-stakes moment in the product.
+    return <AssembleTransition t={t} />;
   }
   return (
     <>
-      <ExpansionSnapshot snapshot={snapshot} locale={locale} />
+      {/* Level 2 MVP §3: the narrative Virtual Snapshot (VirtualSnapshot) replaces the interim
+          ExpansionSnapshot for this respondent-facing screen. ExpansionSnapshot itself is untouched
+          and stays in use by the admin Control Center's reviewer preview (AdminApp.tsx). */}
+      <VirtualSnapshot snapshot={snapshot} locale={locale} t={t} />
       {premium && <PremiumTransition locale={locale} source={premium} />}
       {feedback && <SnapshotFeedback locale={locale} source={feedback} />}
       {anotherProjectInMind && onStartAnother && <Completion bundle={bundle} t={t} anotherProjectInMind onStartAnother={onStartAnother} intro={false} />}

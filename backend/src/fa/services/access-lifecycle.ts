@@ -4,10 +4,14 @@
  *   access          day 0 = first private link emitted; expires after `initial_access_days`
  *                   (15, provisional); +15/+30 immediate extensions; never beyond `max_access_day`
  *   communication   reminder on `reminder_day` (5 days before expiry at 15); one exceptional
- *                   recovery email on `recovery_email_day`; nothing automated after that
+ *                   recovery email on `recovery_email_day`; nothing further tied to the access
+ *                   window itself — the two-stage retention warning below is a separate cadence
  *   retention       temporary data retention until `temporary_retention_day`, counted from the
  *                   access-window start — or from the lifecycle origin (identity) when no private
- *                   link was ever emitted — only while Premium was never activated
+ *                   link was ever emitted — only while Premium was never activated; a
+ *                   `retention_reminder` and closer `retention_reminder_final` email precede the
+ *                   purge (see the temporary_retention job in operations/jobs.ts) — a communications
+ *                   cadence, not part of this versioned policy, so it needs no new policy field
  *
  * The durations are versioned configuration: the question bank bundle may carry a `lifecycle`
  * section (pinned per project with the bundle). Changing 15 → 21 days is a new published version,

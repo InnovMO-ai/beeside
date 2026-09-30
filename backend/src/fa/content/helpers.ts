@@ -68,6 +68,20 @@ export function q(input: QuestionInput): QuestionDef {
   return { ...rest, required, copy: { en: locale(0), es: locale(1) } };
 }
 
+/**
+ * Level 2 MVP (fa-qb-2.0.0): under noUncheckedIndexedAccess, destructuring a fixed position out of
+ * a hand-authored QuestionDef[] literal (e.g. `const [B1, B2] = BUSINESS_QUESTIONS`) types each
+ * binding as `QuestionDef | undefined`, even though the source array's length and order are fixed
+ * in code and that position is guaranteed to exist. Rather than asserting past that with `!` (which
+ * would compile the same way whether or not the invariant actually held) or silently filtering the
+ * position out of a bundle's `questions` array (which could drop a real question from the journey
+ * without anyone noticing), this fails loudly at module load if the assumption is ever wrong.
+ */
+export function requiredQuestion(question: QuestionDef | undefined, describe: string): QuestionDef {
+  if (!question) throw new Error(`fa-qb-2.0.0: expected question ${describe} to exist at this fixed position`);
+  return question;
+}
+
 export const when = {
   eq: (field: string, value: string): Condition => ({ field, op: "eq", value }),
   in: (field: string, ...values: string[]): Condition => ({ field, op: "in", values }),
@@ -75,4 +89,6 @@ export const when = {
   answered: (field: string): Condition => ({ field, op: "answered" }),
   any: (...conditions: Condition[]): Condition => ({ any: conditions }),
   all: (...conditions: Condition[]): Condition => ({ all: conditions }),
+  /** Level 2 MVP addition: negation, e.g. "not already established by an earlier answer". */
+  not: (condition: Condition): Condition => ({ not: condition }),
 };

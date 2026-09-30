@@ -12,7 +12,9 @@ import { PREVIEW_ROOM_URL } from "../premium/content";
  * link, sends through the provider-agnostic transport and records the outcome — each step in its own
  * short transaction, never holding a business transaction open across a network call. Retries are
  * bounded with exponential backoff; a delivery that is no longer relevant (the assessment completed,
- * expired or was purged) is cancelled at send time instead of being sent late.
+ * expired or was purged) is cancelled at send time instead of being sent late — and so is one whose
+ * template was switched to inactive (`bundle.emails[key].active === false`) through Communications
+ * Admin after it was already queued (see admin/communications-service.ts).
  */
 
 const DAY_MS = 86_400_000;
@@ -20,7 +22,7 @@ export const DEFAULT_SNAPSHOT_LINK_DAYS = 60;
 const LEASE_SECONDS = 300;
 const BACKOFF_SECONDS = [60, 300, 1800, 7200, 43_200];
 
-type TemplateSource = "question_bank" | "snapshot_template";
+export type TemplateSource = "question_bank" | "snapshot_template";
 
 interface TemplateDefinition {
   source: TemplateSource;
@@ -77,6 +79,35 @@ export const EMAIL_TEMPLATES = {
     sentEvent: "snapshot_email_sent",
     lifecycle: false,
     relevance: (p) => (p.assessment_state === "COMPLETED_LOCKED" ? null : `assessment_${p.assessment_state.toLowerCase()}`),
+  },
+  // Fires immediately when an immediate +15/+30 extension (or exceptional recovery) is granted —
+  // see extendFromLink in fa/services/link-service.ts. Distinct from the day-after contextual
+  // access_followup_* emails above.
+  access_extension_confirmed: { source: "question_bank", linkKind: "RESUME", language: "interaction", sentEvent: "access_extension_confirmed_sent", lifecycle: true, relevance: accessOpen },
+  // Fires once, right after premium_activated/premium_reactivated is processed — see
+  // processSubscriptionEvent in premium/subscription-events.ts. Never cancelled by later state: it
+  // confirms something that already happened, not an invitation to act before a deadline.
+  premium_activation_confirmed: { source: "snapshot_template", linkKind: null, language: "deliverable", sentEvent: "premium_activation_confirmed_sent", lifecycle: false, relevance: () => null },
+  // Two-stage warning before a free (never-Premium) project's temporary retention elapses and its
+  // client data is purged — see the temporary_retention job in operations/jobs.ts, which enqueues
+  // these directly (no fa_project_lifecycle tracking column: the email_delivery table itself is the
+  // per-template "already sent" ledger, the same pattern emailRequestedRecently already relies on).
+  // Cancelled at send time if Premium was activated or the project was already purged in the interim.
+  retention_reminder: {
+    source: "question_bank",
+    linkKind: "RESUME",
+    language: "interaction",
+    sentEvent: "retention_reminder_sent",
+    lifecycle: true,
+    relevance: (p) => (p.premium_ever_activated ? "premium_activated" : p.assessment_state === "DELETED" ? "assessment_deleted" : null),
+  },
+  retention_reminder_final: {
+    source: "question_bank",
+    linkKind: "RESUME",
+    language: "interaction",
+    sentEvent: "retention_reminder_final_sent",
+    lifecycle: true,
+    relevance: (p) => (p.premium_ever_activated ? "premium_activated" : p.assessment_state === "DELETED" ? "assessment_deleted" : null),
   },
 } satisfies Record<string, TemplateDefinition>;
 
@@ -211,6 +242,7 @@ async function prepare(tx: Db, deps: FaDeps, delivery: DeliveryRow, now: Date): 
     access_until: project.access_expires_at ? formatDate(project.access_expires_at, locale) : "",
     days_left: project.access_expires_at ? String(daysLeft(project.access_expires_at, now)) : "",
     recoverable_until: project.access_max_until ? formatDate(project.access_max_until, locale) : "",
+    retention_until: project.retention_until ? formatDate(project.retention_until, locale) : "",
   };
 
   let rendered: { subject: string; body: string; cta: string; secondaryCta: string | null };
@@ -219,10 +251,12 @@ async function prepare(tx: Db, deps: FaDeps, delivery: DeliveryRow, now: Date): 
     const pin = await tx.query<{ snapshot_template_version: string }>("SELECT snapshot_template_version FROM project WHERE project_id = $1", [project.project_id]);
     const bundle = await deps.bundles.templateByVersion(pin.rows[0]?.snapshot_template_version ?? "");
     if (!bundle.emails[template]) return { kind: "cancel", reason: "template_not_configured" };
+    if (bundle.emails[template]?.active === false) return { kind: "cancel", reason: "template_inactive" };
     rendered = renderEmail(bundle, template, locale, variables);
   } else {
     const bundle = await questionBankFor(deps, project, template);
     if (!bundle) return { kind: "cancel", reason: "template_not_configured" };
+    if (bundle.emails[template]?.active === false) return { kind: "cancel", reason: "template_inactive" };
     rendered = renderEmail(bundle, template, locale, variables);
     const configured = (bundle.links as { preview_room_url?: unknown }).preview_room_url;
     if (typeof configured === "string" && configured.startsWith("https://")) previewRoomUrl = configured;

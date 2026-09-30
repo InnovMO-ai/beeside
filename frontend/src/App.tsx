@@ -259,7 +259,11 @@ export function App() {
           locale={locale}
           load={api.sessionSnapshot}
           onLocale={applyLocale}
-          anotherProjectInMind={view?.anotherProjectInMind === "yes"}
+          // Owner decision (2026-09-18): ANOTHER_PROJECT is no longer asked during the assessment
+          // (Company → Project 1 → Project 2 already supports this without a prior question) — the
+          // "start another project" offer is now unconditional on completion, not gated on a
+          // fa.project.another_project_in_mind answer that a Level 2 respondent was never asked.
+          anotherProjectInMind
           onStartAnother={async () => startSession((await api.anotherProject(true)).sessionToken)}
           premium={SESSION_PREMIUM}
           feedback={SESSION_FEEDBACK}

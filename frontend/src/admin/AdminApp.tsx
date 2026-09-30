@@ -17,6 +17,7 @@ type Route =
   | { name: "projects" }
   | { name: "project"; id: string; tab: ProjectTab }
   | { name: "config" }
+  | { name: "communications" }
   | { name: "analytics" }
   | { name: "operations" }
   | { name: "audit" }
@@ -37,7 +38,7 @@ export function parseAdminRoute(pathname: string): Route {
     const tab = TABS.find((t) => t.id === parts[2])?.id ?? "overview";
     return { name: "project", id: parts[1], tab };
   }
-  if (parts[0] === "config" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
+  if (parts[0] === "config" || parts[0] === "communications" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
   return { name: "projects" };
 }
 
@@ -148,6 +149,7 @@ export function AdminApp() {
   const nav: Array<{ route: Route; label: string; show: boolean }> = [
     { route: { name: "projects" }, label: "Projects", show: can("projects.read") },
     { route: { name: "config" }, label: "Configuration", show: can("config.read") },
+    { route: { name: "communications" }, label: "Communications", show: can("operations.read") },
     { route: { name: "analytics" }, label: "Analytics", show: can("analytics.read") },
     { route: { name: "operations" }, label: "Operations", show: can("operations.read") },
     { route: { name: "audit" }, label: "Audit", show: can("audit.read") },
@@ -194,6 +196,7 @@ export function AdminApp() {
         {route.name === "projects" && <ProjectsView onOpen={(id) => navigate({ name: "project", id, tab: "overview" })} />}
         {route.name === "project" && <ProjectView id={route.id} tab={route.tab} can={can} onTab={(tab) => navigate({ ...route, tab })} onBack={() => navigate({ name: "projects" })} />}
         {route.name === "config" && <ConfigView can={can} />}
+        {route.name === "communications" && can("operations.read") && <CommunicationsView can={can} />}
         {route.name === "analytics" && can("analytics.read") && <AnalyticsView />}
         {route.name === "operations" && <OperationsView can={can} />}
         {route.name === "audit" && can("audit.read") && <AuditView />}
@@ -815,6 +818,175 @@ function VersionDetail({ registry, version, can, onChanged }: { registry: Regist
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------- communications
+// Governed template management, not a general CMS: templates live in the versioned question-bank/
+// snapshot-template bundles, and every save below goes through communications-service.ts's
+// saveAndPublishTemplate — the SAME draft/preview/review/publish sequence Configuration uses
+// generically, scoped so it can only ever touch one template's copy/active flag. ADMIN only; a
+// Supervisor sees the same preview with no edit controls (config.write is ADMIN-only, see rbac.ts).
+const EMAIL_TEMPLATE_PLACEHOLDER_HINT = "{{preferred_name}}, {{company_name}}, {{access_until}}, {{days_left}}, {{recoverable_until}}, {{retention_until}}";
+
+function CommunicationsView({ can }: { can: (p: Permission) => boolean }) {
+  const overview = useLoad(() => adminApi.communicationsTemplates(), []);
+  const canEdit = can("config.write");
+  const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState({ subject: "", body: "", cta: "", secondaryCta: "" });
+
+  const startEdit = (key: string, locale: string, raw: Json) => {
+    setMessage(null);
+    setEditing(`${key}:${locale}`);
+    setForm({ subject: text(raw.subject), body: text(raw.body), cta: text(raw.cta), secondaryCta: raw.secondaryCta ? text(raw.secondaryCta) : "" });
+  };
+
+  const submit = (source: "question_bank" | "snapshot_template", key: string, locale: "en" | "es", active?: boolean) => {
+    setSaving(true);
+    setMessage(null);
+    adminApi
+      .updateCommunicationsTemplate(source, key, {
+        locale,
+        subject: form.subject,
+        body: form.body,
+        cta: form.cta,
+        ...(form.secondaryCta ? { secondaryCta: form.secondaryCta } : {}),
+        ...(typeof active === "boolean" ? { active } : {}),
+      })
+      .then((result) => {
+        setMessage(`${key} (${locale}): saved and published as ${text((result as Json).version)}.`);
+        setEditing(null);
+        overview.reload();
+      })
+      .catch((e: unknown) => setMessage(`${key} (${locale}): ${errorMessage(e)}`))
+      .finally(() => setSaving(false));
+  };
+
+  const toggleActive = (source: "question_bank" | "snapshot_template", key: string, nowActive: boolean, anyLocale: Json) => {
+    setSaving(true);
+    setMessage(null);
+    adminApi
+      .updateCommunicationsTemplate(source, key, {
+        locale: "en",
+        subject: text(anyLocale.subject),
+        body: text(anyLocale.body),
+        cta: text(anyLocale.cta),
+        ...(anyLocale.secondaryCta ? { secondaryCta: text(anyLocale.secondaryCta) } : {}),
+        active: !nowActive,
+      })
+      .then((result) => {
+        setMessage(`${key}: ${nowActive ? "deactivated" : "activated"} (published as ${text((result as Json).version)}).`);
+        overview.reload();
+      })
+      .catch((e: unknown) => setMessage(`${key}: ${errorMessage(e)}`))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <section aria-labelledby="comms-title">
+      <h1 id="comms-title" className="admin-title">Communications</h1>
+      <p className="helper">
+        {canEdit
+          ? "Email templates the platform sends. Edit a locale's subject, body or CTA and save — it publishes immediately through the same governed version history as Configuration, so nothing here can touch questions, scoring or canonical fields."
+          : "A preview of the email templates the platform sends, filled with sample values. Changing them requires the Administrator role."}
+      </p>
+      {message && <p role="status">{message}</p>}
+      <Status data={overview.data} error={overview.error} />
+      {overview.data && (
+        <>
+          <p className="helper">
+            Question bank {text(overview.data.questionBankVersion)}
+            {overview.data.questionBankPublishedAt ? ` (published ${formatWhen(overview.data.questionBankPublishedAt)})` : ""} · Snapshot template{" "}
+            {text(overview.data.snapshotTemplateVersion)}
+            {overview.data.snapshotTemplatePublishedAt ? ` (published ${formatWhen(overview.data.snapshotTemplatePublishedAt)})` : ""}
+          </p>
+          <div className="admin-grid">
+            {(overview.data.templates as Json[]).map((tpl) => {
+              const key = text(tpl.key);
+              const source = tpl.source as "question_bank" | "snapshot_template";
+              const active = tpl.active !== false;
+              const locales = (tpl.locales ?? {}) as Record<string, Json>;
+              const anyLocale = (locales.en ?? Object.values(locales)[0] ?? {}) as Json;
+              return (
+                <div key={key} className="admin-card admin-wide">
+                  <h2>
+                    <code>{key}</code> <span className="admin-badge">{text(tpl.source)}</span>
+                    {!active && <span className="admin-badge">inactive</span>}
+                  </h2>
+                  {canEdit && (
+                    <div className="admin-actions">
+                      <button
+                        type="button"
+                        className="button button-text"
+                        disabled={saving}
+                        aria-pressed={active}
+                        onClick={() => toggleActive(source, key, active, anyLocale)}
+                      >
+                        {active ? "Deactivate" : "Activate"}
+                      </button>
+                    </div>
+                  )}
+                  {Object.entries(locales).map(([locale, raw]) => {
+                    const editKey = `${key}:${locale}`;
+                    const rendered = (raw.preview ?? raw) as Json;
+                    return (
+                      <div key={locale} className="admin-card">
+                        <h3>{locale.toUpperCase()}</h3>
+                        {editing === editKey ? (
+                          <form
+                            onSubmit={(e: FormEvent) => {
+                              e.preventDefault();
+                              submit(source, key, locale as "en" | "es");
+                            }}
+                          >
+                            <label className="field">
+                              <span className="label">Subject</span>
+                              <input className="input" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+                            </label>
+                            <label className="field">
+                              <span className="label">Body</span>
+                              <textarea className="textarea" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+                            </label>
+                            <label className="field">
+                              <span className="label">CTA</span>
+                              <input className="input" value={form.cta} onChange={(e) => setForm({ ...form, cta: e.target.value })} />
+                            </label>
+                            {source === "question_bank" && (
+                              <label className="field">
+                                <span className="label">Secondary CTA (optional)</span>
+                                <input className="input" value={form.secondaryCta} onChange={(e) => setForm({ ...form, secondaryCta: e.target.value })} />
+                              </label>
+                            )}
+                            <p className="helper">Placeholders: {EMAIL_TEMPLATE_PLACEHOLDER_HINT}</p>
+                            <div className="admin-actions">
+                              <button type="submit" className="button button-primary" disabled={saving}>Save &amp; publish</button>
+                              <button type="button" className="button button-text" disabled={saving} onClick={() => setEditing(null)}>Cancel</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <p><strong>Subject:</strong> {text(rendered.subject)}</p>
+                            <p>{text(rendered.body)}</p>
+                            <p><strong>CTA:</strong> {text(rendered.cta)}{rendered.secondaryCta ? ` · ${text(rendered.secondaryCta)}` : ""}</p>
+                            {canEdit && (
+                              <button type="button" className="button button-text" onClick={() => startEdit(key, locale, raw)}>
+                                Edit
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

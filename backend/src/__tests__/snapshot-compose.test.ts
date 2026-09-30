@@ -1,4 +1,7 @@
 import { buildQuestionBankBundle } from "../fa/content/question-bank";
+import { EXPANSION_PROFILE_DIMENSIONS } from "../fa/engine/expansion-profile";
+import { computeJourney } from "../fa/engine/journey";
+import type { NeedsMapValue } from "../fa/engine/needs-map-types";
 import { buildRulesEngineBundle } from "../rules/content/rules-engine-v1";
 import { evaluateRules } from "../rules/engine";
 import { ComposeInput, composeClientSnapshot, composeInternalAssessment } from "../snapshot/compose";
@@ -19,8 +22,17 @@ function byFieldKey(persona: Record<string, unknown>): Map<string, unknown> {
   return map;
 }
 
-function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInput> = {}) {
+function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInput> = {}, extraAnswers: Record<string, unknown> = {}) {
   const answers = byFieldKey(persona);
+  // fa.needs.map (Level 2 MVP) has no question in this test file's v1 bundle at all — it is set
+  // directly by field_key here, exactly as snapshot-service.ts reads it: the compose layer only ever
+  // needs the answer value, never the question definition.
+  for (const [key, value] of Object.entries(extraAnswers)) answers.set(key, value);
+  // Same derivation snapshot-service.ts uses in production: applicability comes from the journey
+  // engine, not from "whatever the persona happened to set" — a persona field with no applicable
+  // question in this bundle must not silently count as evidence either way.
+  const journey = computeJourney(qb, answers, null);
+  const applicableFieldKeys = new Set(qb.questions.filter((q) => journey.applicableQuestionIds.has(q.id)).map((q) => q.field_key));
   const evaluation = evaluateRules(rules, new Map([...answers].map(([k, v]) => [k, { value: v, answerId: `a:${k}` }])));
   const input: ComposeInput = {
     projectId: "00000000-0000-4000-8000-000000000001",
@@ -29,6 +41,7 @@ function compose(persona: Record<string, unknown>, overrides: Partial<ComposeInp
     company: { name: "Northwind Manufacturing", website: null },
     person: { firstName: "Ana", lastName: "Rivera", preferredName: "Ana", deliverableLanguage: "en", interactionLanguage: "es" },
     answers,
+    applicableFieldKeys,
     questionBank: qb,
     rules,
     template,
@@ -101,7 +114,10 @@ const SAAS = {
 
 /** Every string a person can read in the rendered Snapshot (structural keys excluded). */
 function displayText(value: unknown, key = ""): string[] {
-  if (typeof value === "string") return key === "tone" || key === "key" ? [] : [value];
+  // "status"/"stage" are stable enum keys (like "tone"/"key"): NeedsMapStatus and PathwayStage
+  // values are never meant to be read as prose — their localized wording lives in the sibling
+  // "*Label" fields, which this helper does collect.
+  if (typeof value === "string") return ["tone", "key", "status", "stage", "tier"].includes(key) ? [] : [value];
   if (Array.isArray(value)) return value.flatMap((v) => displayText(v));
   if (value && typeof value === "object") return Object.entries(value).flatMap(([k, v]) => displayText(v, k));
   return [];
@@ -253,5 +269,184 @@ describe("Internal beeside Assessment", () => {
     );
     const saas = compose(SAAS).internal.executive_summary.en;
     expect(saas).not.toMatch(/Primary concern|Expansion driver/);
+  });
+});
+
+describe("Expansion Profile radar (Macroblock 7 six-dimension taxonomy, 2026-09-28)", () => {
+  it("includes all six dimensions, in the fixed owner-approved order, on both the client Snapshot and Internal Assessment", () => {
+    const { client, internal } = compose(MANUFACTURER);
+    const expectedKeys = EXPANSION_PROFILE_DIMENSIONS.map((d) => d.key);
+    expect(expectedKeys).toEqual([
+      "market_evidence",
+      "commercial_ambition_differentiation",
+      "local_capability_base",
+      "governance_constraints",
+      "financial_framework",
+      "activation_planning",
+    ]);
+    expect(client.locales.en.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
+    expect(client.locales.es.expansionProfile.map((d) => d.key)).toEqual(expectedKeys);
+    expect(internal.expansion_profile.map((d) => d.key)).toEqual(expectedKeys);
+  });
+
+  it("carries a stable tier key alongside tierLabel (RadarProfile's CSS/icon hook — never derived from the localized label text)", () => {
+    const { client } = compose(MANUFACTURER);
+    for (const locale of ["en", "es"] as const) {
+      for (const d of client.locales[locale].expansionProfile) {
+        expect(["well_defined", "partially_defined", "early_stage"]).toContain(d.tier);
+      }
+    }
+    // The same dimension gets the same tier regardless of deliverable language.
+    expect(client.locales.en.expansionProfile.map((d) => d.tier)).toEqual(client.locales.es.expansionProfile.map((d) => d.tier));
+  });
+
+  it("keeps every dimension's internal value in [0,1], with defined never exceeding applicable, and tier consistent with value", () => {
+    for (const persona of [MANUFACTURER, SAAS]) {
+      const { internal } = compose(persona);
+      for (const d of internal.expansion_profile) {
+        expect(d.value).toBeGreaterThanOrEqual(0);
+        expect(d.value).toBeLessThanOrEqual(1);
+        expect(d.defined_field_count).toBeLessThanOrEqual(d.applicable_field_count);
+        if (d.value >= 0.7) expect(d.tier).toBe("well_defined");
+        else if (d.value >= 0.35) expect(d.tier).toBe("partially_defined");
+        else expect(d.tier).toBe("early_stage");
+      }
+    }
+  });
+
+  it("never counts a field the respondent was never asked against a dimension's denominator", () => {
+    // fa-qb-1.0.0 (this test's bundle) predates several Level 2-only canonical fields mapped into
+    // these dimensions (e.g. fa.plan.*, fa.company.business_models, fa.provider.investment_range) —
+    // they have no matching question here at all, so they must be excluded, not treated as "asked
+    // and left blank".
+    const { internal } = compose(MANUFACTURER);
+    for (const dimensionDef of EXPANSION_PROFILE_DIMENSIONS) {
+      const fieldsKnownToThisBundle = dimensionDef.fieldKeys.filter((k) => qb.questions.some((q) => q.field_key === k));
+      const scored = internal.expansion_profile.find((d) => d.key === dimensionDef.key)!;
+      expect(scored.applicable_field_count).toBeLessThanOrEqual(fieldsKnownToThisBundle.length);
+    }
+  });
+
+  it("gives a persona with concrete market/customer answers a higher Market Evidence value than a bare baseline", () => {
+    const withAnswers = compose(MANUFACTURER).internal.expansion_profile.find((d) => d.key === "market_evidence")!.value;
+    const bare = compose({ S1: "leading" }).internal.expansion_profile.find((d) => d.key === "market_evidence")!.value;
+    expect(withAnswers).toBeGreaterThan(bare);
+  });
+
+  it("never leaks raw field-level counts (Sherpa-only detail) into the client Snapshot", () => {
+    const { client } = compose(MANUFACTURER);
+    const serialized = JSON.stringify(client.locales);
+    expect(serialized).not.toMatch(/applicable_field_count|defined_field_count|applicableFieldCount|definedFieldCount/);
+  });
+
+  it("never renders a probability, score, pass/fail or investment-attractiveness word for a dimension", () => {
+    const { client } = compose(MANUFACTURER);
+    const visible = displayText(client.locales).join(" | ").toLowerCase();
+    for (const forbidden of ["probability", "score", "pass", "fail", "attractiveness", "%"]) expect(visible).not.toContain(forbidden);
+  });
+});
+
+describe("Needs Landscape (fa.needs.map): priorities kept separate from the dependency-derived pathway", () => {
+  const CHAIN: NeedsMapValue = {
+    selections: [
+      { key: "company_setup", status: "needs_resolution" },
+      { key: "tax_accounting", status: "covered_by_provider" },
+      { key: "hr_payroll_social_security", status: "needs_confirmation" },
+      { key: "banking", status: "covered_internally" }, // not prioritized: appears only in the landscape
+    ],
+    priorityRank: ["company_setup", "tax_accounting", "hr_payroll_social_security"],
+    dependencies: [
+      { key: "company_setup", dependsOn: null, owner: "Ana Rivera", approvalRequired: false, approvalFrom: null },
+      { key: "tax_accounting", dependsOn: "company_setup", owner: null, approvalRequired: true, approvalFrom: "Finance lead" },
+      { key: "hr_payroll_social_security", dependsOn: "tax_accounting", owner: null, approvalRequired: false, approvalFrom: null },
+    ],
+    blockerKeys: ["company_setup"],
+  };
+
+  it("has no priorities, pathway or landscape when the respondent declared no needs at all", () => {
+    const { client } = compose(MANUFACTURER);
+    expect(client.locales.en.needsPriorities).toBeNull();
+    expect(client.locales.en.pathway).toBeNull();
+    expect(client.locales.en.needsLandscape).toBeNull();
+  });
+
+  it("keeps the declared priority order in needsPriorities untouched by dependency data", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const priorities = client.locales.en.needsPriorities!;
+    expect(priorities.items.map((i) => i.key)).toEqual(["company_setup", "tax_accounting", "hr_payroll_social_security"]);
+    expect(priorities.items[0]).toMatchObject({ isImmediatePriority: true, isBlocker: true, dependsOnLabel: null, owner: "Ana Rivera" });
+    expect(priorities.items[1]).toMatchObject({ isImmediatePriority: false, dependsOnLabel: "Company setup / legal structure", approvalRequired: true, approvalFrom: "Finance lead" });
+    expect(priorities.items[2]).toMatchObject({ isBlocker: false, dependsOnLabel: "Tax & accounting" });
+    expect(priorities).toMatchObject({ ownerLabel: "Internal owner", approvalLabel: "Needs approval from" });
+  });
+
+  it("buckets a three-level dependency chain into NOW → DEFINE → ENABLE, one hop per stage", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const pathway = client.locales.en.pathway!;
+    expect(pathway.items.map((i) => [i.key, i.stage])).toEqual([
+      ["company_setup", "now"],
+      ["tax_accounting", "define"],
+      ["hr_payroll_social_security", "enable"],
+    ]);
+    // The pathway is dependency-derived and never reorders the declared priorityRank sequence itself.
+    expect(pathway.items.map((i) => i.key)).toEqual(client.locales.en.needsPriorities!.items.map((i) => i.key));
+    // Reuses the same immediate/blocker wording as needsPriorities — one set of copy, two beats.
+    expect(pathway).toMatchObject({ immediateLabel: "Immediate priority", blockerLabel: "Blocker" });
+  });
+
+  it("keeps two independent items in the same NOW stage as parallel paths, not a forced serial chain", () => {
+    const parallel: NeedsMapValue = {
+      selections: [
+        { key: "company_setup", status: "needs_resolution" },
+        { key: "tax_accounting", status: "needs_resolution" },
+      ],
+      priorityRank: ["company_setup", "tax_accounting"],
+      dependencies: [
+        { key: "company_setup", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax_accounting", dependsOn: null, owner: null, approvalRequired: false, approvalFrom: null },
+      ],
+      blockerKeys: [],
+    };
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": parallel });
+    expect(client.locales.en.pathway!.items.map((i) => i.stage)).toEqual(["now", "now"]);
+  });
+
+  it("never hangs on a cyclical dependency and parks the cycle in the deepest stage instead", () => {
+    const cyclical: NeedsMapValue = {
+      selections: [
+        { key: "company_setup", status: "needs_resolution" },
+        { key: "tax_accounting", status: "needs_resolution" },
+      ],
+      priorityRank: ["company_setup", "tax_accounting"],
+      dependencies: [
+        { key: "company_setup", dependsOn: "tax_accounting", owner: null, approvalRequired: false, approvalFrom: null },
+        { key: "tax_accounting", dependsOn: "company_setup", owner: null, approvalRequired: false, approvalFrom: null },
+      ],
+      blockerKeys: [],
+    };
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": cyclical });
+    expect(client.locales.en.pathway!.items.map((i) => i.stage)).toEqual(["launch", "launch"]);
+  });
+
+  it("lists every declared selection in the capability landscape — including ones never prioritized — with a localized status label and no provider identity", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const landscape = client.locales.en.needsLandscape!;
+    expect(landscape.items.map((i) => i.key)).toEqual(["company_setup", "tax_accounting", "hr_payroll_social_security", "banking"]);
+    expect(landscape.items.map((i) => i.statusLabel)).toEqual([
+      "Still needs to be resolved",
+      "Covered by an existing provider",
+      "Need to confirm whether it applies",
+      "Covered internally",
+    ]);
+    const serialized = JSON.stringify(landscape);
+    expect(serialized).not.toMatch(/Ana Rivera|Finance lead/); // owner/approver names stay in needsPriorities only
+  });
+
+  it("labels are in the fixed five-status / four-stage vocabulary, never a raw score or percentage", () => {
+    const { client } = compose(MANUFACTURER, {}, { "fa.needs.map": CHAIN });
+    const visible = displayText({ needsPriorities: client.locales.en.needsPriorities, pathway: client.locales.en.pathway, needsLandscape: client.locales.en.needsLandscape })
+      .join(" | ")
+      .toLowerCase();
+    for (const forbidden of ["probability", "score", "pass", "fail", "%"]) expect(visible).not.toContain(forbidden);
   });
 });
