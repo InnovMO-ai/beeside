@@ -25,49 +25,71 @@ import { NeedsMapStatus, NeedsMapValue } from "./needs-map-types";
  * table. A real fa-qb-1.1.0 answer for these field_keys, where one already exists, always wins;
  * this is a fallback for Level 2 projects that never asked the old questions at all.
  *
+ * UPDATED 2026-09-30 (Design Freeze taxonomy replacement, needs-explorer-taxonomy.ts): the leaf set
+ * this map keys off of changed from the old 11-category/~30-leaf taxonomy to the frozen 6 families
+ * (A–F) / 36 capabilities. Every leaf that survived the freeze kept its key (see that file's own
+ * "KEY STABILITY" note), so its mapping below is unchanged; every genuinely new leaf introduced by
+ * the freeze gets a best-effort mapping onto the same fixed CAP1 legacy vocabulary
+ * (questions-operation.ts) below; leaves dropped by the freeze (audit, business_advisory,
+ * transfer_pricing, third_party_qualification, warehouse_automation, country_market_brief,
+ * feasibility, trade_market_access, growth_gtm, partnership_strategy, business_check) are removed
+ * from this map — they can no longer be selected, so a dangling entry would never be read.
+ *
  * ACTION NEEDED (flagging, not blocking): confirm against the live `rules_engine_version.config`
  * whether these three field_keys are actually referenced by any `AreaDefinition`. If not, this file
  * and its one call site can be deleted with zero effect on findings/capability ranks. If yes, note
  * the mapping below is a best-effort approximation across two taxonomies that are not isomorphic
- * (CAP1's 24 legacy values vs. the Needs Explorer's 24 leaves, grouped differently) — legacy values
- * with no Needs Explorer equivalent (e.g. "accounting", "contracts", "manufacturing" — the last one
- * because the taxonomy has no manufacturing leaf at all, a documented gap in
- * needs-explorer-taxonomy.ts) are intentionally never derived and will simply not appear. The
- * durable fix, if the live config does depend on this, is a new `rules_engine_version` whose config
- * reads `fa.needs.map` directly — the existing Draft→Preview→Publish workflow already supports
- * publishing one without any of this adapter.
+ * (CAP1's 24 legacy values vs. the Needs Explorer's 36 leaves, grouped differently) — legacy values
+ * with no Needs Explorer equivalent (e.g. "contracts", "manufacturing" — the taxonomy still has no
+ * manufacturing leaf, a documented gap) are intentionally never derived and will simply not appear.
+ * The durable fix, if the live config does depend on this, is a new `rules_engine_version` whose
+ * config reads `fa.needs.map` directly — the existing Draft→Preview→Publish workflow already
+ * supports publishing one without any of this adapter.
  */
 
 const LEAF_TO_LEGACY_CAPABILITY: Readonly<Record<string, readonly string[]>> = {
-  company_setup: ["legal_corporate"],
-  tax: ["tax"],
-  audit: [],
-  business_advisory: [],
-  transfer_pricing: ["tax"],
-  regulatory_permits: ["regulatory_compliance"],
-  hr_payroll_social_security: ["talent_hr", "payroll"],
-  supplier_search: ["suppliers"],
+  // Family A — Validate market & strategy
+  market_validation: ["commercial_strategy"],
+  demand_validation: ["commercial_strategy", "marketing"],
+  appetite_tracker: ["commercial_strategy"],
+  entry_strategy: ["commercial_strategy", "sales_channels"],
+  commercial_strategy_channels: ["commercial_strategy", "sales_channels"],
+  growth: ["commercial_strategy", "marketing"],
   local_partner_search_match: ["local_partner_distributor"],
-  third_party_qualification: ["risk_due_diligence"],
+  location_analysis: ["risk_due_diligence", "facilities"],
+  // Family B — Establish local structure
+  company_setup: ["legal_corporate"],
+  tax_accounting: ["tax", "accounting"],
+  banking: ["banking"],
+  insurance: ["insurance"],
+  regulatory_permits: ["regulatory_compliance"],
+  intellectual_property: ["legal_corporate", "contracts"],
+  // Family C — Prepare facilities & infrastructure
   industrial_warehouse_real_estate: ["facilities"],
+  lease_purchase_development: ["facilities"],
   construction: ["facilities"],
-  threepl_warehousing_inventory: ["warehousing", "logistics"],
-  warehouse_automation: ["warehousing"],
+  infrastructure_utilities: ["facilities"],
+  physical_security: ["facilities", "cyber_data"],
+  // Family D — Build the local team
+  recruitment: ["talent_hr"],
+  hr_payroll_social_security: ["talent_hr", "payroll"],
+  mobility_immigration: ["talent_hr"],
+  labor_advisory: ["talent_hr", "regulatory_compliance"],
+  specialized_talent: ["talent_hr"],
+  // Family E — Activate operations & supply chain
+  supplier_search: ["suppliers"],
+  purchasing_sourcing: ["suppliers"],
   foreign_trade_customs: ["customs_trade"],
   freight_mobility: ["logistics"],
+  threepl_warehousing_inventory: ["warehousing", "logistics"],
   last_mile: ["logistics"],
+  // Family F — Technology & digital operations
   erp: ["technology"],
   wms: ["technology"],
   tms: ["technology"],
+  integrations: ["technology"],
   data_video_surveillance: ["technology", "cyber_data"],
-  banking: ["banking"],
-  insurance: ["insurance"],
-  country_market_brief: [],
-  feasibility: ["risk_due_diligence"],
-  trade_market_access: ["sales_channels"],
-  growth_gtm: ["commercial_strategy", "marketing"],
-  partnership_strategy: ["sales_channels"],
-  business_check: ["commercial_strategy"],
+  cybersecurity: ["cyber_data"],
 };
 
 /** NeedsMapStatus (5 states) collapsed onto the legacy 4-state RESOLUTION_STATUS (helpers.ts). The

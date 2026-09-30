@@ -36,7 +36,17 @@ export type StageId =
   | "l2_priorities"
   | "l2_needs_landscape"
   | "l2_provider_resources"
-  | "l2_review";
+  | "l2_review"
+  // fa-qb-2.1.0 (Product Owner decision 2026-09-30, "Decision A"): the canonical 8-stage rail from
+  // the frozen PRE-SNAPSHOT Design Freeze (Identity pre-rail, then these seven, then Snapshot —
+  // "snapshot" above is reused, not redeclared). See question-bank-v2-1.ts for the full mapping.
+  | "l3_company"
+  | "l3_project"
+  | "l3_objectives_market"
+  | "l3_needs"
+  | "l3_activation"
+  | "l3_rules"
+  | "l3_resources_review";
 
 export type QuestionType =
   | "single_select"
@@ -113,6 +123,13 @@ export interface StepDef {
   /** "grouped" renders every applicable question of the step together as one composition (Level 2
    *  MVP). Undefined preserves the existing one-question-per-screen rendering exactly. */
   layout?: "grouped";
+  /** "Leave a note" affordance (Design Freeze, PRE-SNAPSHOT scope item 5): the id of one of this
+   *  step's own `question_ids`, a normal optional `type: "text"` question, rendered by the client as
+   *  a collapsed post-it in the screen's corner instead of inline in the main question list. Purely
+   *  a UI hint — the underlying answer, validation, Review recap and Snapshot/Precision handoff are
+   *  all the same as any other question; nothing new to persist or validate. Undefined = no note
+   *  affordance on this step (unchanged behavior).  */
+  note_field_id?: string;
   applies_when?: Condition;
   copy: Record<Locale, StepCopy>;
 }

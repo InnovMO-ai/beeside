@@ -4,6 +4,9 @@
  * the canonical mapping to `capability_taxonomy_category` stays backend-only and is never needed in
  * the browser. If the two drift, the backend is authoritative — it validates `needs_map` answers
  * against its own copy (values.ts) regardless of what the client renders.
+ *
+ * REPLACED 2026-09-30 — frozen 6 families (A–F) / 36 capabilities (Design Freeze). See the backend
+ * file for the full rationale, key-stability notes, and dropped-leaf list.
  */
 
 export interface NeedsExplorerLeaf {
@@ -19,92 +22,84 @@ export interface NeedsExplorerGroup {
 
 export const NEEDS_EXPLORER_TAXONOMY: readonly NeedsExplorerGroup[] = [
   {
-    key: "company_legal",
-    label: { en: "Company and legal setup", es: "Constitución de empresa y legal" },
-    leaves: [{ key: "company_setup", label: { en: "Company Setup", es: "Constitución de la empresa" } }],
-  },
-  {
-    key: "tax_audit_advisory",
-    label: { en: "Tax, audit and business advisory", es: "Fiscal, auditoría y asesoría de negocio" },
+    key: "family_a_validate_market_strategy",
+    label: { en: "Validate market & strategy", es: "Validar mercado y estrategia" },
     leaves: [
-      { key: "tax", label: { en: "Tax", es: "Fiscal" } },
-      { key: "audit", label: { en: "Audit", es: "Auditoría" } },
-      { key: "business_advisory", label: { en: "Business Advisory", es: "Asesoría de negocio" } },
-      { key: "transfer_pricing", label: { en: "Transfer Pricing", es: "Precios de transferencia" } },
+      { key: "market_validation", label: { en: "Market validation", es: "Validación de mercado" } },
+      {
+        key: "demand_validation",
+        label: { en: "Validate demand for the product or service", es: "Validar la demanda del producto o servicio" },
+      },
+      { key: "appetite_tracker", label: { en: "Appetite Tracker", es: "Appetite Tracker" } },
+      { key: "entry_strategy", label: { en: "Entry strategy", es: "Estrategia de entrada" } },
+      { key: "commercial_strategy_channels", label: { en: "Commercial strategy / channels", es: "Estrategia comercial / canales" } },
+      { key: "growth", label: { en: "Growth", es: "Crecimiento" } },
+      {
+        key: "local_partner_search_match",
+        label: { en: "Local partner or distributor search", es: "Búsqueda de socio o distribuidor local" },
+      },
+      {
+        key: "location_analysis",
+        label: { en: "Location analysis in the destination country", es: "Análisis de ubicación en el país destino" },
+      },
     ],
   },
   {
-    key: "permits_certifications",
-    label: { en: "Permits and certifications", es: "Permisos y certificaciones" },
-    leaves: [{ key: "regulatory_permits", label: { en: "Regulatory approvals and certifications", es: "Aprobaciones y certificaciones regulatorias" } }],
-  },
-  {
-    key: "people_payroll",
-    label: { en: "People and payroll", es: "Personal y nómina" },
-    leaves: [{ key: "hr_payroll_social_security", label: { en: "HR, Payroll and Social Security", es: "RH, nómina y seguridad social" } }],
-  },
-  {
-    key: "partners_suppliers",
-    label: { en: "Local partners and suppliers", es: "Socios y proveedores locales" },
+    key: "family_b_establish_local_structure",
+    label: { en: "Establish local structure", es: "Establecer la estructura local" },
     leaves: [
-      { key: "supplier_search", label: { en: "Supplier Search", es: "Búsqueda de proveedores" } },
-      { key: "local_partner_search_match", label: { en: "Local Partner Search and Match", es: "Búsqueda y match de socio local" } },
-      { key: "third_party_qualification", label: { en: "Third-Party Qualification", es: "Calificación de terceros" } },
-    ],
-  },
-  {
-    key: "facilities_real_estate",
-    label: { en: "Facilities and real estate", es: "Instalaciones e inmuebles" },
-    leaves: [
-      { key: "industrial_warehouse_real_estate", label: { en: "Industrial and Warehouse Real Estate", es: "Bienes raíces industriales y de almacén" } },
-      { key: "construction", label: { en: "Construction", es: "Construcción" } },
-    ],
-  },
-  {
-    key: "warehousing_inventory",
-    label: { en: "Warehousing and inventory", es: "Almacenamiento e inventario" },
-    leaves: [
-      { key: "threepl_warehousing_inventory", label: { en: "3PL, Warehousing and Inventory", es: "3PL, almacenamiento e inventario" } },
-      { key: "warehouse_automation", label: { en: "Warehouse Automation", es: "Automatización de almacén" } },
-    ],
-  },
-  {
-    key: "freight_customs",
-    label: { en: "Freight and customs", es: "Transporte y aduanas" },
-    leaves: [
-      { key: "foreign_trade_customs", label: { en: "Foreign Trade and Customs", es: "Comercio exterior y aduanas" } },
-      { key: "freight_mobility", label: { en: "Freight Mobility", es: "Movilidad de carga" } },
-      { key: "last_mile", label: { en: "Last Mile", es: "Última milla" } },
-    ],
-  },
-  {
-    key: "technology_systems",
-    label: { en: "Technology and systems", es: "Tecnología y sistemas" },
-    leaves: [
-      { key: "erp", label: { en: "ERP", es: "ERP" } },
-      { key: "wms", label: { en: "WMS", es: "WMS" } },
-      { key: "tms", label: { en: "TMS", es: "TMS" } },
-      { key: "data_video_surveillance", label: { en: "Data and Video Surveillance", es: "Datos y videovigilancia" } },
-    ],
-  },
-  {
-    key: "banking_insurance",
-    label: { en: "Banking and insurance", es: "Banca y seguros" },
-    leaves: [
+      { key: "company_setup", label: { en: "Company setup / legal structure", es: "Constitución de empresa / estructura legal" } },
+      { key: "tax_accounting", label: { en: "Tax & accounting", es: "Fiscal y contabilidad" } },
       { key: "banking", label: { en: "Banking", es: "Banca" } },
       { key: "insurance", label: { en: "Insurance", es: "Seguros" } },
+      { key: "regulatory_permits", label: { en: "Regulatory advisory & compliance", es: "Asesoría regulatoria y cumplimiento" } },
+      { key: "intellectual_property", label: { en: "Intellectual property", es: "Propiedad intelectual" } },
     ],
   },
   {
-    key: "market_entry_growth",
-    label: { en: "Market entry and growth", es: "Entrada al mercado y crecimiento" },
+    key: "family_c_prepare_facilities_infrastructure",
+    label: { en: "Prepare facilities & infrastructure", es: "Preparar instalaciones e infraestructura" },
     leaves: [
-      { key: "country_market_brief", label: { en: "Country and Market Brief", es: "Brief de país y mercado" } },
-      { key: "feasibility", label: { en: "Feasibility", es: "Factibilidad" } },
-      { key: "trade_market_access", label: { en: "Trade and Market Access", es: "Comercio y acceso a mercado" } },
-      { key: "growth_gtm", label: { en: "Growth and GTM", es: "Crecimiento y GTM" } },
-      { key: "partnership_strategy", label: { en: "Partnership Strategy", es: "Estrategia de alianzas" } },
-      { key: "business_check", label: { en: "Business Check", es: "Diagnóstico de negocio" } },
+      { key: "industrial_warehouse_real_estate", label: { en: "Site selection / real estate", es: "Selección de sitio / bienes raíces" } },
+      { key: "lease_purchase_development", label: { en: "Lease / purchase or development", es: "Arrendamiento / compra o desarrollo" } },
+      { key: "construction", label: { en: "Design / fit-out / construction", es: "Diseño / adecuación / construcción" } },
+      { key: "infrastructure_utilities", label: { en: "Infrastructure & utilities", es: "Infraestructura y servicios" } },
+      { key: "physical_security", label: { en: "Physical security", es: "Seguridad física" } },
+    ],
+  },
+  {
+    key: "family_d_build_local_team",
+    label: { en: "Build the local team", es: "Construir el equipo local" },
+    leaves: [
+      { key: "recruitment", label: { en: "Recruitment", es: "Reclutamiento" } },
+      { key: "hr_payroll_social_security", label: { en: "Payroll & social security", es: "Nómina y seguridad social" } },
+      { key: "mobility_immigration", label: { en: "Mobility / immigration", es: "Movilidad / inmigración" } },
+      { key: "labor_advisory", label: { en: "Labor advisory", es: "Asesoría laboral" } },
+      { key: "specialized_talent", label: { en: "Specialized talent", es: "Talento especializado" } },
+    ],
+  },
+  {
+    key: "family_e_activate_operations_supply_chain",
+    label: { en: "Activate operations & supply chain", es: "Activar operación y cadena de suministro" },
+    leaves: [
+      { key: "supplier_search", label: { en: "Supplier search / development", es: "Búsqueda / desarrollo de proveedores" } },
+      { key: "purchasing_sourcing", label: { en: "Purchasing / sourcing", es: "Compras / abastecimiento" } },
+      { key: "foreign_trade_customs", label: { en: "Foreign trade & customs", es: "Comercio exterior y aduanas" } },
+      { key: "freight_mobility", label: { en: "Transportation", es: "Transporte" } },
+      { key: "threepl_warehousing_inventory", label: { en: "Warehousing / 3PL / inventory", es: "Almacenamiento / 3PL / inventario" } },
+      { key: "last_mile", label: { en: "Distribution / last mile", es: "Distribución / última milla" } },
+    ],
+  },
+  {
+    key: "family_f_technology_digital_operations",
+    label: { en: "Technology & digital operations", es: "Tecnología y operaciones digitales" },
+    leaves: [
+      { key: "erp", label: { en: "Enterprise Resource Planning (ERP)", es: "Planeación de Recursos Empresariales (ERP)" } },
+      { key: "wms", label: { en: "Warehouse Management System (WMS)", es: "Sistema de Gestión de Almacenes (WMS)" } },
+      { key: "tms", label: { en: "Transportation Management System (TMS)", es: "Sistema de Gestión de Transporte (TMS)" } },
+      { key: "integrations", label: { en: "Integrations", es: "Integraciones" } },
+      { key: "data_video_surveillance", label: { en: "Data & connectivity", es: "Datos y conectividad" } },
+      { key: "cybersecurity", label: { en: "Cybersecurity", es: "Ciberseguridad" } },
     ],
   },
 ];

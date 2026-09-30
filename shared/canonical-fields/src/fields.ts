@@ -276,6 +276,18 @@ export const FA_FIELDS: readonly CanonicalFieldDefinition[] = [
   field({ key: "fa.provider.investment_range", dataType: "single_select", source: "question_bank", values: ["under_50k", "50k_150k", "150k_500k", "500k_2m", "over_2m", "not_yet_defined"], description: "Investment framework range for this expansion (USD)." }),
   field({ key: "fa.provider.resource_availability", dataType: "single_select", source: "question_bank", values: ["yes", "partially", "no", "not_sure"], description: "Whether the internal team/budget to execute is available." }),
   field({ key: "fa.provider.resource_gap", dataType: "text", source: "question_bank", openText: true, description: "What resource is missing, when availability is not a plain yes (verbatim)." }),
+
+  // ---------------------------------------------------------------- "Leave a note" (fa-qb-2.1.0, PRE-SNAPSHOT scope item 5)
+  // One optional, unscored free-text field per major section, rendered by the client as a collapsed
+  // post-it (StepDef.note_field_id) rather than inline. Same shape as fa.needs.additional_context
+  // above (text/question_bank/openText) — never scored, never converted into a structured value.
+  field({ key: "fa.company.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Your Company: anything else about the company not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.project.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Your Project: anything else about the project not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.objectives.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Objectives: anything else about the objectives not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.market.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Market: anything else about the market not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.activation.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Activation Order: anything else about the activation order not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.rules.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Project Rules: anything else about the project rules not covered by the section's own questions (verbatim, optional)." }),
+  field({ key: "fa.resources.notes", dataType: "text", source: "question_bank", openText: true, description: "'Leave a note' for Resources: anything else about the resources not covered by the section's own questions (verbatim, optional)." }),
 ];
 
 const FIELD_INDEX = new Map(FA_FIELDS.map((definition) => [definition.key, definition]));

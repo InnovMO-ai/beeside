@@ -31,6 +31,12 @@ import { RELATIONSHIP_STATUS, YES_PROBABLY_NO_NOT_SURE, opts, q, when } from "./
  * answers by itself), and O_TECH_SYSTEMS (its own options literally duplicate the erp/wms/tms
  * leaves; its two values with no leaf equivalent — crm, ecommerce, proprietary — had no confirmed
  * downstream consumer, per the review that grounded this decision).
+ *
+ * UPDATED 2026-09-30 (Design Freeze taxonomy replacement): O_TECH_INTEGRATION's gate now also
+ * includes the new "integrations" leaf (Family F, needs-explorer-taxonomy.ts) — it is the same
+ * underlying question ("do you expect implementation/integration/adaptation work") the leaf
+ * itself names, so gating it out would be a UX regression introduced by the freeze, not a
+ * preserved behavior. No other gate keys changed.
  */
 
 const selectedLeaf = (leaf: string) => when.includes("fa.needs.map", leaf);
@@ -232,7 +238,7 @@ export const NEEDS_FOLLOWUP_QUESTIONS: QuestionDef[] = [
     id: "O_TECH_INTEGRATION",
     field_key: "fa.operation.technology.integration_expected",
     type: "single_select",
-    applies_when: selectedAnyLeaf("erp", "wms", "tms", "data_video_surveillance"),
+    applies_when: selectedAnyLeaf("erp", "wms", "tms", "integrations", "data_video_surveillance"),
     title: [
       "Do you expect implementation, integration or adaptation work in the new market?",
       "¿Esperas trabajo de implementación, integración o adaptación en el nuevo mercado?",
