@@ -204,8 +204,8 @@ describe("VirtualSnapshot", () => {
         t={t}
       />,
     );
-    expect(screen.getByText("The Hive")).toBeInTheDocument();
-    expect(screen.getByText("beeside Verified")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The Hive" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "beeside Verified" })).toBeInTheDocument();
     const headings = screen.getAllByRole("heading").map((h) => h.textContent);
     const landscapeIndex = headings.indexOf("Capability landscape");
     const hiveIndex = headings.indexOf("The Hive");
