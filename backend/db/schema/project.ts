@@ -1,4 +1,4 @@
-import { boolean, check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { AnyPgColumn, boolean, check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { actorTypeEnum, assessmentStateEnum, precisionStateEnum, trustStateEnum } from "./enums";
 import { company } from "./identity";
@@ -29,6 +29,12 @@ export const project = pgTable(
     premiumFirstActivatedAt: timestamp("premium_first_activated_at", { withTimezone: true }),
     precisionState: precisionStateEnum("precision_state").notNull().default("NOT_STARTED"),
     precisionStartedAt: timestamp("precision_started_at", { withTimezone: true }),
+    // Macroblock 4 (Precision persistence, Macroblock 2 §3A) — column only, not the split workflow.
+    // Set once, at creation, by the canonical Project-domain creation flow when a PA-detected split
+    // is client-confirmed; NULL for every project that was not itself created as a split-off. Points
+    // at the ORIGINAL project (the one that kept its project_id) — never at another split-off sibling.
+    // No FK cascade semantics beyond ordinary reference integrity: a project row is never deleted.
+    splitFromProjectId: uuid("split_from_project_id").references((): AnyPgColumn => project.projectId),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -36,6 +42,7 @@ export const project = pgTable(
     index("project_company_id_idx").on(t.companyId),
     index("project_assessment_state_idx").on(t.assessmentState),
     index("project_assessment_state_premium_idx").on(t.assessmentState, t.premiumEverActivated),
+    index("project_split_from_project_id_idx").on(t.splitFromProjectId),
     check(
       "project_premium_first_activated_consistency",
       sql`${t.premiumFirstActivatedAt} IS NULL OR ${t.premiumEverActivated} = true`,
@@ -44,6 +51,7 @@ export const project = pgTable(
       "project_precision_started_consistency",
       sql`${t.precisionStartedAt} IS NULL OR ${t.precisionState} = 'STARTED'`,
     ),
+    check("project_split_from_not_self", sql`${t.splitFromProjectId} IS NULL OR ${t.splitFromProjectId} <> ${t.projectId}`),
   ],
 );
 

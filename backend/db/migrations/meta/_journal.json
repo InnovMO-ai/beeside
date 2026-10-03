@@ -120,6 +120,20 @@
       "when": 1791156502289,
       "tag": "0016_fa4_public_v1_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791156602289,
+      "tag": "0017_precision_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791156702289,
+      "tag": "0018_precision_persistence_integrity",
+      "breakpoints": true
     }
   ]
 }
