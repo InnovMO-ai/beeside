@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "source": "claude/precision-macroblock3-manifest-content-readiness-contract-2026-10-02.md §2",
+  "candidate_categories": [
+    {
+      "category_key": "logistics",
+      "detection_signals_positive": ["shipping", "import/export", "warehousing", "distribution", "fulfillment", "supply chain", "freight", "customs", "3PL"],
+      "detection_signals_negative": ["pure digital/SaaS product with no physical goods", "service-only business with no shipped product"],
+      "typical_dependencies": [],
+      "sequencing_hint": "early"
+    },
+    {
+      "category_key": "hr",
+      "detection_signals_positive": ["hiring", "local employees", "payroll", "local team", "headcount", "staffing", "labor"],
+      "detection_signals_negative": ["fully remote-from-origin-country team with no local hires planned"],
+      "typical_dependencies": [],
+      "sequencing_hint": "early"
+    },
+    {
+      "category_key": "legal",
+      "detection_signals_positive": ["entity incorporation", "contracts", "IP registration", "regulatory licensing"],
+      "detection_signals_negative": [],
+      "typical_dependencies": [],
+      "sequencing_hint": "early",
+      "note": "pilot/provisional category_key, per Macroblock 4 hygiene item B — not authored to Category Manifest depth in this pass"
+    },
+    {
+      "category_key": "tax",
+      "detection_signals_positive": ["tax registration", "transfer pricing", "customs duties", "VAT/sales tax"],
+      "detection_signals_negative": [],
+      "typical_dependencies": ["legal"],
+      "sequencing_hint": "mid",
+      "note": "pilot/provisional category_key, per Macroblock 4 hygiene item B — not authored to Category Manifest depth in this pass"
+    },
+    {
+      "category_key": "market_validation",
+      "detection_signals_positive": ["uncertain demand", "not sure if this will sell", "no existing local customers"],
+      "detection_signals_negative": ["existing confirmed local demand/contracts already in hand"],
+      "typical_dependencies": [],
+      "sequencing_hint": "early",
+      "note": "pilot/provisional category_key, per Macroblock 4 hygiene item B — not authored to Category Manifest depth in this pass"
+    }
+  ],
+  "project_split_signals": [
+    {
+      "signal_key": "distinct_target_counterparty",
+      "description_en": "The plan names two or more buyers/partners/customers that are not the same relationship",
+      "description_es": "El plan nombra dos o más contrapartes (compradores/socios/clientes) que no son la misma relación",
+      "weight_hint": "strong"
+    },
+    {
+      "signal_key": "distinct_geography",
+      "description_en": "Two materially different destination markets described as part of \"one\" plan",
+      "description_es": "Dos mercados de destino materialmente distintos descritos como parte de \"un\" plan",
+      "weight_hint": "strong"
+    },
+    {
+      "signal_key": "distinct_operating_model",
+      "description_en": "One thread implies manufacturing/physical operations; another implies pure resale/distribution/licensing, with no shared operational footprint",
+      "description_es": "Un hilo implica manufactura/operación física; otro implica reventa/distribución/licencia pura, sin huella operativa compartida",
+      "weight_hint": "moderate"
+    },
+    {
+      "signal_key": "distinct_timeline",
+      "description_en": "Two objectives on investment/launch horizons more than ~12 months apart with no stated sequencing relationship between them",
+      "description_es": "Dos objetivos con horizontes de inversión/lanzamiento separados por más de ~12 meses, sin relación de secuencia declarada entre ellos",
+      "weight_hint": "weak"
+    },
+    {
+      "signal_key": "distinct_investment_path",
+      "description_en": "The client describes two separate funding/approval decisions, each of which could proceed or be cancelled without affecting the other",
+      "description_es": "El cliente describe dos decisiones de inversión/aprobación separadas, cada una de las cuales podría avanzar o cancelarse sin afectar a la otra",
+      "weight_hint": "strong"
+    }
+  ]
+}

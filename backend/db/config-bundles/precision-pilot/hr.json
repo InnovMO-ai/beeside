@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "category_key": "hr",
+  "source": "claude/precision-macroblock3-manifest-content-readiness-contract-2026-10-02.md §5",
+  "fields": [
+    {
+      "field_key": "hr_employment_model",
+      "type": "enum",
+      "values": ["direct_entity", "eor_peo", "independent_contractors", "undecided"],
+      "label": { "en": "Employment model", "es": "Modelo de contratación" },
+      "requirement_level": "blocking",
+      "applicability_rule": null,
+      "notes": "Gates hr_local_entity_status and hr_statutory_benefits_confirmation applicability patterns."
+    },
+    {
+      "field_key": "hr_local_entity_status",
+      "type": "enum",
+      "values": ["entity_registered", "entity_in_process", "no_entity_planned"],
+      "label": { "en": "Local legal entity status (for employment purposes)", "es": "Estatus de entidad legal local" },
+      "requirement_level": "conditional",
+      "applicability_rule": { "op": "field_equals", "field_key": "hr_employment_model", "value": "direct_entity" },
+      "notes": "Reads, never writes, the legal category's entity-status fact if already answered there — see §8 of the source document."
+    },
+    {
+      "field_key": "hr_payroll_provider_status",
+      "type": "enum",
+      "values": ["engaged", "in_selection", "not_started"],
+      "label": { "en": "Payroll provider status", "es": "Estatus de proveedor de nómina" },
+      "requirement_level": "required",
+      "applicability_rule": null
+    },
+    {
+      "field_key": "hr_employee_population_breakdown",
+      "type": "repeatable_group",
+      "label": { "en": "Employee population breakdown", "es": "Desglose de población de empleados" },
+      "requirement_level": "required",
+      "applicability_rule": null,
+      "group_item_schema": [
+        { "field_key": "role_type", "type": "text", "label": { "en": "Role type", "es": "Tipo de rol" }, "requirement_level": "required" },
+        { "field_key": "headcount", "type": "number", "label": { "en": "Headcount for this role", "es": "Número de empleados en este rol" }, "requirement_level": "required" },
+        { "field_key": "employment_type", "type": "enum", "values": ["full_time", "part_time", "contractor"], "label": { "en": "Employment type", "es": "Tipo de empleo" }, "requirement_level": "required" },
+        { "field_key": "location", "type": "text", "label": { "en": "Work location", "es": "Ubicación de trabajo" }, "requirement_level": "required" },
+        { "field_key": "seniority_level", "type": "enum", "values": ["entry", "mid", "senior", "executive"], "label": { "en": "Seniority level", "es": "Nivel de seniority" }, "requirement_level": "supporting" }
+      ],
+      "min_items": 1,
+      "notes": "Minimum one item required for completeness."
+    },
+    {
+      "field_key": "hr_statutory_benefits_confirmation",
+      "type": "boolean",
+      "label": { "en": "Statutory benefits reviewed and confirmed", "es": "Beneficios estatutarios revisados y confirmados" },
+      "requirement_level": "blocking",
+      "applicability_rule": null,
+      "notes": "The confirmation target (which specific benefits must be reviewed) is itself country-overlay content (see country_overlays below) — this field asks for one confirmation act over whatever the effective overlay-resolved list is."
+    },
+    {
+      "field_key": "hr_union_or_collective_bargaining_presence",
+      "type": "enum",
+      "values": ["present", "not_present", "unknown"],
+      "label": { "en": "Union / collective bargaining presence", "es": "Presencia de sindicato / negociación colectiva" },
+      "requirement_level": "conditional",
+      "applicability_rule": { "op": "group_min_items", "field_key": "hr_employee_population_breakdown", "min": 1 }
+    },
+    {
+      "field_key": "hr_employment_contract_language_requirement",
+      "type": "text_or_language_code_list",
+      "label": { "en": "Required contract language(s)", "es": "Idioma(s) requerido(s) del contrato" },
+      "requirement_level": "supporting",
+      "applicability_rule": null,
+      "notes": "Changed from pure free text to a text/enum (language-code list) hybrid during the source document's §12 content cleanup pass."
+    },
+    {
+      "field_key": "hr_immigration_sponsorship_need_flag",
+      "type": "boolean",
+      "label": { "en": "Will any employee need immigration/visa sponsorship?", "es": "¿Algún empleado necesitará patrocinio de inmigración/visa?" },
+      "requirement_level": "conditional",
+      "applicability_rule": { "op": "group_min_items", "field_key": "hr_employee_population_breakdown", "min": 1 },
+      "notes": "A \"need flag\" only — never the visa process itself."
+    },
+    {
+      "field_key": "hr_termination_severance_framework_awareness",
+      "type": "enum",
+      "values": ["reviewed", "not_yet_reviewed"],
+      "label": { "en": "Termination/severance framework awareness", "es": "Conocimiento del marco de terminación/indemnización" },
+      "requirement_level": "informational",
+      "applicability_rule": null,
+      "notes": "Never blocks — awareness only, not legal advice."
+    },
+    {
+      "field_key": "hr_data_privacy_regime_acknowledgement",
+      "type": "boolean",
+      "label": { "en": "HR data-privacy regime acknowledged", "es": "Régimen de privacidad de datos de RH reconocido" },
+      "requirement_level": "required",
+      "applicability_rule": null
+    },
+    {
+      "field_key": "hr_statutory_year_end_bonus_status",
+      "type": "enum",
+      "values": ["provisioned", "not_provisioned", "not_applicable"],
+      "label": { "en": "Statutory year-end/13th-month bonus status", "es": "Estatus de provisión de bono/aguinaldo de fin de año" },
+      "requirement_level": "required",
+      "applicability_rule": null,
+      "notes": "Base-schema field exercising deactivation directly — deactivated by the US and SG overlays below."
+    }
+  ],
+  "critical_decisions": [
+    {
+      "decision_key": "hr_entity_or_eor_decision",
+      "label": { "en": "Entity-vs-EOR path confirmed", "es": "Ruta entidad-vs-EOR confirmada" },
+      "gates": "blocking",
+      "depends_on_fields": ["hr_employment_model", "hr_local_entity_status"],
+      "resolution_rule": {
+        "op": "and",
+        "rules": [
+          { "op": "field_answered", "field_key": "hr_employment_model" },
+          { "op": "or", "rules": [
+            { "op": "not", "rule": { "op": "field_equals", "field_key": "hr_employment_model", "value": "direct_entity" } },
+            { "op": "field_asked", "field_key": "hr_local_entity_status" }
+          ] }
+        ]
+      }
+    },
+    {
+      "decision_key": "hr_statutory_benefits_decision",
+      "label": { "en": "Statutory benefits path confirmed", "es": "Ruta de beneficios estatutarios confirmada" },
+      "gates": "blocking",
+      "depends_on_fields": ["hr_statutory_benefits_confirmation", "hr_employee_population_breakdown"],
+      "resolution_rule": {
+        "op": "and",
+        "rules": [
+          { "op": "group_min_items", "field_key": "hr_employee_population_breakdown", "min": 1 },
+          { "op": "field_equals", "field_key": "hr_statutory_benefits_confirmation", "value": true }
+        ]
+      }
+    },
+    {
+      "decision_key": "hr_entity_employment_model_consistency_decision",
+      "label": { "en": "Employment model consistent with entity status", "es": "Modelo de contratación consistente con estatus de entidad" },
+      "gates": "blocking",
+      "depends_on_fields": ["hr_employment_model", "hr_local_entity_status", "hr_entity_consistency_ack"],
+      "resolution_rule": {
+        "op": "or",
+        "rules": [
+          { "op": "not", "rule": { "op": "field_equals", "field_key": "hr_employment_model", "value": "eor_peo" } },
+          { "op": "not", "rule": { "op": "field_equals", "field_key": "hr_local_entity_status", "value": "entity_registered" } },
+          { "op": "field_answered", "field_key": "hr_entity_consistency_ack" }
+        ]
+      },
+      "notes": "Material-contradiction worked example, §9.3 of the source document. hr_entity_consistency_ack is a new field (type=text, conditional) surfaced only once evaluateQuality() flags this specific tension — not listed in fields[] above because its applicability is itself contradiction-triggered, per §9.1/§9.3."
+    }
+  ],
+  "country_overlays": {
+    "US": {
+      "deactivate": ["hr_statutory_year_end_bonus_status"],
+      "notes": "Confident, no CONTENT_VALIDATION_REQUIRED flag: no US federal or state law mandates a 13th-month/year-end statutory bonus; year-end bonuses in the US are discretionary/contractual, not statutory."
+    },
+    "MX": {
+      "modify": [
+        { "field_key": "hr_statutory_year_end_bonus_status", "patch": {
+          "label": { "en": "Aguinaldo (statutory year-end bonus) provisioning status", "es": "Estatus de provisión de aguinaldo" },
+          "help_text": { "en": "Mexican law (LFT) mandates a minimum 15-day aguinaldo paid by December 20.", "es": "La LFT exige un aguinaldo mínimo de 15 días, pagado antes del 20 de diciembre." }
+        } }
+      ],
+      "add": [
+        {
+          "field_key": "hr_imss_registration_status",
+          "type": "enum",
+          "values": ["registered", "in_process", "not_started"],
+          "label": { "en": "IMSS (social security) registration status", "es": "Estatus de registro ante el IMSS" },
+          "requirement_level": "required",
+          "applicability_rule_note": "hr_employment_model = direct_entity OR hr_employment_model = eor_peo"
+        }
+      ]
+    },
+    "SG": {
+      "deactivate": ["hr_statutory_year_end_bonus_status"],
+      "deactivate_content_validation_required": ["hr_statutory_year_end_bonus_status"],
+      "deactivate_notes": "CONTENT_VALIDATION_REQUIRED — Singapore's Annual Wage Supplement/bonus practice is widespread but, unlike MX's aguinaldo, is not uniformly and unconditionally a statutory obligation in every employment relationship; needs confirmation from a qualified source before this specific overlay entry is relied on operationally. This flag is carried forward unchanged from the source document — do not clear it here.",
+      "add": [
+        {
+          "field_key": "hr_cpf_contribution_status",
+          "type": "enum",
+          "values": ["set_up", "in_process", "not_applicable_no_sg_citizens_prs"],
+          "label": { "en": "CPF (Central Provident Fund) contribution setup status", "es": "Estatus de configuración de contribuciones al CPF" },
+          "requirement_level": "conditional",
+          "applicability_rule_note": "hr_employee_population_breakdown has an item with location in Singapore",
+          "notes": "Not flagged CONTENT_VALIDATION_REQUIRED — CPF's existence and mandatory nature for SG citizens/PRs is well-established and uncontested."
+        }
+      ]
+    }
+  },
+  "operational_pending_items": [
+    { "pending_item_key": "hr_signed_employment_contract_templates_pending", "label": { "en": "Signed employment contract template(s) on file", "es": "Plantilla(s) de contrato de trabajo firmada(s) en archivo" }, "applicability_rule": { "op": "not", "rule": { "op": "field_equals", "field_key": "hr_employment_model", "value": "undecided" } } },
+    { "pending_item_key": "hr_local_labor_registration_certificate_pending", "label": { "en": "Local labor/registration certificate on file", "es": "Certificado de registro laboral local en archivo" }, "applicability_rule": { "op": "field_equals", "field_key": "hr_local_entity_status", "value": "entity_registered" } }
+  ],
+  "visibility_rules": [
+    { "field_key": "hr_employee_population_breakdown", "default_audience": ["client", "sherpa"], "mode": "CONFIDENTIAL_ELIGIBLE_PER_ITEM", "notes": "A provider-facing presentation view may show aggregate counts only, never names/seniority detail, per the Visibility Resolver's audience-specific redaction." },
+    { "field_key": "*", "default_audience": ["client", "sherpa", "provider"], "mode": "DEFAULT" }
+  ]
+}

@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "category_key": "logistics",
+  "source": "claude/precision-macroblock3-manifest-content-readiness-contract-2026-10-02.md §4 (as corrected by the Macroblock 4 hygiene fix, 2026-10-02)",
+  "fields": [
+    {
+      "field_key": "logistics_operating_responsibility",
+      "type": "enum",
+      "values": ["self_managed", "third_party_logistics", "hybrid"],
+      "label": { "en": "Who will run day-to-day logistics?", "es": "¿Quién operará la logística día a día?" },
+      "requirement_level": "blocking",
+      "applicability_rule": null,
+      "notes": "Gates applicability of several downstream fields (3PL-specific questions only make sense once this is known) — a true level-1 gate, not merely informational."
+    },
+    {
+      "field_key": "logistics_primary_product_type",
+      "type": "enum",
+      "values": ["general_cargo", "food_beverage_perishable", "pharma_medical", "hazardous_regulated", "other"],
+      "label": { "en": "Primary product type being moved", "es": "Tipo principal de producto a mover" },
+      "requirement_level": "required",
+      "applicability_rule": null,
+      "notes": "Drives cold_chain_required/hazardous_materials_flag applicability."
+    },
+    {
+      "field_key": "logistics_flows",
+      "type": "repeatable_group",
+      "label": { "en": "Logistics flows (lanes)", "es": "Flujos logísticos" },
+      "requirement_level": "required",
+      "applicability_rule": null,
+      "group_item_schema": [
+        { "field_key": "origin", "type": "text", "label": { "en": "Origin", "es": "Origen" }, "requirement_level": "required" },
+        { "field_key": "destination", "type": "text", "label": { "en": "Destination", "es": "Destino" }, "requirement_level": "required" },
+        { "field_key": "product", "type": "text", "label": { "en": "Product being moved", "es": "Producto a mover" }, "requirement_level": "required" },
+        { "field_key": "volume", "type": "number_with_unit", "unit_values": ["units", "kg", "pallets", "containers"], "label": { "en": "Volume", "es": "Volumen" }, "requirement_level": "required" },
+        { "field_key": "frequency", "type": "enum", "values": ["one_time", "weekly", "monthly", "quarterly", "as_needed"], "label": { "en": "Frequency", "es": "Frecuencia" }, "requirement_level": "required" },
+        { "field_key": "incoterm", "type": "enum", "values": ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"], "label": { "en": "Incoterm", "es": "Incoterm" }, "requirement_level": "supporting" },
+        { "field_key": "mode_of_transport", "type": "enum", "values": ["ocean", "air", "road", "rail", "multimodal"], "label": { "en": "Mode of transport", "es": "Modo de transporte" }, "requirement_level": "required" },
+        { "field_key": "handling_requirements", "type": "text", "label": { "en": "Special handling requirements", "es": "Requisitos especiales de manejo" }, "requirement_level": "supporting" }
+      ],
+      "min_items": 1,
+      "notes": "At least one item required for completeness (minimum-length rule, §6.3 of the source document)."
+    },
+    {
+      "field_key": "logistics_warehousing_needed",
+      "type": "boolean",
+      "label": { "en": "Is dedicated warehousing/storage needed?", "es": "¿Se necesita almacenamiento dedicado?" },
+      "requirement_level": "required",
+      "applicability_rule": null,
+      "notes": "Gates logistics_warehousing_details."
+    },
+    {
+      "field_key": "logistics_warehousing_details",
+      "type": "text",
+      "label": { "en": "Warehousing details", "es": "Detalles de almacenamiento" },
+      "requirement_level": "conditional",
+      "applicability_rule": { "op": "field_equals", "field_key": "logistics_warehousing_needed", "value": true },
+      "normalization_hint": "free text, but prompts for capacity unit (m²/pallets) and location preference explicitly"
+    },
+    {
+      "field_key": "logistics_hazardous_materials_flag",
+      "type": "boolean",
+      "label": { "en": "Do any flows involve hazardous/regulated materials?", "es": "¿Algún flujo involucra materiales peligrosos/regulados?" },
+      "requirement_level": "blocking",
+      "applicability_rule": null,
+      "notes": "Blocking because a \"yes\" here changes compliance-document requirements materially; a wrong \"no\" here is the material-contradiction scenario in §9.2 of the source document."
+    },
+    {
+      "field_key": "logistics_cold_chain_required",
+      "type": "boolean",
+      "label": { "en": "Does any flow require cold-chain/temperature control?", "es": "¿Algún flujo requiere cadena de frío/control de temperatura?" },
+      "requirement_level": "conditional",
+      "applicability_rule": { "op": "field_in", "field_key": "logistics_primary_product_type", "values": ["food_beverage_perishable", "pharma_medical"] }
+    },
+    {
+      "field_key": "logistics_import_export_license_status",
+      "type": "enum",
+      "values": ["have_valid", "in_process", "not_started", "not_applicable_domestic_only"],
+      "label": { "en": "Import/export licensing status", "es": "Estado de licencias de importación/exportación" },
+      "requirement_level": "conditional",
+      "applicability_rule": null,
+      "applicability_rule_note": "real rule (§4.1): applicable iff any logistics_flows item has an origin and a destination in different countries — a comparison BETWEEN two sibling sub-fields of the same repeatable_group item, which critical-decisions.ts's ResolutionRule AST does not attempt to express (that module's own scope, per the Macroblock 4 brief, is critical_decisions[].resolution_rule, not every field's applicability_rule). Left as a deliberate, explicit prose rule rather than a fabricated AST node; the engine-build macroblock that implements evaluateReadiness() is the right place to decide whether applicability_rule gets its own small AST or a different mechanism."
+    },
+    {
+      "field_key": "logistics_customs_broker_status",
+      "type": "enum",
+      "values": ["engaged", "in_selection", "not_started"],
+      "label": { "en": "Customs broker engagement status", "es": "Estado de contratación de agente aduanal" },
+      "requirement_level": "conditional",
+      "applicability_rule": null,
+      "applicability_rule_note": "real rule (§4.1): applicable iff logistics_import_export_license_status is applicable (cross-border flow exists) AND logistics_operating_responsibility != third_party_logistics — left as prose for the same reason as logistics_import_export_license_status above (depends on that field's own not-yet-AST-encoded applicability)."
+    },
+    {
+      "field_key": "logistics_insurance_coverage_status",
+      "type": "enum",
+      "values": ["covered", "exploring", "not_covered"],
+      "label": { "en": "Cargo insurance coverage status", "es": "Estado de cobertura de seguro de carga" },
+      "requirement_level": "supporting",
+      "applicability_rule": null,
+      "notes": "Never blocks."
+    },
+    {
+      "field_key": "logistics_preferred_carrier_relationships",
+      "type": "text",
+      "label": { "en": "Existing/preferred carrier relationships", "es": "Relaciones existentes/preferidas con transportistas" },
+      "requirement_level": "supporting",
+      "applicability_rule": null
+    },
+    {
+      "field_key": "logistics_lead_time_expectations",
+      "type": "text",
+      "label": { "en": "Expected lead times / tolerances", "es": "Tiempos de entrega esperados / tolerancias" },
+      "requirement_level": "informational",
+      "applicability_rule": null
+    },
+    {
+      "field_key": "logistics_cost_sensitivity_notes",
+      "type": "text",
+      "label": { "en": "Cost sensitivity / budget notes", "es": "Sensibilidad de costos / notas de presupuesto" },
+      "requirement_level": "informational",
+      "applicability_rule": null,
+      "notes": "Visibility-sensitive — see visibility_rules below. May contain counterparty-identifying free text; passes through the Visibility Resolver's project-scoped redaction pass."
+    },
+    {
+      "field_key": "logistics_vat_deferment_scheme_interest",
+      "type": "boolean",
+      "label": { "en": "Interest in a VAT-deferment-on-import scheme, where one exists", "es": "Interés en un esquema de diferimiento de IVA en importación, donde exista" },
+      "requirement_level": "conditional",
+      "applicability_rule": null,
+      "notes": "[Macroblock 4 hygiene fix, 2026-10-02] Genuinely base-schema content, now present as a real fields[] entry rather than only being referenced from country_overlays[*].deactivate. Base: applicable; deactivated by the US and MX overlays below (both lack a comparable deferred-VAT-on-import scheme relevant to this pilot's scope); NOT deactivated by the DE overlay (Germany, as an EU VAT-system country, has a genuine referent for it)."
+    }
+  ],
+  "critical_decisions": [
+    {
+      "decision_key": "logistics_operating_model_decision",
+      "label": { "en": "Operating model confirmed", "es": "Modelo operativo confirmado" },
+      "gates": "blocking",
+      "depends_on_fields": ["logistics_operating_responsibility", "logistics_warehousing_needed", "logistics_customs_broker_status"],
+      "resolution_rule": {
+        "op": "and",
+        "rules": [
+          { "op": "field_answered", "field_key": "logistics_operating_responsibility" },
+          { "op": "field_answered", "field_key": "logistics_warehousing_needed" },
+          { "op": "or", "rules": [
+            { "op": "not", "rule": { "op": "field_equals", "field_key": "logistics_operating_responsibility", "value": "third_party_logistics" } },
+            { "op": "field_asked", "field_key": "logistics_customs_broker_status" }
+          ] }
+        ]
+      }
+    },
+    {
+      "decision_key": "logistics_hazmat_compliance_decision",
+      "label": { "en": "Hazardous-materials compliance path confirmed", "es": "Ruta de cumplimiento de materiales peligrosos confirmada" },
+      "gates": "blocking",
+      "depends_on_fields": ["logistics_hazardous_materials_flag", "logistics_import_export_license_status"],
+      "resolution_rule": {
+        "op": "and",
+        "rules": [
+          { "op": "field_answered", "field_key": "logistics_hazardous_materials_flag" },
+          { "op": "or", "rules": [
+            { "op": "field_equals", "field_key": "logistics_hazardous_materials_flag", "value": false },
+            { "op": "field_asked", "field_key": "logistics_import_export_license_status" }
+          ] }
+        ]
+      }
+    },
+    {
+      "decision_key": "logistics_hazmat_description_consistency_decision",
+      "label": { "en": "Hazmat flag consistent with described products", "es": "Bandera de materiales peligrosos consistente con productos descritos" },
+      "gates": "blocking",
+      "depends_on_fields": ["logistics_hazardous_materials_flag", "logistics_flows", "logistics_hazmat_ack"],
+      "resolution_rule": {
+        "op": "or",
+        "rules": [
+          { "op": "field_equals", "field_key": "logistics_hazardous_materials_flag", "value": true },
+          { "op": "not", "rule": { "op": "group_item_text_matches_any", "field_key": "logistics_flows", "item_field_key": "product", "keywords": ["lithium-ion battery", "aerosol", "flammable"] } },
+          { "op": "field_answered", "field_key": "logistics_hazmat_ack" }
+        ]
+      },
+      "notes": "Material-contradiction worked example, §9.2 of the source document. logistics_hazmat_ack is a new field (type=text, requirement_level=conditional) surfaced only once evaluateQuality() flags this specific tension — not listed in fields[] above because its applicability is itself contradiction-triggered, per §9.2."
+    }
+  ],
+  "country_overlays": {
+    "US": {
+      "deactivate": ["logistics_vat_deferment_scheme_interest"],
+      "add": [
+        {
+          "field_key": "logistics_fda_prior_notice_required",
+          "type": "boolean",
+          "label": { "en": "Is FDA Prior Notice applicable (food/beverage import)?", "es": "¿Aplica el Aviso Previo de la FDA (importación de alimentos/bebidas)?" },
+          "requirement_level": "conditional",
+          "applicability_rule": { "op": "field_equals", "field_key": "logistics_primary_product_type", "value": "food_beverage_perishable" }
+        }
+      ],
+      "modify": [
+        { "field_key": "logistics_import_export_license_status", "patch": { "help_text": { "en": "In the US this includes CBP/ACE filing status.", "es": "En EE.UU. incluye el estatus de presentación ante CBP/ACE." } } }
+      ]
+    },
+    "MX": {
+      "add": [
+        {
+          "field_key": "logistics_immex_program_participation_status",
+          "type": "enum",
+          "values": ["enrolled", "evaluating", "not_applicable"],
+          "label": { "en": "IMMEX program participation status", "es": "Estatus de participación en el programa IMMEX" },
+          "requirement_level": "conditional",
+          "applicability_rule_note": "any logistics_flows item has destination in MX AND logistics_import_export_license_status is applicable"
+        }
+      ],
+      "modify": [
+        { "field_key": "logistics_import_export_license_status", "patch": { "help_text": { "en": "In Mexico this includes VUCEM filing status.", "es": "En México incluye el estatus de trámite ante VUCEM." } } }
+      ],
+      "deactivate": ["logistics_vat_deferment_scheme_interest"]
+    },
+    "DE": {
+      "add": [
+        {
+          "field_key": "logistics_eori_number_status",
+          "type": "enum",
+          "values": ["have_valid", "applied", "not_started"],
+          "label": { "en": "EORI number status (required for EU customs)", "es": "Estatus del número EORI (requerido para aduana de la UE)" },
+          "requirement_level": "required",
+          "applicability_rule_note": "any logistics_flows item has origin or destination in an EU member state"
+        }
+      ],
+      "modify": [
+        { "field_key": "logistics_customs_broker_status", "patch": { "help_text": { "en": "In the EU this may be an indirect customs representative rather than a traditional broker.", "es": "En la UE puede ser un representante aduanal indirecto en lugar de un agente tradicional." } } }
+      ]
+    }
+  },
+  "operational_pending_items": [
+    { "pending_item_key": "logistics_carrier_contract_copy_pending", "label": { "en": "Signed carrier contract(s) on file", "es": "Contrato(s) firmado(s) con transportista en archivo" }, "applicability_rule": { "op": "field_answered", "field_key": "logistics_preferred_carrier_relationships" } },
+    { "pending_item_key": "logistics_customs_broker_poa_pending", "label": { "en": "Power of attorney for customs broker on file", "es": "Poder notarial para agente aduanal en archivo" }, "applicability_rule": { "op": "field_equals", "field_key": "logistics_customs_broker_status", "value": "engaged" } }
+  ],
+  "visibility_rules": [
+    { "field_key": "logistics_cost_sensitivity_notes", "default_audience": ["client", "sherpa"], "mode": "CONFIDENTIAL_ELIGIBLE", "notes": "Also passes through the project-scoped restricted-counterparty redaction pass (free text)." },
+    { "field_key": "logistics_preferred_carrier_relationships", "default_audience": ["client", "sherpa", "provider"], "mode": "CONTEXT_ONLY_FOR_PROVIDER", "notes": "Shown as context, not an actionable instruction to use/avoid a specific carrier." },
+    { "field_key": "*", "default_audience": ["client", "sherpa", "provider"], "mode": "DEFAULT" }
+  ]
+}
