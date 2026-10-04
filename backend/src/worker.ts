@@ -1,4 +1,5 @@
-import { baseDepsFromEnv } from "./index";
+import { baseDepsFromEnv, fa4DepsFromEnv } from "./index";
+import { deliverDueFa4Emails } from "./fa4/email";
 import { integrationsFromEnv } from "./integrations/config";
 import { JobName, runJob } from "./operations/jobs";
 import { jsonLogger } from "./security/redact";
@@ -44,6 +45,22 @@ if (require.main === module) {
       running.delete(job);
     }
   };
+  // FA Public v1.0 email outbox (own table; same lease / backoff semantics as the legacy outbox). Only when FA4_API_ENABLED=true.
+  const fa4 = fa4DepsFromEnv(process.env, deps.db);
+  if (fa4) {
+    const tickFa4 = async () => {
+      try {
+        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now } });
+        // eslint-disable-next-line no-console
+        if (r.sent + r.failed + r.dead > 0) console.log(`[worker] fa4_email_outbox ${JSON.stringify(r)}`);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`[worker] fa4_email_outbox crashed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    void tickFa4();
+    timers.push(setInterval(() => void tickFa4(), 30_000));
+  }
   for (const job of Object.keys(DEFAULT_INTERVALS) as JobName[]) {
     void tick(job);
     timers.push(setInterval(() => void tick(job), intervalFor(job, process.env) * 1000));

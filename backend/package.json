@@ -2,19 +2,19 @@
   "name": "@beeside/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "beeside First Assessment — backend API service (Node.js + TypeScript).",
+  "description": "beeside First Assessment \u2014 backend API service (Node.js + TypeScript).",
   "main": "dist/index.js",
   "scripts": {
-    "prebuild": "npm run build --prefix ../shared/canonical-fields",
+    "prebuild": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\"",
-    "pretest": "npm run build --prefix ../shared/canonical-fields",
+    "pretest": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "test": "jest --runInBand",
-    "pretest:integration": "npm run build --prefix ../shared/canonical-fields",
+    "pretest:integration": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "test:integration": "jest --runInBand -c jest.integration.config.js",
-    "pretypecheck": "npm run build --prefix ../shared/canonical-fields",
+    "pretypecheck": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -26,13 +26,15 @@
     "worker": "node dist/worker.js",
     "jobs:run": "tsx src/scripts/run-job.ts",
     "admin:provision": "tsx src/scripts/provision-admin.ts",
-    "dev:oidc": "tsx src/scripts/dev-oidc-provider.ts"
+    "dev:oidc": "tsx src/scripts/dev-oidc-provider.ts",
+    "fa4:seed-catalog": "tsx src/scripts/seed-fa4-catalog.ts"
   },
   "dependencies": {
     "@beeside/canonical-fields": "0.1.0",
     "drizzle-orm": "^0.45.2",
     "express": "^4.19.2",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "@beeside/fa-public-engine": "1.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

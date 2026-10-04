@@ -14,3 +14,7 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 npm-debug.log*
+.e2e-site/
+frontend/test-results/
+frontend/playwright-report/
+.data/

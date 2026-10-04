@@ -1,0 +1,167 @@
+import type { Locale } from '@beeside/fa-public-engine';
+import { L, NC, type L10n } from '@beeside/fa-public-engine';
+
+/** Journey + result microcopy. Visible vocabulary only: no "frentes", "activadores", "demand signal", "core/adjacent" (DESIGN_HANDOFF §12). */
+export const UI = {
+  back: L('Atrás', 'Back'), next: L('Continuar', 'Continue'), saveLater: L('Guardar y seguir después', 'Save and continue later'),
+  stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: NC('logoAlt', 'Logo de beeside', 'beeside logo'),
+  stages: [L('Tu empresa', 'Your company'), L('Tu proyecto', 'Your project'), L('Por qué y cuándo', 'Why and when'), L('Lo que necesita tu proyecto', 'What your project needs'), L('Algo más', 'Anything else'), L('Tu resultado', 'Your result')] as L10n[],
+  saved: NC('saved', 'Te enviamos un enlace para retomar a', 'We sent a link to pick this up again to'),
+  saveError: NC('saveError', 'No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),
+
+  coverTitle: NC('coverTitle', 'Entiende tu expansión en pocos minutos', 'Understand your expansion in a few minutes'),
+  coverLead: NC('coverLead', 'Cuéntanos tu proyecto y recibe Your Expansion View: lo que entendemos de tu proyecto y dónde beeside puede aportar valor.', 'Tell us about your project and get Your Expansion View: what we understand about your project and where beeside adds value.'),
+  coverMeta: NC('coverMeta', 'Unos 5–10 minutos · Sin crear cuenta · No es un examen ni una calificación.', 'About 5–10 minutes · No account needed · Not an exam or a rating.'),
+  coverLang: NC('coverLang', 'Elige tu idioma', 'Choose your language'), start: NC('start', 'Empezar', 'Start'),
+
+  idTitle: L('¿Quién eres tú en este proyecto?', 'Who are you in this project?'), idLead: NC('idLead', 'Sin cuenta ni contraseña.', 'No account or password.'),
+  name: NC('name', 'Nombre', 'Name'), company: NC('company', 'Empresa', 'Company'), email: NC('email', 'Correo de trabajo', 'Work email'),
+  emailHelp: NC('emailHelp', 'Preferimos un correo de la empresa, pero puedes usar otro. Lo usaremos para guardar tu avance, enviarte el resultado y continuar contigo; no te lo volveremos a pedir.', "We prefer a company address, but any works. We'll use it to save your progress, send your result and continue with you; we won't ask again."),
+  emailInvalid: NC('emailInvalid', 'Revisa el correo', 'Check the email address'),
+  role: NC('role', 'Tu rol en el proyecto', 'Your role in the project'),
+  decider: NC('decider', '¿Quién decide sobre este proyecto?', 'Who decides on this project?'),
+  deciderOpts: { me: NC('deciderOpts.me', 'Yo', 'I do'), other: NC('deciderOpts.other', 'Otra persona', 'Someone else'), shared: NC('deciderOpts.shared', 'Decidimos entre varios', 'We decide together') },
+  terms: NC('terms', 'Acepto los Términos y Condiciones', 'I accept the Terms and Conditions'), privacy: NC('privacy', 'Reconozco la Política de Privacidad', 'I acknowledge the Privacy Policy'),
+  openInNewTab: NC('openInNewTab', '(se abre en una pestaña nueva)', '(opens in a new tab)'),
+
+  coTitle: L('¿Quiénes son?', 'Who are you?'),
+  hasBiz: NC('hasBiz', '¿Tu empresa o negocio ya está en marcha?', 'Is your company or business already up and running?'), yes: L('Sí', 'Yes'), no: L('No', 'No'), unknown: L('No lo sé', 'Not sure'),
+  sector: NC('sector', '¿Qué hace tu empresa?', 'What does your company do?'), sectorPh: NC('sectorPh', 'Ej. desarrollo de software', 'e.g. software development'),
+  size: NC('size', '¿De qué tamaño es la empresa?', 'How big is the company?'),
+  sizes: { '1-10': NC('sizes.1-10', '1–10 personas', '1–10 people'), '11-50': NC('sizes.11-50', '11–50', '11–50'), '51-250': NC('sizes.51-250', '51–250', '51–250'), '251-1000': NC('sizes.251-1000', 'Más de 250', 'More than 250'), '1000+': NC('sizes.1000+', 'Más de 1.000', 'More than 1,000') },
+  operatesIn: NC('operatesIn', '¿Dónde opera hoy?', 'Where does it operate today?'), searchCountry: L('Busca un país', 'Search for a country'), none: NC('none', 'Sin resultados', 'No results'),
+  exitTitle: NC('exitTitle', 'Por ahora, FA es para negocios en marcha', 'For now, FA is for businesses already running'),
+  exitBody: NC('exitBody', 'First Assessment está pensado para empresas o negocios que ya operan y quieren expandirse. Guardamos tu interés de forma anónima para entender qué necesitan quienes están empezando. Gracias por contarnos.', 'First Assessment is designed for businesses that already operate and want to expand. We keep your interest anonymously to understand what people starting out need. Thanks for telling us.'),
+
+  destTitle: L('¿A dónde quieres llevar tu empresa?', 'Where do you want to take your company?'), destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
+  destLabel: L('Destino', 'Destination'), destOpen: L('Aún no lo tengo decidido', "I haven't decided yet"), region: NC('region', 'Región o estado (opcional)', 'Region or state (optional)'),
+  sameTitle: L('¿Harás lo mismo en', 'Will you do the same in'), sameLead: L('Si es distinto, te preguntamos por cada país.', "If it's different, we'll ask for each country."),
+  sameYes: L('Sí, lo mismo en los dos', 'Yes, the same in both'), sameYesMany: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameNo: L('No, cada país tiene su papel', 'No, each country has its own role'),
+  actTitle: L('¿Qué quieres hacer allí?', 'What do you want to do there?'),
+  acts: { sell: NC('acts.sell', 'Vender', 'Sell'), produce: NC('acts.produce', 'Producir', 'Produce'), source: NC('acts.source', 'Abastecerte de proveedores locales', 'Source from local suppliers'), operate: NC('acts.operate', 'Operar', 'Operate'), hire: NC('acts.hire', 'Contratar personas', 'Hire people'), invest_only: NC('acts.invest_only', 'Sólo invertir, sin operar', 'Only invest, without operating') },
+  withTitle: NC('withTitle', '¿Con qué?', 'With what?'), withs: { goods: NC('withs.goods', 'Bienes físicos', 'Physical goods'), services: NC('withs.services', 'Servicios', 'Services'), digital: NC('withs.digital', 'Productos o servicios digitales', 'Digital products or services') },
+  descPh: NC('descPh', 'Cuéntalo con tus palabras (opcional)', 'Say it in your own words (optional)'),
+  presTitle: L('¿Cómo piensas estar presente?', 'How do you plan to be present?'),
+  pres: { remote: NC('pres.remote', 'Desde fuera, de forma remota', 'From abroad, remotely'), third_parties: NC('pres.third_parties', 'A través de terceros', 'Through third parties'), own_physical: NC('pres.own_physical', 'Con presencia propia: oficina, planta o local', 'With your own presence: office, plant or premises'), own_onsite: NC('pres.own_onsite', 'Con equipo propio ejecutando en sitio, sin espacio propio', 'With your own team executing on site, without premises of your own'), acquisition: NC('pres.acquisition', 'Comprando o adquiriendo una empresa', 'Buying or acquiring a company'), open: NC('pres.open', 'Aún no está definido', 'Not defined yet') },
+  perm: NC('perm', '¿Será permanente o temporal?', 'Will it be permanent or temporary?'), permOpts: { permanent: NC('permOpts.permanent', 'Permanente', 'Permanent'), temporary: NC('permOpts.temporary', 'Temporal', 'Temporary'), open: NC('permOpts.open', 'Aún no lo sé', 'Not sure yet') },
+  months: NC('months', '¿Cuántos meses, aproximadamente?', 'About how many months?'),
+  existTitle: L('¿Qué tienes ya allí?', 'What do you already have there?'),
+  exist: { nothing: NC('exist.nothing', 'Nada todavía', 'Nothing yet'), via_third: NC('exist.via_third', 'Presencia a través de terceros: distribuidor, clientes…', 'Presence through third parties: distributor, customers…'), own: NC('exist.own', 'Presencia propia', 'A presence of your own') },
+  existNote: NC('existNote', '¿Con quién o cómo? (opcional)', 'With whom or how? (optional)'),
+
+  r1Eyebrow: L('Esto es lo que entendemos', "This is what we understand"), r1Fix: L('Toca cualquier parte para corregirla.', 'Tap any part to correct it.'),
+  r1Know: L('¿Ya sabes lo que necesitas?', 'Do you already know what you need?'), r1KnowHelp: L('Puedes ir directo a marcarlo; antes te haremos tres preguntas cortas.', "You can go straight to marking it; first we'll ask three short questions."),
+  r1Direct: L('Ir directo', 'Go direct'), r1Confirm: L('Sí, es así', "Yes, that's right"),
+  r1Company: NC('r1Company', 'Tu empresa', 'Your company'),
+
+  reasonEyebrow: L('Lo que te mueve', "What's driving you"), reasonTitle: L('¿Por qué ahora?', 'Why now?'),
+  reasons: {
+    client_request: NC('reasons.client_request', 'Un cliente me lo pidió', 'A customer asked for it'), follow_clients: NC('reasons.follow_clients', 'Acompañar a clientes actuales', 'Follow current customers'), growth: NC('reasons.growth', 'Una oportunidad de crecimiento', 'A growth opportunity'),
+    talent: NC('reasons.talent', 'Acceso a talento', 'Access to talent'), cost: NC('reasons.cost', 'Costos o eficiencia', 'Cost or efficiency'), resilience: NC('reasons.resilience', 'Una cadena de suministro más resiliente', 'A more resilient supply chain'),
+    diversify: NC('reasons.diversify', 'Depender menos de un mercado', 'Depend less on one market'), contract: NC('reasons.contract', 'Ejecutar un contrato ganado', 'Execute a contract I won'), partner: NC('reasons.partner', 'Una plataforma para crecer con otros clientes', 'A platform to grow with other customers'), other: NC('reasons.other', 'Otro motivo', 'Something else'),
+  },
+  reasonWords: NC('reasonWords', 'Escríbelo con tus palabras (opcional)', 'Say it in your own words (optional)'),
+  reasonMirror: NC('reasonMirror', 'Lo que nos cuentas', "What you're telling us"),
+  decTitle: L('¿En qué punto está la decisión?', 'Where does the decision stand?'),
+  dec: { exploring: L('Lo estoy explorando', "I'm exploring it"), decided: L('Está decidido; vemos cómo hacerlo', "It's decided; we're working out how"), in_progress: L('Ya está en marcha', "It's already under way") },
+  dependsOn: L('¿De qué depende todavía?', 'What does it still depend on?'),
+  startQ: L('¿Cuándo te gustaría empezar?', 'When would you like to start?'),
+  starts: { asap: L('Cuanto antes', 'As soon as possible'), '3m': L('En unos 3 meses', 'In about 3 months'), '6m': L('En unos 6 meses', 'In about 6 months'), '12m': L('En un año o más', 'In a year or more'), unknown: L('Aún no lo sé', "Don't know yet") },
+  extDate: L('¿Hay alguna fecha externa que no puedas mover?', 'Is there an external date you cannot move?'), extDateHelp: L('Un contrato, una licitación, el compromiso con un cliente…', 'A contract, a tender, a commitment to a customer…'),
+  dateLabel: L('Fecha', 'Date'), dateWhat: L('¿Qué ocurre ese día?', 'What happens that day?'), datePh: NC('datePh', 'Ej. 2028-Q1 o 2026-12', 'e.g. 2028-Q1 or 2026-12'),
+
+  scaleTitle: L('¿De qué tamaño es el proyecto?', 'How big is the project?'), scaleWhy: NC('scaleWhy', '¿Por qué preguntamos? Sólo para dimensionar el proyecto; no lo usamos para evaluarte.', "Why do we ask? Only to size the project; we don't use it to assess you."),
+  scaleQ: {
+    investment: NC('scaleQ.investment', '¿Qué inversión estimas en', 'What investment do you expect in'), people: NC('scaleQ.people', '¿Cuántas personas contratarías en', 'How many people would you hire in'),
+    products: NC('scaleQ.products', '¿Cuántos productos o líneas llevarías a', 'How many products or lines would you take to'), purchase: NC('scaleQ.purchase', '¿Qué volumen de compra prevés en', 'What purchase volume do you expect in'), duration: NC('scaleQ.duration', '¿Cuánto durará el proyecto en', 'How long will the project last in'),
+  },
+  scaleDecline: NC('scaleDecline', 'Prefiero no decirlo', 'I prefer not to say'), scaleUnknown: NC('scaleUnknown', 'Aún no lo sé', "Don't know yet"),
+
+  actTitle1: L('Dos preguntas que cambian lo que toca a tu proyecto.', 'Two questions that change what your project involves.'),
+  sellTitle: L('Lo que vendes', 'What you sell'), siteTitle: L('Lo que montas allí', 'What you set up there'),
+  regulated: NC('regulated', '¿Tu producto o actividad está regulado?', 'Is your product or activity regulated?'),
+  sellsTo: NC('sellsTo', '¿A quién vendes?', 'Who do you sell to?'), sellsToOpts: { companies: NC('sellsToOpts.companies', 'Empresas', 'Businesses'), government: NC('sellsToOpts.government', 'Gobierno', 'Government'), consumers: NC('sellsToOpts.consumers', 'Consumidores', 'Consumers'), mixed: NC('sellsToOpts.mixed', 'Varios', 'A mix') },
+  ownBrand: NC('ownBrand', '¿Vendes con marca propia?', 'Do you sell under your own brand?'),
+  location: L('¿Ya sabes dónde estará?', 'Do you know where it will be?'), locationSite: L('¿Ya sabes dónde estará la obra?', 'Do you know where the site will be?'), locOpts: { defined: L('Lugar definido', 'Place decided'), region_only: L('Región elegida, lugar por decidir', 'Region chosen, place to be decided'), undecided: L('Aún no', 'Not yet') },
+  carries: L('¿Qué llevarás desde el país?', 'What will you bring from your home country?'), carryOpts: { people: NC('carryOpts.people', 'Personas de tu equipo', 'People from your team'), equipment: NC('carryOpts.equipment', 'Maquinaria, herramientas o equipos', 'Machinery, tools or equipment'), nothing: NC('carryOpts.nothing', 'Nada', 'Nothing') },
+
+  topicsTitle: L('Esto es lo que toca tu proyecto', 'This is what your project involves'),
+  topicsLead: L('Primero, dinos en qué punto está cada tema. Después te preguntamos dónde quieres apoyo', "First, tell us where each topic stands. Then we'll ask where you'd like support"),
+  topicsLeadDate: L(' y qué debe estar listo antes de tu fecha clave', ' and what must be ready before your key date'),
+  statuses: { resolved: L('Ya resuelto', 'Resolved'), in_progress: L('En marcha', 'Under way'), pending: L('Pendiente', 'Pending'), unknown: L('No lo sé', 'Not sure') },
+  notStarted: L('Aún no he empezado nada', "I haven't started anything yet"),
+  missing: L('¿Falta algo?', 'Anything missing?'), missingPh: L('Escríbelo con tus palabras', 'Write it in your own words'), add: L('Añadir', 'Add'),
+  notApply: L('No aplican, por lo que nos contaste', 'Not relevant, based on what you told us'),
+  dependsTitle: L('Todavía no está definido', "It's not yet defined"), dependsLead: L('De esa decisión depende:', 'That decision affects:'), dependsTag: L('Depende', 'Depends'),
+  causes: { presence: NC('causes.presence', 'cómo estarás presente en', 'how you will be present in'), hire: NC('causes.hire', 'cómo contratarás', 'how you will hire'), legal_operation: NC('causes.legal_operation', 'cómo operarás legalmente en', 'how you will operate legally in') },
+  possible: L('Posible', 'Possible'),
+  supportTitle: L('¿Dónde quieres apoyo?', 'Where do you want support?'), supportLead: L('Solo en los temas que aún no están resueltos. «No» no significa que no quieras delegarlo más adelante.', "Only on topics not yet resolved. “No” doesn't mean you won't want to delegate it later."),
+  markTitle: L('Marca lo que necesitas', 'Mark what you need'), markLead: L('Estos temas aplican a tu proyecto. Lo que no marques quedará como «no indicado», no como resuelto.', 'These topics apply to your project. Anything you leave unmarked stays “not indicated”, not “resolved”.'),
+  concreteQ: L('¿Buscas algo concreto? Escríbelo', 'Looking for something specific? Write it'), concretePh: L('Por ejemplo, grúas', 'For example, cranes'),
+  related: L('Lo relacionamos con', 'We linked it to'), change: L('Cambiar', 'Change'), applyHere: L('Aplican a tu proyecto', 'Apply to your project'),
+  markedCount: L('Marcados', 'Marked'), notIndicated: L('No indicado', 'Not indicated'), otherTopics: L('Otros temas que aplican', 'Other topics that apply'),
+  unrelated: NC('unrelated', 'No encontramos un tema para esto; lo conservamos tal cual con tu Sherpa.', "We couldn't match this to a topic; we keep it as written."),
+  criticalTitleQuarter: L('¿Qué debe estar listo antes del', 'What needs to be ready before'), criticalTitleDate: L('¿Qué debe estar listo antes de', 'What needs to be ready before'), criticalTitle: NC('criticalTitle', '¿Qué debe estar listo según tu calendario?', 'What needs to be ready according to your schedule?'), criticalLead: L('Marca los temas atados a una fecha que no puedes mover.', "Mark the topics tied to a date you can't move."),
+  cargoTitle: L('¿Dónde necesitas mover la carga?', 'Where do you need to move the cargo?'),
+  cargo: (c: string) => ({ within: NC('within', `Dentro de ${c}`, `Within ${c}`), into_from_abroad: NC('into_from_abroad', `Hacia ${c} desde otro país`, `Into ${c} from another country`), both: NC('both', 'Ambos', 'Both'), unknown: L('Aún no lo sé', "Don't know yet") }),
+
+  valuesTitle: L('¿Qué valoras de un apoyo?', 'What do you value in support?'), valuesLead: NC('valuesLead', 'Elige lo que más te importa. Puedes saltarlo.', 'Pick what matters most. You can skip this.'),
+  values: { speed: NC('values.speed', 'Velocidad', 'Speed'), no_network: NC('values.no_network', 'No construir una red desde cero', "Not building a network from scratch"), single_contact: NC('values.single_contact', 'Un solo interlocutor', 'A single point of contact'), local_validation: NC('values.local_validation', 'Validación local', 'Local validation'), comparable_options: NC('values.comparable_options', 'Alternativas comparables', 'Comparable options'), coordination: NC('values.coordination', 'Coordinación', 'Coordination'), cost: NC('values.cost', 'Costo', 'Cost'), keep_control: NC('values.keep_control', 'Mantener el control de mi equipo', 'Keeping control of my team') },
+  valueWords: NC('valueWords', 'En tus palabras (opcional)', 'In your own words (optional)'), keepQ: L('¿Qué quieres mantener en tu equipo? (opcional)', 'What do you want to keep in your team? (optional)'),
+  extraTitle: NC('extraTitle', 'Algo más', 'Anything else'), extraLead: NC('extraLead', 'Todo es opcional; nada depende de esta página.', 'Everything is optional; nothing depends on this page.'),
+  success: NC('success', '¿Cómo sería un buen resultado?', 'What would a good outcome look like?'), constraints: NC('constraints', 'Restricciones que ya conoces', 'Constraints you already know'),
+  descr: NC('descr', 'Descríbelo con tus palabras', 'Describe it in your own words'), experience: NC('experience', 'Experiencia o intentos anteriores', 'Previous experience or attempts'), unknowns: NC('unknowns', 'Lo que todavía no sabes', "What you don't know yet"),
+  personal: NC('personal', 'Hay una necesidad personal ligada al proyecto (sólo queremos saber que existe, sin detalles)', 'There is a personal need tied to the project (we only need to know it exists, no details)'),
+  seeResult: NC('seeResult', 'Ver mi resultado', 'See my result'),
+  generating: NC('generating', 'Preparando tu resultado…', 'Preparing your result…'), resultError: NC('resultError', 'No pudimos preparar el resultado. Inténtalo de nuevo.', "We couldn't prepare your result. Please try again."),
+
+  // ----- result -----
+  yev: L('Your Expansion View', 'Your Expansion View'), glance: L('De un vistazo', 'At a glance'), topics: L('temas', 'topics'),
+  yourProject: L('Tu proyecto', 'Your project'), whyNow: L('Por qué ahora', 'Why now'), whyNowWords: L('Por qué ahora, en tus palabras', 'Why now, in your words'),
+  decided: L('Ya decidido', 'Already decided'), stillOpen: L('Todavía abierto', 'Still open'), projectSize: L('Tamaño del proyecto', 'Project size'), goodResult: L('Cómo sería un buen resultado', 'What a good outcome looks like'),
+  fixSomething: L('Corregir algo', 'Edit something'),
+  whatItInvolves: L('Lo que toca', 'What it involves'), whereYouAre: L('Dónde estás', 'Where you are'),
+  resolved: L('Ya resuelto', 'Resolved'), underWay: L('En marcha', 'Under way'), pendingL: L('Pendiente', 'Pending'),
+  alreadyHave: L('Lo que ya tienes', 'What you already have'),
+  whereValue: L('Where beeside adds value.', 'Where beeside adds value.'), whereValueTitle: L('Dónde puede aportar beeside en tu proyecto', 'Where beeside can add value to your project'),
+  valuedSupport: L('Lo que valoras en un apoyo', 'What you value in support'), keptTeam: L('Lo que mantienes en tu equipo', 'What you keep in-house'),
+  criticalTag: NC('criticalTag', 'Fecha crítica', 'Critical date'), nextStep: L('Siguiente paso', 'Next step'),
+  premiumBody: L('Con acceso Premium, trabajamos contigo el detalle de cada tema y te presentamos propuestas con alcance, plazo y costo para que decidas.', 'With Premium access, we work through each topic with you and bring you proposals with scope, timing and cost so you can decide.'),
+  continueWith: L('Continuar con beeside', 'Continue with beeside'), continued: NC('continued', 'Listo: tu solicitud quedó registrada. Seguiremos contigo en el mismo correo.', "Done: your request is recorded. We'll continue with you at the same email."),
+  emailResult: L('Recibir este resultado por email', 'Get this result by email'), emailed: NC('emailed', 'Te lo enviamos al correo que nos diste.', 'We sent it to the email you gave us.'),
+  noPremiumTitle: NC('noPremiumTitle', 'Esto es lo que entendemos de tu proyecto', 'This is what we understand about your project'),
+  noPremiumBody: NC('noPremiumBody', 'Por ahora no tenemos un siguiente paso con valor real que ofrecerte para este proyecto; el entendimiento que ves aquí es lo que te entregamos.', "For now we don't have a next step with real value to offer for this project; the understanding you see here is what we deliver."),
+  backToStart: L('Volver al inicio', 'Back to the start'),
+  footerCopy: L('© 2026 beeside', '© 2026 beeside'), termsLink: L('Términos y Condiciones', 'Terms and Conditions'), privacyLink: L('Política de Privacidad', 'Privacy Policy'),
+  aboutBeeside: L('Sobre beeside', 'About beeside'),
+  vsHeadline: L('Expande tu negocio.\nNo tu carga de trabajo.', 'Expand your business.\nNot your workload.'),
+  vsSherpa: L('Un Sherpa a tu lado', 'A Sherpa by your side'), vsSherpaD: L('Con Premium, una persona de beeside acompaña tu proyecto de principio a fin.', 'With Premium, one person from beeside stays with your project from start to finish.'),
+  vsHive: L('Especialistas seleccionados', 'Selected specialists'), vsHiveD: L('The Hive reúne a los especialistas con los que trabaja beeside.', 'The Hive brings together the specialists beeside works with.'),
+  vsHub: L('Todo en un solo lugar', 'Everything in one place'), vsHubD: L('Operation Hub te muestra cada tema y cada propuesta en una sola vista.', 'Operation Hub shows every topic and every proposal in a single view.'),
+  vsAdvisory: NC('vsAdvisory', 'Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: NC('vsAdvisoryD', 'Criterio experto y lectura estratégica cuando tu proyecto lo requiere.', 'Expert judgement and strategic reading when your project calls for it.'),
+  privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
+} as const;
+
+export type UiKey = keyof typeof UI;
+export const tr = (l: L10n, locale: Locale) => l[locale];
+
+/** "Porque …" explanation shown under each topic (derived from the declared facts that activated it). */
+const BECAUSE: Record<string, L10n> = {
+  own_premises: NC('because.own_premises', 'tendrás presencia propia', 'you will have a presence of your own'), own_plant: L('tendrás planta propia', 'you will have your own plant'),
+  own_presence: L('tendrás presencia propia', 'you will have your own presence'), hire: L('vas a contratar personas', 'you will hire people'),
+  operate: L('vas a operar', 'you will operate'), produce: NC('because.produce', 'vas a producir en el lugar', 'you will produce on site'), source: L('comprarás a proveedores locales', 'you will buy from local suppliers'),
+  sell: NC('because.sell', 'vas a vender', 'you will sell'), goods_cross: L('tus bienes cruzarán fronteras', 'your goods will cross borders'), goods: L('producirás bienes físicos', 'you will handle physical goods'),
+  carries_people: NC('because.carries_people', 'llevarás personas de tu equipo', 'you will bring people from your team'), carries_equipment: L('llevarás maquinaria, herramientas o equipos', 'you will bring machinery, tools or equipment'),
+  onsite_execution: L('vas a ejecutar una obra en sitio', 'you will execute work on site'), temporary: L('el proyecto tiene fin previsto', 'the project has a planned end'),
+  sells_government: NC('because.sells_government', 'vendes a gobierno', 'you sell to government'), own_brand: NC('because.own_brand', 'vendes con marca propia', 'you sell under your own brand'),
+  regulated: NC('because.regulated', 'tu actividad está regulada', 'your activity is regulated'), regulated_unknown: L('nos dijiste que no sabes si tu actividad está regulada', "you said you're not sure if your activity is regulated"),
+  group_operation: L('la operación será parte de tu grupo', 'the operation will be part of your group'), invest_only: NC('because.invest_only', 'inviertes sin operar', 'you invest without operating'),
+  third_parties: NC('because.third_parties', 'estarás presente a través de terceros', 'you will be present through third parties'), declared: NC('because.declared', 'lo mencionaste', 'you mentioned it'),
+};
+export function becauseText(keys: string[], locale: Locale): string {
+  const parts = keys.map((k) => BECAUSE[k]?.[locale]).filter((x): x is string => !!x);
+  const uniq = [...new Set(parts)];
+  if (!uniq.length) return '';
+  const joined = uniq.length === 1 ? uniq[0]! : `${uniq.slice(0, -1).join(', ')} ${locale === 'es' ? 'y' : 'and'} ${uniq[uniq.length - 1]}`;
+  return `${locale === 'es' ? 'Porque' : 'Because'} ${joined}`;
+}

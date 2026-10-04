@@ -6,6 +6,7 @@ import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
 import { LogEmailTransport } from "./fa/email/email-adapter";
 import { createFaRouter } from "./fa/routes";
+import { Fa4Deps, createFa4Router } from "./fa4/routes";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
@@ -33,6 +34,8 @@ export interface SecurityOptions {
 export interface AppOptions {
   /** First Assessment API dependencies; the API is mounted only when provided. */
   fa?: FaDeps;
+  /** FA Public v1.0 API (isolated module); mounted only when provided. */
+  fa4?: Fa4Deps;
   /** Provider-agnostic subscription event endpoint; mounted only when provided. */
   billing?: BillingDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
@@ -56,6 +59,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(healthRouter);
   if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
   if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
+  if (options.fa4) app.use("/api/fa4", createFa4Router(options.fa4, { limiter: security.limiter }));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   app.use(notFoundJson());
@@ -99,6 +103,28 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
   const base = baseDepsFromEnv(env);
   const simulate = env.PREMIUM_DEV_SIMULATION === "true" && env.NODE_ENV !== "production";
   return { ...base, ...(simulate ? { premium: { checkout: devSimulatedCheckout({ bundles: base.bundles }) } } : {}) };
+}
+
+/**
+ * FA Public v1.0 API (module fa4), isolated from the legacy First Assessment. Off unless FA4_API_ENABLED=true; it reuses the existing
+ * EmailTransport, the shared rate limiter / `rate_limit_counter` table and the same Postgres pool settings.
+ */
+export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): Fa4Deps | undefined {
+  if (env.FA4_API_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
+  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  return {
+    db,
+    email: new LogEmailTransport(env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"),
+    config: {
+      appBaseUrl: env.APP_BASE_URL,
+      sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
+      resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
+      emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
+      now: () => new Date(),
+    },
+    emailDispatch: "deferred",
+  };
 }
 
 /** Signed subscription events from a future billing adapter (BILLING_EVENTS_ENABLED=true). */
@@ -179,9 +205,11 @@ if (require.main === module) {
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
-  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? null;
+  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
   const app = createApp({
     fa,
+    fa4,
     billing,
     admin,
     security: securityOptionsFromEnv(process.env, db),
