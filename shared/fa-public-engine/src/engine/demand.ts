@@ -2,11 +2,17 @@ import type { Answers } from '../domain/answers';
 import { OPEN_DEST } from '../domain/answers';
 import type { Catalog, CapabilityStatus, CoverageState, FrontKey } from '../domain/types';
 import type { Resolution, ResolvedCapability } from './resolve';
+import { norm } from './text';
 
 /**
  * Internal Demand Signals (CATALOG_MODEL §9, D-106/D-114). NEVER exposed to the customer.
- * One per project × destination × capability (or normalized need), deduplicated.
+ * One per project × destination × capability (or normalized need). The id is the SEMANTIC identity of that relationship — it never depends
+ * on array/iteration position — so re-delivering a result after unrelated answer changes updates the same signal and never orphans sourcing work.
  */
+export function demandSignalId(projectId: string, destination: string, capabilityId: string | null, front: FrontKey | null, originalText: string | null): string {
+  const what = capabilityId ? `cap:${capabilityId}` : front ? `need:${front}` : `text:${norm(originalText ?? '').slice(0, 80) || 'unspecified'}`;
+  return `ds:${projectId}:${destination}:${what}`;
+}
 export type DemandReason = 'SOURCEABLE' | 'REVIEW' | 'DEVELOPING' | 'NO_ACTIVE_COVERAGE' | 'UNMAPPED_NEED' | 'NOT_OFFERED';
 export type DemandClass = 'ACTIONABLE' | 'INFORMATIONAL';
 export type SourcingStatus = 'OPEN' | 'RESEARCHING' | 'SHORTLISTED' | 'BUSINESS_CHECK' | 'COVERED' | 'DISMISSED';
@@ -32,6 +38,8 @@ export interface DemandSignal {
   triageStatus: TriageStatus | null;
   owner: string | null;
   catalogVersion: string;
+  /** Set (never deleted) when the underlying demand disappears from a later delivery; cleared if it returns. */
+  supersededAt: string | null;
 }
 
 export function deriveDemandSignals(projectId: string, a: Answers, res: Resolution, catalog: Catalog, now = new Date()): DemandSignal[] {
@@ -39,10 +47,10 @@ export function deriveDemandSignals(projectId: string, a: Answers, res: Resoluti
   const created = now.toISOString();
   const target = a.externalDate.has ? a.externalDate.date ?? null : null;
 
-  const add = (s: Omit<DemandSignal, 'signalId' | 'projectId' | 'createdAt' | 'premiumState' | 'owner' | 'catalogVersion' | 'targetDate'>) => {
-    const key = `${projectId}|${s.destination}|${s.capabilityId ?? `${s.front}:${s.normalizedNeed}`}|${s.reason}`;
-    if (out.has(key)) return;
-    out.set(key, { ...s, signalId: `ds_${out.size + 1}_${hash(key)}`, projectId, createdAt: created, premiumState: res.premiumShown ? 'OFFERED' : 'NONE', owner: null, catalogVersion: res.catalogVersion, targetDate: target });
+  const add = (s: Omit<DemandSignal, 'signalId' | 'projectId' | 'createdAt' | 'premiumState' | 'owner' | 'catalogVersion' | 'targetDate' | 'supersededAt'>) => {
+    const id = demandSignalId(projectId, s.destination, s.capabilityId, s.front, s.originalText);
+    if (out.has(id)) return;
+    out.set(id, { ...s, signalId: id, projectId, createdAt: created, premiumState: res.premiumShown ? 'OFFERED' : 'NONE', owner: null, catalogVersion: res.catalogVersion, targetDate: target, supersededAt: null });
   };
   const svcOf = (capId: string) => catalog.services.find((s) => s.serviceId === catalog.capabilities.find((c) => c.capabilityId === capId)?.serviceId);
   const mk = (dest: string, front: FrontKey | null, c: ResolvedCapability | null, reason: DemandReason, cls: DemandClass, text: string | null) => {
@@ -80,11 +88,6 @@ export function deriveDemandSignals(projectId: string, a: Answers, res: Resoluti
     }
   }
   return [...out.values()];
-}
-
-function hash(s: string): string {
-  let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(36);
 }
 
 // ---------- least-privilege access before Premium (D-109, D-113) ----------

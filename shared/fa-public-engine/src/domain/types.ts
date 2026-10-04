@@ -68,6 +68,10 @@ export interface Capability {
   fronts: Array<{ front: FrontKey; match: Match }>;
   triggerTermsEs: string[]; triggerTermsEn: string[]; triggerRule?: TriggerRule;
   capabilityStatus: CapabilityStatus;
+  /** Catalog-driven dependency: the capability only makes sense once an open project decision is taken (Rule 1). */
+  dependsOn?: 'own_entity';
+  /** Catalog-driven: its scope limit is shown as a footnote of the result. */
+  footnote?: boolean;
   coverageBasis: CoverageBasis;
   coverage: CoverageValue[];
   providerStatus: ProviderStatus; businessCheckStatus: BusinessCheckStatus;

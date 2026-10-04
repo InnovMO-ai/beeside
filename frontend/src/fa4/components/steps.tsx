@@ -6,8 +6,8 @@ import { BRAND } from '../brand';
 import { activatorFields, isValidEmail } from '@beeside/fa-public-engine';
 import { plansFor } from '@beeside/fa-public-engine';
 import { destinationsNeedingCargoRoute, mapTextToFront, resolveAll } from '@beeside/fa-public-engine';
-import { buildNotApplicable, formatKeyDate, projectParagraphs } from '@beeside/fa-public-engine';
-import { countryName } from '@beeside/fa-public-engine';
+import { buildNotApplicable, formatKeyDate, reflectionParagraphs, type Seg } from '@beeside/fa-public-engine';
+import { countryName, STATE_MESSAGES, visibleStateKey } from '@beeside/fa-public-engine';
 import { UI, becauseText } from '../copy/ui';
 import { CheckGroup, ChipGroup, ChipMulti, CountryPicker, Label, RadioGroup, Segmented, TextField } from './controls';
 
@@ -17,8 +17,8 @@ const T = (l: { es: string; en: string }, loc: Locale) => l[loc];
 function Head({ eyebrow, title, lead, tint }: { eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; tint?: boolean }) {
   return <header style={tint ? undefined : undefined}>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1 className="h1">{title}</h1>{lead && <p className="lead">{lead}</p>}</header>;
 }
-const compName = (c: ProjectComponent, loc: Locale) => c.destinations.map((d) => (d === OPEN_DEST ? (loc === 'es' ? 'el país que elijas' : 'the country you choose') : countryName(d, loc))).join(loc === 'es' ? ' y ' : ' and ');
-const frontName = (cat: Catalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? (loc === 'es' ? d.nameEs : d.nameEn) : f; };
+const compName = (c: ProjectComponent, loc: Locale) => c.destinations.map((d) => (d === OPEN_DEST ? UI.countryYouChoose[loc] : countryName(d, loc))).join(` ${UI.and[loc]} `);
+const frontName = (cat: Catalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? { es: d.nameEs, en: d.nameEn }[loc] : f; };
 const upd = (s: StepCtx, id: string, fn: (c: ProjectComponent) => ProjectComponent) => s.set((a) => ({ ...a, components: a.components.map((c) => (c.id === id ? fn(c) : c)) }));
 
 // ---------------- 0. cover / identity ----------------
@@ -32,7 +32,7 @@ export function CoverStep({ onStart, setLocale, locale }: { onStart: () => void;
       <fieldset style={{ border: 0, padding: 0 }}>
         <legend className="label">{UI.coverLang[locale]}</legend>
         <div className="chips" role="radiogroup">
-          {(['es', 'en'] as const).map((l) => <button key={l} type="button" role="radio" aria-checked={locale === l} className={`chip ${locale === l ? 'on' : ''}`} onClick={() => setLocale(l)}>{l === 'es' ? 'Español' : 'English'}</button>)}
+          {(['es', 'en'] as const).map((l) => <button key={l} type="button" role="radio" aria-checked={locale === l} className={`chip ${locale === l ? 'on' : ''}`} onClick={() => setLocale(l)}>{UI.languageNames[l]}</button>)}
         </div>
       </fieldset>
       <p style={{ marginTop: 28 }}><button className="btn primary" style={{ flex: 'none', minWidth: 200 }} onClick={onStart}>{UI.start[locale]}</button></p>
@@ -101,7 +101,7 @@ export function DestinationsStep({ a, set, locale }: StepCtx) {
 }
 export function SameInAllStep({ a, set, locale }: StepCtx) {
   const names = a.destinations.list.map((x) => countryName(x.iso, locale));
-  const joined = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${locale === 'es' ? 'y' : 'and'} ${names[names.length - 1]}` : names.join('');
+  const joined = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${UI.and[locale]} ${names[names.length - 1]}` : names.join('');
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[1]![locale]} title={`${UI.sameTitle[locale]} ${joined}?`} lead={UI.sameLead[locale]} />
@@ -153,24 +153,26 @@ export function ExistingStep(s: StepCtx & { compId: string }) {
   );
 }
 export function ReflectionStep({ a, set, locale, goTo }: StepCtx) {
-  const paras = projectParagraphs(a);
-  const sector = a.company.sector.trim();
-  const ops = a.company.operatesIn.map((i) => countryName(i, locale));
-  const compLine = locale === 'es'
-    ? `Tu empresa ${sector ? `se dedica a ${sector.toLowerCase()}` : 'está en marcha'}${ops.length ? ` y opera en ${ops.join(', ')}` : ''}.`
-    : `Your company ${sector ? `works in ${sector.toLowerCase()}` : 'is up and running'}${ops.length ? ` and operates in ${ops.join(', ')}` : ''}.`;
+  // Frozen R1: lavender band, the company sentence as headline, one white card per destination, every fragment editable in place.
+  const [lead, ...cards] = reflectionParagraphs(a);
+  const frags = (segs: Seg[]) => segs.map((g, i) => {
+    const text = g.text[locale];
+    if (!g.edit) return <span key={i}>{text}</span>;
+    const [, pre = '', core = '', post = ''] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text) ?? [];   // boundary spaces stay outside the button so the sentence reads naturally
+    return <span key={i}>{pre}<button type="button" className="frag" onClick={() => goTo(g.edit!)}>{core}</button>{post}</span>;
+  });
   return (
-    <div>
-      <p className="eyebrow">{UI.r1Eyebrow[locale]}</p>
-      <div className="reflect">
-        <p><button type="button" className="frag" onClick={() => goTo('company')}>{compLine}</button></p>
-        {paras.map((p, i) => <p key={i}><button type="button" className="frag" onClick={() => goTo(`activity:${a.components[Math.min(i, a.components.length - 1)]?.id ?? 'c1'}`)}>{p[locale]}</button></p>)}
+    <div className="r1">
+      <div className="r1-main">
+        <p className="eyebrow">{a.identity.name.trim() ? `${a.identity.name.trim().split(/\s+/)[0]}, ${UI.r1EyebrowNamed[locale]}` : UI.r1Eyebrow[locale]}</p>
+        <p className="r1-lead">{lead ? frags(lead) : null}</p>
+        <div className="r1-cards">{cards.map((c, i) => <div className="r1-card" key={i}><p>{frags(c)}</p></div>)}</div>
+        <p className="hint r1-fix">{UI.r1Fix[locale]}</p>
       </div>
-      <p className="hint" style={{ marginBottom: 20 }}>{UI.r1Fix[locale]}</p>
-      <div className="card" style={{ borderColor: 'var(--purple)', borderWidth: 2, maxWidth: 520 }}>
-        <b>{UI.r1Know[locale]}</b><p className="hint" style={{ margin: '4px 0 12px' }}>{UI.r1KnowHelp[locale]}</p>
-        <button type="button" className="btn primary" style={{ flex: 'none' }} onClick={() => { set((x) => ({ ...x, projectConfirmed: true, knowsNeeds: true })); goTo('reason'); }}>{UI.r1Direct[locale]}</button>
-      </div>
+      <aside className="r1-aside">
+        <b>{UI.r1Know[locale]}</b><p className="hint">{UI.r1KnowHelp[locale]}</p>
+        <button type="button" className="btn outline" style={{ flex: 'none' }} onClick={() => { set((x) => ({ ...x, projectConfirmed: true, knowsNeeds: true })); goTo('reason'); }}>{UI.r1Direct[locale]}</button>
+      </aside>
     </div>
   );
 }
@@ -271,6 +273,7 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
   const [text, setText] = useState('');
   const mine = s.a.addedNeeds.filter((n) => n.destination === dest || (!n.destination && dest !== OPEN_DEST));
   const loc = s.locale;
+  const premiumShown = resolveAll(s.a, s.catalog).premiumShown;
   const add = () => { const v = text.trim(); if (!v) return; s.set((x) => ({ ...x, addedNeeds: [...x.addedNeeds, { id: `n${Date.now()}${x.addedNeeds.length}`, text: v.slice(0, 500), destination: dest }] })); setText(''); };
   return (
     <div style={{ marginTop: 16 }}>
@@ -284,8 +287,8 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
         return (
           <div key={n.id} className="card soft" style={{ marginTop: 8 }}>
             <p className="quote">«{n.text}»</p>
-            <p className="hint">{m.front ? <>{UI.related[loc]} <b>{frontName(s.catalog, m.front, loc)}</b></> : UI.unrelated[loc]}</p>
-            <button type="button" className="linkbtn" onClick={() => s.set((x) => ({ ...x, addedNeeds: x.addedNeeds.filter((y) => y.id !== n.id) }))}>{loc === 'es' ? 'Quitar' : 'Remove'}</button>
+            <p className="hint">{m.front ? <>{UI.related[loc]} <b>{frontName(s.catalog, m.front, loc)}</b></> : STATE_MESSAGES[visibleStateKey('UNMAPPED_NEED', premiumShown)][loc]}.</p>
+            <button type="button" className="linkbtn" onClick={() => s.set((x) => ({ ...x, addedNeeds: x.addedNeeds.filter((y) => y.id !== n.id) }))}>{UI.remove[loc]}</button>
           </div>
         );
       })}
@@ -315,6 +318,52 @@ export function FrontsStatusStep(s: StepCtx) {
               </div>
             );
           })}
+          <DependsBlock s={s} dest={p.destination} />
+          <NotApplicable a={a} catalog={s.catalog} locale={loc} dest={p.destination} />
+          <AddNeed s={s} dest={p.destination} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** Desktop (frozen Design): ONE table — topic, status, support and (when there is an external date) critical date, per row. */
+export function FrontsTableStep(s: StepCtx) {
+  const { a, locale: loc } = s; const plans = plansFor(a);
+  const setFront = (dest: string, f: FrontKey, p: Partial<Answers['fronts'][string]>) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], ...p } } }));
+  const markAllPending = () => s.set((x) => { const fr = { ...x.fronts }; for (const p of plans) for (const t of p.applies) fr[frontKey(p.destination, t.front)] = { ...fr[frontKey(p.destination, t.front)], status: 'pending' }; return { ...x, fronts: fr }; });
+  const raw = a.externalDate.date; const when = raw ? formatKeyDate(raw, loc) : '';
+  const critLabel = `${UI.readyBefore[loc]} ${when}?`;
+  const yn = (v: boolean | undefined) => (v === undefined ? undefined : v ? 'yes' : 'no');
+  return (
+    <div>
+      <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
+      <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
+      {plans.map((p) => (
+        <section key={p.destination} aria-label={countryName(p.destination, loc)}>
+          <div className="dest-head"><h2>{countryName(p.destination, loc)}{a.destinations.list.find((d) => d.iso === p.destination)?.region ? ` · ${a.destinations.list.find((d) => d.iso === p.destination)!.region}` : ''}</h2><span className="hint">{p.applies.length} {UI.topics[loc]}</span></div>
+          <div className="ftable" role="table" aria-label={countryName(p.destination, loc)}>
+            <div className="ftable-head" role="row"><span role="columnheader">{UI.colTopic[loc]}</span><span role="columnheader">{UI.colStatus[loc]}</span><span role="columnheader">{UI.colSupport[loc]}</span></div>
+            {p.applies.map((t) => {
+              const fk = frontKey(p.destination, t.front); const cur = a.fronts[fk];
+              const showSupport = cur?.status !== 'resolved';
+              const name = frontName(s.catalog, t.front, loc);
+              return (
+                <div className="ftable-row" role="row" key={t.front}>
+                  <div role="cell"><div className="name">{name} {t.verdict.possible && <span className="tag">{UI.possible[loc]}</span>}</div><div className="why">{becauseText(t.verdict.because, loc)}</div></div>
+                  <div role="cell"><Segmented label={`${name} — ${UI.colStatus[loc]}`} value={cur?.status} onChange={(v) => setFront(p.destination, t.front, { status: v })}
+                    options={(['resolved', 'in_progress', 'pending', 'unknown'] as const).map((v) => ({ value: v, label: UI.statuses[v][loc] }))} /></div>
+                  <div role="cell">
+                    {showSupport && <Segmented cols={3} label={`${name} — ${UI.colSupport[loc]}`} value={cur?.support} onChange={(v) => setFront(p.destination, t.front, { support: v })}
+                      options={[{ value: 'yes', label: UI.yes[loc] }, { value: 'no', label: UI.no[loc] }, { value: 'unknown', label: UI.unknown[loc] }]} />}
+                    {a.externalDate.has && showSupport && (<><div className="crit-label">{critLabel}</div>
+                      <Segmented cols={3} label={`${name} — ${critLabel}`} value={yn(cur?.critical) as 'yes' | 'no' | undefined} onChange={(v) => setFront(p.destination, t.front, { critical: v === 'yes' })}
+                        options={[{ value: 'yes', label: UI.yes[loc] }, { value: 'no', label: UI.no[loc] }]} /></>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           <DependsBlock s={s} dest={p.destination} />
           <NotApplicable a={a} catalog={s.catalog} locale={loc} dest={p.destination} />
           <AddNeed s={s} dest={p.destination} />
@@ -358,7 +407,7 @@ export function FrontsMarkStep(s: StepCtx) {
   const setMark = (dest: string, f: FrontKey, v: boolean) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], marked: v } } }));
   return (
     <div>
-      <Head eyebrow={`${UI.stages[3]![loc]} · 1 ${loc === 'es' ? 'de' : 'of'} 2`} title={UI.markTitle[loc]} lead={UI.markLead[loc]} />
+      <Head eyebrow={`${UI.stages[3]![loc]} · 1 ${UI.of[loc]} 2`} title={UI.markTitle[loc]} lead={UI.markLead[loc]} />
       <p className="hint" role="status">{UI.markedCount[loc]} {marked} · {UI.notIndicated[loc]} {total - marked}</p>
       {plans.map((p) => (
         <section key={p.destination}>

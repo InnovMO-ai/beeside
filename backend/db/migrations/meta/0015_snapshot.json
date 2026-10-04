@@ -1,5 +1,5 @@
 {
-  "id": "18b8f459-54f4-4b7b-b662-0712f5e00d0e",
+  "id": "53a5f839-1abb-4a87-a3e6-4f1cfa9cabcb",
   "prevId": "4e7460af-9203-4c51-b05b-d49145fa2a2b",
   "version": "7",
   "dialect": "postgresql",
@@ -5869,6 +5869,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_used_at": {
           "name": "last_used_at",
           "type": "timestamp with time zone",
@@ -6064,6 +6070,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "draft_data": {
+          "name": "draft_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "draft_status": {
+          "name": "draft_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "valid_from": {
           "name": "valid_from",
           "type": "text",
@@ -6113,6 +6131,14 @@
         "fa4_catalog_entity_status": {
           "name": "fa4_catalog_entity_status",
           "value": "\"fa4_catalog_entity\".\"publication_status\" IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED')"
+        },
+        "fa4_catalog_entity_draft_status": {
+          "name": "fa4_catalog_entity_draft_status",
+          "value": "\"fa4_catalog_entity\".\"draft_status\" IS NULL OR \"fa4_catalog_entity\".\"draft_status\" IN ('DRAFT','REVIEW')"
+        },
+        "fa4_catalog_entity_draft_consistency": {
+          "name": "fa4_catalog_entity_draft_consistency",
+          "value": "(\"fa4_catalog_entity\".\"draft_data\" IS NULL) = (\"fa4_catalog_entity\".\"draft_status\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -6125,6 +6151,12 @@
           "name": "version",
           "type": "text",
           "primaryKey": true,
+          "notNull": true
+        },
+        "version_seq": {
+          "name": "version_seq",
+          "type": "bigserial",
+          "primaryKey": false,
           "notNull": true
         },
         "published_at": {
@@ -6144,7 +6176,15 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "fa4_catalog_version_version_seq_unique": {
+          "name": "fa4_catalog_version_version_seq_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "version_seq"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -6192,6 +6232,27 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fa4_continuation_request_unique": {
+          "name": "fa4_continuation_request_unique",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "result_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6307,8 +6368,21 @@
           "primaryKey": false,
           "notNull": true
         },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -6366,12 +6440,37 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "fa4_demand_signal_catalog_version_fa4_catalog_version_version_fk": {
+          "name": "fa4_demand_signal_catalog_version_fa4_catalog_version_version_fk",
+          "tableFrom": "fa4_demand_signal",
+          "tableTo": "fa4_catalog_version",
+          "columnsFrom": [
+            "catalog_version"
+          ],
+          "columnsTo": [
+            "version"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "fa4_demand_signal_premium_state": {
+          "name": "fa4_demand_signal_premium_state",
+          "value": "\"fa4_demand_signal\".\"premium_state\" IN ('NONE','OFFERED','ACTIVE')"
+        },
+        "fa4_demand_signal_sourcing_status": {
+          "name": "fa4_demand_signal_sourcing_status",
+          "value": "\"fa4_demand_signal\".\"sourcing_status\" IS NULL OR \"fa4_demand_signal\".\"sourcing_status\" IN ('OPEN','RESEARCHING','SHORTLISTED','BUSINESS_CHECK','COVERED','DISMISSED')"
+        },
+        "fa4_demand_signal_triage_status": {
+          "name": "fa4_demand_signal_triage_status",
+          "value": "\"fa4_demand_signal\".\"triage_status\" IS NULL OR \"fa4_demand_signal\".\"triage_status\" IN ('PENDING','INVESTIGATE','NO_ACTION')"
+        },
         "fa4_demand_signal_class": {
           "name": "fa4_demand_signal_class",
           "value": "\"fa4_demand_signal\".\"class\" IN ('ACTIONABLE','INFORMATIONAL')"
@@ -6521,6 +6620,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "fa4_email_delivery_project_idx": {
+          "name": "fa4_email_delivery_project_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "template",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -6549,6 +6675,178 @@
         "fa4_email_delivery_template": {
           "name": "fa4_email_delivery_template",
           "value": "\"fa4_email_delivery\".\"template\" IN ('fa4_resume_link','fa4_result_link')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fa4_legal_acceptance": {
+      "name": "fa4_legal_acceptance",
+      "schema": "",
+      "columns": {
+        "acceptance_id": {
+          "name": "acceptance_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document": {
+          "name": "document",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "document_version": {
+          "name": "document_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_url": {
+          "name": "document_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fa4_legal_acceptance_unique": {
+          "name": "fa4_legal_acceptance_unique",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "document",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fa4_legal_acceptance_project_id_fa4_project_project_id_fk": {
+          "name": "fa4_legal_acceptance_project_id_fa4_project_project_id_fk",
+          "tableFrom": "fa4_legal_acceptance",
+          "tableTo": "fa4_project",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "fa4_legal_acceptance_document": {
+          "name": "fa4_legal_acceptance_document",
+          "value": "\"fa4_legal_acceptance\".\"document\" IN ('TERMS','PRIVACY')"
+        },
+        "fa4_legal_acceptance_language": {
+          "name": "fa4_legal_acceptance_language",
+          "value": "\"fa4_legal_acceptance\".\"language\" IN ('es','en')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fa4_privacy_erasure_log": {
+      "name": "fa4_privacy_erasure_log",
+      "schema": "",
+      "columns": {
+        "erasure_id": {
+          "name": "erasure_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "performed_at": {
+          "name": "performed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fa4_privacy_erasure_log_project_id_fa4_project_project_id_fk": {
+          "name": "fa4_privacy_erasure_log_project_id_fa4_project_project_id_fk",
+          "tableFrom": "fa4_privacy_erasure_log",
+          "tableTo": "fa4_project",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "fa4_privacy_erasure_mode": {
+          "name": "fa4_privacy_erasure_mode",
+          "value": "\"fa4_privacy_erasure_log\".\"mode\" IN ('ANONYMIZE')"
         }
       },
       "isRLSEnabled": false
@@ -6640,7 +6938,7 @@
       "checkConstraints": {
         "fa4_project_status": {
           "name": "fa4_project_status",
-          "value": "\"fa4_project\".\"status\" IN ('IN_PROGRESS','DELIVERED','INELIGIBLE')"
+          "value": "\"fa4_project\".\"status\" IN ('IN_PROGRESS','DELIVERED','INELIGIBLE','ANONYMIZED')"
         },
         "fa4_project_locale": {
           "name": "fa4_project_locale",

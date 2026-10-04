@@ -18,7 +18,11 @@ export const fa4CatalogEntity = pgTable(
     entityType: text("entity_type").notNull(),
     entityId: text("entity_id").notNull(),
     publicationStatus: text("publication_status").notNull(),
+    /** The EFFECTIVE record. For a PUBLISHED entity it never changes until a new version is explicitly published. */
     data: jsonb("data").notNull(),
+    /** A pending edit. Saving a draft never touches `data` / `publication_status` (draft/published isolation). */
+    draftData: jsonb("draft_data"),
+    draftStatus: text("draft_status"),
     validFrom: text("valid_from").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -26,6 +30,8 @@ export const fa4CatalogEntity = pgTable(
     uniqueIndex("fa4_catalog_entity_pk").on(t.entityType, t.entityId),
     check("fa4_catalog_entity_type", sql`${t.entityType} IN ('FRONT','CATEGORY','SERVICE','CAPABILITY','COUNTRY')`),
     check("fa4_catalog_entity_status", sql`${t.publicationStatus} IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED')`),
+    check("fa4_catalog_entity_draft_status", sql`${t.draftStatus} IS NULL OR ${t.draftStatus} IN ('DRAFT','REVIEW')`),
+    check("fa4_catalog_entity_draft_consistency", sql`(${t.draftData} IS NULL) = (${t.draftStatus} IS NULL)`),
   ],
 );
 
@@ -47,6 +53,8 @@ export const fa4CatalogChange = pgTable(
 
 export const fa4CatalogVersion = pgTable("fa4_catalog_version", {
   version: text("version").primaryKey(),
+  // Monotonic order of publication (timestamps are not enough: two versions can share a transaction time).
+  versionSeq: bigserial("version_seq", { mode: "number" }).notNull().unique(),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
   content: jsonb("content").notNull(),
 });
@@ -65,7 +73,7 @@ export const fa4Project = pgTable(
   },
   (t) => [
     index("fa4_project_email_idx").on(t.email, t.updatedAt),
-    check("fa4_project_status", sql`${t.status} IN ('IN_PROGRESS','DELIVERED','INELIGIBLE')`),
+    check("fa4_project_status", sql`${t.status} IN ('IN_PROGRESS','DELIVERED','INELIGIBLE','ANONYMIZED')`),
     check("fa4_project_locale", sql`${t.locale} IN ('es','en')`),
   ],
 );
@@ -80,6 +88,8 @@ export const fa4AccessToken = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    // RESUME links are single-use: the exchange atomically sets used_at (and revoked_at).
+    usedAt: timestamp("used_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   },
   (t) => [
@@ -116,11 +126,17 @@ export const fa4DemandSignal = pgTable(
     triageStatus: text("triage_status"),
     owner: text("owner"),
     premiumState: text("premium_state").notNull(),
-    catalogVersion: text("catalog_version").notNull(),
+    catalogVersion: text("catalog_version").notNull().references(() => fa4CatalogVersion.version),
     payload: jsonb("payload").notNull(),
+    // A signal whose demand disappears is superseded (UPDATE), never deleted: the runtime role has no DELETE (least privilege).
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    check("fa4_demand_signal_premium_state", sql`${t.premiumState} IN ('NONE','OFFERED','ACTIVE')`),
+    check("fa4_demand_signal_sourcing_status", sql`${t.sourcingStatus} IS NULL OR ${t.sourcingStatus} IN ('OPEN','RESEARCHING','SHORTLISTED','BUSINESS_CHECK','COVERED','DISMISSED')`),
+    check("fa4_demand_signal_triage_status", sql`${t.triageStatus} IS NULL OR ${t.triageStatus} IN ('PENDING','INVESTIGATE','NO_ACTION')`),
     index("fa4_demand_signal_project_idx").on(t.projectId),
     index("fa4_demand_signal_capability_idx").on(t.destination, t.capabilityId),
     check("fa4_demand_signal_class", sql`${t.signalClass} IN ('ACTIONABLE','INFORMATIONAL')`),
@@ -150,6 +166,7 @@ export const fa4EmailDelivery = pgTable(
   (t) => [
     uniqueIndex("fa4_email_delivery_dedupe_unique").on(t.dedupeKey),
     index("fa4_email_delivery_due_idx").on(t.status, t.nextAttemptAt),
+    index("fa4_email_delivery_project_idx").on(t.projectId, t.template, t.createdAt),
     check("fa4_email_delivery_status", sql`${t.status} IN ('PENDING','SENDING','SENT','FAILED','DEAD','CANCELLED')`),
     check("fa4_email_delivery_template", sql`${t.template} IN ('fa4_resume_link','fa4_result_link')`),
   ],
@@ -163,5 +180,42 @@ export const fa4ContinuationRequest = pgTable(
     resultId: uuid("result_id").notNull().references(() => fa4Result.resultId),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("fa4_continuation_request_project_idx").on(t.projectId)],
+  (t) => [index("fa4_continuation_request_project_idx").on(t.projectId), uniqueIndex("fa4_continuation_request_unique").on(t.projectId, t.resultId)],
+);
+
+/**
+ * Immutable legal-acceptance evidence (Terms and Privacy are separate acceptances, D-085). Written once when the project is created;
+ * changing normal FA answers can never rewrite it. No IP address or other personal data is collected here. LEGAL-1 / CHK-1 (final
+ * documents, versions and URLs) remain launch blockers: `document_version` / `document_url` come from configuration.
+ */
+export const fa4LegalAcceptance = pgTable(
+  "fa4_legal_acceptance",
+  {
+    acceptanceId: uuid("acceptance_id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    document: text("document").notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+    documentVersion: text("document_version").notNull(),
+    documentUrl: text("document_url").notNull(),
+    language: text("language").notNull(),
+  },
+  (t) => [
+    uniqueIndex("fa4_legal_acceptance_unique").on(t.projectId, t.document),
+    check("fa4_legal_acceptance_document", sql`${t.document} IN ('TERMS','PRIVACY')`),
+    check("fa4_legal_acceptance_language", sql`${t.language} IN ('es','en')`),
+  ],
+);
+
+/** Audit trail of authorized privacy erasures (no personal data). */
+export const fa4PrivacyErasureLog = pgTable(
+  "fa4_privacy_erasure_log",
+  {
+    erasureId: uuid("erasure_id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    mode: text("mode").notNull(),
+    actor: text("actor").notNull(),
+    reason: text("reason").notNull(),
+    performedAt: timestamp("performed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("fa4_privacy_erasure_mode", sql`${t.mode} IN ('ANONYMIZE')`)],
 );

@@ -28,6 +28,8 @@ export interface ResolvedCapability {
   /** Shown only as a conditional note (e.g. company setup when no own entity is decided). */
   conditionalOn?: 'own_entity';
   kind: Capability['kind'];
+  /** Catalog-driven: show its scope limit as a footnote of the result. */
+  footnote?: boolean;
 }
 
 export type NeedOrigin = 'derived' | 'declared';
@@ -65,7 +67,7 @@ function coverageOf(cap: Capability, value: string): CoverageState | undefined {
 export function evaluateCapability(cap: Capability, dest: string, a: Answers): ResolvedCapability {
   const base = {
     capabilityId: cap.capabilityId, nameEs: cap.nameEs, nameEn: cap.nameEn,
-    limitEs: cap.scopeLimitEs, limitEn: cap.scopeLimitEn, coverageBasis: cap.coverageBasis, kind: cap.kind,
+    limitEs: cap.scopeLimitEs, limitEn: cap.scopeLimitEn, coverageBasis: cap.coverageBasis, kind: cap.kind, ...(cap.footnote ? { footnote: true } : {}),
   };
   if (cap.capabilityStatus !== 'ACTIVE') {
     return { ...base, state: cap.capabilityStatus, basisValue: null, coverage: 'UNAVAILABLE' };
@@ -153,7 +155,7 @@ export function resolveFront(
     const r = evaluateCapability(c, dest, a);
     trace.push({ rule: 'D-111', detail: `${c.capabilityId}: basis ${c.coverageBasis}=${r.basisValue ?? 'n/a'} coverage ${r.coverage} → ${r.state}` });
     // RULE 1: capability dependency (not front dependency). Company setup depends on the open decision of having an own entity.
-    if (c.capabilityId === 'CAP_HIVE_FI_COMPANY_SETUP' && comp.presence !== 'own_physical' && comp.presence !== 'own_onsite') { r.conditionalOn = 'own_entity'; r.state = 'DEPENDENT'; }
+    if (c.dependsOn === 'own_entity' && comp.presence !== 'own_physical' && comp.presence !== 'own_onsite') { r.conditionalOn = 'own_entity'; r.state = 'DEPENDENT'; }
     return r;
   });
   const state = mostConservative(resolved.filter((r) => !r.conditionalOn || resolved.every((x) => x.conditionalOn)).map((r) => r.state));

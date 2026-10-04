@@ -93,3 +93,18 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     }
   });
 });
+
+describe("frozen summary presentation (VERIFY M6-C)", () => {
+  it("Journey A: 'De un vistazo' lists one row + state chip per topic and says how many other topics do not apply", () => {
+    const { container } = render(<ResultScreen model={modelFor(journeyA("es"))} locale="es" onContinue={vi.fn()} onEmail={vi.fn()} />);
+    const rows = container.querySelectorAll(".glance .topic-row");
+    expect(rows.length).toBe(4);
+    for (const r of Array.from(rows)) expect(r.querySelector(".gchip")).toBeTruthy();
+    expect(container.querySelector(".glance")!.textContent).toMatch(/Otros 5 temas no aplican a tu proyecto\. El detalle, abajo\./);
+  });
+  it.each([["B", journeyB("es", "unknown")], ["C", journeyC("es", "unknown")]] as const)("Journey %s keeps counts per state in the glance", (_n, a) => {
+    const { container } = render(<ResultScreen model={modelFor(a)} locale="es" onContinue={vi.fn()} onEmail={vi.fn()} />);
+    expect(container.querySelectorAll(".glance .topic-row").length).toBe(0);
+    expect(container.querySelectorAll(".glance .row b").length).toBeGreaterThan(0);
+  });
+});

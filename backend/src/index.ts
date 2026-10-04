@@ -6,7 +6,8 @@ import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
 import { LogEmailTransport } from "./fa/email/email-adapter";
 import { createFaRouter } from "./fa/routes";
-import { Fa4Deps, createFa4Router } from "./fa4/routes";
+import { FA4_RATE_LIMITS, Fa4Deps, createFa4Router } from "./fa4/routes";
+import { LegalConfig } from "./fa4/repository";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
@@ -121,10 +122,40 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
       resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
       emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
+      emailRecipientDailyQuota: Number(env.FA4_EMAIL_RECIPIENT_DAILY_QUOTA ?? 6),
+      resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
+      legal: fa4LegalFromEnv(env),
+      rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
     emailDispatch: "deferred",
   };
+}
+
+/**
+ * Legal acceptance evidence (M2). The Terms / Privacy document identifiers and URLs are configuration, not code: the final documents
+ * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
+ * is recorded so no environment silently stores a plausible-looking version.
+ */
+export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
+  const names = ["FA4_TERMS_VERSION", "FA4_TERMS_URL_ES", "FA4_TERMS_URL_EN", "FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
+  const missing = names.filter((n) => !env[n]);
+  if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
+  const ph = "UNSET-LEGAL-1";
+  return {
+    termsVersion: env.FA4_TERMS_VERSION ?? ph, termsUrl: { es: env.FA4_TERMS_URL_ES ?? ph, en: env.FA4_TERMS_URL_EN ?? ph },
+    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: env.FA4_PRIVACY_URL_ES ?? ph, en: env.FA4_PRIVACY_URL_EN ?? ph },
+  };
+}
+
+/** Abuse-prevention limits are configurable: FA4_RL_<NAME>="<limit>/<windowSeconds>", e.g. FA4_RL_LINKREQUESTEMAIL=3/3600. */
+export function fa4RateLimitOverrides(env: NodeJS.ProcessEnv = process.env): NonNullable<Fa4Deps["config"]["rateLimits"]> {
+  const out: NonNullable<Fa4Deps["config"]["rateLimits"]> = {};
+  for (const k of Object.keys(FA4_RATE_LIMITS) as Array<keyof typeof FA4_RATE_LIMITS>) {
+    const m = /^(\d+)\/(\d+)$/.exec(env[`FA4_RL_${k.toUpperCase()}`] ?? "");
+    if (m) out[k] = { limit: Number(m[1]), windowSeconds: Number(m[2]) };
+  }
+  return out;
 }
 
 /** Signed subscription events from a future billing adapter (BILLING_EVENTS_ENABLED=true). */

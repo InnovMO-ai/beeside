@@ -159,3 +159,34 @@ textarea.field { min-height: 96px; resize: vertical; }
   .topics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- R1 (frozen): lavender band, white per-destination cards ---------- */
+.r1 { display: grid; gap: 20px; }
+.r1-lead { font-size: 22px; line-height: 1.4; margin-bottom: 16px; }
+.r1-cards { display: grid; gap: 12px; }
+.r1-card { background: #fff; border-radius: var(--radius); padding: 14px 16px; font-size: 17px; line-height: 1.45; }
+.r1 button.frag, .r1-lead button.frag { all: unset; cursor: pointer; display: inline; padding: 10px 0; font-weight: 700; text-decoration: underline; text-decoration-color: var(--purple-2); text-underline-offset: 4px; color: var(--ink); }
+.r1 button.frag:focus-visible { outline: 3px solid var(--focus); }
+.r1-fix { margin-top: 16px; }
+.r1-aside { background: #fff; border-radius: var(--radius); padding: 14px 16px; align-self: start; }
+.r1-aside .hint { margin: 4px 0 12px; }
+@media (min-width: 1024px) {
+  .r1 { grid-template-columns: minmax(0, 1fr) 260px; gap: 32px; }
+  .r1-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- desktop combined fronts table ---------- */
+.ftable { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; margin-top: 8px; }
+.ftable-head, .ftable-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; padding: 12px 16px; align-items: start; }
+.ftable-head { font-size: 13px; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+.ftable-row + .ftable-row { border-top: 1px solid var(--line); }
+.ftable-row .name { font-weight: 600; } .ftable-row .why { color: var(--ink-3); font-size: 13px; }
+.ftable .crit-label { font-size: 12px; margin: 8px 0 4px; color: var(--ink-2); }
+
+/* Journey A "De un vistazo": one row per topic with its state chip (frozen presentation) */
+.glance .topic-row { flex-direction: column; align-items: flex-start; gap: 4px; border-top: 1px solid var(--line); }
+.glance .topic-row:first-of-type { border-top: 0; }
+.glance .gname { font-weight: 600; }
+.gchip { max-width: 100%; text-align: left; font-size: 12px; border-radius: 999px; padding: 2px 10px; border: 1px solid var(--purple-2); color: var(--purple); background: #fff; }
+.gchip.ACTIVE, .gchip.SOURCEABLE { background: var(--purple); color: #fff; border-color: var(--purple); }
+.gchip.DEPENDENT, .gchip.TOPIC_TO_CONSIDER { background: var(--lav); border-color: transparent; color: var(--ink-2); }

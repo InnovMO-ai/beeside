@@ -33,22 +33,38 @@ export interface Fa4EmailDeps {
   config: { appBaseUrl: string; resumeLinkDays: number; now: () => Date };
 }
 
-export async function enqueueFa4Email(db: Db, projectId: string, template: Fa4EmailTemplate, dedupeKey: string, now: Date): Promise<string | null> {
-  const { rows } = await db.query<{ delivery_id: string }>(
-    `INSERT INTO fa4_email_delivery (dedupe_key, project_id, template, next_attempt_at, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $4, $4) ON CONFLICT (dedupe_key) DO NOTHING RETURNING delivery_id`,
-    [dedupeKey, projectId, template, now],
-  );
-  return rows[0]?.delivery_id ?? null;
-}
+export interface Fa4EmailLimits { cooldownMinutes: number; recipientDailyQuota: number }
 
-/** Resend cooldown: any non-cancelled delivery of this template for the project inside the window. */
-export async function fa4EmailRequestedRecently(db: Db, projectId: string, template: Fa4EmailTemplate, minutes: number, now: Date): Promise<boolean> {
-  const { rows } = await db.query<{ recent: boolean }>(
-    `SELECT EXISTS (SELECT 1 FROM fa4_email_delivery WHERE project_id = $1 AND template = $2 AND status <> 'CANCELLED' AND created_at > $3) AS recent`,
-    [projectId, template, new Date(now.getTime() - minutes * 60_000)],
-  );
-  return rows[0]?.recent === true;
+/**
+ * Enqueues one email for a project, atomically (a per-recipient advisory lock serializes concurrent requests):
+ *  - cooldown: no second email of the same template for the project inside the window (a bucketed dedupe key also makes a race a no-op);
+ *  - per-recipient quota: at most `recipientDailyQuota` FA 4.0 emails to one address per 24 h, whatever the project or who asked.
+ * Returns true only when a new delivery was queued.
+ */
+export async function enqueueFa4Email(db: Db, projectId: string, template: Fa4EmailTemplate, now: Date, limits: Fa4EmailLimits, discriminator = ""): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const p = (await tx.query<{ email: string }>("SELECT email FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [projectId])).rows[0];
+    if (!p) return false;
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_email:${p.email}`]);
+    const cooled = await tx.query(
+      "SELECT 1 FROM fa4_email_delivery WHERE project_id = $1 AND template = $2 AND status <> 'CANCELLED' AND created_at > $3 LIMIT 1",
+      [projectId, template, new Date(now.getTime() - limits.cooldownMinutes * 60_000)],
+    );
+    if (cooled.rows.length) return false;
+    const quota = await tx.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM fa4_email_delivery d JOIN fa4_project pr ON pr.project_id = d.project_id
+        WHERE pr.email = $1 AND d.status <> 'CANCELLED' AND d.created_at > $2`,
+      [p.email, new Date(now.getTime() - 86_400_000)],
+    );
+    if ((quota.rows[0]?.n ?? 0) >= limits.recipientDailyQuota) return false;
+    const bucket = Math.floor(now.getTime() / (Math.max(1, limits.cooldownMinutes) * 60_000));
+    const { rows } = await tx.query(
+      `INSERT INTO fa4_email_delivery (dedupe_key, project_id, template, next_attempt_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $4, $4) ON CONFLICT (dedupe_key) DO NOTHING RETURNING delivery_id`,
+      [`${template}:${projectId}:${discriminator}${bucket}`, projectId, template, now],
+    );
+    return rows.length > 0;
+  });
 }
 
 interface Due { delivery_id: string; project_id: string; template: Fa4EmailTemplate; attempts: number; max_attempts: number }

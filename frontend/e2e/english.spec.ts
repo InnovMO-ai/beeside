@@ -33,6 +33,6 @@ test('Project reflection: tapping a fragment returns to the source answer (corre
   const { seed, open } = await import('./helpers');
   const token = await seed(request, journeyA(), 'reflection');
   await open(page, token);
-  await page.getByRole('button', { name: /En México quieres contratar personas/ }).click();
+  await page.getByRole('button', { name: 'contratar personas' }).click();
   await expect(page.getByRole('heading', { name: '¿Qué quieres hacer allí?' })).toBeVisible();
 });

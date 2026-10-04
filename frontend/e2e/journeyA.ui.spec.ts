@@ -39,7 +39,7 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByRole('button', { name: 'Continuar' }).click();
   // presence
   await page.getByLabel('Aún no está definido').check();
-  await page.getByLabel('Aún no lo sé').check();
+  await page.getByLabel('Aún no definido', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
   // existing
   await page.getByLabel('Nada todavía').check();
@@ -65,7 +65,7 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByLabel(/¿Cuántas personas contratarías en México/).fill('3 a 5 personas');
   await page.getByRole('button', { name: 'Continuar' }).click();
   // activators: only "regulated" applies (nothing to sell, no premises) → one short step
-  await expect(page.getByText('¿Tu producto o actividad está regulado?')).toBeVisible();
+  await expect(page.getByText('¿Actividad o producto regulado?')).toBeVisible();
   await expect(page.getByText('¿A quién vendes?')).toHaveCount(0);
   await expect(page.getByText(/¿Qué llevarás desde el país de origen/)).toHaveCount(0);
   await page.getByLabel('No', { exact: true }).check();
@@ -75,15 +75,24 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Esto es lo que toca tu proyecto' })).toBeVisible();
   await expect(page.getByText('Banco y pagos en el país')).toBeVisible();                      // shown under "depends"
   await page.getByRole('button', { name: 'Aún no he empezado nada' }).click();
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  // support: yes, yes, not sure  ("No" does not mean "do not delegate")
-  await expect(page.getByText(/«No» no significa/)).toBeVisible();
-  const rows = page.locator('.topic');
-  await rows.nth(0).getByRole('radio', { name: 'Sí' }).click();          // legal
-  await rows.nth(1).getByRole('radio', { name: 'Sí' }).click();          // recruitment? order: legal, recruitment, employment
-  await rows.nth(1).getByRole('radio', { name: 'No lo sé' }).click();
-  await rows.nth(2).getByRole('radio', { name: 'Sí' }).click();
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  // support: yes, yes, not sure  ("No" does not mean "do not delegate"). Desktop answers inside the combined table; mobile has its own step.
+  if (await page.locator('.ftable').count()) {
+    const rowsT = page.locator('.ftable-row');
+    await rowsT.nth(0).getByRole('radio', { name: 'Sí' }).click();
+    await rowsT.nth(1).getByRole('radio', { name: 'Sí' }).click();
+    await rowsT.nth(1).getByRole('radiogroup', { name: /apoyo/ }).getByRole('radio', { name: 'No lo sé' }).click();
+    await rowsT.nth(2).getByRole('radio', { name: 'Sí' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+  } else {
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByText(/«No» no significa/)).toBeVisible();
+    const rows = page.locator('.topic');
+    await rows.nth(0).getByRole('radio', { name: 'Sí' }).click();          // legal
+    await rows.nth(1).getByRole('radio', { name: 'Sí' }).click();          // recruitment? order: legal, recruitment, employment
+    await rows.nth(1).getByRole('radio', { name: 'No lo sé' }).click();
+    await rows.nth(2).getByRole('radio', { name: 'Sí' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+  }
 
   // support values, extra, result
   await page.getByLabel('En tus palabras (opcional)').fill('Entender cómo contratar sin complicar la empresa.');

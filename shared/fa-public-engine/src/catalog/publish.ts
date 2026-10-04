@@ -12,6 +12,7 @@ export function validateCapabilityForPublish(cap: Capability, catalog: Catalog):
   if (cap.fronts.some((f) => f.match === 'SPECIFIC') && !cap.triggerRule && (!cap.triggerTermsEs.length || !cap.triggerTermsEn.length))
     errs.push('SPECIFIC capabilities need trigger_terms in ES and EN');
   if (cap.capabilityStatus === 'SOURCEABLE' && !cap.sourcingPolicy?.trim()) errs.push('SOURCEABLE needs an explicit sourcing policy in the change reason');
+  if (cap.dependsOn !== undefined && cap.dependsOn !== 'own_entity') errs.push('dependsOn must be a known dependency');
   const service = catalog.services.find((s) => s.serviceId === cap.serviceId);
   if (!service) errs.push(`service ${cap.serviceId} does not exist`);
   return errs;

@@ -116,7 +116,7 @@ export function CountryPicker({ locale, selected, onChange, single, disabledOpen
         {selected.map((iso) => (
           <span key={iso} className="chip on" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {name(iso)}
-            <button type="button" aria-label={`${locale === 'es' ? 'Quitar' : 'Remove'} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 28, minHeight: 28 }}>×</button>
+            <button type="button" aria-label={`${UI.remove[locale]} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 28, minHeight: 28 }}>×</button>
           </span>
         ))}
       </div>

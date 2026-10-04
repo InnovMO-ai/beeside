@@ -18,3 +18,4 @@ npm-debug.log*
 frontend/test-results/
 frontend/playwright-report/
 .data/
+docs/fa4/visual/

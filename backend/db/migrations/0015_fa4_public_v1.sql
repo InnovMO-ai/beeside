@@ -6,6 +6,7 @@ CREATE TABLE "fa4_access_token" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"revoked_at" timestamp with time zone,
+	"used_at" timestamp with time zone,
 	"last_used_at" timestamp with time zone,
 	CONSTRAINT "fa4_access_token_kind" CHECK ("fa4_access_token"."kind" IN ('SESSION','RESUME'))
 );
@@ -27,16 +28,22 @@ CREATE TABLE "fa4_catalog_entity" (
 	"entity_id" text NOT NULL,
 	"publication_status" text NOT NULL,
 	"data" jsonb NOT NULL,
+	"draft_data" jsonb,
+	"draft_status" text,
 	"valid_from" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "fa4_catalog_entity_type" CHECK ("fa4_catalog_entity"."entity_type" IN ('FRONT','CATEGORY','SERVICE','CAPABILITY','COUNTRY')),
-	CONSTRAINT "fa4_catalog_entity_status" CHECK ("fa4_catalog_entity"."publication_status" IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED'))
+	CONSTRAINT "fa4_catalog_entity_status" CHECK ("fa4_catalog_entity"."publication_status" IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED')),
+	CONSTRAINT "fa4_catalog_entity_draft_status" CHECK ("fa4_catalog_entity"."draft_status" IS NULL OR "fa4_catalog_entity"."draft_status" IN ('DRAFT','REVIEW')),
+	CONSTRAINT "fa4_catalog_entity_draft_consistency" CHECK (("fa4_catalog_entity"."draft_data" IS NULL) = ("fa4_catalog_entity"."draft_status" IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "fa4_catalog_version" (
 	"version" text PRIMARY KEY NOT NULL,
+	"version_seq" bigserial NOT NULL,
 	"published_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"content" jsonb NOT NULL
+	"content" jsonb NOT NULL,
+	CONSTRAINT "fa4_catalog_version_version_seq_unique" UNIQUE("version_seq")
 );
 --> statement-breakpoint
 CREATE TABLE "fa4_continuation_request" (
@@ -59,7 +66,12 @@ CREATE TABLE "fa4_demand_signal" (
 	"premium_state" text NOT NULL,
 	"catalog_version" text NOT NULL,
 	"payload" jsonb NOT NULL,
+	"superseded_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "fa4_demand_signal_premium_state" CHECK ("fa4_demand_signal"."premium_state" IN ('NONE','OFFERED','ACTIVE')),
+	CONSTRAINT "fa4_demand_signal_sourcing_status" CHECK ("fa4_demand_signal"."sourcing_status" IS NULL OR "fa4_demand_signal"."sourcing_status" IN ('OPEN','RESEARCHING','SHORTLISTED','BUSINESS_CHECK','COVERED','DISMISSED')),
+	CONSTRAINT "fa4_demand_signal_triage_status" CHECK ("fa4_demand_signal"."triage_status" IS NULL OR "fa4_demand_signal"."triage_status" IN ('PENDING','INVESTIGATE','NO_ACTION')),
 	CONSTRAINT "fa4_demand_signal_class" CHECK ("fa4_demand_signal"."class" IN ('ACTIONABLE','INFORMATIONAL')),
 	CONSTRAINT "fa4_demand_signal_reason" CHECK ("fa4_demand_signal"."reason" IN ('SOURCEABLE','REVIEW','DEVELOPING','NO_ACTIVE_COVERAGE','UNMAPPED_NEED','NOT_OFFERED'))
 );
@@ -84,6 +96,28 @@ CREATE TABLE "fa4_email_delivery" (
 	CONSTRAINT "fa4_email_delivery_template" CHECK ("fa4_email_delivery"."template" IN ('fa4_resume_link','fa4_result_link'))
 );
 --> statement-breakpoint
+CREATE TABLE "fa4_legal_acceptance" (
+	"acceptance_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"project_id" uuid NOT NULL,
+	"document" text NOT NULL,
+	"accepted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"document_version" text NOT NULL,
+	"document_url" text NOT NULL,
+	"language" text NOT NULL,
+	CONSTRAINT "fa4_legal_acceptance_document" CHECK ("fa4_legal_acceptance"."document" IN ('TERMS','PRIVACY')),
+	CONSTRAINT "fa4_legal_acceptance_language" CHECK ("fa4_legal_acceptance"."language" IN ('es','en'))
+);
+--> statement-breakpoint
+CREATE TABLE "fa4_privacy_erasure_log" (
+	"erasure_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"project_id" uuid NOT NULL,
+	"mode" text NOT NULL,
+	"actor" text NOT NULL,
+	"reason" text NOT NULL,
+	"performed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "fa4_privacy_erasure_mode" CHECK ("fa4_privacy_erasure_log"."mode" IN ('ANONYMIZE'))
+);
+--> statement-breakpoint
 CREATE TABLE "fa4_project" (
 	"project_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" text NOT NULL,
@@ -93,7 +127,7 @@ CREATE TABLE "fa4_project" (
 	"status" text DEFAULT 'IN_PROGRESS' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "fa4_project_status" CHECK ("fa4_project"."status" IN ('IN_PROGRESS','DELIVERED','INELIGIBLE')),
+	CONSTRAINT "fa4_project_status" CHECK ("fa4_project"."status" IN ('IN_PROGRESS','DELIVERED','INELIGIBLE','ANONYMIZED')),
 	CONSTRAINT "fa4_project_locale" CHECK ("fa4_project"."locale" IN ('es','en'))
 );
 --> statement-breakpoint
@@ -110,7 +144,10 @@ ALTER TABLE "fa4_access_token" ADD CONSTRAINT "fa4_access_token_project_id_fa4_p
 ALTER TABLE "fa4_continuation_request" ADD CONSTRAINT "fa4_continuation_request_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fa4_continuation_request" ADD CONSTRAINT "fa4_continuation_request_result_id_fa4_result_result_id_fk" FOREIGN KEY ("result_id") REFERENCES "public"."fa4_result"("result_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fa4_demand_signal" ADD CONSTRAINT "fa4_demand_signal_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fa4_demand_signal" ADD CONSTRAINT "fa4_demand_signal_catalog_version_fa4_catalog_version_version_fk" FOREIGN KEY ("catalog_version") REFERENCES "public"."fa4_catalog_version"("version") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fa4_email_delivery" ADD CONSTRAINT "fa4_email_delivery_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fa4_legal_acceptance" ADD CONSTRAINT "fa4_legal_acceptance_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fa4_privacy_erasure_log" ADD CONSTRAINT "fa4_privacy_erasure_log_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fa4_result" ADD CONSTRAINT "fa4_result_project_id_fa4_project_project_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."fa4_project"("project_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fa4_result" ADD CONSTRAINT "fa4_result_catalog_version_fa4_catalog_version_version_fk" FOREIGN KEY ("catalog_version") REFERENCES "public"."fa4_catalog_version"("version") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "fa4_access_token_hash_unique" ON "fa4_access_token" USING btree ("token_hash");--> statement-breakpoint
@@ -118,10 +155,13 @@ CREATE INDEX "fa4_access_token_project_idx" ON "fa4_access_token" USING btree ("
 CREATE INDEX "fa4_catalog_change_entity_idx" ON "fa4_catalog_change" USING btree ("entity_type","entity_id","change_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "fa4_catalog_entity_pk" ON "fa4_catalog_entity" USING btree ("entity_type","entity_id");--> statement-breakpoint
 CREATE INDEX "fa4_continuation_request_project_idx" ON "fa4_continuation_request" USING btree ("project_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "fa4_continuation_request_unique" ON "fa4_continuation_request" USING btree ("project_id","result_id");--> statement-breakpoint
 CREATE INDEX "fa4_demand_signal_project_idx" ON "fa4_demand_signal" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "fa4_demand_signal_capability_idx" ON "fa4_demand_signal" USING btree ("destination","capability_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "fa4_email_delivery_dedupe_unique" ON "fa4_email_delivery" USING btree ("dedupe_key");--> statement-breakpoint
 CREATE INDEX "fa4_email_delivery_due_idx" ON "fa4_email_delivery" USING btree ("status","next_attempt_at");--> statement-breakpoint
+CREATE INDEX "fa4_email_delivery_project_idx" ON "fa4_email_delivery" USING btree ("project_id","template","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "fa4_legal_acceptance_unique" ON "fa4_legal_acceptance" USING btree ("project_id","document");--> statement-breakpoint
 CREATE INDEX "fa4_project_email_idx" ON "fa4_project" USING btree ("email","updated_at");--> statement-breakpoint
 CREATE INDEX "fa4_result_project_idx" ON "fa4_result" USING btree ("project_id","result_seq");--> statement-breakpoint
 CREATE UNIQUE INDEX "fa4_result_seq_unique" ON "fa4_result" USING btree ("result_seq");

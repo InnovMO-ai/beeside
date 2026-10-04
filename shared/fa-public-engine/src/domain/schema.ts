@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { Answers } from './answers';
 
 const s = (max = 2000) => z.string().max(max);
+/** Record keys can never be prototype-pollution names. */
+const key = (max: number) => z.string().max(max).refine((k) => !['__proto__', 'constructor', 'prototype'].includes(k), 'reserved key');
 const iso = z.string().regex(/^([A-Z]{2}|OPEN)$/);
 const component = z.object({
   id: z.string().min(1).max(40), destinations: z.array(iso).max(30), description: s(500).optional(),
@@ -28,11 +30,11 @@ export const answersSchema: z.ZodType<Answers> = z.object({
   reasonText: s(3000), decision: z.enum(['exploring', 'decided', 'in_progress']).nullable(), dependsOn: s(1000),
   startWhen: z.enum(['asap', '3m', '6m', '12m', 'unknown']).nullable(),
   externalDate: z.object({ has: z.boolean().nullable(), date: s(40).optional(), what: s(300).optional() }).strict(),
-  scale: z.record(z.string().max(40), z.object({ proxy: z.enum(['investment', 'people', 'products', 'purchase', 'duration']), text: s(200), declined: z.boolean() }).strict()),
+  scale: z.record(key(40), z.object({ proxy: z.enum(['investment', 'people', 'products', 'purchase', 'duration']), text: s(200), declined: z.boolean() }).strict()),
   regulated: z.enum(['yes', 'no', 'unknown']).nullable(),
-  fronts: z.record(z.string().max(80), z.object({ status: z.enum(['resolved', 'in_progress', 'pending', 'unknown']).optional(), support: z.enum(['yes', 'no', 'unknown']).optional(), critical: z.boolean().optional(), marked: z.boolean().optional(), note: s(500).optional() }).strict()),
+  fronts: z.record(key(80), z.object({ status: z.enum(['resolved', 'in_progress', 'pending', 'unknown']).optional(), support: z.enum(['yes', 'no', 'unknown']).optional(), critical: z.boolean().optional(), marked: z.boolean().optional(), note: s(500).optional() }).strict()),
   addedNeeds: z.array(z.object({ id: z.string().max(40), text: s(500), destination: z.string().max(10) }).strict()).max(60),
-  cargoRoute: z.record(z.string().max(10), z.enum(['within', 'into_from_abroad', 'both', 'unknown'])),
+  cargoRoute: z.record(key(10), z.enum(['within', 'into_from_abroad', 'both', 'unknown'])),
   supportValues: z.array(z.enum(['speed', 'no_network', 'single_contact', 'local_validation', 'comparable_options', 'coordination', 'cost', 'keep_control'])).max(8),
   supportWords: s(1000), keepWords: s(1000),
   context: z.object({ success: s(2000), constraints: s(2000), description: s(3000), experience: s(2000), unknowns: s(2000), personalNeed: z.boolean() }).strict(),

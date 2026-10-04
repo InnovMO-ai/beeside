@@ -7,6 +7,8 @@ import { defineConfig } from "@playwright/test";
  *   E2E_DATABASE_URL=postgres://postgres@127.0.0.1:54329/beeside_fa4_e2e npm run test:e2e --workspace=frontend
  */
 const DB = process.env.E2E_DATABASE_URL ?? "";
+// The API runs as the least-privilege runtime login role when E2E_RUNTIME_DATABASE_URL is set (CI does); migrations always use E2E_DATABASE_URL.
+const APP_DB = process.env.E2E_RUNTIME_DATABASE_URL ?? DB;
 const WEB = 4177;
 const API = 8087;
 export default defineConfig({
@@ -20,7 +22,7 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   webServer: [
     {
-      command: `FA4_API_ENABLED=true DATABASE_URL=${DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
+      command: `FA4_API_ENABLED=true DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
       url: `http://localhost:${API}/health`,
       timeout: 60_000,
       reuseExistingServer: false,

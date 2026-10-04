@@ -10,17 +10,27 @@ import { EmailTransport } from "../fa/email/email-adapter";
 import { FaError } from "../fa/services/errors";
 import { looksLikeAccessToken } from "../fa/services/tokens";
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../security/rate-limit";
-import { Fa4EmailDeps, deliverDueFa4Emails, enqueueFa4Email, fa4EmailRequestedRecently } from "./email";
+import { Fa4EmailDeps, deliverDueFa4Emails, enqueueFa4Email } from "./email";
 import {
-  Fa4ProjectRow, createProject, issueToken, latestProjectIdForEmail, latestResult, loadPublishedCatalog, normalizeEmail,
-  projectByToken, requestContinuation, saveProject,
+  Fa4ProjectRow, LegalConfig, createProject, exchangeResumeToken, latestResult, loadPublishedCatalog, normalizeEmail,
+  projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
 } from "./repository";
 import { deliverResult } from "./service";
 
 export interface Fa4Deps {
   db: Db;
   email: EmailTransport;
-  config: { appBaseUrl: string; sessionTtlHours: number; resumeLinkDays: number; emailCooldownMinutes: number; now: () => Date };
+  config: {
+    appBaseUrl: string; sessionTtlHours: number; resumeLinkDays: number; emailCooldownMinutes: number; now: () => Date;
+    /** Max FA 4.0 emails to one address per 24 h (any project, any requester). */
+    emailRecipientDailyQuota: number;
+    /** Max projects a "resume by email" request sends project-specific links for. */
+    resumeProjectsPerRequest: number;
+    /** Approved Terms / Privacy identifiers recorded as immutable acceptance evidence (LEGAL-1 / CHK-1 pending). */
+    legal: LegalConfig;
+    /** Overrides of the technical abuse-prevention limits (see FA4_RATE_LIMITS). */
+    rateLimits?: Partial<Record<keyof typeof FA4_RATE_LIMITS, { limit: number; windowSeconds: number }>>;
+  };
   /** "inline" delivers the outbox before responding (tests / local); otherwise the worker or an explicit job delivers. */
   emailDispatch?: "inline" | "deferred";
 }
@@ -32,6 +42,8 @@ export const FA4_RATE_LIMITS = {
   create: policy("fa4_create_address", 10, 600),
   linkRequestAddress: policy("fa4_link_request_address", 10, 600),
   linkRequestEmail: policy("fa4_link_request_email", 3, 3600),
+  /** Per (email + origin) pair, tighter than either alone. */
+  linkRequestPair: policy("fa4_link_request_pair", 2, 3600),
   linkToken: policy("fa4_link_token_address", 60, 600),
   sessionWrites: policy("fa4_session_writes", 900, 600),
   mail: policy("fa4_mail_session", 6, 600),
@@ -42,28 +54,50 @@ const bearer = (req: Request) => /^Bearer\s+(\S+)$/i.exec(req.header("authorizat
 const bodyOf = (req: Request): Record<string, unknown> => (typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {});
 const maskEmail = (e: string) => { const [u = "", d = ""] = e.split("@"); return `${u.slice(0, 1)}***@${d}`; };
 
-/** Public catalog for client-side flow decisions: internal fields (partner refs, provider / Business Check status, sourcing policy) are never sent. */
+/**
+ * Minimal customer-safe projection of the PUBLISHED catalog, built from an explicit allow-list (a new internal field can never leak
+ * by default). It keeps what the deterministic flow needs in the browser — fronts, trigger terms, coverage and capability states,
+ * country messages — and nothing internal: no provider / Business Check status, sourcing policy, internal reference or notes.
+ */
 export function publicCatalog(c: Catalog): Catalog {
   return {
-    ...c,
-    capabilities: c.capabilities.map((cap): Capability => {
-      const safe: Capability = { ...cap, providerStatus: "NONE", businessCheckStatus: "N/A" };
-      delete safe.internalRef;
-      delete safe.sourcingPolicy;
-      return safe;
-    }),
+    version: c.version,
+    publishedAt: c.publishedAt,
+    fronts: c.fronts.map((f) => ({
+      key: f.key, internalName: f.key, nameEs: f.nameEs, nameEn: f.nameEn,
+      synonymsEs: f.synonymsEs, synonymsEn: f.synonymsEn, examplesEs: f.examplesEs, examplesEn: f.examplesEn,
+    })) as Catalog["fronts"],
+    categories: c.categories.map((x) => ({ categoryId: x.categoryId, nameEs: x.nameEs, nameEn: x.nameEn, description: "", publicationStatus: x.publicationStatus, validFrom: x.validFrom })),
+    services: c.services.map((x) => ({
+      serviceId: x.serviceId, categoryId: x.categoryId, nameEs: x.nameEs, nameEn: x.nameEn, publicDescription: "", internalDescription: "",
+      aliases: [], publicationStatus: x.publicationStatus, validFrom: x.validFrom,
+    })),
+    capabilities: c.capabilities.map((cap): Capability => ({
+      capabilityId: cap.capabilityId, serviceId: cap.serviceId, kind: cap.kind, nameEs: cap.nameEs, nameEn: cap.nameEn,
+      fronts: cap.fronts, triggerTermsEs: cap.triggerTermsEs, triggerTermsEn: cap.triggerTermsEn,
+      ...(cap.triggerRule ? { triggerRule: cap.triggerRule } : {}),
+      capabilityStatus: cap.capabilityStatus,
+      ...(cap.dependsOn ? { dependsOn: cap.dependsOn } : {}), ...(cap.footnote ? { footnote: true } : {}),
+      coverageBasis: cap.coverageBasis, coverage: cap.coverage,
+      providerStatus: "NONE", businessCheckStatus: "N/A",
+      ...(cap.scopeLimitEs ? { scopeLimitEs: cap.scopeLimitEs } : {}), ...(cap.scopeLimitEn ? { scopeLimitEn: cap.scopeLimitEn } : {}),
+      validFrom: cap.validFrom, updatedAt: cap.updatedAt, publicationStatus: cap.publicationStatus,
+    })),
+    countries: c.countries,
   };
 }
 
 export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter } = {}): Router {
   const router = Router();
   const limiter = security.limiter;
-  router.use(rateLimit(limiter, FA4_RATE_LIMITS.address));
+  const lim = (k: keyof typeof FA4_RATE_LIMITS): RateLimitPolicy => ({ ...FA4_RATE_LIMITS[k], ...(deps.config.rateLimits?.[k] ?? {}) });
+  router.use(rateLimit(limiter, lim('address')));
   router.use(express.json({ limit: "256kb" }));
-  router.use("/session", rateLimit(limiter, FA4_RATE_LIMITS.sessionWrites, bearer));
-  router.use("/links", rateLimit(limiter, FA4_RATE_LIMITS.linkToken));
+  router.use("/session", rateLimit(limiter, lim('sessionWrites'), bearer));
+  router.use("/links", rateLimit(limiter, lim('linkToken')));
 
   const emailDeps: Fa4EmailDeps = { db: deps.db, email: deps.email, config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now } };
+  const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };
 
   const handle = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => {
@@ -84,7 +118,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   }));
 
   // Create the project right after the identity step. No account, no password.
-  router.post("/sessions", rateLimit(limiter, FA4_RATE_LIMITS.create), handle(async (req, res) => {
+  router.post("/sessions", rateLimit(limiter, lim('create')), handle(async (req, res) => {
     const parsed = answersSchema.safeParse(bodyOf(req).answers);
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
     const a = parsed.data;
@@ -94,7 +128,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     ].filter(Boolean);
     if (missing.length) throw new FaError("INVALID_INPUT", "identity is incomplete", { fields: missing });
     const now = deps.config.now();
-    const created = await createProject(deps.db, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : "company", new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000));
+    const created = await createProject(deps.db, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : "company", new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000), deps.config.legal);
     res.status(201).json({ sessionToken: created.sessionToken });
   }));
 
@@ -107,17 +141,18 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const p = await session(req);
     const parsed = answersSchema.safeParse(bodyOf(req).answers);
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
-    const a = { ...parsed.data, identity: { ...parsed.data.identity, email: p.email } };   // the captured email can't be swapped silently
-    await saveProject(deps.db, p.projectId, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey, a.company.hasExistingBusiness === false ? "INELIGIBLE" : undefined);
+    // Email and the two legal acknowledgements are pinned to what was captured at identity: the email can't be swapped silently
+    // and acceptance evidence (fa4_legal_acceptance) can't diverge from the stored flags. Name / company / role stay editable.
+    const a = { ...parsed.data, identity: { ...parsed.data.identity, email: p.email, termsAccepted: p.answers.identity.termsAccepted, privacyAcknowledged: p.answers.identity.privacyAcknowledged } };
+    await saveProject(deps.db, p.projectId, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey);
     res.json({ ok: true });
   }));
 
   // "Guardar y seguir después": a resume link to the email already captured (never asked again).
-  router.post("/session/finish-later", rateLimit(limiter, FA4_RATE_LIMITS.mail, bearer), handle(async (req, res) => {
+  router.post("/session/finish-later", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
     const p = await session(req);
     const now = deps.config.now();
-    if (!(await fa4EmailRequestedRecently(deps.db, p.projectId, "fa4_resume_link", deps.config.emailCooldownMinutes, now)))
-      await enqueueFa4Email(deps.db, p.projectId, "fa4_resume_link", `fa4_resume_link:${p.projectId}:${now.getTime()}`, now);
+    await enqueueFa4Email(deps.db, p.projectId, "fa4_resume_link", now, emailLimits);
     await dispatch();
     res.json({ ok: true, email: maskEmail(p.email) });
   }));
@@ -135,13 +170,12 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     res.json(await deliverResult(deps.db, p.projectId, p.answers, deps.config.now()));
   }));
 
-  router.post("/session/result/email", rateLimit(limiter, FA4_RATE_LIMITS.mail, bearer), handle(async (req, res) => {
+  router.post("/session/result/email", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
     const p = await session(req);
     const r = await latestResult(deps.db, p.projectId);
     if (!r) throw new FaError("NOT_FOUND", "no result yet");
     const now = deps.config.now();
-    if (!(await fa4EmailRequestedRecently(deps.db, p.projectId, "fa4_result_link", deps.config.emailCooldownMinutes, now)))
-      await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", `fa4_result_link:${r.resultId}:${now.getTime()}`, now);
+    await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", now, emailLimits, `${r.resultId}:`);
     await dispatch();
     res.json({ ok: true });
   }));
@@ -155,28 +189,30 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     res.json({ ok: true });
   }));
 
-  // Exchange an emailed RESUME link token (URL fragment) for a working session.
+  // Exchange an emailed RESUME link token (URL fragment) for a working session. The link is project-specific and SINGLE-USE:
+  // the exchange atomically spends it, so a replay (or a forwarded copy) is refused with the same generic answer as an unknown link.
   router.post("/links/continue", handle(async (req, res) => {
     const raw = bodyOf(req).token;
-    const project = looksLikeAccessToken(raw) ? await projectByToken(deps.db, raw, "RESUME", deps.config.now()) : null;
-    if (!project) throw new FaError("NOT_FOUND", "this link is not valid or has expired");
     const now = deps.config.now();
-    const sessionToken = await deps.db.transaction((tx) => issueToken(tx, project.projectId, "SESSION", new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000)));
-    res.json({ sessionToken });
+    const exchanged = looksLikeAccessToken(raw) ? await exchangeResumeToken(deps.db, raw, now, new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000)) : null;
+    if (!exchanged) throw new FaError("NOT_FOUND", "this link is not valid or has expired");
+    res.json({ sessionToken: exchanged.sessionToken });
   }));
 
-  // Resume by email: always the same answer (no account enumeration); the link goes only to the stored address.
-  router.post("/links/request", rateLimit(limiter, FA4_RATE_LIMITS.linkRequestAddress), rateLimit(limiter, FA4_RATE_LIMITS.linkRequestEmail, (req) => {
-    const v = bodyOf(req).email; return typeof v === "string" && v.trim() ? normalizeEmail(v).slice(0, 320) : null;
-  }), handle(async (req, res) => {
+  // Resume by email. The answer is always the same ({ok:true}) whether or not the address has projects (no account enumeration).
+  // An email alone never opens a project: for each of the address's projects (up to a small cap) it queues a project-specific
+  // single-use link sent ONLY to the stored address. Limits: per origin, per email, and per (email + origin) pair.
+  const pairKey = (req: Request) => {
+    const v = bodyOf(req).email; return typeof v === "string" && v.trim() ? `${normalizeEmail(v).slice(0, 320)}|${req.ip ?? req.socket.remoteAddress ?? "unknown"}` : null;
+  };
+  const emailKey = (req: Request) => { const v = bodyOf(req).email; return typeof v === "string" && v.trim() ? normalizeEmail(v).slice(0, 320) : null; };
+  router.post("/links/request", rateLimit(limiter, lim('linkRequestAddress')), rateLimit(limiter, lim('linkRequestPair'), pairKey), rateLimit(limiter, lim('linkRequestEmail'), emailKey), handle(async (req, res) => {
     const email = bodyOf(req).email;
     if (typeof email === "string" && isValidEmail(email)) {
-      const projectId = await latestProjectIdForEmail(deps.db, email);
       const now = deps.config.now();
-      if (projectId && !(await fa4EmailRequestedRecently(deps.db, projectId, "fa4_resume_link", deps.config.emailCooldownMinutes, now))) {
-        await enqueueFa4Email(deps.db, projectId, "fa4_resume_link", `fa4_resume_link:${projectId}:${now.getTime()}`, now);
-        await dispatch();
-      }
+      for (const projectId of await recentProjectsForEmail(deps.db, email, deps.config.resumeProjectsPerRequest))
+        await enqueueFa4Email(deps.db, projectId, "fa4_resume_link", now, emailLimits);
+      await dispatch();
     }
     res.json({ ok: true });
   }));

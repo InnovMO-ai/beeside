@@ -18,7 +18,7 @@ interface CapDef {
   fronts: Array<[FrontKey, Match]>; termsEs?: string; termsEn?: string; rule?: Activity[];
   status: CapabilityStatus; basis: CoverageBasis; cov: Array<[string, CoverageValue['state']]>;
   provider?: ProviderStatus; bc?: BusinessCheckStatus; limEs?: string; limEn?: string;
-  policy?: string; ref?: string;
+  policy?: string; ref?: string; dependsOn?: 'own_entity'; footnote?: boolean;
 }
 const cap = (d: CapDef): Capability => ({
   capabilityId: d.id, serviceId: d.svc, kind: d.kind, nameEs: d.es, nameEn: d.en,
@@ -30,6 +30,7 @@ const cap = (d: CapDef): Capability => ({
   providerStatus: d.provider ?? 'NONE', businessCheckStatus: d.bc ?? 'NOT_RECORDED',
   ...(d.limEs ? { scopeLimitEs: d.limEs } : {}), ...(d.limEn ? { scopeLimitEn: d.limEn } : {}),
   ...(d.policy ? { sourcingPolicy: d.policy } : {}), ...(d.ref ? { internalRef: d.ref } : {}),
+  ...(d.dependsOn ? { dependsOn: d.dependsOn } : {}), ...(d.footnote ? { footnote: true } : {}),
   validFrom: SINCE, updatedAt: SINCE, publicationStatus: 'PUBLISHED',
 });
 
@@ -65,7 +66,7 @@ export const CAPABILITIES: Capability[] = [
   sa('CAP_SA_ED_PARTNER_MATCH', 'SVC_SA_PARTNER_MATCH', 'Búsqueda de socios locales', 'Local partner search & match', [['FR_LOCAL_PARTNERS', 'DEFAULT']], '', '', 'Termina en una conexión calificada; sin garantía de cierre', 'Ends in a qualified connection; no guarantee of closing'),
 
   // The Hive — Firm infrastructure / legal
-  hiveSupport('CAP_HIVE_FI_COMPANY_SETUP', 'SVC_CORPORATE_SETUP_TAX', 'Constitución y estructura de la empresa', 'Company setup', [['FR_LEGAL_TAX', 'DEFAULT']], 'ACTIVE', { ref: GT, provider: 'AFFILIATED' }),
+  hiveSupport('CAP_HIVE_FI_COMPANY_SETUP', 'SVC_CORPORATE_SETUP_TAX', 'Constitución y estructura de la empresa', 'Company setup', [['FR_LEGAL_TAX', 'DEFAULT']], 'ACTIVE', { ref: GT, provider: 'AFFILIATED', dependsOn: 'own_entity' }),
   hiveSupport('CAP_HIVE_FI_TAX', 'SVC_CORPORATE_SETUP_TAX', 'Impuestos', 'Tax services', [['FR_LEGAL_TAX', 'DEFAULT']], 'ACTIVE', { ref: GT }),
   hiveSupport('CAP_HIVE_FI_AUDIT', 'SVC_CORPORATE_SETUP_TAX', 'Auditoría', 'Audit', [['FR_LEGAL_TAX', 'SPECIFIC']], 'ACTIVE', { termsEs: 'auditoría|dictamen|control interno', termsEn: 'audit', ref: GT }),
   hiveSupport('CAP_HIVE_FI_BUSINESS_ADVISORY', 'SVC_CORPORATE_SETUP_TAX', 'Asesoría corporativa y transaccional', 'Business advisory', [['FR_INVEST_RC', 'SPECIFIC'], ['FR_LEGAL_TAX', 'SPECIFIC']], 'ACTIVE', { termsEs: 'valuación|m&a|reestructura|gobierno corporativo', termsEn: 'valuation|m&a|restructuring', ref: GT }),
@@ -81,11 +82,11 @@ export const CAPABILITIES: Capability[] = [
   hiveSupport('CAP_HIVE_DOC_CERT_LEGALIZATION', 'SVC_DOCUMENT_SERVICES', 'Certificación y legalización de documentos', 'Document certification and legalization', [['FR_LEGAL_TAX', 'SPECIFIC']], 'ACTIVE', { basis: 'ISSUING_COUNTRY', termsEs: 'certificación de documentos|legalización|copia certificada|notarización', termsEn: 'document certification|legalization|notarization' }),
 
   // Financial
-  hiveSupport('CAP_HIVE_FIN_BANKING', 'SVC_BANKING', 'Banca empresarial', 'Business banking', [['FR_BANKING', 'DEFAULT']], 'ACTIVE', { limEs: 'La apertura de cuentas la decide el banco', limEn: 'Account opening is decided by the bank', ref: 'Santander — Global' }),
-  hiveSupport('CAP_HIVE_FIN_INSURANCE', 'SVC_INSURANCE', 'Seguros empresariales', 'Corporate insurance', [['FR_INSURANCE', 'DEFAULT']], 'ACTIVE', { limEs: 'La emisión de pólizas la decide la aseguradora', limEn: 'Policy issuance is decided by the insurer', ref: 'MAPFRE — Global' }),
+  hiveSupport('CAP_HIVE_FIN_BANKING', 'SVC_BANKING', 'Banca empresarial', 'Business banking', [['FR_BANKING', 'DEFAULT']], 'ACTIVE', { footnote: true, limEs: 'La apertura de cuentas la decide el banco', limEn: 'Account opening is decided by the bank', ref: 'Santander — Global' }),
+  hiveSupport('CAP_HIVE_FIN_INSURANCE', 'SVC_INSURANCE', 'Seguros empresariales', 'Corporate insurance', [['FR_INSURANCE', 'DEFAULT']], 'ACTIVE', { footnote: true, limEs: 'La emisión de pólizas la decide la aseguradora', limEn: 'Policy issuance is decided by the insurer', ref: 'MAPFRE — Global' }),
 
   // People
-  hiveSupport('CAP_HIVE_HR_PAYROLL', 'SVC_PAYROLL', 'Nómina y obligaciones laborales', 'Payroll & labor obligations', [['FR_EMPLOYMENT', 'DEFAULT']], 'ACTIVE', { limEs: 'Para tus propios empleados; no actúa como empleador en tu lugar', limEn: 'For your own employees; it does not act as employer on your behalf', ref: GT }),
+  hiveSupport('CAP_HIVE_HR_PAYROLL', 'SVC_PAYROLL', 'Nómina y obligaciones laborales', 'Payroll & labor obligations', [['FR_EMPLOYMENT', 'DEFAULT']], 'ACTIVE', { footnote: true, limEs: 'Para tus propios empleados; no actúa como empleador en tu lugar', limEn: 'For your own employees; it does not act as employer on your behalf', ref: GT }),
   hiveSupport('CAP_HIVE_HR_EOR', 'SVC_EOR', 'Contratación mediante tercero empleador', 'Employer of Record (EOR)', [['FR_EMPLOYMENT', 'SPECIFIC']], 'SOURCEABLE', { termsEs: 'tercero empleador|eor|contratar sin entidad', termsEn: 'employer of record|eor', policy: 'COM-3 / D-097' }),
   hiveSupport('CAP_HIVE_HR_RECRUITMENT', 'SVC_RECRUITMENT', 'Reclutamiento', 'Recruitment', [['FR_RECRUITMENT', 'DEFAULT']], 'SOURCEABLE', { limEs: 'Sin garantía de contratación', limEn: 'No guarantee of hiring', policy: 'COM-3 / D-097' }),
   hiveSupport('CAP_HIVE_HR_EMPLOYEE_TRANSPORT', 'SVC_EMPLOYEE_TRANSPORT', 'Transporte de personal', 'Employee transportation', [['FR_STAFF_HOUSING', 'SPECIFIC']], 'ACTIVE', { termsEs: 'traslados|transporte de personal', termsEn: 'crew transport|staff transport', limEs: 'Sólo traslados', limEn: 'Transfers only', ref: GT }),

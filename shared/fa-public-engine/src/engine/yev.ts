@@ -4,6 +4,7 @@ import type { Catalog, FrontKey, Locale, RoutingState } from '../domain/types';
 import { L, NC, countryL10n, type L10n, type VisibleStateKey, visibleStateKey } from '../i18n/messages';
 import type { CountryMessageKind, Resolution, ResolvedNeed } from './resolve';
 import { resolveAll } from './resolve';
+import { FRONT_ORDER } from '../catalog/fronts';
 import { NA_DISPLAY_FRONTS, type DependsCause, type NotApplicableGroup } from './frontRules';
 
 /**
@@ -22,6 +23,10 @@ export interface YevDestination {
   countryMessage: CountryMessageKind | null;
   topicCount: number;
   glance: Array<{ key: VisibleStateKey; count: number }>;
+  /** Frozen summary presentation: 'topics' = one chip per topic (small single-destination projects, Journey A); 'counts' = counts per state (B, C). */
+  glanceMode: 'topics' | 'counts';
+  glanceItems: Array<{ front: FrontKey; name: L10n; key: VisibleStateKey }>;
+  notApplicableCount: number;
   applies: Topic[];
   depends: { cause: DependsCause; topics: Topic[] } | null;
   /** RULE 6/9: canonical Front Catalog names, one group per declared negative. */
@@ -67,18 +72,21 @@ function naReason(g: NotApplicableGroup, c: ProjectComponent): L10n {
   switch (g) {
     case 'sell': return L('El proyecto no incluye vender allí', 'The project does not include selling there');      // frozen B (ES+EN)
     case 'place': return c.presence === 'own_onsite'
-      ? NC('na.place.onsite', 'No tendrás espacio propio', "You won't have premises of your own")                     // ES frozen C
-      : NC('na.place.office', 'No abrirás oficina', "You won't open an office");                                       // ES frozen A
-    case 'goods': return NC('na.goods', 'No moverás bienes', "You won't move goods");                                 // ES frozen A
+      ? L('No tendrás espacio propio', "You won't have premises of your own")                     // ES frozen C
+      : L('No abrirás oficina', "You won't open an office");                                       // ES frozen A
+    case 'goods': return L('No moverás bienes', "You won't move goods");                                 // ES frozen A
     case 'housing_exit': return L('Presencia permanente', 'Permanent presence');                                      // frozen B (ES+EN)
   }
 }
 
+/** Journey A (frozen): small single-destination results list each topic with its state; larger / multi-destination results show counts (B, C). */
+export const GLANCE_PER_TOPIC_MAX = 6;
+
 export const START_LABEL: Record<StartWhen, L10n> = {
-  asap: NC('yev.start.asap', 'Empezar cuanto antes', 'Start as soon as possible'),
-  '3m': NC('yev.start.3m', 'Empezar en unos 3 meses', 'Start in about 3 months'),
+  asap: L('Empezar cuanto antes', 'Start as soon as possible'),
+  '3m': L('Empezar en unos 3 meses', 'Start in about 3 months'),
   '6m': L('Empezar en unos 6 meses', 'Start in about 6 months'),
-  '12m': NC('yev.start.12m', 'Empezar en un año o más', 'Start in a year or more'),
+  '12m': L('Empezar en un año o más', 'Start in a year or more'),
   unknown: NC('yev.start.unknown', 'Momento de inicio aún por definir', 'Start date still to be defined'),
 };
 
@@ -95,8 +103,8 @@ export function formatKeyDate(raw: string | undefined, locale: Locale): string {
 }
 
 const ACTIVITY_VERB: Record<string, L10n> = {
-  sell: NC('yev.verb.sell', 'vender', 'sell'), produce: NC('yev.verb.produce', 'producir', 'produce'), source: NC('yev.verb.source', 'comprar a proveedores locales', 'buy from local suppliers'),
-  operate: NC('yev.verb.operate', 'operar', 'operate'), hire: NC('yev.verb.hire', 'contratar personas', 'hire people'), invest_only: NC('yev.verb.invest_only', 'invertir sin operar', 'invest without operating'),
+  sell: L('vender', 'sell'), produce: L('producir', 'produce'), source: L('comprar a proveedores locales', 'buy from local suppliers'),
+  operate: L('operar', 'operate'), hire: L('contratar personas', 'hire people'), invest_only: L('invertir sin operar', 'invest without operating'),
 };
 function joinL(items: L10n[]): L10n {
   const j = (xs: string[], and: string) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${and} ${xs[xs.length - 1]}`);
@@ -114,9 +122,9 @@ function componentPhrase(c: ProjectComponent, a: Answers): L10n {
   if (acts.includes('produce') && c.presence === 'own_physical') return L('Planta propia', 'Own plant');
   if (acts.length === 1 && acts[0] === 'hire') {
     const t = a.scale[c.id]?.text;
-    return t ? L(`Un equipo de ${t}`, `A team of ${t}`) : NC('yev.phrase.team', 'Un equipo', 'A team');
+    return t ? L(`Un equipo de ${t}`, `A team of ${t}`) : L('Un equipo', 'A team');
   }
-  if (acts.includes('sell')) return NC('yev.phrase.commercial', 'Presencia comercial', 'Commercial presence');
+  if (acts.includes('sell')) return L('Presencia comercial', 'Commercial presence');
   if (acts.includes('invest_only')) return NC('yev.phrase.invest', 'Inversión', 'Investment');
   return NC('yev.phrase.operation', 'Operación', 'Operation');
 }
@@ -125,7 +133,7 @@ function presenceTail(c: ProjectComponent): L10n {
   const dur = c.durationMonths ? (c.durationMonths % 12 === 0 ? L(`unos ${c.durationMonths / 12} años`, `about ${c.durationMonths / 12} years`) : L(`unos ${c.durationMonths} meses`, `about ${c.durationMonths} months`)) : null;
   if (c.permanence === 'temporary') return NC('yev.tail.temporary', `durante ${dur?.es ?? 'un periodo definido'}, con fin previsto`, `for ${dur?.en ?? 'a defined period'}, with a planned end`);
   switch (c.presence) {
-    case 'own_physical': return c.activities.includes('produce') ? NC('yev.tail.plant', 'de forma permanente y con planta propia', 'permanently and with your own plant') : NC('yev.tail.own', 'con presencia propia', 'with your own presence');
+    case 'own_physical': return c.activities.includes('produce') ? L('de forma permanente y con planta propia', 'permanently and with your own plant') : NC('yev.tail.own', 'con presencia propia', 'with your own presence');
     case 'own_onsite': return NC('yev.tail.onsite', 'ejecutando en sitio', 'executing on site');
     case 'third_parties': return NC('yev.tail.third', 'a través de terceros', 'through third parties');
     case 'remote': return NC('yev.tail.remote', 'de forma remota', 'remotely');
@@ -134,24 +142,55 @@ function presenceTail(c: ProjectComponent): L10n {
   }
 }
 
-export function projectParagraphs(a: Answers): L10n[] {
-  const out: L10n[] = [];
+/** A piece of reflected text; `edit` is the journey step (stepKey) the user returns to when tapping it (frozen R1: "Toca cualquier parte para corregirla"). */
+export interface Seg { text: L10n; edit?: string }
+const seg = (es: string, en: string, edit?: string): Seg => ({ text: L(es, en), ...(edit ? { edit } : {}) });
+
+/** Reflected paragraphs of the project per component (R1 and "Tu proyecto"), as editable segments. Same words as the stored result text. */
+export function projectSegments(a: Answers): Seg[][] {
+  const out: Seg[][] = [];
   for (const c of a.components) {
-    const dests = c.destinations.map((d) => destCountry(d));
-    const where = joinL(dests);
+    const where = joinL(c.destinations.map((d) => destCountry(d)));
     const verbs = joinL(c.activities.map((x) => ACTIVITY_VERB[x]!));
     const open = c.presence === 'open' || c.presence === null;
-    const body: L10n = c.description
-      ? NC('yev.para.described', `En ${where.es} quieres ${c.description}${open ? '; aún no has definido de qué forma' : ''}.`, `In ${where.en} you want ${c.description}${open ? '; you have not yet defined the form' : ''}.`)
-      : open
-        ? NC('yev.para.open', `En ${where.es} quieres ${verbs.es}. Aún no has definido cómo hacerlo.`, `In ${where.en} you want to ${verbs.en}. You have not yet defined how.`)
-        : NC('yev.para.defined', `En ${where.es} quieres ${verbs.es}, ${presenceTail(c).es}.`, `In ${where.en} you want to ${verbs.en}, ${presenceTail(c).en}.`);
-    const today = c.existing === 'nothing' ? NC('yev.para.nothing', ' Hoy no tienes presencia allí.', " Today you have no presence there.")
-      : c.existingNote ? NC('yev.para.today', ` Hoy ${low1(c.existingNote).replace(/^vendes/, 'vendes')}.`, ` Today: ${low1(c.existingNote)}.`) : L('', '');
-    out.push(L(body.es + today.es, body.en + today.en));
+    const act = `activity:${c.id}`, pres = `presence:${c.id}`, ex = `existing:${c.id}`;
+    const p: Seg[] = [];
+    if (c.description) {
+      p.push(seg(`En ${where.es} quieres `, `In ${where.en} you want `), seg(c.description, c.description, act));
+      if (open) p.push(seg('; aún no has definido de qué forma', '; you have not yet defined the form', pres));
+      p.push(seg('.', '.'));
+    } else if (open) {
+      p.push(seg(`En ${where.es} quieres `, `In ${where.en} you want to `), seg(verbs.es, verbs.en, act),
+        seg('. Aún no has definido cómo hacerlo.', '. You have not yet defined how.', pres));
+    } else {
+      const tail = presenceTail(c);
+      p.push(seg(`En ${where.es} quieres `, `In ${where.en} you want to `), seg(verbs.es, verbs.en, act), seg(', ', ', '), seg(tail.es, tail.en, pres), seg('.', '.'));
+    }
+    if (c.existing === 'nothing') p.push(seg(' Hoy no tienes presencia allí.', ' Today you have no presence there.', ex));
+    else if (c.existingNote) p.push(seg(` Hoy ${low1(c.existingNote)}.`, ` Today: ${low1(c.existingNote)}.`, ex));
+    out.push(p);
   }
-  if (a.components.length > 1 && a.projectConfirmed) out.push(L('Lo consideras un solo proyecto.', 'You see it as a single project.'));
+  if (a.components.length > 1 && a.projectConfirmed) out.push([seg('Lo consideras un solo proyecto.', 'You see it as a single project.', 'destinations')]);
   return out;
+}
+const NCseg = (id: string, es: string, en: string, edit?: string): Seg => ({ text: NC(id, es, en), ...(edit ? { edit } : {}) });
+const joinSegs = (p: Seg[]): L10n => L(p.map((x) => x.text.es).join(''), p.map((x) => x.text.en).join(''));
+
+export function projectParagraphs(a: Answers): L10n[] {
+  return projectSegments(a).map(joinSegs);
+}
+
+/** R1 — "Esto es lo que entendemos": company sentence + one paragraph per component, each fragment editable. */
+export function reflectionParagraphs(a: Answers): Seg[][] {
+  const c = a.company;
+  const countries = c.operatesIn.length ? joinL(c.operatesIn.map(countryL10n)) : null;
+  const size = c.size ? sizeLabel(c.size) : null;
+  const company: Seg[] = [NCseg('r1.company.lead', 'Tu empresa ', 'Your company ', 'company')];
+  company.push(c.sector.trim() ? NCseg('r1.company.sector', `se dedica a ${c.sector.trim()}`, `works in ${c.sector.trim()}`, 'company') : NCseg('r1.company.running', 'está en marcha', 'is up and running', 'company'));
+  if (size) company.push(NCseg('r1.company.size', `, tiene ${low1(size.es)}`, `, has ${low1(size.en)}`, 'company'));
+  if (countries) company.push(NCseg('r1.company.countries', ` y opera en ${countries.es}`, ` and operates in ${countries.en}`, 'company'));
+  company.push(seg('.', '.'));
+  return [company, ...projectSegments(a)];
 }
 
 function buildTitle(a: Answers): L10n {
@@ -221,7 +260,7 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
       if (c.conditionalOn || !c.limitEs || c.state === 'REVIEW' && c.kind === 'STRATEGIC_ADVISORY') continue;
       if (n.state === 'DEPENDENT') continue;
       const k = c.capabilityId; if (seen.has(k)) continue; seen.add(k);
-      if (['CAP_HIVE_HR_PAYROLL', 'CAP_HIVE_FIN_BANKING', 'CAP_HIVE_FIN_INSURANCE'].includes(c.capabilityId))
+      if (c.footnote)
         foot.push(L(`${c.nameEs}: ${c.limitEs}.`, `${c.nameEn}: ${c.limitEn}.`));
     }
     if (valueNeeds.some((n) => n.capabilities.some((c) => c.state === 'SOURCEABLE' || (c.state === 'REVIEW' && c.kind === 'HIVE'))))
@@ -232,11 +271,16 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
 
     const notApplicable = buildNotApplicable(d.plan, topic, res.destinations.length);
 
+    const glanceItems = valueGroups.flatMap((g) => g.items.map((it) => ({ front: it.front, name: it.name, key: g.key })))
+      .sort((x, y) => FRONT_ORDER.indexOf(x.front) - FRONT_ORDER.indexOf(y.front));
+    const glanceMode: 'topics' | 'counts' = res.destinations.length === 1 && !d.countryMessage && !shortcut && glanceItems.length > 0 && glanceItems.length <= GLANCE_PER_TOPIC_MAX ? 'topics' : 'counts';
+
     return {
       destination: d.destination, name: nameL, ...(region ? { region } : {}),
       countryMessage: d.countryMessage,
       topicCount: d.topics.length,
       glance: order.filter((k) => glanceMap.has(k)).map((k) => ({ key: k, count: glanceMap.get(k)! })),
+      glanceMode, glanceItems, notApplicableCount: notApplicable.reduce((n, g) => n + g.fronts.length, 0),
       applies,
       depends: dependsTopics.length ? { cause: plan.dependsCause ?? 'presence', topics: dependsTopics } : null,
       notApplicable,
@@ -258,10 +302,10 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
   const markedN = shortcut ? allTopics.filter((t) => t.kind === 'applies' && !t.notIndicated).length : 0;
   const sentences: L10n[] = [];
   const names = (pred: (t: (typeof allTopics)[number]) => boolean) => joinL(allTopics.filter(pred).map((t) => low1(frontName(catalog, t.front).es) === '' ? L('', '') : L(low1(frontName(catalog, t.front).es), low1(frontName(catalog, t.front).en))));
-  if (nRes) sentences.push(NC('yev.where.resolved', `Ya resuelto: ${names((t) => t.status === 'resolved').es}.`, `Already resolved: ${names((t) => t.status === 'resolved').en}.`));
-  if (nProg) sentences.push(NC('yev.where.inprogress', `En marcha: ${names((t) => t.status === 'in_progress').es}.`, `Under way: ${names((t) => t.status === 'in_progress').en}.`));
+  if (nRes) sentences.push(L(`Ya resuelto: ${names((t) => t.status === 'resolved').es}.`, `Already resolved: ${names((t) => t.status === 'resolved').en}.`));
+  if (nProg) sentences.push(L(`En marcha: ${names((t) => t.status === 'in_progress').es}.`, `Under way: ${names((t) => t.status === 'in_progress').en}.`));
   if (!nRes && !nProg && nPend && !shortcut) sentences.push(L(`Todavía no has empezado ninguno de los ${numberEs(nPend)}.`, `You haven't started any of the ${numberEn(nPend)} yet.`));
-  if (unanswered && answered.length) sentences.push(L(`De los otros ${unanswered} temas no nos indicaste en qué punto están.`, `For the other ${unanswered} topics you didn't tell us where they stand.`));
+  if (unanswered && answered.length) sentences.push(unanswered === 1 ? L('Del otro tema no nos indicaste en qué punto está.', "For the other topic you didn't tell us where it stands.") : L(`De los otros ${unanswered} temas no nos indicaste en qué punto están.`, `For the other ${unanswered} topics you didn't tell us where they stand.`));
   const needs: ResolvedNeed[] = res.destinations.filter((d) => !d.countryMessage).flatMap((d) => d.needs.filter((n) => n.origin === 'derived' && n.state !== 'DEPENDENT'));
   const yes = needs.filter((n) => n.support === 'yes'); const unk = needs.filter((n) => n.support === 'unknown');
   if (!shortcut && yes.length && unk.length) sentences.push(L(`Quieres apoyo en ${numberEs(yes.length)}; en ${joinL(unk.map((n) => L(low1(frontName(catalog, n.front).es), low1(frontName(catalog, n.front).en)))).es} aún no lo sabes.`,

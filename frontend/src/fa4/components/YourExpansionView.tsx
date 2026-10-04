@@ -1,7 +1,7 @@
 import type { Locale } from '@beeside/fa-public-engine';
 import { Logo } from './Logo';
 import { COUNTRY_MESSAGES, STATE_MESSAGES, numberWord, type L10n } from '@beeside/fa-public-engine';
-import { UI } from '../copy/ui';
+import { UI, fill } from '../copy/ui';
 import type { YevDestination, YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /**
@@ -12,11 +12,11 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
   const t = (l: L10n) => l[locale];
   const m = model;
   const dependsCount = m.counts.depends;
+  const A = cap(numberWord(m.counts.applies, locale));
   const headline = m.shortcut
-    ? (locale === 'es' ? `${cap(numberWord(m.counts.applies, locale))} temas aplican. Marcaste ${numberWord(m.counts.marked, locale)}.` : `${cap(numberWord(m.counts.applies, locale))} topics apply. You marked ${numberWord(m.counts.marked, locale)}.`)
-    : (locale === 'es'
-      ? `${cap(numberWord(m.counts.applies, locale))} ${m.counts.applies === 1 ? 'tema aplica' : 'temas aplican'}${m.destinations.length > 1 ? ` en ${numberWord(m.destinations.length, locale)} países` : ' hoy'}.${dependsCount ? ` ${dependsCount === 1 ? 'Uno más depende' : `${cap(numberWord(dependsCount, locale))} más dependen`} de una decisión.` : ''}`
-      : `${cap(numberWord(m.counts.applies, locale))} ${m.counts.applies === 1 ? 'topic applies' : 'topics apply'}${m.destinations.length > 1 ? ` across ${numberWord(m.destinations.length, locale)} countries` : ' today'}.${dependsCount ? ` ${cap(numberWord(dependsCount, locale))} more ${dependsCount === 1 ? 'depends' : 'depend'} on a decision.` : ''}`);
+    ? fill(UI.headAppliesShortcut, locale, { applies: A, marked: numberWord(m.counts.marked, locale) })
+    : `${fill(m.counts.applies === 1 ? UI.headApplies1 : UI.headAppliesN, locale, { applies: A })}${m.destinations.length > 1 ? fill(UI.headIn, locale, { n: numberWord(m.destinations.length, locale) }) : t(UI.headToday)}.`
+      + (dependsCount ? (dependsCount === 1 ? t(UI.headDepends1) : fill(UI.headDependsN, locale, { n: cap(numberWord(dependsCount, locale)) })) : '');
 
   return (
     <article aria-labelledby="yev-title">
@@ -65,7 +65,7 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
           <div>
             <p className="eyebrow" id="yev-where">{t(UI.whereYouAre)}</p>
             {m.shortcut ? (
-              <div className="stats"><div className="stat strong"><b>{m.whereYouAre.marked}</b>{locale === 'es' ? 'Marcados' : 'Marked'}</div><div className="stat"><b>{m.whereYouAre.notIndicated}</b>{t(UI.notIndicated)}</div></div>
+              <div className="stats"><div className="stat strong"><b>{m.whereYouAre.marked}</b>{t(UI.marked)}</div><div className="stat"><b>{m.whereYouAre.notIndicated}</b>{t(UI.notIndicated)}</div></div>
             ) : (
               <div className="stats">
                 <div className="stat"><b>{m.whereYouAre.resolved}</b>{t(UI.resolved)}</div>
@@ -107,13 +107,20 @@ function destTitle(d: YevDestination, locale: Locale) { return d.region ? `${d.n
 function GlanceCard({ d, locale, shortcut, model }: { d: YevDestination; locale: Locale; shortcut: boolean; model: YourExpansionViewModel }) {
   return (
     <div className="glance">
-      <h3><span>{destTitle(d, locale)}</span><span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>{shortcut ? `${locale === 'es' ? 'Marcados' : 'Marked'} ${d.marked.length} · ${UI.notIndicated[locale]} ${d.notIndicated.length}` : `${d.topicCount} ${UI.topics[locale]}`}</span></h3>
+      <h3><span>{destTitle(d, locale)}</span><span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>{shortcut ? `${UI.marked[locale]} ${d.marked.length} · ${UI.notIndicated[locale]} ${d.notIndicated.length}` : `${d.topicCount} ${UI.topics[locale]}`}</span></h3>
       {d.countryMessage ? (
         <div className="row"><span style={{ display: 'flex', alignItems: 'center' }}><span className="dot none" aria-hidden />{COUNTRY_MESSAGES[d.countryMessage][locale]}</span></div>
+      ) : d.glanceMode === 'topics' ? (
+        <>
+          {d.glanceItems.map((g) => (
+            <div className="row topic-row" key={g.front}><span className="gname">{g.name[locale]}</span><span className={`gchip ${g.key}`}>{STATE_MESSAGES[g.key][locale]}</span></div>
+          ))}
+          {d.notApplicableCount > 0 && <p className="hint" style={{ marginTop: 8 }}>{d.notApplicableCount === 1 ? UI.glanceOther1[locale] : fill(UI.glanceOthers, locale, { n: d.notApplicableCount })}</p>}
+        </>
       ) : d.glance.map((g) => (
         <div className="row" key={g.key}><span style={{ display: 'flex', alignItems: 'center' }}><span className={`dot ${g.key}`} aria-hidden />{STATE_MESSAGES[g.key][locale]}</span><b>{g.count}</b></div>
       ))}
-      {shortcut && d.notIndicated.length > 0 && model.destinations.length === 1 && <p className="hint" style={{ marginTop: 6 }}>{locale === 'es' ? `A los ${d.notIndicated.length} temas que no marcaste no les asignamos estado.` : `We don't assign a status to the ${d.notIndicated.length} topics you didn't mark.`}</p>}
+      {shortcut && d.notIndicated.length > 0 && model.destinations.length === 1 && <p className="hint" style={{ marginTop: 6 }}>{fill(UI.noStatusNote, locale, { n: d.notIndicated.length })}</p>}
     </div>
   );
 }
@@ -129,7 +136,7 @@ function InvolvesBlock({ d, locale, shortcut }: { d: YevDestination; locale: Loc
       </div>
       {d.involvesNote && <p className="note" style={{ margin: '12px 0' }}>{t(d.involvesNote)}</p>}
       {d.depends && (
-        <div className="dep"><b>{locale === 'es' ? 'Depende de' : 'Depends on'} {causeText}</b>
+        <div className="dep"><b>{UI.dependsOnLabel[locale]} {causeText}</b>
           <ul>{d.depends.topics.map((x) => <li key={x.front}><span>{t(x.name)}</span><span className="tag">{UI.dependsTag[locale]}</span></li>)}</ul>
         </div>
       )}
@@ -140,7 +147,7 @@ function InvolvesBlock({ d, locale, shortcut }: { d: YevDestination; locale: Loc
       {shortcut && d.notIndicated.length > 0 && (
         <div style={{ marginTop: 12 }}><b style={{ fontSize: 14 }}>{UI.notIndicated[locale]} · {d.notIndicated.length}</b>
           {d.notIndicated.map((x) => <p key={x.front} style={{ color: 'var(--ink-2)', fontSize: 14 }}>{t(x.name)}{x.possible ? ` (${UI.possible[locale].toLowerCase()})` : ''}</p>)}
-          <p className="hint">{locale === 'es' ? '«No indicado» no significa resuelto: aplica a tu proyecto, pero no lo marcaste.' : "“Not indicated” doesn't mean resolved: it applies to your project, but you didn't mark it."}</p></div>
+          <p className="hint">{UI.notIndicatedNote[locale]}</p></div>
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import {
   resolveAll,
 } from "@beeside/fa-public-engine";
 import { Db } from "../db/database";
-import { loadPublishedCatalog, replaceOpenSignals, storeResult } from "./repository";
+import { loadPublishedCatalog, syncSignals, storeResult } from "./repository";
 
 /**
  * Generates and stores a delivered Your Expansion View: deterministic (answers + PUBLISHED catalog -> model), no AI.
@@ -18,7 +18,7 @@ export async function deliverResult(db: Db, projectId: string, answers: Answers,
     const resolution = resolveAll(answers, catalog);
     const model = buildYourExpansionView(answers, catalog, now, resolution);
     const resultId = await storeResult(tx, projectId, model);
-    await replaceOpenSignals(tx, projectId, deriveDemandSignals(projectId, answers, resolution, catalog, now));
+    await syncSignals(tx, projectId, deriveDemandSignals(projectId, answers, resolution, catalog, now));
     return { resultId, model };
   });
 }

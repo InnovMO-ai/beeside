@@ -5,6 +5,8 @@ import { deriveDemandSignals } from '../engine/demand';
 import { buildFlow, nextStep, prevStep, stepKey } from '../engine/flow';
 import { journeyA, journeyB, journeyC } from '../testing/journeys';
 import { deriveDecision } from '../domain/answers';
+import { demandSignalId } from '../engine/demand';
+import { reflectionParagraphs, projectParagraphs } from '../engine/yev';
 import type { Answers } from '../domain/answers';
 
 const cat = SEED_CATALOG;
@@ -260,5 +262,58 @@ describe('PO-approved rules 1, 3, 5, 6, 7, 8, 9', () => {
   });
   it('Rule 10 — I-26 stays reachable after being answered', () => {
     expect(flowIds(journeyB('es', 'within'))).toContain('cargo_route');
+  });
+});
+
+describe('VERIFY fixes — engine', () => {
+  const sigs = (a: Answers, id = 'p1') => deriveDemandSignals(id, a, resolveAll(a, cat), cat);
+
+  it('M4 — Demand Signal identity is semantic (project × destination × capability/need), never positional', () => {
+    const a = journeyB('es', 'unknown');
+    const base = sigs(a);
+    for (const s of base) expect(s.signalId).toBe(demandSignalId('p1', s.destination, s.capabilityId, s.front, s.originalText));
+    // unrelated answer changes that shift iteration order do not change the identity of the remaining demands
+    const b = journeyB('es', 'unknown'); delete b.fronts['MX|FR_SITE']; b.fronts['MX|FR_PERMITS'] = { status: 'resolved', support: 'yes' };
+    const after = sigs(b);
+    const ids = new Set(after.map((s) => s.signalId));
+    for (const s of base.filter((x) => x.capabilityId !== 'CAP_HIVE_LEGAL_PERMITS')) expect(ids.has(s.signalId)).toBe(true);
+    expect(ids.has(demandSignalId('p1', 'MX', 'CAP_HIVE_LEGAL_PERMITS', 'FR_PERMITS', null))).toBe(false);      // that demand really disappeared
+    expect(new Set(base.map((s) => s.signalId)).size).toBe(base.length);
+    expect(base.every((s) => s.supersededAt === null)).toBe(true);
+  });
+  it('M4 — a free-text unmapped need keeps a stable identity from its normalized text', () => {
+    const a = journeyA(); a.addedNeeds = [{ id: 'n', text: 'Comprar un VELERO', destination: 'MX' }];
+    const b = journeyA(); b.addedNeeds = [{ id: 'other-id', text: ' comprar un velero ', destination: 'MX' }];
+    const u = (x: Answers) => sigs(x).find((s) => s.reason === 'UNMAPPED_NEED')!.signalId;
+    expect(u(a)).toBe(u(b));
+  });
+  it('catalog attributes, not capability ids, drive the Rule 1 dependency and the result footnotes', () => {
+    const co = cat.capabilities.find((c) => c.capabilityId === 'CAP_HIVE_FI_COMPANY_SETUP')!;
+    expect(co.dependsOn).toBe('own_entity');
+    const y = buildYourExpansionView(journeyB('es', 'unknown'), cat);
+    expect(y.destinations[0]!.valueFootnotes.map((f) => f.es).join(' ')).toMatch(/Banca empresarial/);
+    const tweaked = { ...cat, capabilities: cat.capabilities.map((c) => (c.capabilityId === 'CAP_HIVE_FIN_BANKING' ? { ...c, footnote: false } : c)) };
+    expect(buildYourExpansionView(journeyB('es', 'unknown'), tweaked).destinations[0]!.valueFootnotes.map((f) => f.es).join(' ')).not.toMatch(/Banca empresarial/);
+  });
+  it('M6C — frozen summary: small single-destination results list each topic; larger / multi-destination results show counts', () => {
+    const ya = buildYourExpansionView(journeyA(), cat).destinations[0]!;
+    expect(ya.glanceMode).toBe('topics');
+    expect(ya.glanceItems.map((i) => [i.name.es, i.key])).toEqual([
+      ['Estructura legal, impuestos y contabilidad', 'ACTIVE'], ['Encontrar a las personas', 'SOURCEABLE'], ['Contratar legalmente y pagar nómina', 'ACTIVE'], ['Banco y pagos en el país', 'DEPENDENT']]);
+    expect(ya.notApplicableCount).toBe(5);
+    for (const d of buildYourExpansionView(journeyB('es', 'unknown'), cat).destinations) expect(d.glanceMode).toBe('counts');
+    expect(buildYourExpansionView(journeyC('es', 'unknown'), cat).destinations[0]!.glanceMode).toBe('counts');
+  });
+  it('M6B — R1 reflection: company sentence + one paragraph per component; every fragment points to the step that edits it; text equals the result text', () => {
+    const r = reflectionParagraphs(journeyB('es'));
+    expect(r).toHaveLength(4);
+    expect(r[0]!.map((x) => x.text.es).join('')).toBe('Tu empresa se dedica a Automatización para automoción, tiene más de 250 personas y opera en Alemania, República Checa y China.');
+    expect(r[0]!.filter((x) => x.edit).every((x) => x.edit === 'company')).toBe(true);
+    const mx = r[1]!;
+    expect(mx.map((x) => x.text.es).join('')).toBe(projectParagraphs(journeyB('es'))[0]!.es);
+    expect(mx.find((x) => x.text.es.startsWith('producir'))!.edit).toBe('activity:mx');
+    expect(mx.find((x) => x.text.es.includes('planta propia'))!.edit).toBe('presence:mx');
+    expect(mx.some((x) => x.edit === 'existing:mx')).toBe(true);
+    expect(r[3]!.map((x) => x.text.es).join('')).toBe('Lo consideras un solo proyecto.');
   });
 });

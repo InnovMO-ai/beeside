@@ -29,6 +29,9 @@ export function Fa4App() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const desktop = useDesktop();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locale = a.locale;
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);   // <html lang> follows the language chosen on the cover (a11y)
@@ -37,9 +40,10 @@ export function Fa4App() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const cat = await api.catalog();
+      let cat: Catalog;
+      try { cat = await api.catalog(); } catch { if (alive) { setCatalogError(true); setBooting(false); } return; }
       if (!alive) return;
-      setCatalog(cat);
+      setCatalogError(false); setCatalog(cat);
       const link = linkFromLocation();
       try {
         if (link) {
@@ -61,7 +65,7 @@ export function Fa4App() {
       if (alive) setBooting(false);
     })().catch(() => setBooting(false));
     return () => { alive = false; };
-  }, []);
+  }, [attempt]);
 
   const set = useCallback((fn: (x: Answers) => Answers) => setA((x) => {
     const y = fn(x);
@@ -101,11 +105,11 @@ export function Fa4App() {
     if (step.id === 'identity' && !(await ensureSession())) return;
     const base = step.id === 'reflection' && a.knowsNeeds === null ? { ...a, projectConfirmed: true, knowsNeeds: false } : a;
     if (base !== a) setA(base);
-    const n = nextStep(base, catalog, step);
+    const n = skipCombined(nextStep, base, catalog, step, desktop);
     if (n.id === 'result') await generate(); else setStep(n);
     window.scrollTo?.({ top: 0 });
   }
-  function onBack() { if (catalog) { setStep(prevStep(a, catalog, step)); window.scrollTo?.({ top: 0 }); } }
+  function onBack() { if (catalog) { setStep(skipCombined(prevStep, a, catalog, step, desktop)); window.scrollTo?.({ top: 0 }); } }
 
   async function saveLater() {
     if (!(await ensureSession())) return;
@@ -117,6 +121,14 @@ export function Fa4App() {
   }
   const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch { return false; } };
 
+  if (catalogError && !catalog) {
+    return (
+      <div className="fa4"><div className="shell" lang={locale}><main className="main" role="alert">
+        <h1 className="h1">{UI.catalogErrorTitle[locale]}</h1><p className="lead">{UI.catalogErrorBody[locale]}</p>
+        <button className="btn primary" style={{ flex: 'none' }} onClick={() => { setBooting(true); setAttempt((n) => n + 1); }}>{UI.retry[locale]}</button>
+      </main></div></div>
+    );
+  }
   if (booting || !catalog || !ctx) return <div className="fa4"><div className="shell"><main className="main" aria-busy="true"><p className="hint">…</p></main></div></div>;
 
   if (step.id === 'result') {
@@ -151,13 +163,13 @@ export function Fa4App() {
     <div className="fa4"><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''}`} lang={locale}>
       <div className="topbar"><Logo /><button className="linkbtn" onClick={saveLater}>{UI.saveLater[locale]}</button></div>
       {stage >= 1 && stage <= 6 && (
-        <nav className="progress" aria-label={locale === 'es' ? 'Progreso' : 'Progress'}>
+        <nav className="progress" aria-label={UI.progress[locale]}>
           <ol>{UI.stages.map((_, i) => <li key={i} className={i + 1 < stage ? 'done' : i + 1 === stage ? 'now' : ''} aria-current={i + 1 === stage ? 'step' : undefined} />)}</ol>
           <div className="labels"><span>{UI.stages[stage - 1]![locale]}</span><span>{stage} {UI.stepOf[locale]} 6</span></div>
           <div className="stage-names" aria-hidden>{UI.stages.map((s, i) => <span key={i} className={i + 1 === stage ? 'now' : ''}>{s[locale]}</span>)}</div>
         </nav>
       )}
-      <main className="main" id="main"><StepBody step={step} ctx={ctx} /></main>
+      <main className="main" id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} /></main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
@@ -168,7 +180,7 @@ export function Fa4App() {
   );
 }
 
-function StepBody({ step, ctx }: { step: StepRef; ctx: S.StepCtx }) {
+function StepBody({ step, ctx, desktop }: { step: StepRef; ctx: S.StepCtx; desktop: boolean }) {
   const c = step.comp ?? '';
   switch (step.id) {
     case 'identity': return <S.IdentityStep {...ctx} />;
@@ -186,7 +198,7 @@ function StepBody({ step, ctx }: { step: StepRef; ctx: S.StepCtx }) {
     case 'activators': return <S.ActivatorsStep {...ctx} mode="all" />;
     case 'activators_sell': return <S.ActivatorsStep {...ctx} mode="sell" />;
     case 'activators_site': return <S.ActivatorsStep {...ctx} mode="site" />;
-    case 'fronts_status': return <S.FrontsStatusStep {...ctx} />;
+    case 'fronts_status': return desktop ? <S.FrontsTableStep {...ctx} /> : <S.FrontsStatusStep {...ctx} />;
     case 'fronts_support': return <S.FrontsSupportStep {...ctx} />;
     case 'fronts_mark': return <S.FrontsMarkStep {...ctx} />;
     case 'fronts_critical': return <S.FrontsCriticalStep {...ctx} />;
@@ -195,4 +207,25 @@ function StepBody({ step, ctx }: { step: StepRef; ctx: S.StepCtx }) {
     case 'extra': return <S.ExtraStep {...ctx} />;
     default: return null;
   }
+}
+
+/** Desktop ≥ 1024 px (frozen Design: one combined table for status / support / critical date). */
+function useDesktop(): boolean {
+  const q = '(min-width: 1024px)';
+  const get = () => (typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(q).matches : false);
+  const [d, setD] = useState(get);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const m = window.matchMedia(q); const on = () => setD(m.matches);
+    m.addEventListener?.('change', on); return () => m.removeEventListener?.('change', on);
+  }, []);
+  return d;
+}
+
+/** On desktop the support and critical-date questions live inside the combined fronts table, so those steps are skipped (not in the "mark what you need" path). */
+function skipCombined(move: typeof nextStep, a: Answers, c: Catalog, from: StepRef, desktop: boolean): StepRef {
+  let n = move(a, c, from);
+  if (!desktop || !buildFlow(a, c).some((x) => x.id === 'fronts_status')) return n;
+  while (n.id === 'fronts_support' || n.id === 'fronts_critical') n = move(a, c, n);
+  return n;
 }

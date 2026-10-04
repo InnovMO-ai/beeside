@@ -102,4 +102,15 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(screen.getByTestId("premium-continuation")).toBeInTheDocument();
     await waitFor(() => expect(document.documentElement.lang).toBe("es"));
   });
+
+  it("shows an error state with a retry when the catalog cannot be loaded (never an endless spinner)", async () => {
+    let failing = true;
+    mockApi((c) => (c.url === "/api/fa4/catalog" && failing ? json({ error: "X" }, 500) : null));
+    render(<Fa4App />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("No pudimos cargar First Assessment");
+    failing = false;
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    await screen.findByRole("button", { name: "Empezar" });
+  });
 });

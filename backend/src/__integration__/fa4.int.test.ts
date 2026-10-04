@@ -25,7 +25,10 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
   const db = createSavepointDb(client);
   const deps: Fa4Deps = {
     db, email,
-    config: { appBaseUrl: "https://fa.test", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 5, now: () => clock.now },
+    config: {
+      appBaseUrl: "https://fa.test", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 5, emailRecipientDailyQuota: 6, resumeProjectsPerRequest: 3, now: () => clock.now,
+      legal: { termsVersion: "T-2026.1", termsUrl: { es: "https://fa.test/es/terminos", en: "https://fa.test/en/terms" }, privacyVersion: "P-2026.1", privacyUrl: { es: "https://fa.test/es/privacidad", en: "https://fa.test/en/privacy" } },
+    },
     emailDispatch: "inline",
   };
   const api = (opts: { limiter?: ReturnType<typeof createRateLimiter> } = {}) =>
