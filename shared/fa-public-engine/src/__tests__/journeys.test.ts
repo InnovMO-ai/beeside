@@ -47,11 +47,11 @@ describe('Journey A — simple / focused', () => {
 
 describe('Journey B — complex multi-country', () => {
   const a = journeyB('es', 'unknown');
-  it('Mexico: 11 topics → 7 ACTIVE, 1 SOURCEABLE, 2 REVIEW (incl. route-based freight), 1 NOT_OFFERED', () => {
+  it('Mexico: 10 topics → 6 ACTIVE, 1 SOURCEABLE, 2 REVIEW (incl. route-based freight), 1 NOT_OFFERED', () => {
     const s = states(a, 'MX');
-    expect(Object.keys(s)).toHaveLength(11);
+    expect(Object.keys(s)).toHaveLength(10);
     const tally = Object.values(s).reduce<Record<string, number>>((m, v) => ({ ...m, [v]: (m[v] ?? 0) + 1 }), {});
-    expect(tally).toEqual({ ACTIVE: 7, SOURCEABLE: 1, REVIEW: 2, NOT_OFFERED: 1 });
+    expect(tally).toEqual({ ACTIVE: 6, SOURCEABLE: 1, REVIEW: 2, NOT_OFFERED: 1 });
     expect(s.FR_LOGISTICS).toBe('REVIEW');         // 3PL ACTIVE but freight route not declared → most conservative
     expect(s.FR_SITE).toBe('ACTIVE');              // industrial real estate triggered by "produce" (SPECIFIC via project data)
     expect(s.FR_PERMITS).toBe('NOT_OFFERED');
@@ -63,16 +63,17 @@ describe('Journey B — complex multi-country', () => {
     expect(us.countryMessage).toBe('NO_ACTIVE_COVERAGE');
     expect(us.valueGroups).toEqual([]);
     expect(us.topicCount).toBe(4);
-    expect(us.applies.map((t) => t.front)).toEqual(['FR_RECRUITMENT', 'FR_EMPLOYMENT']);
-    expect(us.depends?.topics.map((t) => t.front)).toEqual(['FR_LEGAL_TAX', 'FR_BANKING']);
+    // Rule 1: local hiring makes the legal/tax topic APPLY even though the operating model is open; only banking depends on that decision
+    expect(us.applies.map((t) => t.front)).toEqual(['FR_LEGAL_TAX', 'FR_RECRUITMENT', 'FR_EMPLOYMENT']);
+    expect(us.depends?.topics.map((t) => t.front)).toEqual(['FR_BANKING']);
     expect(us.depends?.cause).toBe('presence');
     expect(us.region).toBe('Texas');
   });
-  it('groups the YEV by destination and scales (13 apply, 2 depend, 9 unanswered)', () => {
+  it('groups the YEV by destination and scales (13 apply, 1 depends, 8 unanswered)', () => {
     const y = buildYourExpansionView(a, cat);
     expect(y.destinations.map((d) => d.destination)).toEqual(['MX', 'US']);
-    expect(y.counts).toMatchObject({ applies: 13, depends: 2 });
-    expect(y.whereYouAre).toMatchObject({ resolved: 0, inProgress: 2, pending: 4, unanswered: 9 });
+    expect(y.counts).toMatchObject({ applies: 13, depends: 1 });
+    expect(y.whereYouAre).toMatchObject({ resolved: 0, inProgress: 2, pending: 4, unanswered: 8 });
     expect(y.title.es).toBe('Planta propia en México y presencia comercial y de ingeniería en Texas');
     expect(naNames(y.destinations[0]!)).toEqual(['Vender y llegar a tus clientes · Proteger tu marca', 'Alojamiento y traslados del equipo · Cerrar ordenadamente al terminar']);
   });
@@ -106,7 +107,7 @@ describe('Journey B — complex multi-country', () => {
     expect(by('NOT_OFFERED')[0]).toMatchObject({ class: 'INFORMATIONAL', capabilityId: 'CAP_HIVE_LEGAL_PERMITS', sourcingStatus: null });
     // Strategic Advisory REVIEW and confirmed ACTIVE never create signals
     expect(sig.some((s) => s.capabilityId?.startsWith('CAP_SA_'))).toBe(false);
-    expect(sig.some((s) => s.capabilityId === 'CAP_HIVE_FI_TAX')).toBe(false);
+    expect(sig.some((s) => s.destination === 'MX' && s.capabilityId === 'CAP_HIVE_FI_TAX')).toBe(false);      // confirmed ACTIVE in an active country: no signal
     // no duplicates
     expect(new Set(sig.map((s) => s.signalId)).size).toBe(sig.length);
   });
@@ -175,14 +176,28 @@ describe('PO-approved rules 1, 3, 5, 6, 7, 8, 9', () => {
     return t ? t.kind : 'none';
   };
 
-  it('Rule 1 — legal/tax: local hiring applies; an operating presence with an undefined model depends; own presence applies', () => {
+  it('Rule 1 — legal/tax APPLIES with local hiring or own presence; an open model never makes the whole topic DEPENDENT', () => {
     expect(front(mk({ activities: ['hire'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('applies');                      // Journey A
-    expect(front(mk({ activities: ['operate', 'hire'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('depends');           // B Texas
-    expect(front(mk({ activities: ['sell'], withWhat: ['goods'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('depends');
-    expect(front(mk({ activities: ['produce'], withWhat: ['goods'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('depends');
+    expect(front(mk({ activities: ['operate', 'hire'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('applies');           // B Texas: hires locally
+    expect(front(mk({ activities: ['operate'], presence: 'open' }), 'FR_LEGAL_TAX')).toBe('applies');
     expect(front(mk({ activities: ['operate', 'hire'], presence: 'own_onsite' }), 'FR_LEGAL_TAX')).toBe('applies');
     expect(front(mk({ activities: ['operate'], presence: 'own_physical' }), 'FR_LEGAL_TAX')).toBe('applies');
     expect(front(mk({ activities: ['hire'], presence: 'third_parties' }), 'FR_LEGAL_TAX')).toBe('applies');
+    for (const presence of ['open', 'own_onsite', 'own_physical', 'remote'] as const)
+      expect(front(mk({ activities: ['operate', 'hire'], presence }), 'FR_LEGAL_TAX')).not.toBe('depends');
+  });
+  it('Rule 1 — dependency lives at CAPABILITY level: company setup depends on the open entity decision, tax/payroll do not; the topic keeps its state', () => {
+    const caps = (a: Answers) => resolveAll(a, cat).destinations[0]!.needs.find((n) => n.front === 'FR_LEGAL_TAX')!;
+    const open = mk({ activities: ['hire'], presence: 'open' }); open.fronts['MX|FR_LEGAL_TAX'] = { status: 'pending', support: 'yes' };
+    const n = caps(open);
+    expect(Object.fromEntries(n.capabilities.map((c) => [c.capabilityId, c.state]))).toEqual({ CAP_HIVE_FI_COMPANY_SETUP: 'DEPENDENT', CAP_HIVE_FI_TAX: 'ACTIVE' });
+    expect(n.state).toBe('ACTIVE');                                                    // the dependent capability does not drag the front down
+    const own = mk({ activities: ['hire'], presence: 'own_physical' }); own.fronts['MX|FR_LEGAL_TAX'] = { status: 'pending', support: 'yes' };
+    expect(caps(own).capabilities.every((c) => c.state === 'ACTIVE')).toBe(true);
+    // the customer-facing model keeps the topic ACTIVE and shows company setup only as a conditional note
+    const y = buildYourExpansionView(open, cat);
+    const item = y.destinations[0]!.valueGroups.flatMap((g) => g.items).find((i) => i.front === 'FR_LEGAL_TAX')!;
+    expect(item.state).toBe('ACTIVE'); expect(item.conditionalNotes).toHaveLength(1);
   });
   it('Rule 2 — banking: applies with confirmed own physical presence; depends while the operating/structure model is open', () => {
     expect(front(mk({ activities: ['hire'], presence: 'own_physical' }), 'FR_BANKING')).toBe('applies');
@@ -190,13 +205,16 @@ describe('PO-approved rules 1, 3, 5, 6, 7, 8, 9', () => {
     expect(front(mk({ activities: ['operate'], presence: 'own_onsite' }), 'FR_BANKING')).toBe('depends');
     expect(front(mk({ activities: ['hire'], presence: 'remote' }), 'FR_BANKING')).toBe('none');
   });
-  it('Rule 3 — relation with the home company: never from operating or hiring alone; needs evidence of related entities', () => {
-    for (const c of [{ activities: ['hire'], presence: 'open' }, { activities: ['operate', 'hire', 'source'], presence: 'own_onsite' }, { activities: ['operate'], presence: 'third_parties' }] as const)
+  it('Rule 3 — a related-company relationship is NEVER inferred from presence, plant, office, premises or hiring; only declared evidence activates it', () => {
+    for (const c of [{ activities: ['hire'], presence: 'open' }, { activities: ['operate', 'hire', 'source'], presence: 'own_onsite' }, { activities: ['operate'], presence: 'third_parties' },
+      { activities: ['produce', 'hire'], withWhat: ['goods'], presence: 'own_physical' }, { activities: ['sell'], withWhat: ['goods'], presence: 'own_physical' }] as const)
       expect(front(mk(c as never), 'FR_PARENT_LINK')).toBe('none');
-    expect(front(journeyA(), 'FR_PARENT_LINK')).toBe('none');
-    expect(front(journeyC(), 'FR_PARENT_LINK')).toBe('none');
-    expect(resolveAll(journeyB(), cat).destinations[0]!.topics.some((t) => t.front === 'FR_PARENT_LINK')).toBe(true);     // own plant + local entity
-    expect(front(mk({ activities: ['sell'], presence: 'own_physical', withWhat: ['goods'] }), 'FR_PARENT_LINK')).toBe('applies');
+    for (const a of [journeyA(), journeyB(), journeyC()]) expect(resolveAll(a, cat).destinations.every((d) => d.topics.every((t) => t.front !== 'FR_PARENT_LINK'))).toBe(true);
+    // declared in the user's own words (I-19) -> the topic exists, flagged as declared, never as derived
+    const a = journeyB('es', 'unknown'); a.addedNeeds = [{ id: 'n1', text: 'precios de transferencia entre la matriz y la filial', destination: 'MX' }];
+    const need = resolveAll(a, cat).destinations[0]!.needs.find((n) => n.front === 'FR_PARENT_LINK')!;
+    expect(need).toMatchObject({ origin: 'declared', because: ['declared'] });
+    expect(need.declaredTexts).toEqual(['precios de transferencia entre la matriz y la filial']);
   });
   it('Rule 4 — own_onsite is a first-class presence value', () => {
     expect(journeyC().components[0]!.presence).toBe('own_onsite');

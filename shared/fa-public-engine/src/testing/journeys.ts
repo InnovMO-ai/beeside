@@ -47,7 +47,7 @@ export function journeyB(locale: 'es' | 'en' = 'es', cargoRoute?: 'within' | 'in
   a.externalDate = { has: true, date: '2028-Q1', what: 'Programa de nuestro cliente' };
   a.scale = { mx: { proxy: 'investment', text: '35–50 M€', declined: false }, us: { proxy: 'investment', text: '', declined: false } };
   a.regulated = 'no';
-  const mx = ['FR_SITE', 'FR_LEGAL_TAX', 'FR_PERMITS', 'FR_RECRUITMENT', 'FR_EMPLOYMENT', 'FR_TRADE', 'FR_LOGISTICS', 'FR_SUPPLIERS', 'FR_BANKING', 'FR_INSURANCE', 'FR_PARENT_LINK'];
+  const mx = ['FR_SITE', 'FR_LEGAL_TAX', 'FR_PERMITS', 'FR_RECRUITMENT', 'FR_EMPLOYMENT', 'FR_TRADE', 'FR_LOGISTICS', 'FR_SUPPLIERS', 'FR_BANKING', 'FR_INSURANCE'];
   for (const f of mx) a.fronts[`MX|${f}`] = { support: 'yes' };
   Object.assign(a.fronts['MX|FR_SITE']!, { status: 'in_progress' });
   Object.assign(a.fronts['MX|FR_SUPPLIERS']!, { status: 'in_progress' });

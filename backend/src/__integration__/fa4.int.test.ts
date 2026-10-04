@@ -163,7 +163,7 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
       const b = await start(journeyB("es", "unknown"));
       const rb = await api().post("/api/fa4/session/result").set(auth(b));
       const mx = rb.body.model.destinations.find((d: { destination: string }) => d.destination === "MX");
-      expect(mx.glance).toEqual([{ key: "ACTIVE", count: 7 }, { key: "SOURCEABLE", count: 1 }, { key: "REVIEW", count: 2 }, { key: "TO_REVIEW_WITH_SHERPA", count: 1 }]);
+      expect(mx.glance).toEqual([{ key: "ACTIVE", count: 6 }, { key: "SOURCEABLE", count: 1 }, { key: "REVIEW", count: 2 }, { key: "TO_REVIEW_WITH_SHERPA", count: 1 }]);
       const us = rb.body.model.destinations.find((d: { destination: string }) => d.destination === "US");
       expect(us.countryMessage).toBe("NO_ACTIVE_COVERAGE"); expect(us.valueGroups).toEqual([]);
 

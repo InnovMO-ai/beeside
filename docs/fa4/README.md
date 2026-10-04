@@ -2,7 +2,7 @@
 
 Public, free, **deterministic** First Assessment: `user input → deterministic rules → conditional data → applicable topics (fronts) → capability routing → coverage logic → Your Expansion View`. No runtime AI; every customer-facing conclusion traces to *declared data → rule → result* (each resolved need carries a `trace`). It is **isolated from the legacy First Assessment** (no Snapshot, radar, scoring, Level 2, question bank or rules engine are reused).
 
-Source of truth: the canonical beeside_FA4 documentation (`00_CONTROL`, `01_PRODUCT`, `02_PROVE/PROVE-04`, `03_DESIGN`) and the frozen Journeys A / B / C. Product decisions made while building are in `DECISION_LOG` D-122 … D-133.
+Source of truth: the canonical beeside_FA4 documentation (`00_CONTROL`, `01_PRODUCT`, `02_PROVE/PROVE-04`, `03_DESIGN`) and the frozen Journeys A / B / C. Product decisions made while building are in `DECISION_LOG` D-122 … D-134.
 
 ## Where things live
 | Layer | Path | Notes |

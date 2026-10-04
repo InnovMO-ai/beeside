@@ -101,7 +101,7 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   expect(order[0]!).toBeLessThan(order[1]!); expect(order[1]!).toBeLessThan(order[2]!);
   await expect(page.getByText('Expande tu negocio.')).toBeVisible();                           // institutional block is in Journey A too
   await expect(page.getByTestId('beeside-value-section').locator('[data-component]')).toHaveCount(4);
-  for (const t of ['Un Sherpa a tu lado', 'Especialistas seleccionados', 'Todo en un solo lugar', 'Strategic Advisory']) await expect(page.getByTestId('beeside-value-section').getByText(t, { exact: true })).toBeVisible();
+  for (const t of ['Tu Sherpa', 'The Hive', 'Operation Hub', 'Strategic Advisory']) await expect(page.getByTestId('beeside-value-section').getByText(t, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar con beeside' })).toBeVisible();
   await expect(page.getByText('Antes de Premium, no compartimos tu proyecto con proveedores.')).toBeVisible();
   for (const bad of ['Por confirmar', 'Sin servicio', 'Snapshot', 'SOURCEABLE', 'NOT_OFFERED']) await expect(page.locator('body')).not.toContainText(bad);

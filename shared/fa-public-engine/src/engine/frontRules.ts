@@ -19,7 +19,6 @@ export type FrontVerdict =
   | { kind: 'none' };
 export type DependsCause = 'presence' | 'hire' | 'legal_operation';
 
-const operatesInDestination = (c: ProjectComponent) => c.activities.includes('operate') || c.activities.includes('sell') || c.activities.includes('produce');
 const has = (c: ProjectComponent, a: ProjectComponent['activities'][number]) => c.activities.includes(a);
 const ownPhysical = (c: ProjectComponent) => c.presence === 'own_physical';
 const ownOnsite = (c: ProjectComponent) => c.presence === 'own_onsite';
@@ -43,14 +42,11 @@ export function evaluateFront(front: FrontKey, c: ProjectComponent, a: Answers):
     case 'FR_SITE':
       return ownPhysical(c) ? A([has(c, 'produce') ? 'own_plant' : 'own_premises']) : { kind: 'none' };
     case 'FR_LEGAL_TAX': {
-      // RULE 1 (PO-approved, see FA_INFORMATION_MODEL §3):
-      //  1. own presence in destination (physical or on-site) -> APPLIES;
-      //  2. an operating presence (operate / sell / produce) whose model or structure is still undefined, with no own-presence
-      //     activator -> DEPENDENT on that decision. This precedes local hiring when both occur in the same component;
-      //  3. local hiring (and no undefined operating presence, e.g. a talent-only project) -> APPLIES.
+      // RULE 1 (D-122): FRONT applicability and CAPABILITY dependency stay separate. The topic APPLIES with own presence in the
+      // destination or local hiring/operation. An undefined operating/corporate model never turns the whole topic into DEPENDENT: it only
+      // makes specific capabilities depend on that decision (e.g. company setup — see resolve.ts), never the front itself.
       if (!activeProject) return { kind: 'none' };
       if (ownAny(c)) return A(['own_presence', ...(has(c, 'hire') ? (['hire'] as Because[]) : []), ...(has(c, 'operate') ? (['operate'] as Because[]) : [])]);
-      if (c.presence === 'open' && operatesInDestination(c)) return D(['operate']);
       if (has(c, 'hire') || has(c, 'operate')) return A([has(c, 'hire') ? 'hire' : 'operate']);
       return { kind: 'none' };
     }
@@ -85,10 +81,11 @@ export function evaluateFront(front: FrontKey, c: ProjectComponent, a: Answers):
     case 'FR_EXIT':
       return c.permanence === 'temporary' && activeProject ? A(['temporary']) : { kind: 'none' };
     case 'FR_PARENT_LINK':
-      // RULE 3 (PO-approved): never from the mere fact of operating or hiring abroad. Requires evidence of a real relationship
-      // between related entities. The deterministic evidence available in Public v1.0 is an OWN physical presence (plant, office or
-      // premises) -> a local entity/branch of the home company; another declared datum may be added later without changing this rule.
-      return activeProject && ownPhysical(c) ? A(['group_operation']) : { kind: 'none' };
+      // RULE 3 (D-124): a related-entity / intercompany relationship is NEVER inferred from a plant, office, premises, hiring or any physical
+      // presence. It needs a declared evidence of a real relationship between related entities. FA Public v1.0 does not capture that datum
+      // (no new question; depth belongs to Precision), so the only way this topic appears is when the user declares it in their own words (I-19,
+      // e.g. "precios de transferencia", "facturación intercompañía"), which the resolver maps deterministically — see resolve.ts.
+      return { kind: 'none' };
     case 'FR_GTM':
       return has(c, 'sell') ? A(['sell']) : { kind: 'none' };
     case 'FR_PUBLIC_PROCUREMENT':

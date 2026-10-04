@@ -135,10 +135,11 @@ export const UI = {
   footerCopy: L('© 2026 beeside', '© 2026 beeside'), termsLink: L('Términos y Condiciones', 'Terms and Conditions'), privacyLink: L('Política de Privacidad', 'Privacy Policy'),
   aboutBeeside: L('Sobre beeside', 'About beeside'),
   vsHeadline: L('Expande tu negocio.\nNo tu carga de trabajo.', 'Expand your business.\nNot your workload.'),
-  vsSherpa: L('Un Sherpa a tu lado', 'A Sherpa by your side'), vsSherpaD: L('Con Premium, una persona de beeside acompaña tu proyecto de principio a fin.', 'With Premium, one person from beeside stays with your project from start to finish.'),
-  vsHive: L('Especialistas seleccionados', 'Selected specialists'), vsHiveD: L('The Hive reúne a los especialistas con los que trabaja beeside.', 'The Hive brings together the specialists beeside works with.'),
-  vsHub: L('Todo en un solo lugar', 'Everything in one place'), vsHubD: L('Operation Hub te muestra cada tema y cada propuesta en una sola vista.', 'Operation Hub shows every topic and every proposal in a single view.'),
-  vsAdvisory: NC('vsAdvisory', 'Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: NC('vsAdvisoryD', 'Criterio experto y lectura estratégica cuando tu proyecto lo requiere.', 'Expert judgement and strategic reading when your project calls for it.'),
+  // BeesideValueSection (PO-approved copy, D-134). Headline stays "Expande tu negocio. No tu carga de trabajo." (D-120).
+  vsSherpa: L('Tu Sherpa', 'Your Sherpa'), vsSherpaD: L('Una persona que coordina tu expansión y mantiene continuidad de principio a fin.', 'One person coordinating your expansion and keeping continuity from start to finish.'),
+  vsHive: L('The Hive', 'The Hive'), vsHiveD: L('Especialistas y proveedores seleccionados para las necesidades de tu proyecto.', 'Curated specialists and providers for the needs of your project.'),
+  vsHub: L('Operation Hub', 'Operation Hub'), vsHubD: L('Un solo lugar para seguir avances, tareas, documentos y próximos pasos.', 'One place to follow progress, tasks, documents and next steps.'),
+  vsAdvisory: L('Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: L('Experiencia especializada para ayudarte a resolver decisiones complejas de expansión.', 'Specialized expertise to help you navigate complex expansion decisions.'),
   privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
 } as const;
 

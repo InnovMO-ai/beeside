@@ -31,12 +31,12 @@ test('Result B — multi-destination grouping and country message instead of per
   await open(page, token);
   await page.getByRole('button', { name: 'Ver mi resultado' }).click();
   const r = page.getByTestId('result-screen');
-  await expect(r.getByText('Trece temas aplican en dos países. Dos más dependen de una decisión.')).toBeVisible();
+  await expect(r.getByText('Trece temas aplican en dos países. Uno más depende de una decisión.')).toBeVisible();
   await expect(r.getByText('beeside aún no cuenta con cobertura activa en este país.').first()).toBeVisible();
   await expect(r.getByText('Lo revisaremos con tu Sherpa').first()).toBeVisible();      // permits NOT_OFFERED with Premium continuation
   const us = r.locator('.dest-head', { hasText: 'Estados Unidos' }).last().locator('..');
   await expect(us.locator('.vgroup')).toHaveCount(0);
-  await expect(r.locator('.vgroup').filter({ hasText: 'beeside puede ayudarte' })).toContainText('7');
+  await expect(r.locator('.vgroup').filter({ hasText: 'beeside puede ayudarte' })).toContainText('6');
 });
 
 test('Result B in English — visible states and country messages are the canonical EN strings', async ({ page, request }) => {
@@ -51,6 +51,7 @@ test('Result B in English — visible states and country messages are the canoni
   await expect(r.getByText("We'll review it with your Sherpa").first()).toBeVisible();
   await expect(r.getByText('beeside does not yet have active coverage in this country.').first()).toBeVisible();
   await expect(r.getByText('Expand your business.')).toBeVisible();
+  for (const t of ['Your Sherpa', 'The Hive', 'Operation Hub', 'Strategic Advisory']) await expect(r.getByTestId('beeside-value-section').getByText(t, { exact: true })).toBeVisible();
   await expect(r.getByText('beeside puede ayudarte')).toHaveCount(0);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });

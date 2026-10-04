@@ -20,7 +20,8 @@ export interface TraceStep { rule: string; detail: string }
 
 export interface ResolvedCapability {
   capabilityId: string; nameEs: string; nameEn: string; limitEs?: string; limitEn?: string;
-  state: CapabilityStatus;
+  /** DEPENDENT = this capability only makes sense once an open decision (e.g. own entity) is taken; the topic itself still applies. */
+  state: CapabilityStatus | 'DEPENDENT';
   coverageBasis: Capability['coverageBasis'];
   basisValue: string | null;
   coverage: CoverageState | 'UNAVAILABLE';
@@ -151,7 +152,8 @@ export function resolveFront(
   const resolved = chosen.map((c) => {
     const r = evaluateCapability(c, dest, a);
     trace.push({ rule: 'D-111', detail: `${c.capabilityId}: basis ${c.coverageBasis}=${r.basisValue ?? 'n/a'} coverage ${r.coverage} → ${r.state}` });
-    if (c.capabilityId === 'CAP_HIVE_FI_COMPANY_SETUP' && comp.presence !== 'own_physical' && comp.presence !== 'own_onsite') r.conditionalOn = 'own_entity';
+    // RULE 1: capability dependency (not front dependency). Company setup depends on the open decision of having an own entity.
+    if (c.capabilityId === 'CAP_HIVE_FI_COMPANY_SETUP' && comp.presence !== 'own_physical' && comp.presence !== 'own_onsite') { r.conditionalOn = 'own_entity'; r.state = 'DEPENDENT'; }
     return r;
   });
   const state = mostConservative(resolved.filter((r) => !r.conditionalOn || resolved.every((x) => x.conditionalOn)).map((r) => r.state));

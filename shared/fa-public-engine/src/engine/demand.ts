@@ -51,7 +51,7 @@ export function deriveDemandSignals(projectId: string, a: Answers, res: Resoluti
       destination: dest, basisValue: c?.basisValue ?? null, front,
       categoryId: svc?.categoryId ?? null, serviceId: svc?.serviceId ?? null, capabilityId: c?.capabilityId ?? null,
       originalText: text, normalizedNeed: c?.capabilityId ?? front ?? 'UNMAPPED',
-      reason, class: cls, capabilityStatus: c?.state ?? null, coverageState: c?.coverage ?? null,
+      reason, class: cls, capabilityStatus: c && c.state !== 'DEPENDENT' ? c.state : null, coverageState: c?.coverage ?? null,
       sourcingStatus: cls === 'ACTIONABLE' ? 'OPEN' : null, triageStatus: reason === 'UNMAPPED_NEED' ? 'PENDING' : null,
     });
   };
@@ -62,7 +62,7 @@ export function deriveDemandSignals(projectId: string, a: Answers, res: Resoluti
       if (n.state === 'DEPENDENT') continue;             // unresolved decision: nothing to source yet
       const text = n.declaredTexts.join(' / ') || null;
       if (d.countryMessage === 'DEVELOPING' || d.countryMessage === 'NO_ACTIVE_COVERAGE') {
-        const first = n.capabilities[0] ?? null;
+        const first = n.capabilities.find((c) => !c.conditionalOn) ?? null;   // a capability that only depends on an open decision is not a demand
         mk(d.destination, n.front, first, d.countryMessage, 'ACTIONABLE', text);
         continue;
       }

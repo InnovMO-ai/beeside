@@ -24,9 +24,10 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     expect(order[1]!.compareDocumentPosition(order[2]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const value = screen.getByTestId("beeside-value-section");
     expect(within(value).getByText("Expande tu negocio.", { exact: false })).toBeInTheDocument();
-    // the four fixed components (Option A, frozen copy for three; Strategic Advisory line is NEEDS_CANONICAL_COPY)
+    // the four fixed components as visible titles (PO-approved copy, D-134)
     expect(Array.from(value.querySelectorAll("[data-component]")).map((e) => e.getAttribute("data-component"))).toEqual(["sherpa", "hive", "operation-hub", "strategic-advisory"]);
-    for (const t of ["Un Sherpa a tu lado", "Especialistas seleccionados", "Todo en un solo lugar", "Strategic Advisory"]) expect(within(value).getByText(t, { exact: true })).toBeInTheDocument();
+    for (const t of ["Tu Sherpa", "The Hive", "Operation Hub", "Strategic Advisory"]) expect(within(value).getByText(t, { exact: true })).toBeInTheDocument();
+    expect(within(value).getByText("Una persona que coordina tu expansión y mantiene continuidad de principio a fin.")).toBeInTheDocument();
     for (const bad of FORBIDDEN) expect(container.textContent ?? "", bad).not.toContain(bad);
     expect(container.textContent ?? "").not.toMatch(/\d\s?%/);
   });
@@ -47,7 +48,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
 
   it("Journey B: multi-destination grouping, country message instead of per-service states (ES)", () => {
     const { container } = render(<ResultScreen model={modelFor(journeyB("es", "unknown"))} locale="es" />);
-    expect(screen.getByText("Trece temas aplican en dos países. Dos más dependen de una decisión.")).toBeInTheDocument();
+    expect(screen.getByText("Trece temas aplican en dos países. Uno más depende de una decisión.")).toBeInTheDocument();
     expect(screen.getAllByText("beeside aún no cuenta con cobertura activa en este país.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Lo revisaremos con tu Sherpa").length).toBeGreaterThan(0);
     const names = Array.from(container.querySelectorAll(".dest-head h2")).map((h) => h.textContent);
@@ -60,6 +61,13 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     expect(screen.getByText("Doce temas aplican. Marcaste ocho.")).toBeInTheDocument();
     expect(screen.getByText(/«No indicado» no significa resuelto/)).toBeInTheDocument();
     expect(screen.getByText("«grúas de gran capacidad»")).toBeInTheDocument();
+  });
+
+  it("English: the four components are titled Your Sherpa / The Hive / Operation Hub / Strategic Advisory", () => {
+    render(<ResultScreen model={modelFor(journeyA("en"))} locale="en" />);
+    const value = screen.getByTestId("beeside-value-section");
+    for (const t of ["Your Sherpa", "The Hive", "Operation Hub", "Strategic Advisory"]) expect(within(value).getByText(t, { exact: true })).toBeInTheDocument();
+    expect(within(value).getByText("One place to follow progress, tasks, documents and next steps.")).toBeInTheDocument();
   });
 
   it("English: canonical EN state and country messages, no Spanish leakage in the fixed labels", () => {
