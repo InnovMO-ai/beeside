@@ -126,6 +126,7 @@ describe("publishDevConfiguration default — new-assessment safety (Decision B)
     // calling the function itself, which requires a live Postgres connection this suite doesn't have.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const fs = require("fs") as typeof import("fs");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const path = require("path") as typeof import("path");
     const src = fs.readFileSync(path.resolve(__dirname, "../fa/admin/publish-config.ts"), "utf8");
     expect(src).toMatch(/questionBank:\s*"v1"\s*\|\s*"v2"\s*\|\s*"v2\.1"\s*=\s*"v1"/);

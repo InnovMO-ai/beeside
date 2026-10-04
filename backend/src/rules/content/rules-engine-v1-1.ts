@@ -1,12 +1,12 @@
 import type { RulesEngineBundle } from "../types";
-import { buildRulesEngineBundle, FA_RULES_ENGINE_VERSION } from "./rules-engine-v1";
+import { buildRulesEngineBundle } from "./rules-engine-v1";
 import { FA_QUESTION_BANK_VERSION_V2 } from "../../fa/content/question-bank-v2";
 import { FA_QUESTION_BANK_VERSION_V21 } from "../../fa/content/question-bank-v2-1";
 
 export const FA_RULES_ENGINE_VERSION_V1_1 = "re-1.1.0";
 
 /**
- * Rules Engine re-1.1.0 — pure version/compatibility extension of re-1.0.0 ({@link FA_RULES_ENGINE_VERSION}),
+ * Rules Engine re-1.1.0 — pure version/compatibility extension of re-1.0.0 ((FA_RULES_ENGINE_VERSION)),
  * per Product Owner authorization (2026-09-30, "RULES ENGINE COMPATIBILITY", item 2): "You may...
  * create a new compatible Rules Engine version; extend schema/version compatibility; add/update
  * fingerprints or version allowlists... You may NOT silently change: scoring methodology;
