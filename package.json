@@ -14,7 +14,8 @@
     "test": "npm run test --workspace=shared/canonical-fields && npm run test --workspace=shared/fa-public-engine && npm run test --workspace=backend && npm run test --workspace=frontend",
     "typecheck": "npm run typecheck --workspace=shared/canonical-fields && npm run typecheck --workspace=shared/fa-public-engine && npm run typecheck --workspace=backend && npm run typecheck --workspace=frontend",
     "fa4:copy-inventory": "node scripts/fa4-copy-inventory.js",
-    "fa4:copy-inventory:check": "node scripts/fa4-copy-inventory.js --check"
+    "fa4:copy-inventory:check": "node scripts/fa4-copy-inventory.js --check",
+    "fa4:launch-check": "node scripts/fa4-launch-check.js"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"
