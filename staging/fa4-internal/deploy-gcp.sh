@@ -59,6 +59,9 @@ g run deploy fa4-staging-backend "${COMMON[@]}" --image "${REPO}/fa4-staging-bac
 echo "== web (frontend; IAP in front)"
 g run deploy fa4-staging-web "${COMMON[@]}" --image "${REPO}/fa4-staging-web:${TAG}" --no-allow-unauthenticated \
   --set-env-vars "API_UPSTREAM_URL=${BACKEND_URL},UPSTREAM_AUTH_AUDIENCE=${BACKEND_URL},ROBOTS_NOINDEX=true,STAGING_TEST_LEGAL=true,ROOT_REDIRECT=/fa4"
+# the same web service is also reachable at its legacy-format hostname: allow that origin too (browser Origin must match the API's allow-list)
+ALT_WEB_URL=$(g run services describe fa4-staging-web --region "$REGION" --format 'value(status.url)')
+g run services update fa4-staging-backend --region "$REGION" --update-env-vars "ALLOWED_ORIGINS=${ALT_WEB_URL}" >/dev/null
 # the web service may call the private backend
 g run services add-iam-policy-binding fa4-staging-backend --region "$REGION" --member "serviceAccount:${RUN_SA}" --role roles/run.invoker >/dev/null
 
