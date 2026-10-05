@@ -137,13 +137,17 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
  * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
  * is recorded so no environment silently stores a plausible-looking version.
  */
+const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://www.beeside.you/termsandconditions" } as const;
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
-  const names = ["FA4_TERMS_VERSION", "FA4_TERMS_URL_ES", "FA4_TERMS_URL_EN", "FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
+  // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
+  // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
+  const names = ["FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
   const missing = names.filter((n) => !env[n]);
   if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
   const ph = "UNSET-LEGAL-1";
   return {
-    termsVersion: env.FA4_TERMS_VERSION ?? ph, termsUrl: { es: env.FA4_TERMS_URL_ES ?? ph, en: env.FA4_TERMS_URL_EN ?? ph },
+    termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+    termsUrl: { es: env.FA4_TERMS_URL_ES ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? OFFICIAL_TERMS.url },
     privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: env.FA4_PRIVACY_URL_ES ?? ph, en: env.FA4_PRIVACY_URL_EN ?? ph },
   };
 }

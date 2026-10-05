@@ -15,7 +15,8 @@ export const BRAND = {
   lifestyleImage: { src: null as string | null, label: { es: 'Imagen lifestyle · persona relajada · asset pendiente', en: 'Lifestyle image · relaxed person · asset pending' } },
   legal: {
     // CHK-1 — pages already published on the beeside website; FA links to them and never duplicates them.
-    termsUrl: { es: env('VITE_FA4_TERMS_URL_ES', 'https://beeside.example/legal/terminos'), en: env('VITE_FA4_TERMS_URL_EN', 'https://beeside.example/legal/terms') },
+    // Terms: official page (same document for ES and EN in version 1.0, 2026-08-27). Privacy: PENDING (placeholder until its URL is provided).
+    termsUrl: { es: env('VITE_FA4_TERMS_URL_ES', 'https://www.beeside.you/termsandconditions'), en: env('VITE_FA4_TERMS_URL_EN', 'https://www.beeside.you/termsandconditions') },
     privacyUrl: { es: env('VITE_FA4_PRIVACY_URL_ES', 'https://beeside.example/legal/privacidad'), en: env('VITE_FA4_PRIVACY_URL_EN', 'https://beeside.example/legal/privacy') },
     /** LEGAL-1 pending: no commercial-contact consent control is rendered until legal defines the basis. */
     commercialContactConsent: null as null | { optional: true },
