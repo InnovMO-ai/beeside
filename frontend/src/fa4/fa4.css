@@ -208,6 +208,7 @@ textarea.field { min-height: 96px; resize: vertical; }
 .cv-lang { position: relative; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; font-size: 12.5px; font-weight: 500; cursor: pointer; flex: none; }
 .cv-lang::after { content: ''; position: absolute; inset: -6px; }   /* keeps a 46 px touch target around the smaller pill */
 .cv-lang:focus-visible, .cv-cta:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.cv-stage { flex: 1; display: flex; flex-direction: column; }
 .cv-side { display: none; }
 .cv-main { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: 28px var(--gutter) 0; }
 .cv-copy { max-width: 560px; }
@@ -227,7 +228,7 @@ textarea.field { min-height: 96px; resize: vertical; }
 @media (min-width: 1024px) {
   /* proportions of the 2000 px reference: unit u = 1vw/20 */
   .cv { --u: clamp(0.5px, 0.05vw, 0.9px); min-height: 100vh; }
-  .cv-top { padding: calc(54 * var(--u)) calc(92 * var(--u)) 0; }
+  .cv-top { padding: clamp(28px, 2.7vw, 54px) calc(92 * var(--u)) 0; }
   .cv-logo { height: calc(48 * var(--u) * 1); height: clamp(40px, 3.3vw, 64px); }
   .cv-sep { height: clamp(24px, 1.9vw, 36px); margin: 0 clamp(8px, .8vw, 16px); }
   .cv-product { font-size: clamp(14px, 1.05vw, 20px); font-weight: 600; }
@@ -239,9 +240,12 @@ textarea.field { min-height: 96px; resize: vertical; }
   .cv-lead { font-size: clamp(16px, 1.2vw, 23px); margin-bottom: clamp(26px, 2.5vw, 48px); max-width: 30em; }
   .cv-cta { min-height: clamp(54px, 4vw, 80px); min-width: clamp(280px, 21vw, 420px); font-size: clamp(17px, 1.25vw, 24px); padding: 0 clamp(26px, 2.5vw, 50px); }
   .cv-note { font-size: clamp(13px, .95vw, 18px); margin-top: clamp(26px, 2.2vw, 44px); max-width: 36em; }
-  .cv-globe { position: absolute; z-index: 1; right: 5.5%; top: clamp(56px, 5.2vw, 110px); width: 52%; max-width: none; margin: 0; }
-  .cv-side { display: grid; position: absolute; z-index: 3; right: calc(140 * var(--u)); top: clamp(150px, 15vw, 290px); gap: clamp(5px, .5vw, 10px); font-weight: 700; letter-spacing: .26em; font-size: clamp(10px, .8vw, 16px); color: var(--ink); }
-  .cv-foot { padding: 0 calc(92 * var(--u)) clamp(20px, 2.4vw, 44px); display: flex; align-items: flex-end; justify-content: space-between; }
+  /* the hero + benefit strip form ONE composition of fixed proportions (reference 2000 x 1125); on windows taller than it, it is centered vertically */
+  .cv-stage { justify-content: center; }
+  .cv-main { flex: none; min-height: min(44.5vw, calc(100vh - 270px)); }
+  .cv-globe { position: absolute; z-index: 1; right: 5.5%; top: .5vw; width: min(52%, calc((100vh - 280px) * 1.18)); max-width: none; margin: 0; }
+  .cv-side { display: grid; position: absolute; z-index: 3; right: calc(48 * var(--u)); top: 3.2vw; gap: clamp(5px, .5vw, 10px); font-weight: 700; letter-spacing: .26em; font-size: clamp(10px, .8vw, 16px); color: var(--ink); }
+  .cv-foot { padding: clamp(8px, 1vw, 20px) calc(92 * var(--u)) clamp(14px, 1.5vw, 30px); display: flex; align-items: flex-end; justify-content: space-between; }
   .cv-benefits { display: flex; align-items: center; gap: 0; }
   .cv-benefits li { padding: 0 clamp(16px, 1.6vw, 32px); }
   .cv-benefits li:first-child { padding-left: 0; }
