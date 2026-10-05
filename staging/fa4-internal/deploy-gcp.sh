@@ -26,14 +26,24 @@ for s in fa4-staging-db-runtime-password fa4-staging-hash-secret fa4-staging-dat
   g secrets add-iam-policy-binding "$s" --member "serviceAccount:${RUN_SA}" --role roles/secretmanager.secretAccessor >/dev/null
 done
 
-echo "== build images ($TAG)"
-g builds submit --config staging/fa4-internal/cloudbuild.yaml --substitutions "_REPO=${REPO},_TAG=${TAG},_ENV_LABEL=${LABEL}" .
+if [ "${SKIP_BUILD:-0}" != "1" ]; then
+  echo "== build images ($TAG) with a dedicated build service account (the default compute SA is shared with the legacy services and is left untouched)"
+  BUILD_SA=fa4-staging-build@${PROJECT}.iam.gserviceaccount.com
+  g iam service-accounts describe "$BUILD_SA" >/dev/null 2>&1 || { g iam service-accounts create fa4-staging-build --display-name="FA4 staging builds (Cloud Build)"; sleep 8; }
+  g storage buckets add-iam-policy-binding "gs://${PROJECT}_cloudbuild" --member "serviceAccount:${BUILD_SA}" --role roles/storage.objectViewer >/dev/null
+  g projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:${BUILD_SA}" --role roles/logging.logWriter --condition=None >/dev/null
+  g artifacts repositories add-iam-policy-binding beeside-dev --location "$REGION" --member "serviceAccount:${BUILD_SA}" --role roles/artifactregistry.writer >/dev/null
+  g builds submit --config staging/fa4-internal/cloudbuild.yaml --service-account "projects/${PROJECT}/serviceAccounts/${BUILD_SA}" --substitutions "_REPO=${REPO},_TAG=${TAG},_ENV_LABEL=${LABEL}" .
+fi
 
+# The prepare job needs the shared instance's migration credentials: it runs as the existing migration runner (no change to that secret's IAM).
+PREP_SA=beeside-dev-migration-runner@${PROJECT}.iam.gserviceaccount.com
+g secrets add-iam-policy-binding fa4-staging-db-runtime-password --member "serviceAccount:${PREP_SA}" --role roles/secretmanager.secretAccessor >/dev/null
 echo "== prepare job (separate database fa4_staging, migrations, catalog, runtime role)"
 g run jobs deploy fa4-staging-prepare --region "$REGION" --image "${REPO}/fa4-staging-backend:${TAG}" \
   --command node --args dist/scripts/fa4-staging-prepare.js \
   --set-secrets "MIGRATION_DATABASE_URL=beeside-dev-migration-database-url:latest,FA4_STAGING_RUNTIME_PASSWORD=fa4-staging-db-runtime-password:latest" \
-  --set-cloudsql-instances "$SQL_CONN" --service-account "$RUN_SA" --max-retries 0 --task-timeout 300
+  --set-cloudsql-instances "$SQL_CONN" --service-account "$PREP_SA" --max-retries 0 --task-timeout 300
 g run jobs execute fa4-staging-prepare --region "$REGION" --wait
 
 echo "== backend (private, min 0 / max 1)"

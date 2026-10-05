@@ -37,3 +37,10 @@ cd frontend && API_UPSTREAM_URL=http://localhost:8081 ROBOTS_NOINDEX=true STAGIN
 
 ## What to try
 Journeys A (simple), B (multi-country, cargo route) and C (shortcut "mark what you need"), in ES and EN, at phone and desktop widths; save-for-later and resume link (single-use); Your Expansion View → BeesideValueSection → Premium continuation / email-the-result; the early exit for "no existing business".
+
+## Deployed instance (GCP, project `beeside-dev-508220`, region `northamerica-south1`)
+`deploy-gcp.sh` (idempotent) builds with Cloud Build and deploys, **without touching the `beeside` database, the legacy Cloud Run services or `main`**:
+- database `fa4_staging` on the existing Cloud SQL instance + a dedicated login `fa4_staging_runtime` whose table privileges are mirrored from `beeside_runtime_role` (no DELETE, no UPDATE on append-only tables, no membership → no path to the legacy database);
+- Cloud Run `fa4-staging-backend` (private, IAM-only, min 0 / max 1) and `fa4-staging-web` (min 0 / max 1) behind **Google IAP** (access: `domain:beeside.you`); the web service calls the backend with a Google ID token;
+- secrets in Secret Manager (`fa4-staging-*`); email is log-only (Cloud Logging, `email:log`); Privacy = TEST placeholder.
+Teardown: see the end of the script.
