@@ -19,7 +19,9 @@ const PRODUCTION = process.env.NODE_ENV === "production";
 // INTERNAL STAGING switches (all off by default; public production sets none of them).
 const NOINDEX = process.env.ROBOTS_NOINDEX === "true";                       // never indexed by search engines
 const BASIC_AUTH = process.env.STAGING_BASIC_AUTH ?? "";                      // "user:password" gate in front of everything except /health
-const TEST_LEGAL = process.env.STAGING_TEST_LEGAL === "true";                 // serves the non-legal TEST Privacy placeholder page
+const TEST_LEGAL = process.env.STAGING_TEST_LEGAL === "true";
+// An FA4-only environment sends the bare root to the FA4 entry instead of the legacy First Assessment shell (which needs the legacy API and would show a misleading error).
+const ROOT_REDIRECT = /^\/[A-Za-z0-9/_-]*$/.test(process.env.ROOT_REDIRECT ?? "") ? process.env.ROOT_REDIRECT : "";                 // serves the non-legal TEST Privacy placeholder page
 const digest = (v) => createHash("sha256").update(v).digest();
 // The FA4 API itself uses "Authorization: Bearer" for the working session, so the browser cannot also send Basic credentials on /api calls:
 // after a successful Basic login a same-origin HttpOnly cookie (derived from the secret) authorizes the page's own API calls.
@@ -137,6 +139,11 @@ export const server = http.createServer((request, response) => {
     if (!auth.ok) {
       response.writeHead(401, { "WWW-Authenticate": 'Basic realm="beeside internal staging", charset="UTF-8"', "Content-Type": "text/plain; charset=utf-8" });
       response.end("Authentication required");
+      return;
+    }
+    if (ROOT_REDIRECT && (request.url === "/" || request.url.startsWith("/?"))) {
+      response.writeHead(302, { Location: ROOT_REDIRECT, "Cache-Control": "no-store" });
+      response.end();
       return;
     }
     if (NOINDEX && request.url === "/robots.txt") {

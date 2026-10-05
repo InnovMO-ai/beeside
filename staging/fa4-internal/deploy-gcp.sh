@@ -46,19 +46,19 @@ g run jobs deploy fa4-staging-prepare --region "$REGION" --image "${REPO}/fa4-st
   --set-cloudsql-instances "$SQL_CONN" --service-account "$PREP_SA" --max-retries 0 --task-timeout 300
 g run jobs execute fa4-staging-prepare --region "$REGION" --wait
 
+# Deterministic service URLs (the same hostnames the browser and IAP use)
+WEB_URL=https://fa4-staging-web-${PNUM}.${REGION}.run.app
+BACKEND_URL=https://fa4-staging-backend-${PNUM}.${REGION}.run.app
 echo "== backend (private, min 0 / max 1)"
 COMMON=(--region "$REGION" --service-account "$RUN_SA" --min-instances 0 --max-instances 1 --memory 512Mi --cpu 1)
 g run deploy fa4-staging-backend "${COMMON[@]}" --image "${REPO}/fa4-staging-backend:${TAG}" --no-allow-unauthenticated \
   --add-cloudsql-instances "$SQL_CONN" \
-  --set-env-vars "NODE_ENV=staging,FA4_ENV=staging,FA4_API_ENABLED=true,APP_BASE_URL=https://placeholder.invalid" \
+  --set-env-vars "NODE_ENV=staging,FA4_ENV=staging,FA4_API_ENABLED=true,APP_BASE_URL=${WEB_URL}" \
   --set-secrets "DATABASE_URL=fa4-staging-database-url:latest,SECURITY_HASH_SECRET=fa4-staging-hash-secret:latest"
-BACKEND_URL=$(g run services describe fa4-staging-backend --region "$REGION" --format 'value(status.url)')
 
 echo "== web (frontend; IAP in front)"
 g run deploy fa4-staging-web "${COMMON[@]}" --image "${REPO}/fa4-staging-web:${TAG}" --no-allow-unauthenticated \
-  --set-env-vars "API_UPSTREAM_URL=${BACKEND_URL},UPSTREAM_AUTH_AUDIENCE=${BACKEND_URL},ROBOTS_NOINDEX=true,STAGING_TEST_LEGAL=true"
-WEB_URL=$(g run services describe fa4-staging-web --region "$REGION" --format 'value(status.url)')
-g run services update fa4-staging-backend --region "$REGION" --update-env-vars "APP_BASE_URL=${WEB_URL}" >/dev/null
+  --set-env-vars "API_UPSTREAM_URL=${BACKEND_URL},UPSTREAM_AUTH_AUDIENCE=${BACKEND_URL},ROBOTS_NOINDEX=true,STAGING_TEST_LEGAL=true,ROOT_REDIRECT=/fa4"
 # the web service may call the private backend
 g run services add-iam-policy-binding fa4-staging-backend --region "$REGION" --member "serviceAccount:${RUN_SA}" --role roles/run.invoker >/dev/null
 
