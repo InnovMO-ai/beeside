@@ -168,6 +168,9 @@ export const UI = {
   vsHive: L('The Hive', 'The Hive'), vsHiveD: L('Especialistas y proveedores seleccionados para las necesidades de tu proyecto.', 'Curated specialists and providers for the needs of your project.'),
   vsHub: L('Operation Hub', 'Operation Hub'), vsHubD: L('Un solo lugar para seguir avances, tareas, documentos y próximos pasos.', 'One place to follow progress, tasks, documents and next steps.'),
   vsAdvisory: L('Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: L('Experiencia especializada para ayudarte a resolver decisiones complejas de expansión.', 'Specialized expertise to help you navigate complex expansion decisions.'),
+  idBeforeTitle: L('Antes de continuar', 'Before you continue'),
+  idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu First Assessment.', "Review and accept what's required to continue with your First Assessment."),
+  acceptContinue: L('Aceptar y continuar', 'Accept and continue'),
   privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
 } as const;
 

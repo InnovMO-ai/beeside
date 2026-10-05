@@ -23,7 +23,7 @@ test('English: language is chosen on the cover only; the whole first steps rende
   for (const l of await links.all()) await expect(l).toHaveAttribute('rel', /noopener/);
   await noHorizontalOverflow(page);
   expect(await axeViolations(page)).toEqual([]);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Accept and continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
   await expect(page.getByText('Your company').filter({ visible: true }).first()).toBeVisible();   // progress shows the stage name in EN
 });

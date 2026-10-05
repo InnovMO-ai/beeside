@@ -200,11 +200,13 @@ textarea.field { min-height: 96px; resize: vertical; }
 .cv { position: relative; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; color: var(--ink);
   background: radial-gradient(120% 90% at 72% 38%, #ffffff 0%, #f8f6ff 48%, #efeafb 100%); }
 .cv-top { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px var(--gutter) 0; }
-.cv-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cv-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cv-logo { display: block; height: 34px; width: auto; }
 .cv-sep { width: 1px; height: 26px; background: #cfcbe0; flex: none; }
-.cv-product { font-weight: 600; font-size: 14px; white-space: nowrap; }
-.cv-lang { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; font-size: 15px; font-weight: 500; cursor: pointer; }
+.cv-product { font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+.cv-top { gap: 28px; }
+.cv-lang { position: relative; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; font-size: 12.5px; font-weight: 500; cursor: pointer; flex: none; }
+.cv-lang::after { content: ''; position: absolute; inset: -6px; }   /* keeps a 46 px touch target around the smaller pill */
 .cv-lang:focus-visible, .cv-cta:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .cv-side { display: none; }
 .cv-main { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: 28px var(--gutter) 0; }
@@ -247,4 +249,23 @@ textarea.field { min-height: 96px; resize: vertical; }
   .cv-benefits img { height: clamp(40px, 2.5vw, 50px); }
   .cv-tagline { display: flex; align-items: center; gap: 0; position: relative; margin: 0; padding-left: clamp(46px, 4vw, 80px); flex-direction: column; align-items: flex-start; font-weight: 600; letter-spacing: .22em; font-size: clamp(11px, .9vw, 18px); line-height: 1.5; color: var(--ink); }
   .cv-tagline i { position: absolute; left: 0; top: 50%; width: clamp(34px, 2.4vw, 46px); height: 2px; background: var(--purple-2); }
+}
+
+/* ---------- Identity: closing "Before you continue" section ---------- */
+.id-legal { margin-top: 44px; padding-top: 32px; border-top: 1px solid var(--line); }
+.id-legal h2 { font-size: 20px; line-height: 1.25; margin: 0 0 6px; }
+.id-legal .hint { font-size: 14px; color: var(--ink-2); margin: 0 0 18px; }
+.id-legal .choices { gap: 14px; }
+.id-legal .trust { display: flex; gap: 10px; align-items: flex-start; margin: 30px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.id-legal .trust svg { flex: none; margin-top: 2px; color: var(--purple-2); }
+
+/* ---------- Desktop balance: a quiet purple panel to the right of the question column (not on mobile / wide screens) ---------- */
+.deco { display: none; }
+@media (min-width: 1100px) {
+  .main.with-deco { display: grid; grid-template-columns: minmax(0, 680px) minmax(0, 1fr); column-gap: 64px; align-items: start; }
+  .deco { display: block; justify-self: end; position: sticky; top: 28px; width: min(100%, 380px); height: clamp(340px, 54vh, 540px); border-radius: 32px; overflow: hidden;
+    background: radial-gradient(120% 90% at 100% 0%, #4a2a9e 0%, var(--purple) 58%); }
+  .deco::before, .deco::after { content: ''; position: absolute; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .13); }
+  .deco::before { width: 420px; height: 420px; right: -150px; bottom: -170px; }
+  .deco::after { width: 250px; height: 250px; right: -60px; bottom: -85px; border-color: rgba(255, 255, 255, .2); }
 }

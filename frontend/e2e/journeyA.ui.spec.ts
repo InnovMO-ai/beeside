@@ -11,12 +11,12 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByLabel('Empresa').fill('Nubia Software');
   await page.getByLabel('Email de trabajo').fill('laura@nubia.example');
   await page.getByLabel('Decido yo', { exact: true }).check();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();       // terms + privacy are mandatory and separate
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeDisabled();       // terms + privacy are mandatory and separate
   await page.getByLabel(/Acepto los Términos/).check();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeDisabled();
   await page.getByLabel(/Reconozco la Política/).check();
   await noHorizontalOverflow(page);
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Aceptar y continuar' }).click();
 
   // company (eligibility gate + progress "1 of 6")
   await expect(page.getByRole('heading', { name: '¿Quiénes son?' })).toBeVisible();

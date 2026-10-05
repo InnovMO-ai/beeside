@@ -47,10 +47,10 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));
     await screen.findByRole("heading", { name: "Who are you?" });
     const create = calls.find((c) => c.url === "/api/fa4/sessions")!;
     expect(create.method).toBe("POST");

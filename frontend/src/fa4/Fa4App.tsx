@@ -165,7 +165,7 @@ export function Fa4App() {
   const stage = STAGE_OF[step.id];
   const complete = isStepComplete(step, a);
   const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
-  const label = step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
+  const label = step.id === 'identity' ? UI.acceptContinue[locale] : step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
   return (
@@ -178,7 +178,7 @@ export function Fa4App() {
           <div className="stage-names" aria-hidden>{UI.stages.map((s, i) => <span key={i} className={i + 1 === stage ? 'now' : ''}>{s[locale]}</span>)}</div>
         </nav>
       )}
-      <main className="main" id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} /></main>
+      <main className={`main ${wide ? '' : 'with-deco'}`} id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} />{!wide && <aside className="deco" aria-hidden />}</main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}

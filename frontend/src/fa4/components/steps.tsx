@@ -35,11 +35,19 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
       </div>
       <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
       <RadioGroup legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
-      <div className="choices" style={{ marginTop: 20 }}>
+      {/* Closing section of Identity: separated from "who decides" by space + a divider; required acceptances only (optional marketing consent is NOT rendered until LEGAL-1 defines its basis). */}
+      <section className="id-legal" aria-labelledby="id-legal-title">
+        <h2 id="id-legal-title">{UI.idBeforeTitle[locale]}</h2>
+        <p className="hint">{UI.idBeforeLead[locale]}</p>
+        <div className="choices">
         <label className="choice"><input type="checkbox" checked={id.termsAccepted} onChange={(e) => setId({ termsAccepted: e.target.checked })} /><span>{UI.terms[locale]} — <a href={BRAND.legal.termsUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.termsLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
         <label className="choice"><input type="checkbox" checked={id.privacyAcknowledged} onChange={(e) => setId({ privacyAcknowledged: e.target.checked })} /><span>{UI.privacy[locale]} — <a href={BRAND.legal.privacyUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.privacyLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
-      </div>
-      <p className="note" style={{ marginTop: 16 }}>{UI.privacyNotice[locale]}</p>
+        </div>
+        <p className="trust">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l7 3v5c0 4.4-2.9 8.3-7 10-4.1-1.7-7-5.6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>
+          <span>{UI.privacyNotice[locale]}</span>
+        </p>
+      </section>
     </div>
   );
 }
