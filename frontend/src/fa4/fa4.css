@@ -259,13 +259,21 @@ textarea.field { min-height: 96px; resize: vertical; }
 .id-legal .trust { display: flex; gap: 10px; align-items: flex-start; margin: 30px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
 .id-legal .trust svg { flex: none; margin-top: 2px; color: var(--purple-2); }
 
-/* ---------- Desktop balance: a quiet purple panel to the right of the question column (not on mobile / wide screens) ---------- */
+/* ---------- Desktop balance: a full-height purple panel on the right edge of question screens (not on mobile, wide screens or the result) ---------- */
 .deco { display: none; }
 @media (min-width: 1100px) {
-  .main.with-deco { display: grid; grid-template-columns: minmax(0, 680px) minmax(0, 1fr); column-gap: 64px; align-items: start; }
-  .deco { display: block; justify-self: end; position: sticky; top: 28px; width: min(100%, 380px); height: clamp(340px, 54vh, 540px); border-radius: 32px; overflow: hidden;
-    background: radial-gradient(120% 90% at 100% 0%, #4a2a9e 0%, var(--purple) 58%); }
-  .deco::before, .deco::after { content: ''; position: absolute; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .13); }
-  .deco::before { width: 420px; height: 420px; right: -150px; bottom: -170px; }
-  .deco::after { width: 250px; height: 250px; right: -60px; bottom: -85px; border-color: rgba(255, 255, 255, .2); }
+  .shell.has-deco { --panel-w: clamp(340px, 30vw, 540px); padding-right: var(--panel-w); }
+  /* the question column is centered in the area left of the panel */
+  .shell.has-deco .topbar, .shell.has-deco .progress, .shell.has-deco .main, .shell.has-deco .navbar .inner { max-width: 776px; }
+  .deco { display: block; position: fixed; z-index: 1; top: 0; right: 0; bottom: 0; width: var(--panel-w); overflow: hidden;
+    background: radial-gradient(130% 80% at 100% 0%, #4a2a9e 0%, var(--purple) 55%, #240668 100%); }
+  .deco::before, .deco::after { content: ''; position: absolute; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .12); }
+  .deco::before { width: 720px; height: 720px; left: -190px; bottom: -330px; }
+  .deco::after { width: 420px; height: 420px; left: -40px; bottom: -150px; border-color: rgba(255, 255, 255, .2); }
 }
+
+/* Optional marketing consent: visibly subordinate to the two required acceptances */
+.id-optional { margin-top: 26px; }
+.id-optional-cap { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.choice.soft { border-style: dashed; background: transparent; font-size: 14.5px; color: var(--ink-2); }
+.choice.soft.on, .choice.soft:has(input:checked) { border-style: solid; }

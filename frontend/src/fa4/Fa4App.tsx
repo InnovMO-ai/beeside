@@ -169,7 +169,7 @@ export function Fa4App() {
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
   return (
-    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''}`} lang={locale}>
+    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'}`} lang={locale}>
       <div className="topbar"><Logo /><button className="linkbtn" onClick={saveLater}>{UI.saveLater[locale]}</button></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
@@ -178,11 +178,12 @@ export function Fa4App() {
           <div className="stage-names" aria-hidden>{UI.stages.map((s, i) => <span key={i} className={i + 1 === stage ? 'now' : ''}>{s[locale]}</span>)}</div>
         </nav>
       )}
-      <main className={`main ${wide ? '' : 'with-deco'}`} id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} />{!wide && <aside className="deco" aria-hidden />}</main>
+      <main className="main" id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} /></main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
       </div></div>
+      {!wide && <aside className="deco" aria-hidden />}
       {toast && <div role="status" className="note" style={{ position: 'fixed', left: 16, right: 16, bottom: 80 }} onClick={() => setToast(null)}>{toast}</div>}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>

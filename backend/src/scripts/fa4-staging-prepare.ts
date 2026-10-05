@@ -60,7 +60,7 @@ async function main() {
     );
     const priv = (await pool.query(
       `SELECT count(*) FILTER (WHERE privilege_type = 'DELETE' AND table_name LIKE 'fa4\\_%')::int AS deletes,
-              count(*) FILTER (WHERE privilege_type = 'UPDATE' AND table_name IN ('fa4_result','fa4_catalog_version','fa4_catalog_change','fa4_legal_acceptance','fa4_privacy_erasure_log'))::int AS append_only_updates,
+              count(*) FILTER (WHERE privilege_type = 'UPDATE' AND table_name IN ('fa4_result','fa4_catalog_version','fa4_catalog_change','fa4_legal_acceptance','fa4_privacy_erasure_log','fa4_marketing_consent'))::int AS append_only_updates,
               count(*)::int AS grants
          FROM information_schema.role_table_grants WHERE grantee = $1 AND table_schema = 'public'`, [login])).rows[0];
     if (priv.deletes || priv.append_only_updates || !priv.grants) throw new Error(`unexpected runtime privileges: ${JSON.stringify(priv)}`);

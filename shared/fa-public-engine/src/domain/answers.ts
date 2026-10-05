@@ -14,6 +14,8 @@ export type StartWhen = 'asap' | '3m' | '6m' | '12m' | 'unknown';
 export interface Identity {
   name: string; company: string; email: string; role: string; decider: DeciderRole | null;
   termsAccepted: boolean; privacyAcknowledged: boolean;
+  /** OPTIONAL commercial communications (separate from Terms / Privacy; never implied by them). Source of truth: fa4_marketing_consent. */
+  marketingConsent?: boolean;
 }
 
 export interface Destination {
@@ -90,7 +92,7 @@ export const frontKey = (dest: string, front: FrontKey) => `${dest}|${front}`;
 export function emptyAnswers(locale: Locale = 'es'): Answers {
   return {
     locale,
-    identity: { name: '', company: '', email: '', role: '', decider: null, termsAccepted: false, privacyAcknowledged: false },
+    identity: { name: '', company: '', email: '', role: '', decider: null, termsAccepted: false, privacyAcknowledged: false, marketingConsent: false },
     company: { hasExistingBusiness: null, sector: '', size: null, operatesIn: [] },
     destinations: { list: [], open: false, sameInAll: null },
     components: [], projectConfirmed: false, knowsNeeds: null,

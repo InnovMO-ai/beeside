@@ -12,7 +12,7 @@ import { looksLikeAccessToken } from "../fa/services/tokens";
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../security/rate-limit";
 import { Fa4EmailDeps, deliverDueFa4Emails, enqueueFa4Email } from "./email";
 import {
-  Fa4ProjectRow, LegalConfig, createProject, exchangeResumeToken, latestResult, loadPublishedCatalog, normalizeEmail,
+  Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeResumeToken, latestResult, loadPublishedCatalog, normalizeEmail,
   projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
 } from "./repository";
 import { deliverResult } from "./service";
@@ -114,7 +114,8 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   router.get("/session", handle(async (req, res) => {
     const p = await session(req);
-    res.json({ answers: p.answers, step: p.stepKey, status: p.status });
+    // the append-only consent history is the source of truth for the optional marketing checkbox
+    res.json({ answers: { ...p.answers, identity: { ...p.answers.identity, marketingConsent: await latestMarketingConsent(deps.db, p.projectId) } }, step: p.stepKey, status: p.status });
   }));
 
   router.put("/session", handle(async (req, res) => {
@@ -125,6 +126,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     // and acceptance evidence (fa4_legal_acceptance) can't diverge from the stored flags. Name / company / role stay editable.
     const a = { ...parsed.data, identity: { ...parsed.data.identity, email: p.email, termsAccepted: p.answers.identity.termsAccepted, privacyAcknowledged: p.answers.identity.privacyAcknowledged } };
     await saveProject(deps.db, p.projectId, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey);
+    await recordMarketingConsent(deps.db, p.projectId, parsed.data.identity.marketingConsent === true, a.locale);   // optional, independent of Terms / Privacy; appends only on change
     res.json({ ok: true });
   }));
 

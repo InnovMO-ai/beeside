@@ -48,6 +48,11 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
     expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    const marketing = screen.getByLabelText(/I would like to receive news, information and commercial communications from beeside\./) as HTMLInputElement;
+    expect(marketing.checked).toBe(false);                                                  // optional: unchecked by default
+    await user.click(marketing);                                                            // ticking it does NOT enable the button
+    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();
+    await user.click(marketing);
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
     await user.click(screen.getByRole("button", { name: "Accept and continue" }));

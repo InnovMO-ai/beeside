@@ -15,6 +15,10 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByLabel(/Acepto los Términos/).check();
   await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeDisabled();
   await page.getByLabel(/Reconozco la Política/).check();
+  // optional marketing consent: unchecked by default, clearly optional, and NOT needed to continue
+  await expect(page.getByText('Comunicaciones opcionales')).toBeVisible();
+  await expect(page.getByLabel(/Quiero recibir novedades, información y comunicaciones comerciales de beeside/)).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeEnabled();
   await noHorizontalOverflow(page);
   await page.getByRole('button', { name: 'Aceptar y continuar' }).click();
 

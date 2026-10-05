@@ -43,6 +43,11 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
         <label className="choice"><input type="checkbox" checked={id.termsAccepted} onChange={(e) => setId({ termsAccepted: e.target.checked })} /><span>{UI.terms[locale]} — <a href={BRAND.legal.termsUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.termsLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
         <label className="choice"><input type="checkbox" checked={id.privacyAcknowledged} onChange={(e) => setId({ privacyAcknowledged: e.target.checked })} /><span>{UI.privacy[locale]} — <a href={BRAND.legal.privacyUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.privacyLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
         </div>
+        {/* OPTIONAL and independent: unchecked by default, never implied by Terms / Privacy, does not gate "Accept and continue". */}
+        <div className="id-optional">
+          <p className="id-optional-cap">{UI.idOptionalComms[locale]}</p>
+          <label className="choice soft"><input type="checkbox" checked={id.marketingConsent === true} onChange={(e) => setId({ marketingConsent: e.target.checked })} /><span>{UI.marketingConsent[locale]}</span></label>
+        </div>
         <p className="trust">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l7 3v5c0 4.4-2.9 8.3-7 10-4.1-1.7-7-5.6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>
           <span>{UI.privacyNotice[locale]}</span>

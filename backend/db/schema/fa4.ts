@@ -1,4 +1,4 @@
-import { bigserial, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -218,4 +218,25 @@ export const fa4PrivacyErasureLog = pgTable(
     performedAt: timestamp("performed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("fa4_privacy_erasure_mode", sql`${t.mode} IN ('ANONYMIZE')`)],
+);
+
+/**
+ * OPTIONAL commercial-communications consent, kept apart from the legal acceptances (Terms / Privacy never imply it). Append-only history:
+ * the first row is the decision taken at project creation (consented true OR false), later rows record every change.
+ * `wording_ref` identifies the exact checkbox wording shown; no IP or other personal data is stored.
+ */
+export const fa4MarketingConsent = pgTable(
+  "fa4_marketing_consent",
+  {
+    consentId: uuid("consent_id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    consented: boolean("consented").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    language: text("language").notNull(),
+    wordingRef: text("wording_ref").notNull(),
+  },
+  (t) => [
+    index("fa4_marketing_consent_project_idx").on(t.projectId, t.decidedAt),
+    check("fa4_marketing_consent_language", sql`${t.language} IN ('es','en')`),
+  ],
 );
