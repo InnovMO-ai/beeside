@@ -9,24 +9,28 @@ FROM node:20-slim AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY shared/canonical-fields/package.json shared/canonical-fields/
+COPY shared/fa-public-engine/package.json shared/fa-public-engine/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 RUN npm ci --ignore-scripts
 COPY shared/canonical-fields shared/canonical-fields
+COPY shared/fa-public-engine shared/fa-public-engine
 COPY backend backend
-RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=backend
+RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=backend
 
 FROM node:20-slim AS runtime
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 COPY shared/canonical-fields/package.json shared/canonical-fields/
+COPY shared/fa-public-engine/package.json shared/fa-public-engine/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 # Production dependencies only: no build tooling, no test tooling, no frontend packages.
 RUN npm ci --omit=dev --ignore-scripts --workspace=@beeside/backend --include-workspace-root \
  && npm cache clean --force
 COPY --from=build /repo/shared/canonical-fields/dist shared/canonical-fields/dist
+COPY --from=build /repo/shared/fa-public-engine/dist shared/fa-public-engine/dist
 COPY --from=build /repo/backend/dist backend/dist
 # Migrations travel with the image: the migration job applies them and the readiness probe counts them.
 COPY backend/db/migrations backend/db/migrations

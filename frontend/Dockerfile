@@ -7,12 +7,14 @@ FROM node:20-slim AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY shared/canonical-fields/package.json shared/canonical-fields/
+COPY shared/fa-public-engine/package.json shared/fa-public-engine/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 RUN npm ci --ignore-scripts
 COPY shared/canonical-fields shared/canonical-fields
+COPY shared/fa-public-engine shared/fa-public-engine
 COPY frontend frontend
-RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=frontend
+RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=frontend
 
 FROM node:20-slim AS runtime
 WORKDIR /app

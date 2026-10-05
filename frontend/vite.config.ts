@@ -52,5 +52,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Playwright specs (e2e/) run with `npm run test:e2e`, never under vitest.
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

@@ -6,6 +6,8 @@ import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
 import { LogEmailTransport } from "./fa/email/email-adapter";
 import { createFaRouter } from "./fa/routes";
+import { FA4_RATE_LIMITS, Fa4Deps, createFa4Router } from "./fa4/routes";
+import { LegalConfig } from "./fa4/repository";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
@@ -33,6 +35,8 @@ export interface SecurityOptions {
 export interface AppOptions {
   /** First Assessment API dependencies; the API is mounted only when provided. */
   fa?: FaDeps;
+  /** FA Public v1.0 API (isolated module); mounted only when provided. */
+  fa4?: Fa4Deps;
   /** Provider-agnostic subscription event endpoint; mounted only when provided. */
   billing?: BillingDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
@@ -56,6 +60,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(healthRouter);
   if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
   if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
+  if (options.fa4) app.use("/api/fa4", createFa4Router(options.fa4, { limiter: security.limiter }));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   app.use(notFoundJson());
@@ -99,6 +104,58 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
   const base = baseDepsFromEnv(env);
   const simulate = env.PREMIUM_DEV_SIMULATION === "true" && env.NODE_ENV !== "production";
   return { ...base, ...(simulate ? { premium: { checkout: devSimulatedCheckout({ bundles: base.bundles }) } } : {}) };
+}
+
+/**
+ * FA Public v1.0 API (module fa4), isolated from the legacy First Assessment. Off unless FA4_API_ENABLED=true; it reuses the existing
+ * EmailTransport, the shared rate limiter / `rate_limit_counter` table and the same Postgres pool settings.
+ */
+export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): Fa4Deps | undefined {
+  if (env.FA4_API_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
+  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  return {
+    db,
+    email: new LogEmailTransport(env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"),
+    config: {
+      appBaseUrl: env.APP_BASE_URL,
+      sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
+      resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
+      emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
+      emailRecipientDailyQuota: Number(env.FA4_EMAIL_RECIPIENT_DAILY_QUOTA ?? 6),
+      resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
+      legal: fa4LegalFromEnv(env),
+      rateLimits: fa4RateLimitOverrides(env),
+      now: () => new Date(),
+    },
+    emailDispatch: "deferred",
+  };
+}
+
+/**
+ * Legal acceptance evidence (M2). The Terms / Privacy document identifiers and URLs are configuration, not code: the final documents
+ * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
+ * is recorded so no environment silently stores a plausible-looking version.
+ */
+export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
+  const names = ["FA4_TERMS_VERSION", "FA4_TERMS_URL_ES", "FA4_TERMS_URL_EN", "FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
+  const missing = names.filter((n) => !env[n]);
+  if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
+  const ph = "UNSET-LEGAL-1";
+  return {
+    termsVersion: env.FA4_TERMS_VERSION ?? ph, termsUrl: { es: env.FA4_TERMS_URL_ES ?? ph, en: env.FA4_TERMS_URL_EN ?? ph },
+    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: env.FA4_PRIVACY_URL_ES ?? ph, en: env.FA4_PRIVACY_URL_EN ?? ph },
+  };
+}
+
+/** Abuse-prevention limits are configurable: FA4_RL_<NAME>="<limit>/<windowSeconds>", e.g. FA4_RL_LINKREQUESTEMAIL=3/3600. */
+export function fa4RateLimitOverrides(env: NodeJS.ProcessEnv = process.env): NonNullable<Fa4Deps["config"]["rateLimits"]> {
+  const out: NonNullable<Fa4Deps["config"]["rateLimits"]> = {};
+  for (const k of Object.keys(FA4_RATE_LIMITS) as Array<keyof typeof FA4_RATE_LIMITS>) {
+    const m = /^(\d+)\/(\d+)$/.exec(env[`FA4_RL_${k.toUpperCase()}`] ?? "");
+    if (m) out[k] = { limit: Number(m[1]), windowSeconds: Number(m[2]) };
+  }
+  return out;
 }
 
 /** Signed subscription events from a future billing adapter (BILLING_EVENTS_ENABLED=true). */
@@ -179,9 +236,11 @@ if (require.main === module) {
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
-  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? null;
+  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
   const app = createApp({
     fa,
+    fa4,
     billing,
     admin,
     security: securityOptionsFromEnv(process.env, db),
