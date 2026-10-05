@@ -170,7 +170,6 @@ export const UI = {
   vsAdvisory: L('Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: L('Experiencia especializada para ayudarte a resolver decisiones complejas de expansión.', 'Specialized expertise to help you navigate complex expansion decisions.'),
   idBeforeTitle: L('Antes de continuar', 'Before you continue'),
   idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu First Assessment.', "Review and accept what's required to continue with your First Assessment."),
-  idOptionalComms: L('Comunicaciones opcionales', 'Optional communications'),
   marketingConsent: L('Quiero recibir novedades, información y comunicaciones comerciales de beeside.', 'I would like to receive news, information and commercial communications from beeside.'),
   acceptContinue: L('Aceptar y continuar', 'Accept and continue'),
   privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),

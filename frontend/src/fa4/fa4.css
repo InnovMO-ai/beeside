@@ -272,8 +272,9 @@ textarea.field { min-height: 96px; resize: vertical; }
   .deco::after { width: 420px; height: 420px; left: -40px; bottom: -150px; border-color: rgba(255, 255, 255, .2); }
 }
 
-/* Optional marketing consent: visibly subordinate to the two required acceptances */
-.id-optional { margin-top: 26px; }
-.id-optional-cap { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
-.choice.soft { border-style: dashed; background: transparent; font-size: 14.5px; color: var(--ink-2); }
-.choice.soft.on, .choice.soft:has(input:checked) { border-style: solid; }
+/* Optional marketing consent: same size and spacing as Terms / Privacy; only the dashed border marks it as optional */
+.choice.optional { border-style: dashed; }
+.choice.optional:has(input:checked) { border-style: solid; }
+/* Identity: the action buttons follow the legal section at the end of the page (no sticky bar covering it on phones) */
+.shell.static-nav .navbar { position: static; border: 0; background: transparent; padding-top: 8px; }
+.shell.static-nav .main { padding-bottom: 28px; }

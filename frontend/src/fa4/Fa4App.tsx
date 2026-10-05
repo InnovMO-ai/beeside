@@ -169,7 +169,7 @@ export function Fa4App() {
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
   return (
-    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'}`} lang={locale}>
+    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
       <div className="topbar"><Logo /><button className="linkbtn" onClick={saveLater}>{UI.saveLater[locale]}</button></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
