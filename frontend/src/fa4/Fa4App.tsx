@@ -4,6 +4,8 @@ import {
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
 } from '@beeside/fa-public-engine';
 import { api, ApiError, sessionStore } from './api';
+import { CoverScreen } from './components/CoverScreen';
+import { EnvRibbon } from './components/EnvRibbon';
 import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
@@ -133,17 +135,17 @@ export function Fa4App() {
 
   if (catalogError && !catalog) {
     return (
-      <div className="fa4"><div className="shell" lang={locale}><main className="main" role="alert">
+      <div className="fa4"><EnvRibbon /><div className="shell" lang={locale}><main className="main" role="alert">
         <h1 className="h1">{UI.catalogErrorTitle[locale]}</h1><p className="lead">{UI.catalogErrorBody[locale]}</p>
         <button className="btn primary" style={{ flex: 'none' }} onClick={() => { setBooting(true); setAttempt((n) => n + 1); }}>{UI.retry[locale]}</button>
       </main></div></div>
     );
   }
-  if (booting || !catalog || !ctx) return <div className="fa4"><div className="shell"><main className="main" aria-busy="true"><p className="hint">…</p></main></div></div>;
+  if (booting || !catalog || !ctx) return <div className="fa4"><EnvRibbon /><div className="shell"><main className="main" aria-busy="true"><p className="hint">…</p></main></div></div>;
 
   if (step.id === 'result') {
     return (
-      <div className="fa4"><div className="shell" lang={locale}>
+      <div className="fa4"><EnvRibbon /><div className="shell" lang={locale}>
         {!model
           ? <main className="main" aria-live="polite"><p>{busy ? UI.generating[locale] : UI.resultError[locale]}</p>{!busy && <button className="btn" onClick={generate}>{UI.next[locale]}</button>}</main>
           : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'reflection' })}
@@ -156,21 +158,18 @@ export function Fa4App() {
 
   if (step.id === 'cover') {
     return (
-      <div className="fa4"><div className="shell cover" lang={locale}>
-        <div className="topbar"><Logo /></div>
-        <main className="main"><S.CoverStep locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })} /></main>
-      </div></div>
+      <div className="fa4"><EnvRibbon /><CoverScreen locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })} /></div>
     );
   }
 
   const stage = STAGE_OF[step.id];
   const complete = isStepComplete(step, a);
   const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
-  const label = step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
+  const label = step.id === 'identity' ? UI.acceptContinue[locale] : step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
   return (
-    <div className="fa4"><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''}`} lang={locale}>
+    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
       <div className="topbar"><Logo /><button className="linkbtn" onClick={saveLater}>{UI.saveLater[locale]}</button></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
@@ -184,6 +183,7 @@ export function Fa4App() {
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
       </div></div>
+      {!wide && <aside className="deco" aria-hidden />}
       {toast && <div role="status" className="note" style={{ position: 'fixed', left: 16, right: 16, bottom: 80 }} onClick={() => setToast(null)}>{toast}</div>}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>

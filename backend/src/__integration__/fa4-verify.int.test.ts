@@ -274,6 +274,16 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
     });
   });
 
+  describe("session header", () => {
+    it("the app's X-Fa4-Session header works like Authorization: Bearer (gateways such as IAP consume Authorization)", async () => {
+      const p = await start(email("hdr"));
+      const viaHeader = await app().get("/api/fa4/session").set("X-Fa4-Session", p.token);
+      expect(viaHeader.status).toBe(200);
+      expect((await app().get("/api/fa4/session").set(auth(p.token))).status).toBe(200);
+      expect((await app().get("/api/fa4/session").set("X-Fa4-Session", "bogus")).status).toBe(401);
+    });
+  });
+
   describe("M2 — immutable, separate legal-acceptance evidence", () => {
     it("records Terms and Privacy separately with version, URL, language, timestamp — and nothing else about the person", async () => {
       const e = email("m2"); const p = await start(e);
@@ -305,7 +315,43 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
     it("a project cannot be created without configured legal identifiers in production", () => {
       const { fa4LegalFromEnv } = jest.requireActual("../index") as typeof import("../index");
       expect(() => fa4LegalFromEnv({ NODE_ENV: "production" } as never)).toThrow(/LEGAL-1/);
-      expect(fa4LegalFromEnv({ NODE_ENV: "development" } as never).termsVersion).toBe("UNSET-LEGAL-1");
+      expect(fa4LegalFromEnv({ NODE_ENV: "development" } as never).privacyVersion).toBe("UNSET-LEGAL-1");   // Terms default to the official version; Privacy stays an explicit placeholder
+    });
+  });
+
+  describe("optional marketing consent — separate, never implied", () => {
+    const history = async (pid: string) => q("SELECT consented, language, wording_ref FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at, consent_id", [pid]);
+    it("accepting Terms + Privacy does NOT imply marketing: the first decision is recorded as false, and the legal records are separate", async () => {
+      const p = await start(email("mk0"));   // fixture has termsAccepted + privacyAcknowledged = true, no marketing choice
+      expect(await history(p.pid)).toEqual([{ consented: false, language: "es", wording_ref: "marketing-v1" }]);
+      expect((await q("SELECT document FROM fa4_legal_acceptance WHERE project_id = $1 ORDER BY document", [p.pid])).map((r) => r.document)).toEqual(["PRIVACY", "TERMS"]);
+      expect((await app().get("/api/fa4/session").set(auth(p.token))).body.answers.identity.marketingConsent).toBe(false);
+    });
+    it("an explicit opt-in is recorded once; changes append rows (opt-out included); saving without a change adds nothing", async () => {
+      const e = email("mk1"); const a = answersFor(e); a.identity.marketingConsent = true;
+      const r = await app().post("/api/fa4/sessions").send({ answers: a, step: "company" });
+      const token = r.body.sessionToken as string; const pid = (await q("SELECT project_id FROM fa4_project WHERE email = $1", [e]))[0].project_id as string;
+      expect((await history(pid)).map((x) => x.consented)).toEqual([true]);
+      await app().put("/api/fa4/session").set(auth(token)).send({ answers: a, step: "x" });                 // same decision → no new row
+      expect((await history(pid)).length).toBe(1);
+      const off = { ...a, identity: { ...a.identity, marketingConsent: false } };
+      await app().put("/api/fa4/session").set(auth(token)).send({ answers: off, step: "x" });
+      await app().put("/api/fa4/session").set(auth(token)).send({ answers: a, step: "x" });
+      expect((await history(pid)).map((x) => x.consented)).toEqual([true, false, true]);
+      expect((await app().get("/api/fa4/session").set(auth(token))).body.answers.identity.marketingConsent).toBe(true);   // the history is the source of truth
+    });
+    it("Terms / Privacy stay mandatory, marketing is not: a project without marketing is created; without Terms it is refused", async () => {
+      const ok = await app().post("/api/fa4/sessions").send({ answers: answersFor(email("mk2")), step: "company" });
+      expect(ok.status).toBe(201);
+      const bad = answersFor(email("mk3")); bad.identity.termsAccepted = false; bad.identity.marketingConsent = true;
+      expect((await app().post("/api/fa4/sessions").send({ answers: bad, step: "company" })).status).toBe(400);    // marketing=true never substitutes Terms
+    });
+    it("the history is append-only for everyone (owner: trigger; runtime: no UPDATE / DELETE / TRUNCATE)", async () => {
+      await expect(admin.query("UPDATE fa4_marketing_consent SET consented = true")).rejects.toMatchObject({ code: "BV601" });
+      await expect(admin.query("DELETE FROM fa4_marketing_consent")).rejects.toMatchObject({ code: "BV601" });
+      await expect(admin.query("TRUNCATE fa4_marketing_consent")).rejects.toMatchObject({ code: "BV601" });
+      for (const sql of ["UPDATE fa4_marketing_consent SET consented = true", "DELETE FROM fa4_marketing_consent", "TRUNCATE fa4_marketing_consent"])
+        await expect(rt.query(sql)).rejects.toMatchObject({ code: "42501" });
     });
   });
 

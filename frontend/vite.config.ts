@@ -27,8 +27,20 @@ import react from "@vitejs/plugin-react";
 const devApiTarget = process.env.VITE_DEV_API_TARGET ?? "http://localhost:8080";
 const devApiOrigin = process.env.VITE_DEV_API_ORIGIN;
 
+// Launch guard (CHK-1): a release build (VITE_FA4_LAUNCH=true) must not ship the placeholder Privacy link. Regular CI/dev builds are unaffected.
+function fa4LaunchGuard() {
+  return {
+    name: "fa4-launch-guard",
+    buildStart() {
+      if (process.env.VITE_FA4_LAUNCH !== "true") return;
+      const ok = (process.env.VITE_FA4_PRIVACY_URL_ES && process.env.VITE_FA4_PRIVACY_URL_EN) || process.env.VITE_FA4_PRIVACY_URL;
+      if (!ok) throw new Error("VITE_FA4_LAUNCH=true requires the official Privacy URL (VITE_FA4_PRIVACY_URL, or _ES and _EN): CHK-1 is not closed");
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), fa4LaunchGuard()],
   server: {
     proxy: {
       "/api": {

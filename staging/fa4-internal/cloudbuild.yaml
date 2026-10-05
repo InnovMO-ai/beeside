@@ -1,0 +1,15 @@
+# Builds the two FA4 staging images with Cloud Build (no local Docker needed). Used by deploy-gcp.sh.
+substitutions:
+  _REPO: northamerica-south1-docker.pkg.dev/beeside-dev-508220/beeside-dev
+  _TAG: dev
+  _ENV_LABEL: "STAGING INTERNO · datos de prueba"
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_REPO}/fa4-staging-backend:${_TAG}", "."]
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "frontend/Dockerfile", "--build-arg", "VITE_FA4_ENV_LABEL=${_ENV_LABEL}", "-t", "${_REPO}/fa4-staging-web:${_TAG}", "."]
+images:
+  - ${_REPO}/fa4-staging-backend:${_TAG}
+  - ${_REPO}/fa4-staging-web:${_TAG}
+options:
+  logging: CLOUD_LOGGING_ONLY

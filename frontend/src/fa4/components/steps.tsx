@@ -21,25 +21,7 @@ const compName = (c: ProjectComponent, loc: Locale) => c.destinations.map((d) =>
 const frontName = (cat: PublicCatalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? { es: d.nameEs, en: d.nameEn }[loc] : f; };
 const upd = (s: StepCtx, id: string, fn: (c: ProjectComponent) => ProjectComponent) => s.set((a) => ({ ...a, components: a.components.map((c) => (c.id === id ? fn(c) : c)) }));
 
-// ---------------- 0. cover / identity ----------------
-export function CoverStep({ onStart, setLocale, locale }: { onStart: () => void; setLocale: (l: Locale) => void; locale: Locale }) {
-  return (
-    <div style={{ maxWidth: 680 }}>
-      <p className="eyebrow">beeside</p>
-      <h1 className="h1">{UI.coverTitle[locale]}</h1>
-      <p className="lead">{UI.coverLead[locale]}</p>
-      <p className="hint" style={{ marginBottom: 24 }}>{UI.coverMeta[locale]}</p>
-      <fieldset style={{ border: 0, padding: 0 }}>
-        <legend className="label">{UI.coverLang[locale]}</legend>
-        <div className="chips" role="radiogroup">
-          {(['es', 'en'] as const).map((l) => <button key={l} type="button" role="radio" aria-checked={locale === l} className={`chip ${locale === l ? 'on' : ''}`} onClick={() => setLocale(l)}>{UI.languageNames[l]}</button>)}
-        </div>
-      </fieldset>
-      <p style={{ marginTop: 28 }}><button className="btn primary" style={{ flex: 'none', minWidth: 200 }} onClick={onStart}>{UI.start[locale]}</button></p>
-    </div>
-  );
-}
-
+// ---------------- identity ----------------
 export function IdentityStep({ a, set, locale }: StepCtx) {
   const id = a.identity; const [touched, setTouched] = useState(false);
   const setId = (p: Partial<Answers['identity']>) => set((x) => ({ ...x, identity: { ...x.identity, ...p } }));
@@ -53,11 +35,21 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
       </div>
       <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
       <RadioGroup legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
-      <div className="choices" style={{ marginTop: 20 }}>
+      {/* Closing section of Identity: separated from "who decides" by space + a divider; required acceptances only (optional marketing consent is NOT rendered until LEGAL-1 defines its basis). */}
+      <section className="id-legal" aria-labelledby="id-legal-title">
+        <h2 id="id-legal-title">{UI.idBeforeTitle[locale]}</h2>
+        <p className="hint">{UI.idBeforeLead[locale]}</p>
+        <div className="choices">
         <label className="choice"><input type="checkbox" checked={id.termsAccepted} onChange={(e) => setId({ termsAccepted: e.target.checked })} /><span>{UI.terms[locale]} — <a href={BRAND.legal.termsUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.termsLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
         <label className="choice"><input type="checkbox" checked={id.privacyAcknowledged} onChange={(e) => setId({ privacyAcknowledged: e.target.checked })} /><span>{UI.privacy[locale]} — <a href={BRAND.legal.privacyUrl[locale]} target="_blank" rel="noopener noreferrer">{UI.privacyLink[locale]}<span className="sr-only"> {UI.openInNewTab[locale]}</span></a></span></label>
-      </div>
-      <p className="note" style={{ marginTop: 16 }}>{UI.privacyNotice[locale]}</p>
+          {/* OPTIONAL and independent: unchecked by default, never implied by Terms / Privacy, does not gate "Accept and continue". */}
+          <label className="choice optional"><input type="checkbox" checked={id.marketingConsent === true} onChange={(e) => setId({ marketingConsent: e.target.checked })} /><span>{UI.marketingConsent[locale]}</span></label>
+        </div>
+        <p className="trust">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l7 3v5c0 4.4-2.9 8.3-7 10-4.1-1.7-7-5.6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>
+          <span>{UI.privacyNotice[locale]}</span>
+        </p>
+      </section>
     </div>
   );
 }

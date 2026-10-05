@@ -17,7 +17,7 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
   const calls: Call[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const headers = (init?.headers ?? {}) as Record<string, string>;
-    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers.Authorization };
+    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers["X-Fa4-Session"] };
     calls.push(c);
     const custom = extra(c); if (custom) return custom;
     if (url === "/api/fa4/catalog") return json(publicCatalog);
@@ -37,20 +37,25 @@ describe("Fa4App (Vite/React) against the API contract", () => {
   it("cover offers ES/EN; the language is only chosen on the cover; identity creates the project and stores the Bearer session", async () => {
     const calls = mockApi();
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Empezar" });
-    fireEvent.click(screen.getByRole("radio", { name: "English" }));
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us about your expansion project");
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
-    expect(screen.queryByRole("radio", { name: "Español" })).toBeNull();           // no language switcher after the cover
+    await screen.findByRole("button", { name: "Comienza tu evaluación" });
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar idioma a English" }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Your expansion starts with a clearer view.");
+    fireEvent.click(screen.getByRole("button", { name: "Start your assessment" }));
+    expect(screen.queryByRole("button", { name: /Switch language/ })).toBeNull();           // no language switcher after the cover
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Your name"), "Ana");
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    const marketing = screen.getByLabelText(/I would like to receive news, information and commercial communications from beeside\./) as HTMLInputElement;
+    expect(marketing.checked).toBe(false);                                                  // optional: unchecked by default
+    await user.click(marketing);                                                            // ticking it does NOT enable the button
+    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();
+    await user.click(marketing);
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));
     await screen.findByRole("heading", { name: "Who are you?" });
     const create = calls.find((c) => c.url === "/api/fa4/sessions")!;
     expect(create.method).toBe("POST");
@@ -72,7 +77,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     render(<Fa4App />);
     await screen.findByRole("heading", { name: "¿En qué punto está la decisión?" });
     expect(calls.find((c) => c.url === "/api/fa4/links/continue")!.body).toEqual({ token: linkToken });
-    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe(`Bearer ${"T".repeat(43)}`);
+    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe("T".repeat(43));   // X-Fa4-Session (not Authorization, which gateways like IAP consume)
     expect(window.location.hash).toBe("");
   });
 
@@ -80,7 +85,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
     mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : null));
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Empezar" });
+    await screen.findByRole("button", { name: "Comienza tu evaluación" });
   });
 
   it("generates the result through the API and renders the three components; 'save for later' uses the stored email", async () => {
@@ -110,6 +115,6 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(alert).toHaveTextContent("No pudimos cargar First Assessment");
     failing = false;
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    await screen.findByRole("button", { name: "Empezar" });
+    await screen.findByRole("button", { name: "Comienza tu evaluación" });
   });
 });

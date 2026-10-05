@@ -4,19 +4,22 @@ import { axeViolations, noHorizontalOverflow } from './helpers';
 /** Journey A end-to-end through the real UI (ES): identity → project → fronts → Your Expansion View. */
 test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.goto('/fa4');
-  await page.getByRole('button', { name: 'Empezar' }).click();
+  await page.getByRole('button', { name: 'Comienza tu evaluación' }).click();
 
   // identity (right after the cover; same email is reused everywhere)
   await page.getByLabel('Tu nombre').fill('Laura');
   await page.getByLabel('Empresa').fill('Nubia Software');
   await page.getByLabel('Email de trabajo').fill('laura@nubia.example');
   await page.getByLabel('Decido yo', { exact: true }).check();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();       // terms + privacy are mandatory and separate
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeDisabled();       // terms + privacy are mandatory and separate
   await page.getByLabel(/Acepto los Términos/).check();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeDisabled();
   await page.getByLabel(/Reconozco la Política/).check();
+  // optional marketing consent: unchecked by default (dashed = optional), and NOT needed to continue
+  await expect(page.getByLabel(/Quiero recibir novedades, información y comunicaciones comerciales de beeside/)).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Aceptar y continuar' })).toBeEnabled();
   await noHorizontalOverflow(page);
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('button', { name: 'Aceptar y continuar' }).click();
 
   // company (eligibility gate + progress "1 of 6")
   await expect(page.getByRole('heading', { name: '¿Quiénes son?' })).toBeVisible();

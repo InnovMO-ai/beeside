@@ -184,9 +184,29 @@ export async function createProject(db: Db, answers: Answers, stepKey: string, s
       `INSERT INTO fa4_legal_acceptance (project_id, document, document_version, document_url, language) VALUES ($1,'TERMS',$2,$3,$5), ($1,'PRIVACY',$4,$6,$5)`,
       [projectId, legal.termsVersion, legal.termsUrl[lang], legal.privacyVersion, lang, legal.privacyUrl[lang]],
     );
+    // The optional marketing decision is recorded on its own (true OR false) — never inferred from Terms / Privacy.
+    await recordMarketingConsent(tx, projectId, answers.identity.marketingConsent === true, lang, true);
     const sessionToken = await issueToken(tx, projectId, "SESSION", sessionExpiresAt);
     return { projectId, sessionToken };
   });
+}
+
+/** Wording shown next to the optional checkbox (identifier stored with each decision). */
+export const MARKETING_WORDING_REF = "marketing-v1";
+
+/** Appends a marketing-consent decision. Skips a no-op (same as the latest decision) unless `force` (the very first decision is always recorded). */
+export async function recordMarketingConsent(db: Db, projectId: string, consented: boolean, language: "es" | "en", force = false): Promise<void> {
+  if (!force) {
+    const last = (await db.query<{ consented: boolean }>("SELECT consented FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at DESC, consent_id DESC LIMIT 1", [projectId])).rows[0];
+    if (last && last.consented === consented) return;
+  }
+  await db.query("INSERT INTO fa4_marketing_consent (project_id, consented, language, wording_ref) VALUES ($1,$2,$3,$4)", [projectId, consented, language, MARKETING_WORDING_REF]);
+}
+export async function latestMarketingConsent(db: Db, projectId: string): Promise<boolean> {
+  return (await db.query<{ consented: boolean }>("SELECT consented FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at DESC, consent_id DESC LIMIT 1", [projectId])).rows[0]?.consented ?? false;
+}
+export async function marketingConsentHistory(db: Db, projectId: string) {
+  return (await db.query("SELECT consented, language, wording_ref, decided_at FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at, consent_id", [projectId])).rows;
 }
 
 export async function legalAcceptances(db: Db, projectId: string) {

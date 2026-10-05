@@ -18,7 +18,8 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const token = auth ? sessionStore.get() : null;
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // Not `Authorization`: gateways such as Google IAP consume that header for their own credentials.
+  if (token) headers['X-Fa4-Session'] = token;
   const response = await fetch(`${BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   // Where the FA4 API is not enabled, a static host answers with HTML: treat it as unavailable.
   if (!(response.headers.get('Content-Type') ?? '').includes('application/json')) throw new ApiError(response.ok ? 503 : response.status, 'NOT_READY');

@@ -4,15 +4,25 @@ import { L, NC, type L10n } from '@beeside/fa-public-engine';
 /** Journey + result microcopy. Visible vocabulary only: no "frentes", "activadores", "demand signal", "core/adjacent" (DESIGN_HANDOFF §12). */
 export const UI = {
   back: L('Atrás', 'Back'), next: L('Continuar', 'Continue'), saveLater: L('Guardar y seguir después', 'Save and continue later'),
-  stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: NC('logoAlt', 'Logo de beeside', 'beeside logo'),
+  stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: L('beeside', 'beeside'),
   stages: [L('Tu empresa', 'Your company'), L('Tu proyecto', 'Your project'), L('Por qué y cuándo', 'Why and when'), L('Lo que necesita tu proyecto', 'What your project needs'), L('Algo más', 'Anything else'), L('Tu resultado', 'Your result')] as L10n[],
   saved: L('Te enviamos el enlace de regreso a {email}.', 'We sent your return link to {email}.'),
   saveError: L('No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),
 
-  coverTitle: L('Cuéntanos tu proyecto de expansión', 'Tell us about your expansion project'),
-  coverLead: L('Te mostramos lo que entendimos y dónde puede ayudarte beeside.', 'We show you what we understood and where beeside can help.'),
-  coverMeta: L('5–10 minutos · Sin cuenta ni contraseña · No es un examen ni una calificación.', '5–10 minutes · No account or password · Not an exam or a rating.'),
-  coverLang: L('Elige tu idioma', 'Choose your language'), start: L('Empezar', 'Start'),
+  // Cover (PO design): English from the approved mock; Spanish is a proposal pending PO approval (NC).
+  coverEyebrow: NC('cover.eyebrow', 'Un camino más claro. Un mañana más brillante.', 'A clearer path. A brighter tomorrow.'),
+  coverTitleLead: NC('cover.title.lead', 'Tu expansión empieza con una', 'Your expansion starts with a'),
+  coverTitleAccent: NC('cover.title.accent', 'visión más clara.', 'clearer view.'),
+  coverLead: NC('cover.lead', 'Cuéntanos sobre tu proyecto. Te ayudaremos a identificar lo que ya está definido, lo que necesita atención y lo que sigue.', "Tell us about your project. We'll help you identify what's already defined, what needs attention, and what comes next."),
+  coverCta: NC('cover.cta', 'Comienza tu evaluación', 'Start your assessment'),
+  coverNoteStrong: NC('cover.note.strong', 'Dedicar 10–15 minutos a planear hoy te dará semanas de libertad mañana.', 'Investing 10-15 minutes to plan today will give you weeks of freedom tomorrow.'),
+  coverNote: NC('cover.note', 'Puedes guardar y continuar después.', 'You can save and continue later.'),
+  switchLanguage: NC('switchLanguage', 'Cambiar idioma a', 'Switch language to'),
+  // Fixed brand elements: always in English, in both languages.
+  coverProduct: L('First Assessment', 'First Assessment'),
+  coverSideTop: [L('PEOPLE', 'PEOPLE'), L('IDEAS', 'IDEAS'), L('OPPORTUNITIES', 'OPPORTUNITIES'), L('A BRIGHTER TOMORROW', 'A BRIGHTER TOMORROW')],
+  coverSideBottom: [L('EXPAND', 'EXPAND'), L('WITH', 'WITH'), L('CONFIDENCE', 'CONFIDENCE')],
+  benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
   idTitle: L('¿Quién eres tú en este proyecto?', 'Who are you in this project?'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
   name: L('Tu nombre', 'Your name'), company: L('Empresa', 'Company'), email: L('Email de trabajo', 'Work email'),
@@ -158,6 +168,10 @@ export const UI = {
   vsHive: L('The Hive', 'The Hive'), vsHiveD: L('Especialistas y proveedores seleccionados para las necesidades de tu proyecto.', 'Curated specialists and providers for the needs of your project.'),
   vsHub: L('Operation Hub', 'Operation Hub'), vsHubD: L('Un solo lugar para seguir avances, tareas, documentos y próximos pasos.', 'One place to follow progress, tasks, documents and next steps.'),
   vsAdvisory: L('Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: L('Experiencia especializada para ayudarte a resolver decisiones complejas de expansión.', 'Specialized expertise to help you navigate complex expansion decisions.'),
+  idBeforeTitle: L('Antes de continuar', 'Before you continue'),
+  idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu First Assessment.', "Review and accept what's required to continue with your First Assessment."),
+  marketingConsent: L('Quiero recibir novedades, información y comunicaciones comerciales de beeside.', 'I would like to receive news, information and commercial communications from beeside.'),
+  acceptContinue: L('Aceptar y continuar', 'Accept and continue'),
   privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
 } as const;
 

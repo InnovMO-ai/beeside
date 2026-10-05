@@ -1,0 +1,60 @@
+# FA Public v1.0 — INTERNAL STAGING (not a public launch). One command on any machine with Docker; fully reversible: `docker compose down -v`.
+#   cp .env.example .env   # edit the passwords / host
+#   docker compose up -d --build
+# Test data only · email is log-only (never sent) · no Hive sharing · never indexed · basic-auth gate · its own database.
+name: fa4-staging
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}
+      POSTGRES_DB: fa4_staging
+      RUNTIME_DB_PASSWORD: ${DB_RUNTIME_PASSWORD:?set DB_RUNTIME_PASSWORD in .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d fa4_staging"], interval: 5s, timeout: 5s, retries: 15 }
+    # not published to the host: only the backend and the migration job reach it
+
+  prepare:                    # migrations (owner role) + first PUBLISHED catalog version; runs once and exits
+    build: { context: ../.., dockerfile: backend/Dockerfile }
+    command: ["sh", "-c", "node dist/scripts/migrate.js && node dist/scripts/seed-fa4-catalog.js"]
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_OWNER_PASSWORD}@db:5432/fa4_staging
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+
+  backend:                    # the API connects as the least-privilege runtime login role (not owner, not superuser)
+    build: { context: ../.., dockerfile: backend/Dockerfile }
+    environment:
+      NODE_ENV: staging           # internal staging may run on plain http; public production (NODE_ENV=production) keeps its https / secret / proxy guards
+      FA4_ENV: staging
+      SECURITY_HASH_SECRET: ${STAGING_HASH_SECRET:?set STAGING_HASH_SECRET in .env}
+      FA4_API_ENABLED: "true"
+      DATABASE_URL: postgres://beeside_runtime:${DB_RUNTIME_PASSWORD}@db:5432/fa4_staging
+      APP_BASE_URL: ${STAGING_BASE_URL:?set STAGING_BASE_URL in .env}
+      PORT: "8080"
+      # Real Privacy values, when available, simply replace the TEST placeholder:
+      FA4_PRIVACY_VERSION: ${FA4_PRIVACY_VERSION:-}
+      FA4_PRIVACY_URL: ${FA4_PRIVACY_URL:-}
+    depends_on: { prepare: { condition: service_completed_successfully } }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 10 }
+    # not published: reached only through the web service (same origin)
+
+  web:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_FA4_ENV_LABEL: ${STAGING_LABEL:-STAGING INTERNO · datos de prueba · no uses datos reales}
+        VITE_FA4_PRIVACY_URL: ${FA4_PRIVACY_URL:-}
+    environment:
+      API_UPSTREAM_URL: http://backend:8080
+      ROBOTS_NOINDEX: "true"
+      STAGING_BASIC_AUTH: ${STAGING_BASIC_AUTH:?set STAGING_BASIC_AUTH=user:password in .env}
+      STAGING_TEST_LEGAL: "true"
+    ports: ["${WEB_PORT:-8080}:8080"]
+    depends_on: { backend: { condition: service_healthy } }
+
+volumes:
+  dbdata:
