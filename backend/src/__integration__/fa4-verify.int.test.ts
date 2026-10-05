@@ -274,6 +274,16 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
     });
   });
 
+  describe("session header", () => {
+    it("the app's X-Fa4-Session header works like Authorization: Bearer (gateways such as IAP consume Authorization)", async () => {
+      const p = await start(email("hdr"));
+      const viaHeader = await app().get("/api/fa4/session").set("X-Fa4-Session", p.token);
+      expect(viaHeader.status).toBe(200);
+      expect((await app().get("/api/fa4/session").set(auth(p.token))).status).toBe(200);
+      expect((await app().get("/api/fa4/session").set("X-Fa4-Session", "bogus")).status).toBe(401);
+    });
+  });
+
   describe("M2 — immutable, separate legal-acceptance evidence", () => {
     it("records Terms and Privacy separately with version, URL, language, timestamp — and nothing else about the person", async () => {
       const e = email("m2"); const p = await start(e);

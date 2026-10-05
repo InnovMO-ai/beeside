@@ -17,7 +17,7 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
   const calls: Call[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const headers = (init?.headers ?? {}) as Record<string, string>;
-    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers.Authorization };
+    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers["X-Fa4-Session"] };
     calls.push(c);
     const custom = extra(c); if (custom) return custom;
     if (url === "/api/fa4/catalog") return json(publicCatalog);
@@ -72,7 +72,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     render(<Fa4App />);
     await screen.findByRole("heading", { name: "¿En qué punto está la decisión?" });
     expect(calls.find((c) => c.url === "/api/fa4/links/continue")!.body).toEqual({ token: linkToken });
-    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe(`Bearer ${"T".repeat(43)}`);
+    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe("T".repeat(43));   // X-Fa4-Session (not Authorization, which gateways like IAP consume)
     expect(window.location.hash).toBe("");
   });
 

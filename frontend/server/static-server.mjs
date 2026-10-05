@@ -79,28 +79,42 @@ function securityHeaders(response) {
   if (PRODUCTION) response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 }
 
-function proxy(request, response) {
+// Cloud Run service-to-service: when the upstream is a private (IAM-protected) Cloud Run service, the static server presents a Google ID token
+// for it in X-Serverless-Authorization (Cloud Run consumes that header; Authorization / X-Fa4-Session reach the app untouched).
+const UPSTREAM_AUDIENCE = process.env.UPSTREAM_AUTH_AUDIENCE ?? "";
+const METADATA_IDENTITY = process.env.METADATA_IDENTITY_URL ?? "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity";
+let idToken = { value: "", expires: 0 };
+async function upstreamIdToken() {
+  if (!UPSTREAM_AUDIENCE) return null;
+  if (Date.now() < idToken.expires) return idToken.value;
+  const r = await fetch(`${METADATA_IDENTITY}?audience=${encodeURIComponent(UPSTREAM_AUDIENCE)}`, { headers: { "Metadata-Flavor": "Google" } });
+  if (!r.ok) throw new Error(`identity token request failed (${r.status})`);
+  idToken = { value: (await r.text()).trim(), expires: Date.now() + 50 * 60_000 };   // tokens live 1 h
+  return idToken.value;
+}
+
+async function proxy(request, response) {
+  const unavailable = () => {
+    if (!response.headersSent) response.writeHead(502, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: "UPSTREAM_UNAVAILABLE" }));
+  };
+  let token = null;
+  try { token = await upstreamIdToken(); } catch { unavailable(); return; }
   const target = new URL(request.url, UPSTREAM);
   const forwardedFor = [request.headers["x-forwarded-for"], request.socket.remoteAddress].filter(Boolean).join(", ");
   const headers = { ...request.headers, host: UPSTREAM.host, "x-forwarded-for": forwardedFor, "x-forwarded-proto": request.headers["x-forwarded-proto"] ?? "https" };
-  const upstream = (UPSTREAM.protocol === "https:" ? import("node:https") : import("node:http")).then((module) =>
-    module.default.request(target, { method: request.method, headers }, (upstreamResponse) => {
+  if (token) headers["x-serverless-authorization"] = `Bearer ${token}`;
+  try {
+    const module = await (UPSTREAM.protocol === "https:" ? import("node:https") : import("node:http"));
+    const client = module.default.request(target, { method: request.method, headers }, (upstreamResponse) => {
       response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
       upstreamResponse.pipe(response);
-    }),
-  );
-  upstream
-    .then((client) => {
-      client.on("error", () => {
-        if (!response.headersSent) response.writeHead(502, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: "UPSTREAM_UNAVAILABLE" }));
-      });
-      request.pipe(client);
-    })
-    .catch(() => {
-      if (!response.headersSent) response.writeHead(502, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: "UPSTREAM_UNAVAILABLE" }));
     });
+    client.on("error", unavailable);
+    request.pipe(client);
+  } catch {
+    unavailable();
+  }
 }
 
 async function serve(filePath, response, status = 200) {

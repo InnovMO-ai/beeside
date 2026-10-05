@@ -50,7 +50,11 @@ export const FA4_RATE_LIMITS = {
 } as const;
 
 type Handler = (req: Request, res: Response) => Promise<void>;
-const bearer = (req: Request) => /^Bearer\s+(\S+)$/i.exec(req.header("authorization") ?? "")?.[1] ?? null;
+/**
+ * The working-session token: `X-Fa4-Session` (what the app sends — it survives gateways such as Google IAP that consume the
+ * Authorization header for their own credentials) or, equivalently, `Authorization: Bearer`.
+ */
+const bearer = (req: Request) => req.header("x-fa4-session")?.trim() || /^Bearer\s+(\S+)$/i.exec(req.header("authorization") ?? "")?.[1] || null;
 const bodyOf = (req: Request): Record<string, unknown> => (typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {});
 const maskEmail = (e: string) => { const [u = "", d = ""] = e.split("@"); return `${u.slice(0, 1)}***@${d}`; };
 
