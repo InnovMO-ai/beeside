@@ -9,7 +9,7 @@ test('R1: lavender band, headline sentence, white per-destination cards with edi
   const token = await seed(request, journeyB('es', 'unknown'), 'reflection');
   await open(page, token);
   await expect(page.locator('.shell.tinted')).toBeVisible();
-  await expect(page.locator('.r1-lead')).toContainText('Tu empresa se dedica a');
+  await expect(page.locator('.r1-lead')).toContainText('Müller Automation');
   expect(await page.locator('.r1-card').count()).toBeGreaterThanOrEqual(2);   // one white card per component/destination
   await expect(page.locator('.r1-card').first()).toContainText('En México');
   expect(await page.locator('.r1 button.frag').count()).toBeGreaterThan(4);

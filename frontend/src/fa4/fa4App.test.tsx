@@ -3,17 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { SEED_CATALOG } from "@beeside/fa-public-engine/seed";
+import { clientResolution, toPublicCatalog } from "@beeside/fa-public-engine";
 import { journeyA } from "@beeside/fa-public-engine/testing";
 import { Fa4App } from "./Fa4App";
 import { modelFor } from "./fa4.test-helpers";
 
 type Call = { url: string; method: string; body?: unknown; auth?: string };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-// The API never sends internal fields (partner refs, sourcing policy) to the browser.
-const publicCatalog = {
-  ...SEED_CATALOG,
-  capabilities: SEED_CATALOG.capabilities.map((cap) => { const c = { ...cap }; delete c.internalRef; delete c.sourcingPolicy; return c; }),
-};
+// The API sends only the public projection (Front names + keyword index); resolution is per project and server-side.
+const publicCatalog = toPublicCatalog(SEED_CATALOG);
 
 function mockApi(extra: (c: Call) => Response | null = () => null) {
   const calls: Call[] = [];
@@ -23,6 +21,7 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
     calls.push(c);
     const custom = extra(c); if (custom) return custom;
     if (url === "/api/fa4/catalog") return json(publicCatalog);
+    if (url === "/api/fa4/session/resolution") return json(clientResolution((c.body as { answers: never }).answers, SEED_CATALOG));
     if (url === "/api/fa4/sessions") return json({ sessionToken: "S".repeat(43) }, 201);
     if (url === "/api/fa4/session" && c.method === "PUT") return json({ ok: true });
     if (url === "/api/fa4/session/finish-later") return json({ ok: true, email: "l***@nubia.example" });
@@ -40,11 +39,11 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     render(<Fa4App />);
     await screen.findByRole("button", { name: "Empezar" });
     fireEvent.click(screen.getByRole("radio", { name: "English" }));
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Understand your expansion in a few minutes");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us about your expansion project");
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
     expect(screen.queryByRole("radio", { name: "Español" })).toBeNull();           // no language switcher after the cover
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Name"), "Ana");
+    await user.type(screen.getByLabelText("Your name"), "Ana");
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));

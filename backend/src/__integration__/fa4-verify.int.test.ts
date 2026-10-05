@@ -9,7 +9,7 @@ import { CaptureEmailTransport } from "../fa/email/email-adapter";
 import {
   catalogVersions, loadPublishedCatalog, publishCapability, rawSignals, saveCapabilityDraft, seedCatalogIfEmpty,
 } from "../fa4/repository";
-import { Fa4Deps, publicCatalog } from "../fa4/routes";
+import { Fa4Deps } from "../fa4/routes";
 import { MemoryRateLimitStore, createRateLimiter } from "../security/rate-limit";
 
 /**
@@ -370,22 +370,33 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
   });
 
   describe("public catalog, status normalization and input hygiene", () => {
-    it("/api/fa4/catalog exposes only the customer-safe PUBLISHED projection (internal-only fields cannot reach it)", async () => {
+    it("the public catalog cannot enumerate the internal capability × coverage matrix; resolution is server-side and per project", async () => {
       const tag = uniq(); const id = `CAP_TEST_LEAK_${tag}`;
-      const secret = { internalRef: "SECRET-INTERNAL-REF", sourcingPolicy: "SECRET-POLICY", providerStatus: "AFFILIATED", businessCheckStatus: "PASSED", internalDescription: "SECRET-DESC", scopeLimitEs: "límite público" };
+      const secret = { internalRef: "SECRET-INTERNAL-REF", sourcingPolicy: "SECRET-POLICY", providerStatus: "AFFILIATED", businessCheckStatus: "PASSED", internalDescription: "SECRET-DESC", scopeLimitEs: "límite interno" };
       await saveCapabilityDraft(rtDb, { ...SEED_CATALOG.capabilities.find((c) => c.capabilityId === "CAP_HIVE_FIN_BANKING")!, capabilityId: id, ...secret } as never, "a", "x");
-      await saveCapabilityDraft(rtDb, { ...SEED_CATALOG.capabilities.find((c) => c.capabilityId === "CAP_HIVE_FIN_BANKING")!, capabilityId: `${id}_D`, internalRef: "SECRET-DRAFT-ONLY" } as never, "a", "draft stays draft");
       expect(await publishCapability(rtDb, id, "a", "x", `vleak-${tag}`)).toMatchObject({ ok: true });
-      const res = await app().get("/api/fa4/catalog");
+      const res = await app().get("/api/fa4/catalog");   // unauthenticated
       expect(res.status).toBe(200);
+      const keys = new Set<string>();
+      JSON.stringify(res.body, (k, v) => { if (k && Number.isNaN(Number(k))) keys.add(k); return v; });
+      expect([...keys].sort()).toEqual(["front", "fronts", "key", "nameEn", "nameEs", "term", "textIndex", "version", "weight"]);   // no capabilities, coverage, countries or statuses exist in the shape
       const body = JSON.stringify(res.body);
-      for (const s of ["SECRET-INTERNAL-REF", "SECRET-POLICY", "SECRET-DESC", "SECRET-DRAFT-ONLY", "AFFILIATED", "PASSED", "internalRef", "sourcingPolicy", `${id}_D`, "Grant Thornton", "Santander", "MAPFRE"]) expect(body).not.toContain(s);
-      const caps = res.body.capabilities as Array<Record<string, unknown>>;
-      expect(caps.every((c) => c.providerStatus === "NONE" && c.businessCheckStatus === "N/A")).toBe(true);
-      expect(caps.find((c) => c.capabilityId === id)!.scopeLimitEs).toBe("límite público");
-      // the projection is an allow-list: an unknown new internal field is dropped by default
-      const probe = publicCatalog({ ...SEED_CATALOG, capabilities: [{ ...SEED_CATALOG.capabilities[0]!, futureInternalField: "X" } as never] });
-      expect(JSON.stringify(probe)).not.toContain("futureInternalField");
+      for (const s of ["SECRET-", "AFFILIATED", "PASSED", "CAP_HIVE", id, "capabilityStatus", "Grant Thornton", "Santander", "MAPFRE"]) expect(body).not.toContain(s);
+      // the resolution endpoint is not public…
+      expect((await app().post("/api/fa4/session/resolution").send({ answers: journeyA() })).status).toBe(401);
+      // …and for a session it returns only coarse facts for that project: no capability, coverage or state per capability
+      const p = await start(email("res"));
+      const r = await app().post("/api/fa4/session/resolution").set(auth(p.token)).send({ answers: journeyA() });
+      expect(r.status).toBe(200);
+      expect(Object.keys(r.body).sort()).toEqual(["cargoRouteDestinations", "destinations", "premiumShown"]);
+      expect(JSON.stringify(r.body)).not.toMatch(/CAP_|capabilit|coverage|SOURCEABLE|"ACTIVE"|"REVIEW"|trace|provider/);
+      // a probe over many crafted projects still yields only booleans/lists of the project's own topics, never a matrix of countries × capabilities
+      for (const dest of ["MX", "US", "DE", "ZZ"]) {
+        const a = journeyA(); a.destinations.list = [{ iso: dest } as never]; a.components = a.components.map((c) => ({ ...c, destinations: [dest] }));
+        const pr = await app().post("/api/fa4/session/resolution").set(auth(p.token)).send({ answers: a });
+        expect(pr.status).toBe(200);
+        expect(JSON.stringify(pr.body)).not.toMatch(/CAP_|coverage|NO_ACTIVE_COVERAGE|DEVELOPING/);
+      }
     });
 
     it("project status is normalized after an eligibility correction (INELIGIBLE is not sticky)", async () => {

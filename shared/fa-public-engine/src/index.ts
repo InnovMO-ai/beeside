@@ -9,6 +9,8 @@ export { validateCapabilityForPublish, triggerTermWarnings, publishedOnly } from
 export * from "./engine/text";
 export * from "./engine/frontRules";
 export * from "./engine/resolve";
+export * from "./engine/textIndex";
+export * from "./engine/publicView";
 export * from "./engine/yev";
 export * from "./engine/demand";
 export * from "./engine/flow";

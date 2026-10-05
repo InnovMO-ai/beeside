@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildFlow, emptyAnswers, isStepComplete, nextStep, prevStep, STAGE_OF, stepKey, syncComponents,
-  type Answers, type Catalog, type Locale, type StepRef, type YourExpansionViewModel,
+  type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
 } from '@beeside/fa-public-engine';
 import { api, ApiError, sessionStore } from './api';
 import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
-import { UI } from './copy/ui';
+import { UI, fill } from './copy/ui';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
@@ -22,7 +22,8 @@ function linkFromLocation(): { token: string; view: string | null } | null {
 /** FA Public v1.0 application controller. Pure view over the deterministic engine; every conclusion comes from the server-stored answers + PUBLISHED catalog. */
 export function Fa4App() {
   const [a, setA] = useState<Answers>(() => emptyAnswers('es'));
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catalog, setCatalog] = useState<PublicCatalog | null>(null);
+  const [res, setRes] = useState<ClientResolution>(NO_RESOLUTION);
   const [step, setStep] = useState<StepRef>({ id: 'cover' });
   const [hasSession, setHasSession] = useState(false);
   const [model, setModel] = useState<YourExpansionViewModel | null>(null);
@@ -40,7 +41,7 @@ export function Fa4App() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      let cat: Catalog;
+      let cat: PublicCatalog;
       try { cat = await api.catalog(); } catch { if (alive) { setCatalogError(true); setBooting(false); } return; }
       if (!alive) return;
       setCatalogError(false); setCatalog(cat);
@@ -81,7 +82,16 @@ export function Fa4App() {
   }, [a, step, hasSession, locale]);
 
   const goTo = useCallback((k: string) => setStep(parseKey(k)), []);
-  const ctx = useMemo<S.StepCtx | null>(() => (catalog ? { a, set, locale, catalog, goTo } : null), [a, set, locale, catalog, goTo]);
+  // Capability / coverage resolution is server-side (privacy boundary): the browser only receives the coarse facts for THIS project.
+  const resSeq = useRef(0);
+  useEffect(() => {
+    if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company', 'exit'].includes(step.id)) return;
+    const seq = ++resSeq.current;
+    const t = setTimeout(() => { api.resolution(a).then((r) => { if (seq === resSeq.current) setRes(r); }).catch(() => undefined); }, 200);
+    return () => clearTimeout(t);
+  }, [a, hasSession, step.id]);
+  const flow = useMemo<FlowContext>(() => ({ cargoRouteDestinations: res.cargoRouteDestinations }), [res]);
+  const ctx = useMemo<S.StepCtx | null>(() => (catalog ? { a, set, locale, catalog, res, goTo } : null), [a, set, locale, catalog, res, goTo]);
 
   async function ensureSession(): Promise<boolean> {
     if (hasSession) return true;
@@ -105,18 +115,18 @@ export function Fa4App() {
     if (step.id === 'identity' && !(await ensureSession())) return;
     const base = step.id === 'reflection' && a.knowsNeeds === null ? { ...a, projectConfirmed: true, knowsNeeds: false } : a;
     if (base !== a) setA(base);
-    const n = skipCombined(nextStep, base, catalog, step, desktop);
+    const n = skipCombined(nextStep, base, flow, step, desktop);
     if (n.id === 'result') await generate(); else setStep(n);
     window.scrollTo?.({ top: 0 });
   }
-  function onBack() { if (catalog) { setStep(skipCombined(prevStep, a, catalog, step, desktop)); window.scrollTo?.({ top: 0 }); } }
+  function onBack() { if (catalog) { setStep(skipCombined(prevStep, a, flow, step, desktop)); window.scrollTo?.({ top: 0 }); } }
 
   async function saveLater() {
     if (!(await ensureSession())) return;
     try {
       await api.save(a, stepKey(step));
       const r = await api.finishLater();
-      setToast(`${UI.saved[locale]} ${r.email}`);
+      setToast(fill(UI.saved, locale, { email: r.email }));
     } catch { setToast(UI.saveError[locale]); }
   }
   const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch { return false; } };
@@ -155,7 +165,7 @@ export function Fa4App() {
 
   const stage = STAGE_OF[step.id];
   const complete = isStepComplete(step, a);
-  const isLastBeforeResult = nextStep(a, catalog, step).id === 'result';
+  const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
   const label = step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
@@ -175,7 +185,7 @@ export function Fa4App() {
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
       </div></div>
       {toast && <div role="status" className="note" style={{ position: 'fixed', left: 16, right: 16, bottom: 80 }} onClick={() => setToast(null)}>{toast}</div>}
-      <span className="sr-only" data-testid="flow-length">{buildFlow(a, catalog).length}</span>
+      <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>
   );
 }
@@ -223,9 +233,11 @@ function useDesktop(): boolean {
 }
 
 /** On desktop the support and critical-date questions live inside the combined fronts table, so those steps are skipped (not in the "mark what you need" path). */
-function skipCombined(move: typeof nextStep, a: Answers, c: Catalog, from: StepRef, desktop: boolean): StepRef {
+function skipCombined(move: typeof nextStep, a: Answers, c: FlowContext, from: StepRef, desktop: boolean): StepRef {
   let n = move(a, c, from);
   if (!desktop || !buildFlow(a, c).some((x) => x.id === 'fronts_status')) return n;
   while (n.id === 'fronts_support' || n.id === 'fronts_critical') n = move(a, c, n);
   return n;
 }
+
+const NO_RESOLUTION: ClientResolution = { premiumShown: false, cargoRouteDestinations: [], destinations: [] };

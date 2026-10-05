@@ -15,7 +15,7 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
   const A = cap(numberWord(m.counts.applies, locale));
   const headline = m.shortcut
     ? fill(UI.headAppliesShortcut, locale, { applies: A, marked: numberWord(m.counts.marked, locale) })
-    : `${fill(m.counts.applies === 1 ? UI.headApplies1 : UI.headAppliesN, locale, { applies: A })}${m.destinations.length > 1 ? fill(UI.headIn, locale, { n: numberWord(m.destinations.length, locale) }) : t(UI.headToday)}.`
+    : `${fill(m.counts.applies === 1 ? UI.headApplies1 : UI.headAppliesN, locale, { applies: A })}${m.destinations.length > 1 ? fill(UI.headIn, locale, { n: numberWord(m.destinations.length, locale) }) : ''}.`
       + (dependsCount ? (dependsCount === 1 ? t(UI.headDepends1) : fill(UI.headDependsN, locale, { n: cap(numberWord(dependsCount, locale)) })) : '');
 
   return (

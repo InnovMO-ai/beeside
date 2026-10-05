@@ -307,8 +307,10 @@ describe('VERIFY fixes — engine', () => {
   it('M6B — R1 reflection: company sentence + one paragraph per component; every fragment points to the step that edits it; text equals the result text', () => {
     const r = reflectionParagraphs(journeyB('es'));
     expect(r).toHaveLength(4);
-    expect(r[0]!.map((x) => x.text.es).join('')).toBe('Tu empresa se dedica a Automatización para automoción, tiene más de 250 personas y opera en Alemania, República Checa y China.');
-    expect(r[0]!.filter((x) => x.edit).every((x) => x.edit === 'company')).toBe(true);
+    // structured company block: [name] / [what it does] · [size] — no grammar generated from free text
+    expect(r[0]!.map((x) => (x.br ? '\n' : '') + x.text.es).join('')).toBe('Müller Automation\nAutomatización para automoción · 251–1,000 personas');
+    expect(r[0]!.filter((x) => x.edit).map((x) => x.edit)).toEqual(['identity', 'company', 'company']);
+    expect(reflectionParagraphs({ ...journeyB('es'), company: { ...journeyB('es').company, size: null } })[0]!.map((x) => (x.br ? '\n' : '') + x.text.es).join('')).toBe('Müller Automation\nAutomatización para automoción');
     const mx = r[1]!;
     expect(mx.map((x) => x.text.es).join('')).toBe(projectParagraphs(journeyB('es'))[0]!.es);
     expect(mx.find((x) => x.text.es.startsWith('producir'))!.edit).toBe('activity:mx');

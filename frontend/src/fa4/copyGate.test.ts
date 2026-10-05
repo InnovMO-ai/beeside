@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { UI } from './copy/ui';
+import { formatKeyDate } from '@beeside/fa-public-engine';
+import { UI, fill } from './copy/ui';
 
 /**
  * Copy gate. Every customer-facing string must live in copy/ui.ts (or the engine's i18n) as an L()/NC() pair so that the inventory
@@ -44,5 +45,20 @@ describe('copy gate', () => {
     };
     walk(UI, 'UI');
     expect(bad).toEqual([]);
+  });
+
+  it('PO-approved wording (VERIFY close) is in place', () => {
+    expect(UI.saved.es.includes('{email}') && fill(UI.saved, 'es', { email: 'a***@b.c' })).toBe('Te enviamos el enlace de regreso a a***@b.c.');
+    expect(fill(UI.saved, 'en', { email: 'a***@b.c' })).toBe('We sent your return link to a***@b.c.');
+    expect(UI.coverTitle.es).toBe('Cuéntanos tu proyecto de expansión');
+    expect(UI.coverMeta.en).toBe('5–10 minutes · No account or password · Not an exam or a rating.');
+    expect(UI.sizes['251-1000'].es).toBe('251–1,000'); expect(UI.sizes['1000+'].es).toBe('Más de 1,000');
+    expect(UI.noPremiumTitle.en).toBe('Your project, with more clarity');
+    expect(UI.catalogErrorBody.en).not.toMatch(/lost/i);
+    expect(UI.exitBody.es).not.toMatch(/anónim/i);
+    expect(UI.headAppliesN.es).toBe('{applies} temas aplican a tu proyecto');
+  });
+  it('date placeholder examples are inputs the date formatter accepts', () => {
+    for (const ex of ['2028-Q1', '2026-12']) expect(formatKeyDate(ex, 'es')).not.toBe(ex);
   });
 });

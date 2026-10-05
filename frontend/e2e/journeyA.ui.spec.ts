@@ -7,10 +7,10 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByRole('button', { name: 'Empezar' }).click();
 
   // identity (right after the cover; same email is reused everywhere)
-  await page.getByLabel('Nombre').fill('Laura');
+  await page.getByLabel('Tu nombre').fill('Laura');
   await page.getByLabel('Empresa').fill('Nubia Software');
-  await page.getByLabel('Correo de trabajo').fill('laura@nubia.example');
-  await page.getByLabel('Yo', { exact: true }).check();
+  await page.getByLabel('Email de trabajo').fill('laura@nubia.example');
+  await page.getByLabel('Decido yo', { exact: true }).check();
   await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();       // terms + privacy are mandatory and separate
   await page.getByLabel(/Acepto los Términos/).check();
   await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();
@@ -46,7 +46,7 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   // R1 reflection → confirm
-  await expect(page.getByText('Esto es lo que entendemos')).toBeVisible();
+  await expect(page.getByText('esto es lo que entendemos')).toBeVisible();
   await expect(page.getByText(/En México quieres contratar personas/)).toBeVisible();
   await page.getByRole('button', { name: 'Sí, es así' }).click();
 
@@ -61,7 +61,7 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByRole('radio', { name: 'No', exact: true }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();
   // scale (hire-only → people proxy, with "why we ask" and decline option)
-  await expect(page.getByText(/Sólo para dimensionar/)).toBeVisible();
+  await expect(page.getByText(/Sólo nos ayuda a dimensionar/)).toBeVisible();
   await page.getByLabel(/¿Cuántas personas contratarías en México/).fill('3 a 5 personas');
   await page.getByRole('button', { name: 'Continuar' }).click();
   // activators: only "regulated" applies (nothing to sell, no premises) → one short step
@@ -121,5 +121,5 @@ test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.getByRole('button', { name: 'Continuar con beeside' }).click();
   await expect(page.getByText(/tu solicitud quedó registrada/)).toBeVisible();
   await page.getByRole('button', { name: 'Recibir este resultado por email' }).click();
-  await expect(page.getByText('Te lo enviamos al correo que nos diste.')).toBeVisible();
+  await expect(page.getByText('Te lo enviamos al email que nos diste.')).toBeVisible();
 });

@@ -1,24 +1,24 @@
 import { useState, type ReactNode } from 'react';
 import type { Answers, ProjectComponent, ScaleProxy } from '@beeside/fa-public-engine';
 import { frontKey, OPEN_DEST } from '@beeside/fa-public-engine';
-import type { Activity, Catalog, FrontKey, Locale } from '@beeside/fa-public-engine';
+import type { Activity, ClientResolution, FrontKey, Locale, PublicCatalog } from '@beeside/fa-public-engine';
 import { BRAND } from '../brand';
 import { activatorFields, isValidEmail } from '@beeside/fa-public-engine';
 import { plansFor } from '@beeside/fa-public-engine';
-import { destinationsNeedingCargoRoute, mapTextToFront, resolveAll } from '@beeside/fa-public-engine';
+import { mapTextWithIndex } from '@beeside/fa-public-engine';
 import { buildNotApplicable, formatKeyDate, reflectionParagraphs, type Seg } from '@beeside/fa-public-engine';
 import { countryName, STATE_MESSAGES, visibleStateKey } from '@beeside/fa-public-engine';
 import { UI, becauseText } from '../copy/ui';
 import { CheckGroup, ChipGroup, ChipMulti, CountryPicker, Label, RadioGroup, Segmented, TextField } from './controls';
 
-export interface StepCtx { a: Answers; set: (fn: (a: Answers) => Answers) => void; locale: Locale; catalog: Catalog; goTo: (step: string) => void }
+export interface StepCtx { a: Answers; set: (fn: (a: Answers) => Answers) => void; locale: Locale; catalog: PublicCatalog; res: ClientResolution; goTo: (step: string) => void }
 const T = (l: { es: string; en: string }, loc: Locale) => l[loc];
 
 function Head({ eyebrow, title, lead, tint }: { eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; tint?: boolean }) {
   return <header style={tint ? undefined : undefined}>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1 className="h1">{title}</h1>{lead && <p className="lead">{lead}</p>}</header>;
 }
 const compName = (c: ProjectComponent, loc: Locale) => c.destinations.map((d) => (d === OPEN_DEST ? UI.countryYouChoose[loc] : countryName(d, loc))).join(` ${UI.and[loc]} `);
-const frontName = (cat: Catalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? { es: d.nameEs, en: d.nameEn }[loc] : f; };
+const frontName = (cat: PublicCatalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? { es: d.nameEs, en: d.nameEn }[loc] : f; };
 const upd = (s: StepCtx, id: string, fn: (c: ProjectComponent) => ProjectComponent) => s.set((a) => ({ ...a, components: a.components.map((c) => (c.id === id ? fn(c) : c)) }));
 
 // ---------------- 0. cover / identity ----------------
@@ -157,15 +157,16 @@ export function ReflectionStep({ a, set, locale, goTo }: StepCtx) {
   const [lead, ...cards] = reflectionParagraphs(a);
   const frags = (segs: Seg[]) => segs.map((g, i) => {
     const text = g.text[locale];
-    if (!g.edit) return <span key={i}>{text}</span>;
+    const br = g.br ? <br /> : null;
+    if (!g.edit) return <span key={i}>{br}{text}</span>;
     const [, pre = '', core = '', post = ''] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text) ?? [];   // boundary spaces stay outside the button so the sentence reads naturally
-    return <span key={i}>{pre}<button type="button" className="frag" onClick={() => goTo(g.edit!)}>{core}</button>{post}</span>;
+    return <span key={i}>{br}{pre}<button type="button" className="frag" onClick={() => goTo(g.edit!)}>{core}</button>{post}</span>;
   });
   return (
     <div className="r1">
       <div className="r1-main">
         <p className="eyebrow">{a.identity.name.trim() ? `${a.identity.name.trim().split(/\s+/)[0]}, ${UI.r1EyebrowNamed[locale]}` : UI.r1Eyebrow[locale]}</p>
-        <p className="r1-lead">{lead ? frags(lead) : null}</p>
+        <p className="r1-lead">{lead && lead.length ? frags(lead) : null}</p>
         <div className="r1-cards">{cards.map((c, i) => <div className="r1-card" key={i}><p>{frags(c)}</p></div>)}</div>
         <p className="hint r1-fix">{UI.r1Fix[locale]}</p>
       </div>
@@ -255,9 +256,9 @@ export function ActivatorsStep(s: StepCtx & { mode: 'all' | 'sell' | 'site' }) {
 }
 
 /** Rules 6 + 9: canonical Front Catalog names, max 3 groups, reasons only from declared negatives (shared with the result). */
-function NotApplicable({ a, catalog, locale, dest }: { a: Answers; catalog: Catalog; locale: Locale; dest: string }) {
-  const res = resolveAll(a, catalog); const d = res.destinations.find((x) => x.destination === dest); if (!d) return null;
-  const groups = buildNotApplicable(d.plan, (front) => ({ front, name: { es: frontName(catalog, front, 'es'), en: frontName(catalog, front, 'en') } }), res.destinations.length);
+function NotApplicable({ a, catalog, locale, dest }: { a: Answers; catalog: PublicCatalog; locale: Locale; dest: string }) {
+  const plans = plansFor(a); const plan = plans.find((x) => x.destination === dest); if (!plan) return null;
+  const groups = buildNotApplicable(plan, (front) => ({ front, name: { es: frontName(catalog, front, 'es'), en: frontName(catalog, front, 'en') } }), plans.length);
   if (!groups.length) return null;
   return <div style={{ marginTop: 12 }}><b style={{ fontSize: 14 }}>{UI.notApply[locale]}</b>{groups.map((g, i) => <p key={i} className="hint">{g.fronts.map((f) => f.name[locale]).join(' · ')} — {g.reason[locale]}</p>)}</div>;
 }
@@ -273,7 +274,7 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
   const [text, setText] = useState('');
   const mine = s.a.addedNeeds.filter((n) => n.destination === dest || (!n.destination && dest !== OPEN_DEST));
   const loc = s.locale;
-  const premiumShown = resolveAll(s.a, s.catalog).premiumShown;
+  const premiumShown = s.res.premiumShown;
   const add = () => { const v = text.trim(); if (!v) return; s.set((x) => ({ ...x, addedNeeds: [...x.addedNeeds, { id: `n${Date.now()}${x.addedNeeds.length}`, text: v.slice(0, 500), destination: dest }] })); setText(''); };
   return (
     <div style={{ marginTop: 16 }}>
@@ -283,7 +284,7 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
         <button type="button" className="btn outline" onClick={add}>{UI.add[loc]}</button>
       </div>
       {mine.map((n) => {
-        const m = mapTextToFront(n.text, s.catalog);
+        const m = mapTextWithIndex(n.text, s.catalog.textIndex);
         return (
           <div key={n.id} className="card soft" style={{ marginTop: 8 }}>
             <p className="quote">«{n.text}»</p>
@@ -401,7 +402,7 @@ export function FrontsSupportStep(s: StepCtx) {
 
 export function FrontsMarkStep(s: StepCtx) {
   const { a, locale: loc } = s; const plans = plansFor(a);
-  const res = resolveAll(a, s.catalog);
+  const res = s.res;
   const marked = res.destinations.flatMap((d) => d.topics).filter((t) => t.kind === 'applies' && !t.notIndicated).length;
   const total = res.destinations.flatMap((d) => d.topics).filter((t) => t.kind === 'applies').length;
   const setMark = (dest: string, f: FrontKey, v: boolean) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], marked: v } } }));
@@ -414,7 +415,7 @@ export function FrontsMarkStep(s: StepCtx) {
           <div className="dest-head"><h2>{UI.applyHere[loc]} — {countryName(p.destination, loc)}</h2></div>
           <div className="choices">
             {p.applies.map((t) => {
-              const decl = a.addedNeeds.some((n) => n.destination === p.destination && mapTextToFront(n.text, s.catalog).front === t.front);
+              const decl = a.addedNeeds.some((n) => n.destination === p.destination && mapTextWithIndex(n.text, s.catalog.textIndex).front === t.front);
               const on = a.fronts[frontKey(p.destination, t.front)]?.marked === true || decl;
               return (
                 <label key={t.front} className={`choice ${on ? 'on' : ''}`}>
@@ -434,7 +435,9 @@ export function FrontsMarkStep(s: StepCtx) {
 }
 
 export function FrontsCriticalStep(s: StepCtx) {
-  const { a, locale: loc } = s; const res = resolveAll(a, s.catalog);
+  const { a, locale: loc } = s; const res = s.res;
+  // the checkbox reflects the user's own (just-typed) answer immediately; the server-resolved value only fills in what was never touched
+  const crit = (dest: string, f: FrontKey, fromServer: boolean) => a.fronts[frontKey(dest, f)]?.critical ?? fromServer;
   const setCrit = (dest: string, f: FrontKey, v: boolean) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], critical: v } } }));
   const raw = a.externalDate.date;
   const when = raw ? formatKeyDate(raw, loc) : '';
@@ -443,12 +446,12 @@ export function FrontsCriticalStep(s: StepCtx) {
   return (
     <div>
       <Head eyebrow={`${UI.stages[3]![loc]}`} title={title} lead={UI.criticalLead[loc]} />
-      {res.destinations.map((d) => d.needs.filter((n) => n.state !== 'DEPENDENT').length === 0 ? null : (
+      {res.destinations.map((d) => d.needs.filter((n) => !n.dependent).length === 0 ? null : (
         <section key={d.destination}>
           <div className="dest-head"><h2>{countryName(d.destination, loc)}</h2></div>
           <div className="choices">
-            {d.needs.filter((n) => n.state !== 'DEPENDENT').map((n) => (
-              <label key={n.front} className={`choice ${n.critical ? 'on' : ''}`}><input type="checkbox" checked={n.critical} onChange={(e) => setCrit(d.destination, n.front, e.target.checked)} /><span>{frontName(s.catalog, n.front, loc)}</span></label>
+            {d.needs.filter((n) => !n.dependent).map((n) => (
+              <label key={n.front} className={`choice ${crit(d.destination, n.front, n.critical) ? 'on' : ''}`}><input type="checkbox" checked={crit(d.destination, n.front, n.critical)} onChange={(e) => setCrit(d.destination, n.front, e.target.checked)} /><span>{frontName(s.catalog, n.front, loc)}</span></label>
             ))}
           </div>
         </section>
@@ -458,7 +461,7 @@ export function FrontsCriticalStep(s: StepCtx) {
 }
 
 export function CargoRouteStep(s: StepCtx) {
-  const { a, locale: loc } = s; const dests = destinationsNeedingCargoRoute(a, s.catalog);
+  const { a, locale: loc } = s; const dests = s.res.cargoRouteDestinations.filter((d) => a.cargoRoute[d] === undefined);
   const all = [...new Set([...dests, ...Object.keys(a.cargoRoute)])];
   return (
     <div className="narrow">

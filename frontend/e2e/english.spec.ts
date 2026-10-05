@@ -4,13 +4,13 @@ import { axeViolations, noHorizontalOverflow } from './helpers';
 test('English: language is chosen on the cover only; the whole first steps render in English', async ({ page }) => {
   await page.goto('/fa4');
   await page.getByRole('radio', { name: 'English' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Understand your expansion in a few minutes');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tell us about your expansion project');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { name: 'Who are you in this project?' })).toBeVisible();
   await expect(page.getByRole('radio', { name: 'English' })).toHaveCount(0);                 // no language switcher after the cover
   await expect(page.getByRole('radio', { name: 'Español' })).toHaveCount(0);
-  await page.getByLabel('Name').fill('Ana');
+  await page.getByLabel("Your name").fill('Ana');
   await page.getByLabel('Company').fill('Acme');
   await page.getByLabel('Work email').fill('ana@acme.example');
   await page.getByLabel('I do', { exact: true }).check();

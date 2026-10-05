@@ -1,4 +1,4 @@
-import { Locale, NC } from "@beeside/fa-public-engine";
+import { L, Locale } from "@beeside/fa-public-engine";
 import { Db } from "../db/database";
 import { EmailMessage, EmailTransport } from "../fa/email/email-adapter";
 import { backoffSeconds, sanitizeDeliveryError } from "../operations/email-outbox";
@@ -14,16 +14,16 @@ import { issueToken } from "./repository";
  */
 export type Fa4EmailTemplate = "fa4_resume_link" | "fa4_result_link";
 
-const COPY: Record<Fa4EmailTemplate, { subject: ReturnType<typeof NC>; body: ReturnType<typeof NC>; cta: ReturnType<typeof NC> }> = {
+const COPY: Record<Fa4EmailTemplate, { subject: ReturnType<typeof L>; body: ReturnType<typeof L>; cta: ReturnType<typeof L> }> = {
   fa4_resume_link: {
-    subject: NC("email.resume.subject", "Retoma tu First Assessment", "Pick up your First Assessment"),
-    body: NC("email.resume.body", "Usa este enlace para continuar donde lo dejaste.", "Use this link to continue where you left off."),
-    cta: NC("email.resume.cta", "Continuar", "Continue"),
+    subject: L("Retoma tu First Assessment", "Pick up your First Assessment"),
+    body: L("Usa este enlace para continuar donde lo dejaste.", "Use this link to continue where you left off."),
+    cta: L("Continuar", "Continue"),
   },
   fa4_result_link: {
-    subject: NC("email.result.subject", "Tu Your Expansion View", "Your Expansion View"),
-    body: NC("email.result.body", "Aquí está el resultado de tu proyecto.", "Here is the result for your project."),
-    cta: NC("email.result.cta", "Ver mi resultado", "See my result"),
+    subject: L("Your Expansion View de tu proyecto", "Your Expansion View for your project"),
+    body: L("Aquí está Your Expansion View de tu proyecto.", "Here is Your Expansion View for your project."),
+    cta: L("Ver mi resultado", "See my result"),
   },
 };
 

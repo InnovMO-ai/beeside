@@ -1,9 +1,9 @@
 import express, { NextFunction, Request, Response, Router } from "express";
 import {
   answersSchema,
-  Capability,
-  Catalog,
+  clientResolution,
   isValidEmail,
+  toPublicCatalog,
 } from "@beeside/fa-public-engine";
 import { Db } from "../db/database";
 import { EmailTransport } from "../fa/email/email-adapter";
@@ -54,39 +54,6 @@ const bearer = (req: Request) => /^Bearer\s+(\S+)$/i.exec(req.header("authorizat
 const bodyOf = (req: Request): Record<string, unknown> => (typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {});
 const maskEmail = (e: string) => { const [u = "", d = ""] = e.split("@"); return `${u.slice(0, 1)}***@${d}`; };
 
-/**
- * Minimal customer-safe projection of the PUBLISHED catalog, built from an explicit allow-list (a new internal field can never leak
- * by default). It keeps what the deterministic flow needs in the browser — fronts, trigger terms, coverage and capability states,
- * country messages — and nothing internal: no provider / Business Check status, sourcing policy, internal reference or notes.
- */
-export function publicCatalog(c: Catalog): Catalog {
-  return {
-    version: c.version,
-    publishedAt: c.publishedAt,
-    fronts: c.fronts.map((f) => ({
-      key: f.key, internalName: f.key, nameEs: f.nameEs, nameEn: f.nameEn,
-      synonymsEs: f.synonymsEs, synonymsEn: f.synonymsEn, examplesEs: f.examplesEs, examplesEn: f.examplesEn,
-    })) as Catalog["fronts"],
-    categories: c.categories.map((x) => ({ categoryId: x.categoryId, nameEs: x.nameEs, nameEn: x.nameEn, description: "", publicationStatus: x.publicationStatus, validFrom: x.validFrom })),
-    services: c.services.map((x) => ({
-      serviceId: x.serviceId, categoryId: x.categoryId, nameEs: x.nameEs, nameEn: x.nameEn, publicDescription: "", internalDescription: "",
-      aliases: [], publicationStatus: x.publicationStatus, validFrom: x.validFrom,
-    })),
-    capabilities: c.capabilities.map((cap): Capability => ({
-      capabilityId: cap.capabilityId, serviceId: cap.serviceId, kind: cap.kind, nameEs: cap.nameEs, nameEn: cap.nameEn,
-      fronts: cap.fronts, triggerTermsEs: cap.triggerTermsEs, triggerTermsEn: cap.triggerTermsEn,
-      ...(cap.triggerRule ? { triggerRule: cap.triggerRule } : {}),
-      capabilityStatus: cap.capabilityStatus,
-      ...(cap.dependsOn ? { dependsOn: cap.dependsOn } : {}), ...(cap.footnote ? { footnote: true } : {}),
-      coverageBasis: cap.coverageBasis, coverage: cap.coverage,
-      providerStatus: "NONE", businessCheckStatus: "N/A",
-      ...(cap.scopeLimitEs ? { scopeLimitEs: cap.scopeLimitEs } : {}), ...(cap.scopeLimitEn ? { scopeLimitEn: cap.scopeLimitEn } : {}),
-      validFrom: cap.validFrom, updatedAt: cap.updatedAt, publicationStatus: cap.publicationStatus,
-    })),
-    countries: c.countries,
-  };
-}
-
 export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter } = {}): Router {
   const router = Router();
   const limiter = security.limiter;
@@ -114,7 +81,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   };
 
   router.get("/catalog", handle(async (_req, res) => {
-    res.set("Cache-Control", "no-store").json(publicCatalog(await loadPublishedCatalog(deps.db)));
+    res.set("Cache-Control", "no-store").json(toPublicCatalog(await loadPublishedCatalog(deps.db)));
   }));
 
   // Create the project right after the identity step. No account, no password.
@@ -130,6 +97,15 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const now = deps.config.now();
     const created = await createProject(deps.db, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : "company", new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000), deps.config.legal);
     res.status(201).json({ sessionToken: created.sessionToken });
+  }));
+
+  // Server-side capability / coverage resolution for THIS project only: returns coarse, customer-facing facts for the interaction
+  // (which topics apply, which depend on a decision, cargo-route relevance, Premium shown) — never the capability × country matrix.
+  router.post("/session/resolution", handle(async (req, res) => {
+    await session(req);
+    const parsed = answersSchema.safeParse(bodyOf(req).answers);
+    if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
+    res.set("Cache-Control", "no-store").json(clientResolution(parsed.data, await loadPublishedCatalog(deps.db)));
   }));
 
   router.get("/session", handle(async (req, res) => {

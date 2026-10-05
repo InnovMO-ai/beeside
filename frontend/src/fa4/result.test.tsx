@@ -48,7 +48,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
 
   it("Journey B: multi-destination grouping, country message instead of per-service states (ES)", () => {
     const { container } = render(<ResultScreen model={modelFor(journeyB("es", "unknown"))} locale="es" />);
-    expect(screen.getByText("Trece temas aplican en dos países. Uno más depende de una decisión.")).toBeInTheDocument();
+    expect(screen.getByText("Trece temas aplican a tu proyecto en dos países. Uno más depende de una decisión.")).toBeInTheDocument();
     expect(screen.getAllByText("beeside aún no cuenta con cobertura activa en este país.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Lo revisaremos con tu Sherpa").length).toBeGreaterThan(0);
     const names = Array.from(container.querySelectorAll(".dest-head h2")).map((h) => h.textContent);
@@ -58,7 +58,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
 
   it("Journey C: marked vs NOT INDICATED semantics are visible and never read as resolved", () => {
     render(<ResultScreen model={modelFor(journeyC("es", "unknown"))} locale="es" />);
-    expect(screen.getByText("Doce temas aplican. Marcaste ocho.")).toBeInTheDocument();
+    expect(screen.getByText("Doce temas aplican a tu proyecto. Marcaste ocho.")).toBeInTheDocument();
     expect(screen.getByText(/«No indicado» no significa resuelto/)).toBeInTheDocument();
     expect(screen.getByText("«grúas de gran capacidad»")).toBeInTheDocument();
   });

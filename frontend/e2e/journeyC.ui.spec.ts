@@ -12,7 +12,7 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   const token = await seed(request, a, 'reflection');
   await open(page, token);
 
-  await expect(page.getByText('Esto es lo que entendemos')).toBeVisible();
+  await expect(page.getByText('esto es lo que entendemos')).toBeVisible();
   await page.getByRole('button', { name: 'Ir directo' }).click();                           // shortcut offered after R1
 
   await page.getByLabel('Ejecutar un contrato ganado').check();
@@ -69,7 +69,7 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await expect(page.getByRole('heading', { level: 1 })).toContainText('México');
   const glance = result.locator('.res-hero');
   await expect(glance).toContainText('Marcados');
-  await expect(result.getByText('Doce temas aplican. Marcaste ocho.')).toBeVisible();
+  await expect(result.getByText('Doce temas aplican a tu proyecto. Marcaste ocho.')).toBeVisible();
   await expect(result.locator('.vgroup').filter({ hasText: 'beeside puede ayudarte' })).toContainText('3');
   await expect(result.getByText('«grúas de gran capacidad»')).toBeVisible();                   // the user's vocabulary is preserved
   await expect(result.getByText('No indicado no significa resuelto', { exact: false }).or(result.getByText(/«No indicado» no significa resuelto/))).toBeVisible();

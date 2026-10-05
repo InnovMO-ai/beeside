@@ -1,4 +1,4 @@
-import type { Answers, Catalog, YourExpansionViewModel } from '@beeside/fa-public-engine';
+import type { Answers, ClientResolution, PublicCatalog, YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /** FA Public v1.0 API client (module fa4). The working session token lives only in this tab; returning later uses the emailed link. */
 const BASE = '/api/fa4';
@@ -28,7 +28,8 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
 }
 
 export const api = {
-  catalog: () => request<Catalog>('GET', '/catalog', undefined, false),
+  catalog: () => request<PublicCatalog>('GET', '/catalog', undefined, false),
+  resolution: (answers: Answers) => request<ClientResolution>('POST', '/session/resolution', { answers }),
   createSession: (answers: Answers, step: string) => request<{ sessionToken: string }>('POST', '/sessions', { answers, step }, false),
   session: () => request<{ answers: Answers; step: string; status: string }>('GET', '/session'),
   save: (answers: Answers, step: string) => request<{ ok: true }>('PUT', '/session', { answers, step }),

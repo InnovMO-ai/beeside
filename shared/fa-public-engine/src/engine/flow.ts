@@ -42,7 +42,11 @@ export function activatorCount(a: Answers): number {
 }
 
 /** The ordered list of steps for the current answers. Pure and deterministic; the UI only walks this list. */
-export function buildFlow(a: Answers, catalog: Catalog): StepRef[] {
+/** What the flow needs from the catalog: only where the cargo-route question applies. The browser gets it from the server (ClientResolution). */
+export interface FlowContext { cargoRouteDestinations: string[] }
+const cargoDests = (a: Answers, ctx: Catalog | FlowContext): string[] => ('cargoRouteDestinations' in ctx ? ctx.cargoRouteDestinations : destinationsWithCargoRouteRelevance(a, ctx));
+
+export function buildFlow(a: Answers, catalog: Catalog | FlowContext): StepRef[] {
   const s: StepRef[] = [{ id: 'cover' }, { id: 'identity' }, { id: 'company' }];
   if (a.company.hasExistingBusiness === false) { s.push({ id: 'exit' }); return s; }   // eligibility gate (D-038)
   s.push({ id: 'destinations' });
@@ -68,7 +72,7 @@ export function buildFlow(a: Answers, catalog: Catalog): StepRef[] {
   if (shortcut) s.push({ id: 'fronts_mark' });
   else s.push({ id: 'fronts_status' }, { id: 'fronts_support' });
   if (a.externalDate.has) s.push({ id: 'fronts_critical' });
-  if (!onlyInvestProject && dests.length && destinationsWithCargoRouteRelevance(a, catalog).length) s.push({ id: 'cargo_route' });
+  if (!onlyInvestProject && dests.length && cargoDests(a, catalog).length) s.push({ id: 'cargo_route' });
   s.push({ id: 'support_values' }, { id: 'extra' }, { id: 'result' });
   return s;
 }
@@ -77,13 +81,13 @@ const STEP_ORDER: StepId[] = ['cover', 'identity', 'company', 'exit', 'destinati
   'activators', 'activators_sell', 'activators_site', 'fronts_status', 'fronts_mark', 'fronts_support', 'fronts_critical', 'cargo_route', 'support_values', 'extra', 'result'];
 
 /** Next step. If the current step has just left the flow (an answer made it irrelevant), continue in canonical order instead of jumping back. */
-export function nextStep(a: Answers, catalog: Catalog, current: StepRef): StepRef {
+export function nextStep(a: Answers, catalog: Catalog | FlowContext, current: StepRef): StepRef {
   const f = buildFlow(a, catalog); const i = f.findIndex((x) => stepKey(x) === stepKey(current));
   if (i >= 0) return f[Math.min(f.length - 1, i + 1)]!;
   const cur = STEP_ORDER.indexOf(current.id);
   return f.find((x) => STEP_ORDER.indexOf(x.id) > cur) ?? f[f.length - 1]!;
 }
-export function prevStep(a: Answers, catalog: Catalog, current: StepRef): StepRef {
+export function prevStep(a: Answers, catalog: Catalog | FlowContext, current: StepRef): StepRef {
   const f = buildFlow(a, catalog); const i = f.findIndex((x) => stepKey(x) === stepKey(current));
   if (i >= 0) return f[Math.max(0, i - 1)]!;
   const cur = STEP_ORDER.indexOf(current.id);

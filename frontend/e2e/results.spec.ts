@@ -31,7 +31,7 @@ test('Result B — multi-destination grouping and country message instead of per
   await open(page, token);
   await page.getByRole('button', { name: 'Ver mi resultado' }).click();
   const r = page.getByTestId('result-screen');
-  await expect(r.getByText('Trece temas aplican en dos países. Uno más depende de una decisión.')).toBeVisible();
+  await expect(r.getByText('Trece temas aplican a tu proyecto en dos países. Uno más depende de una decisión.')).toBeVisible();
   await expect(r.getByText('beeside aún no cuenta con cobertura activa en este país.').first()).toBeVisible();
   await expect(r.getByText('Lo revisaremos con tu Sherpa').first()).toBeVisible();      // permits NOT_OFFERED with Premium continuation
   const us = r.locator('.dest-head', { hasText: 'Estados Unidos' }).last().locator('..');
@@ -94,6 +94,6 @@ test('Ineligible (no existing business) exits early and respectfully', async ({ 
   await expect(page.getByRole('heading', { name: '¿Quiénes son?' })).toBeVisible();
   await page.getByLabel('Sí', { exact: true }).check(); await page.getByLabel('No', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: /FA es para negocios en marcha/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /First Assessment es para negocios en marcha/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar' })).toHaveCount(0);
 });

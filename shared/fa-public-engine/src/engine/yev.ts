@@ -1,7 +1,7 @@
 import type { Answers, ProjectComponent, StartWhen } from '../domain/answers';
 import { OPEN_DEST, deriveDecision } from '../domain/answers';
 import type { Catalog, FrontKey, Locale, RoutingState } from '../domain/types';
-import { L, NC, countryL10n, type L10n, type VisibleStateKey, visibleStateKey } from '../i18n/messages';
+import { L, countryL10n, type L10n, type VisibleStateKey, visibleStateKey } from '../i18n/messages';
 import type { CountryMessageKind, Resolution, ResolvedNeed } from './resolve';
 import { resolveAll } from './resolve';
 import { FRONT_ORDER } from '../catalog/fronts';
@@ -87,7 +87,7 @@ export const START_LABEL: Record<StartWhen, L10n> = {
   '3m': L('Empezar en unos 3 meses', 'Start in about 3 months'),
   '6m': L('Empezar en unos 6 meses', 'Start in about 6 months'),
   '12m': L('Empezar en un año o más', 'Start in a year or more'),
-  unknown: NC('yev.start.unknown', 'Momento de inicio aún por definir', 'Start date still to be defined'),
+  unknown: L('Momento de inicio aún por definir', 'Start date still to be defined'),
 };
 
 export function formatKeyDate(raw: string | undefined, locale: Locale): string {
@@ -125,25 +125,25 @@ function componentPhrase(c: ProjectComponent, a: Answers): L10n {
     return t ? L(`Un equipo de ${t}`, `A team of ${t}`) : L('Un equipo', 'A team');
   }
   if (acts.includes('sell')) return L('Presencia comercial', 'Commercial presence');
-  if (acts.includes('invest_only')) return NC('yev.phrase.invest', 'Inversión', 'Investment');
-  return NC('yev.phrase.operation', 'Operación', 'Operation');
+  if (acts.includes('invest_only')) return L('Inversión', 'Investment');
+  return L('Operación', 'Operation');
 }
 
 function presenceTail(c: ProjectComponent): L10n {
   const dur = c.durationMonths ? (c.durationMonths % 12 === 0 ? L(`unos ${c.durationMonths / 12} años`, `about ${c.durationMonths / 12} years`) : L(`unos ${c.durationMonths} meses`, `about ${c.durationMonths} months`)) : null;
-  if (c.permanence === 'temporary') return NC('yev.tail.temporary', `durante ${dur?.es ?? 'un periodo definido'}, con fin previsto`, `for ${dur?.en ?? 'a defined period'}, with a planned end`);
+  if (c.permanence === 'temporary') return L(`durante ${dur?.es ?? 'un periodo definido'}, con fin previsto`, `for ${dur?.en ?? 'a defined period'}, with a planned end`);
   switch (c.presence) {
-    case 'own_physical': return c.activities.includes('produce') ? L('de forma permanente y con planta propia', 'permanently and with your own plant') : NC('yev.tail.own', 'con presencia propia', 'with your own presence');
-    case 'own_onsite': return NC('yev.tail.onsite', 'ejecutando en sitio', 'executing on site');
-    case 'third_parties': return NC('yev.tail.third', 'a través de terceros', 'through third parties');
-    case 'remote': return NC('yev.tail.remote', 'de forma remota', 'remotely');
-    case 'acquisition': return NC('yev.tail.acq', 'mediante una adquisición', 'through an acquisition');
-    default: return NC('yev.tail.open', 'aún sin definir cómo', 'with the form still to be defined');
+    case 'own_physical': return c.activities.includes('produce') ? L('de forma permanente y con planta propia', 'permanently and with your own plant') : L('con presencia propia', 'with your own presence');
+    case 'own_onsite': return L('ejecutando en sitio', 'executing on site');
+    case 'third_parties': return L('a través de terceros', 'through third parties');
+    case 'remote': return L('de forma remota', 'remotely');
+    case 'acquisition': return L('mediante una adquisición', 'through an acquisition');
+    default: return L('aún sin definir cómo', 'with the form still to be defined');
   }
 }
 
 /** A piece of reflected text; `edit` is the journey step (stepKey) the user returns to when tapping it (frozen R1: "Toca cualquier parte para corregirla"). */
-export interface Seg { text: L10n; edit?: string }
+export interface Seg { text: L10n; edit?: string; /** line break before this segment */ br?: boolean }
 const seg = (es: string, en: string, edit?: string): Seg => ({ text: L(es, en), ...(edit ? { edit } : {}) });
 
 /** Reflected paragraphs of the project per component (R1 and "Tu proyecto"), as editable segments. Same words as the stored result text. */
@@ -173,7 +173,6 @@ export function projectSegments(a: Answers): Seg[][] {
   if (a.components.length > 1 && a.projectConfirmed) out.push([seg('Lo consideras un solo proyecto.', 'You see it as a single project.', 'destinations')]);
   return out;
 }
-const NCseg = (id: string, es: string, en: string, edit?: string): Seg => ({ text: NC(id, es, en), ...(edit ? { edit } : {}) });
 const joinSegs = (p: Seg[]): L10n => L(p.map((x) => x.text.es).join(''), p.map((x) => x.text.en).join(''));
 
 export function projectParagraphs(a: Answers): L10n[] {
@@ -182,14 +181,18 @@ export function projectParagraphs(a: Answers): L10n[] {
 
 /** R1 — "Esto es lo que entendemos": company sentence + one paragraph per component, each fragment editable. */
 export function reflectionParagraphs(a: Answers): Seg[][] {
+  // Structured company block (no grammar generated from free text): [Company name] / [What it does] · [size, if declared].
   const c = a.company;
-  const countries = c.operatesIn.length ? joinL(c.operatesIn.map(countryL10n)) : null;
+  const company: Seg[] = [];
+  const name = a.identity.company.trim();
+  if (name) company.push({ text: L(name, name), edit: 'identity' });
+  const what = c.sector.trim();
   const size = c.size ? sizeLabel(c.size) : null;
-  const company: Seg[] = [NCseg('r1.company.lead', 'Tu empresa ', 'Your company ', 'company')];
-  company.push(c.sector.trim() ? NCseg('r1.company.sector', `se dedica a ${c.sector.trim()}`, `works in ${c.sector.trim()}`, 'company') : NCseg('r1.company.running', 'está en marcha', 'is up and running', 'company'));
-  if (size) company.push(NCseg('r1.company.size', `, tiene ${low1(size.es)}`, `, has ${low1(size.en)}`, 'company'));
-  if (countries) company.push(NCseg('r1.company.countries', ` y opera en ${countries.es}`, ` and operates in ${countries.en}`, 'company'));
-  company.push(seg('.', '.'));
+  if (what) company.push({ text: L(what, what), edit: 'company', ...(name ? { br: true } : {}) });
+  if (size) {
+    if (what) company.push(seg(' · ', ' · '));
+    company.push({ text: size, edit: 'company', ...(!what && name ? { br: true } : {}) });
+  }
   return [company, ...projectSegments(a)];
 }
 
@@ -340,7 +343,7 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
     const comp = res.destinations.find((x) => x.destination === d.destination)?.plan.component;
     if (!comp) continue;
     if (comp.location === 'undecided' && (comp.presence === 'own_physical' || comp.presence === 'own_onsite'))
-      stillOpen.push(comp.activities.includes('produce') ? L(`Ubicación de la planta en ${d.name.es}`, `Plant location in ${d.name.en}`) : NC('yev.open.where', `Dónde estará el proyecto en ${d.name.es}`, `Where the project will be in ${d.name.en}`));
+      stillOpen.push(comp.activities.includes('produce') ? L(`Ubicación de la planta en ${d.name.es}`, `Plant location in ${d.name.en}`) : L(`Dónde estará el proyecto en ${d.name.es}`, `Where the project will be in ${d.name.en}`));
     if (d.depends) {
       const c = d.depends.cause;
       stillOpen.push(c === 'hire' ? L('Cómo contratar formalmente', 'How to hire formally') : c === 'legal_operation' ? L(`Cómo operarás legalmente en ${d.name.es}`, `How you will operate legally in ${d.name.en}`) : L(`Cómo estarás presente en ${d.name.es}`, `How you will be present in ${d.name.en}`));
@@ -354,16 +357,16 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
   for (const c of a.components) {
     const s = a.scale[c.id]; const dn = joinL(c.destinations.map((d) => countryL10n(d)));
     if (!s || s.proxy === 'people') continue;
-    if (s.declined) projectSize.push(NC('yev.size.declined', `En ${dn.es}: prefieres no decirlo.`, `In ${dn.en}: you prefer not to say.`));
-    else if (s.text) projectSize.push(s.proxy === 'investment' ? L(`Inversión preliminar en ${dn.es}: ${s.text}.`, `Preliminary investment in ${dn.en}: ${s.text}.`) : NC('yev.size.generic', `En ${dn.es}: ${s.text}.`, `In ${dn.en}: ${s.text}.`));
+    if (s.declined) projectSize.push(L(`En ${dn.es}: prefieres no decirlo.`, `In ${dn.en}: you prefer not to say.`));
+    else if (s.text) projectSize.push(s.proxy === 'investment' ? L(`Inversión preliminar en ${dn.es}: ${s.text}.`, `Preliminary investment in ${dn.en}: ${s.text}.`) : L(`En ${dn.es}: ${s.text}.`, `In ${dn.en}: ${s.text}.`));
     else projectSize.push(L(`En ${dn.es}: aún sin definir.`, `In ${dn.en}: not yet defined.`));
   }
 
   const REASON_LABEL: Record<string, L10n> = {
-    client_request: NC('yev.reason.client_request', 'Un cliente te lo pidió', 'A customer asked for it'), follow_clients: NC('yev.reason.follow_clients', 'Acompañar a clientes actuales', 'Following current customers'),
-    growth: NC('yev.reason.growth', 'Oportunidad de crecimiento', 'Growth opportunity'), talent: NC('yev.reason.talent', 'Acceso a talento', 'Access to talent'), cost: NC('yev.reason.cost', 'Costos y eficiencia', 'Cost and efficiency'),
-    resilience: NC('yev.reason.resilience', 'Resiliencia de la cadena de suministro', 'Supply chain resilience'), diversify: NC('yev.reason.diversify', 'Diversificar mercados o riesgos', 'Diversifying markets or risks'),
-    contract: NC('yev.reason.contract', 'Ejecutar un contrato ganado', 'Executing a contract you won'), partner: NC('yev.reason.partner', 'Una plataforma para crecer con otros clientes', 'A platform to grow with other customers'), other: NC('yev.reason.other', 'Otro motivo', 'Another reason'),
+    client_request: L('Un cliente te lo pidió', 'A customer asked for it'), follow_clients: L('Acompañar a clientes actuales', 'Following current customers'),
+    growth: L('Oportunidad de crecimiento', 'Growth opportunity'), talent: L('Acceso a talento', 'Access to talent'), cost: L('Costos y eficiencia', 'Cost and efficiency'),
+    resilience: L('Resiliencia de la cadena de suministro', 'Supply chain resilience'), diversify: L('Diversificar mercados o riesgos', 'Diversifying markets or risks'),
+    contract: L('Ejecutar un contrato ganado', 'Executing a contract you won'), partner: L('Una plataforma para crecer con otros clientes', 'A platform to grow with other customers'), other: L('Otro motivo', 'Another reason'),
   };
 
   const sectorL: L10n | null = a.company.sector ? L(a.company.sector, a.company.sector) : null;
@@ -398,7 +401,7 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
 function sizeLabel(s: string): L10n {
   const m: Record<string, L10n> = {
     '1-10': L('1–10 personas', '1–10 people'), '11-50': L('11–50 personas', '11–50 people'), '51-250': L('51–250 personas', '51–250 people'),
-    '251-1000': L('Más de 250 personas', 'More than 250 people'), '1000+': L('Más de 1.000 personas', 'More than 1,000 people'),
+    '251-1000': L('251–1,000 personas', '251–1,000 people'), '1000+': L('Más de 1,000 personas', 'More than 1,000 people'),
   };
   return m[s] ?? L(s, s);
 }

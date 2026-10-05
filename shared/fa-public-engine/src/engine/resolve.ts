@@ -5,6 +5,7 @@ import type {
 } from '../domain/types';
 import { FRONT_ORDER } from '../catalog/fronts';
 import { dependsCause, planFor, type Because, type DependsCause, type DestinationPlan } from './frontRules';
+import { buildTextIndex, mapTextWithIndex } from './textIndex';
 import { containsTerm, norm } from './text';
 
 /** Conservative ordering (CAPABILITY_REGISTRY §7.2): NOT_OFFERED / UNMAPPED < DEPENDENT < REVIEW < SOURCEABLE < ACTIVE. */
@@ -103,20 +104,7 @@ export function evaluateCapability(cap: Capability, dest: string, a: Answers): R
 
 export interface TextMatch { front: FrontKey | null; weight: number }
 export function mapTextToFront(text: string, catalog: Catalog): TextMatch {
-  const h = norm(text);
-  let best: TextMatch = { front: null, weight: 0 };
-  for (const front of FRONT_ORDER) {
-    const def = catalog.fronts.find((f) => f.key === front);
-    if (!def) continue;
-    let weight = 0;
-    for (const t of [...def.synonymsEs, ...def.synonymsEn]) if (containsTerm(h, t)) weight += 1;
-    for (const c of catalog.capabilities) {
-      if (c.publicationStatus !== 'PUBLISHED' || !c.fronts.some((x) => x.front === front && x.match === 'SPECIFIC')) continue;
-      for (const t of [...c.triggerTermsEs, ...c.triggerTermsEn]) if (containsTerm(h, t)) weight += 2;
-    }
-    if (weight > best.weight) best = { front, weight };
-  }
-  return best;
+  return mapTextWithIndex(text, buildTextIndex(catalog));
 }
 
 // ---------- the resolver ----------
