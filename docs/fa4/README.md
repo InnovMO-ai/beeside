@@ -49,3 +49,6 @@ Email delivery needs a real provider behind `EmailTransport` (development logs /
 
 ## Launch readiness
 `npm run fa4:launch-check` prints each launch blocker (CHK-1 Terms/Privacy, BRAND-1..3, LEGAL-1 blocked copy, email provider) as READY / PENDING from the environment the release will use and exits 1 while any is pending; it never treats a placeholder as valid. A release frontend build uses `VITE_FA4_LAUNCH=true`, which fails unless the official Privacy URL is set (`VITE_FA4_PRIVACY_URL`, or `_ES` / `_EN`). Backend: `FA4_PRIVACY_VERSION` + `FA4_PRIVACY_URL` (one document for both languages; `FA4_PRIVACY_URL_ES|EN` override), required in production. `FA4_TERMS_URL` likewise.
+
+## Internal staging and brand
+`staging/fa4-internal/` (Docker Compose, reversible with `docker compose down -v`) runs a separate, gated, never-indexed environment with test data, log-only email and a TEST Privacy placeholder (`FA4_ENV=staging`, refused on `beeside.you`). Public production keeps every guard. Official brand assets live in `frontend/src/fa4/assets/brand/` (lockup dark/light, purple bee mark, lifestyle photo); the font stack is the live First Assessment one until an official typeface is supplied.

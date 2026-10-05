@@ -18,7 +18,11 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [["list"]],
   // bypassCSP only so axe-core can be injected; the production CSP itself is asserted by e2e/csp.spec.ts in a context without the bypass.
-  use: { baseURL: `http://localhost:${WEB}`, trace: "retain-on-failure", bypassCSP: true },
+  use: {
+    baseURL: `http://localhost:${WEB}`, trace: "retain-on-failure", bypassCSP: true,
+    // Internal-staging smoke: the same suite runs behind the staging basic-auth gate (E2E_BASIC_AUTH=user:password).
+    ...(process.env.E2E_BASIC_AUTH ? { httpCredentials: { username: process.env.E2E_BASIC_AUTH.split(":")[0]!, password: process.env.E2E_BASIC_AUTH.split(":").slice(1).join(":") } } : {}),
+  },
   globalSetup: "./e2e/global-setup.ts",
   webServer: [
     {

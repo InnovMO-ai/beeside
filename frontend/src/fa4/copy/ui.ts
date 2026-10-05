@@ -4,7 +4,7 @@ import { L, NC, type L10n } from '@beeside/fa-public-engine';
 /** Journey + result microcopy. Visible vocabulary only: no "frentes", "activadores", "demand signal", "core/adjacent" (DESIGN_HANDOFF §12). */
 export const UI = {
   back: L('Atrás', 'Back'), next: L('Continuar', 'Continue'), saveLater: L('Guardar y seguir después', 'Save and continue later'),
-  stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: NC('logoAlt', 'Logo de beeside', 'beeside logo'),
+  stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: L('beeside', 'beeside'),
   stages: [L('Tu empresa', 'Your company'), L('Tu proyecto', 'Your project'), L('Por qué y cuándo', 'Why and when'), L('Lo que necesita tu proyecto', 'What your project needs'), L('Algo más', 'Anything else'), L('Tu resultado', 'Your result')] as L10n[],
   saved: L('Te enviamos el enlace de regreso a {email}.', 'We sent your return link to {email}.'),
   saveError: L('No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),

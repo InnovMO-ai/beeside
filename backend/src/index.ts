@@ -113,10 +113,12 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
 export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): Fa4Deps | undefined {
   if (env.FA4_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
+  const staging = fa4IsInternalStaging(env);
   const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
   return {
     db,
-    email: new LogEmailTransport(env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"),
+    // Internal staging never sends email: it logs (with links, so testers can follow resume / result links) through the log transport.
+    email: new LogEmailTransport(staging || (env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production")),
     config: {
       appBaseUrl: env.APP_BASE_URL,
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
@@ -128,8 +130,21 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
-    emailDispatch: "deferred",
+    // Internal staging delivers inline (no worker needed); everywhere else a worker delivers the outbox.
+    emailDispatch: staging ? "inline" : "deferred",
   };
+}
+
+/**
+ * INTERNAL STAGING (not a public launch): explicit opt-in FA4_ENV=staging. It is refused for the public beeside.you hosts and it enables
+ * only TEST legal placeholders, log-only email and inline delivery. Public production (FA4_ENV unset) keeps every guard.
+ */
+export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.FA4_ENV !== "staging") return false;
+  let host = "";
+  try { host = new URL(env.APP_BASE_URL ?? "").hostname.toLowerCase(); } catch { /* validated by the caller */ }
+  if (host === "beeside.you" || host === "www.beeside.you") throw new Error("FA4_ENV=staging is refused for the public host (" + host + "): staging must run on its own internal host");
+  return true;
 }
 
 /**
@@ -143,6 +158,16 @@ export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConf
   // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
   // FA4_TERMS_URL / FA4_PRIVACY_URL set one document for both languages (FA4_*_URL_ES|EN still override per language).
   const privacyEs = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL; const privacyEn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL;
+  // INTERNAL STAGING only: an explicit, visibly non-legal TEST value is recorded as the acceptance evidence for Privacy.
+  if (fa4IsInternalStaging(env) && !env.FA4_PRIVACY_VERSION) {
+    const base = (env.APP_BASE_URL ?? "").replace(/\/$/, "");
+    const test = `${base}/staging/privacy-test`;
+    return {
+      termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+      termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+      privacyVersion: "STAGING-TEST-NOT-LEGAL", privacyUrl: { es: test, en: test },
+    };
+  }
   const missing = [!env.FA4_PRIVACY_VERSION && "FA4_PRIVACY_VERSION", !privacyEs && "FA4_PRIVACY_URL_ES (or FA4_PRIVACY_URL)", !privacyEn && "FA4_PRIVACY_URL_EN (or FA4_PRIVACY_URL)"].filter(Boolean);
   if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
   const ph = "UNSET-LEGAL-1";

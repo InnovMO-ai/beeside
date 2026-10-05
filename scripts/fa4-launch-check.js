@@ -20,9 +20,9 @@ add('CHK-1 Privacy (frontend link)', !!(fe && fn), fe && fn ? fe : 'VITE_FA4_PRI
 
 // BRAND — assets still null/placeholder in brand.ts
 const brand = read('frontend/src/fa4/brand.ts');
-add('BRAND-1 logo', !/logo:\s*\{\s*src:\s*null/.test(brand), 'BRAND.logo.src');
-add('BRAND-2 typography', !/system-ui/.test(brand), 'BRAND.fontStack');
-add('BRAND-3 lifestyle image / Night Shift', !/lifestyleImage:\s*\{\s*src:\s*null/.test(brand), 'BRAND.lifestyleImage.src');
+add('BRAND-1 logo', /logo:\s*\{\s*dark:/.test(brand) && fs.existsSync(path.join(__dirname, '..', 'frontend/src/fa4/assets/brand/lockup-dark.svg')), 'official lockup (dark + light) integrated');
+add('BRAND-2 typography', 'partial', 'no official typeface name/files supplied; interim = the live First Assessment font stack');
+add('BRAND-3 lifestyle image / Night Shift', 'partial', 'lifestyle image integrated; Night Shift treatment for FA 4.0 not defined (legacy FA has one)');
 
 // LEGAL-1 / copy — blocked copy remaining in the inventory
 const inv = read('docs/fa4/COPY_INVENTORY.md');
@@ -33,7 +33,7 @@ add('LEGAL-1 / blocked copy', n === 0, `${n} NEEDS_CANONICAL_COPY entr${n === 1 
 add('Email provider', !!env.FA4_EMAIL_PROVIDER_CONFIGURED, env.FA4_EMAIL_PROVIDER_CONFIGURED ? 'configured' : 'no provider behind EmailTransport (logs/captures only)');
 
 const w = Math.max(...rows.map((r) => r.id.length));
-for (const r of rows) console.log(`${r.ok ? 'READY  ' : 'PENDING'}  ${r.id.padEnd(w)}  ${r.detail}`);
-const pending = rows.filter((r) => !r.ok).length;
+for (const r of rows) console.log(`${r.ok === true ? 'READY  ' : r.ok === 'partial' ? 'PARTIAL' : 'PENDING'}  ${r.id.padEnd(w)}  ${r.detail}`);
+const pending = rows.filter((r) => r.ok !== true).length;
 console.log(`\n${pending ? `${pending} launch blocker(s) pending` : 'all launch blockers closed'}`);
 process.exit(pending ? 1 : 0);

@@ -305,7 +305,7 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
     it("a project cannot be created without configured legal identifiers in production", () => {
       const { fa4LegalFromEnv } = jest.requireActual("../index") as typeof import("../index");
       expect(() => fa4LegalFromEnv({ NODE_ENV: "production" } as never)).toThrow(/LEGAL-1/);
-      expect(fa4LegalFromEnv({ NODE_ENV: "development" } as never).termsVersion).toBe("UNSET-LEGAL-1");
+      expect(fa4LegalFromEnv({ NODE_ENV: "development" } as never).privacyVersion).toBe("UNSET-LEGAL-1");   // Terms default to the official version; Privacy stays an explicit placeholder
     });
   });
 

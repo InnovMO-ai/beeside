@@ -14,6 +14,11 @@ RUN npm ci --ignore-scripts
 COPY shared/canonical-fields shared/canonical-fields
 COPY shared/fa-public-engine shared/fa-public-engine
 COPY frontend frontend
+# Optional build-time settings (internal staging ribbon; the public Privacy link). Empty by default: a public build sets none of the staging ones.
+ARG VITE_FA4_ENV_LABEL=""
+ARG VITE_FA4_PRIVACY_URL=""
+ARG VITE_FA4_LAUNCH=""
+ENV VITE_FA4_ENV_LABEL=$VITE_FA4_ENV_LABEL VITE_FA4_PRIVACY_URL=$VITE_FA4_PRIVACY_URL VITE_FA4_LAUNCH=$VITE_FA4_LAUNCH
 RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=frontend
 
 FROM node:20-slim AS runtime
