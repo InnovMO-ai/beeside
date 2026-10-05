@@ -4,6 +4,7 @@ import {
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
 } from '@beeside/fa-public-engine';
 import { api, ApiError, sessionStore } from './api';
+import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
 import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
@@ -157,10 +158,7 @@ export function Fa4App() {
 
   if (step.id === 'cover') {
     return (
-      <div className="fa4"><EnvRibbon /><div className="shell cover" lang={locale}>
-        <div className="topbar"><Logo /></div>
-        <main className="main"><S.CoverStep locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })} /></main>
-      </div></div>
+      <div className="fa4"><EnvRibbon /><CoverScreen locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })} /></div>
     );
   }
 

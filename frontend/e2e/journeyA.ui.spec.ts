@@ -4,7 +4,7 @@ import { axeViolations, noHorizontalOverflow } from './helpers';
 /** Journey A end-to-end through the real UI (ES): identity → project → fronts → Your Expansion View. */
 test('Journey A — simple project, full UI walk-through', async ({ page }) => {
   await page.goto('/fa4');
-  await page.getByRole('button', { name: 'Empezar' }).click();
+  await page.getByRole('button', { name: 'Comienza tu evaluación' }).click();
 
   // identity (right after the cover; same email is reused everywhere)
   await page.getByLabel('Tu nombre').fill('Laura');

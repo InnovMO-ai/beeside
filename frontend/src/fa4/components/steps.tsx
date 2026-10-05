@@ -21,25 +21,7 @@ const compName = (c: ProjectComponent, loc: Locale) => c.destinations.map((d) =>
 const frontName = (cat: PublicCatalog, f: FrontKey, loc: Locale) => { const d = cat.fronts.find((x) => x.key === f); return d ? { es: d.nameEs, en: d.nameEn }[loc] : f; };
 const upd = (s: StepCtx, id: string, fn: (c: ProjectComponent) => ProjectComponent) => s.set((a) => ({ ...a, components: a.components.map((c) => (c.id === id ? fn(c) : c)) }));
 
-// ---------------- 0. cover / identity ----------------
-export function CoverStep({ onStart, setLocale, locale }: { onStart: () => void; setLocale: (l: Locale) => void; locale: Locale }) {
-  return (
-    <div style={{ maxWidth: 680 }}>
-      <p className="eyebrow">beeside</p>
-      <h1 className="h1">{UI.coverTitle[locale]}</h1>
-      <p className="lead">{UI.coverLead[locale]}</p>
-      <p className="hint" style={{ marginBottom: 24 }}>{UI.coverMeta[locale]}</p>
-      <fieldset style={{ border: 0, padding: 0 }}>
-        <legend className="label">{UI.coverLang[locale]}</legend>
-        <div className="chips" role="radiogroup">
-          {(['es', 'en'] as const).map((l) => <button key={l} type="button" role="radio" aria-checked={locale === l} className={`chip ${locale === l ? 'on' : ''}`} onClick={() => setLocale(l)}>{UI.languageNames[l]}</button>)}
-        </div>
-      </fieldset>
-      <p style={{ marginTop: 28 }}><button className="btn primary" style={{ flex: 'none', minWidth: 200 }} onClick={onStart}>{UI.start[locale]}</button></p>
-    </div>
-  );
-}
-
+// ---------------- identity ----------------
 export function IdentityStep({ a, set, locale }: StepCtx) {
   const id = a.identity; const [touched, setTouched] = useState(false);
   const setId = (p: Partial<Answers['identity']>) => set((x) => ({ ...x, identity: { ...x.identity, ...p } }));
