@@ -21,6 +21,13 @@ import { FaError } from "../fa/services/errors";
 const BUSINESS_RULE_VIOLATION = "BV409";
 const NOT_FOUND_SQLSTATE = "BV404";
 
+/** Returns the first row of a result set that must contain one (INSERT ... RETURNING / SELECT fn()); strict-index safe. */
+function firstRow<T>(rows: T[]): T {
+  const row = rows[0];
+  if (row === undefined) throw new Error("Expected a result row from the database but received none.");
+  return row;
+}
+
 function isPgError(err: unknown): err is { code?: string; message: string } {
   return typeof err === "object" && err !== null && "message" in err;
 }
@@ -60,7 +67,7 @@ export async function createPrecisionAssessment(db: Db, projectId: string): Prom
         "INSERT INTO precision_instance (project_id, scope) VALUES ($1, 'project') RETURNING id",
         [projectId],
       );
-      const instanceId = rows[0].id;
+      const instanceId = firstRow(rows).id;
       await tx.query("INSERT INTO precision_assessment (instance_id, manifest_version) VALUES ($1, $2)", [instanceId, manifestVersion]);
       return { instanceId, manifestVersion };
     });
@@ -102,7 +109,7 @@ export async function getOrCreateCategoryAssessment(
         "INSERT INTO precision_instance (project_id, scope) VALUES ($1, 'category') RETURNING id",
         [projectId],
       );
-      const instanceId = instance[0].id;
+      const instanceId = firstRow(instance).id;
       await tx.query(
         "INSERT INTO category_assessment (instance_id, project_id, category_key, manifest_version, category_origin) VALUES ($1, $2, $3, $4, $5)",
         [instanceId, projectId, categoryKey, manifestVersion, origin],
@@ -143,7 +150,7 @@ export async function recordFact(
         input.confidence ?? null,
       ],
     );
-    return rows[0].fact_record;
+    return firstRow(rows).fact_record;
   });
 }
 
@@ -168,7 +175,7 @@ export async function confirmPrecisionAssessment(db: Db, instanceId: string, con
       "SELECT precision_assessment_confirm($1, $2::jsonb) AS precision_assessment_confirm",
       [instanceId, JSON.stringify(content)],
     );
-    return rows[0].precision_assessment_confirm;
+    return firstRow(rows).precision_assessment_confirm;
   });
 }
 
@@ -181,7 +188,7 @@ export async function completeCategoryAssessment(db: Db, instanceId: string, con
       "SELECT category_assessment_complete($1, $2::jsonb, $3::jsonb) AS category_assessment_complete",
       [instanceId, JSON.stringify(content), JSON.stringify(contextSnapshot)],
     );
-    return rows[0].category_assessment_complete;
+    return firstRow(rows).category_assessment_complete;
   });
 }
 
