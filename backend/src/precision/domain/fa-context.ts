@@ -18,6 +18,8 @@ const POSITIVE_TTL_MS = 30_000;
 export interface FaContextService {
   /** The delivered context or null (none delivered, or the reader failed). Never throws. */
   read(projectId: string): Promise<FaContextRead | null>;
+  /** Like `read`, but says whether a null means "nothing delivered" (failed=false) or "the reader failed just now" (failed=true). Never throws. */
+  readWithStatus(projectId: string): Promise<{ read: FaContextRead | null; failed: boolean }>;
   /** Creates (or reuses) the current source pin for this result. */
   ensurePin(db: Db, projectId: string, read: FaContextRead): Promise<string>;
   invalidate(projectId?: string): void;
@@ -25,21 +27,23 @@ export interface FaContextService {
 
 export function createFaContextService(reader: FaContextReader, log: Logger, now: () => number = Date.now): FaContextService {
   const cache = new Map<string, { at: number; value: FaContextRead }>();
+  async function readWithStatus(projectId: string): Promise<{ read: FaContextRead | null; failed: boolean }> {
+    const hit = cache.get(projectId);
+    if (hit && now() - hit.at < POSITIVE_TTL_MS) return { read: hit.value, failed: false };
+    try {
+      const value = await reader.read(projectId);
+      if (value) cache.set(projectId, { at: now(), value });
+      else cache.delete(projectId);
+      return { read: value, failed: false };
+    } catch (error) {
+      cache.delete(projectId);
+      log("warn", "fa context unavailable", { error: describeError(error) });
+      return { read: null, failed: true };
+    }
+  }
   return {
-    async read(projectId) {
-      const hit = cache.get(projectId);
-      if (hit && now() - hit.at < POSITIVE_TTL_MS) return hit.value;
-      try {
-        const value = await reader.read(projectId);
-        if (value) cache.set(projectId, { at: now(), value });
-        else cache.delete(projectId);
-        return value;
-      } catch (error) {
-        cache.delete(projectId);
-        log("warn", "fa context unavailable", { error: describeError(error) });
-        return null;
-      }
-    },
+    read: async (projectId) => (await readWithStatus(projectId)).read,
+    readWithStatus,
     async ensurePin(db, projectId, read) {
       const find = async (): Promise<string | undefined> => (await db.query<{ id: string }>("SELECT id FROM context_pin WHERE project_id = $1 AND source_result_id = $2", [projectId, read.sourceResultId])).rows[0]?.id;
       const existing = await find();

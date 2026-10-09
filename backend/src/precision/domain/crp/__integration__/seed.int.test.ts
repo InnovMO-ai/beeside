@@ -46,7 +46,7 @@ describeWithDb("demo seed (PostgreSQL)", () => {
     expect(await n("SELECT count(*) AS n FROM category_assessment WHERE project_id = $1 AND lifecycle_status <> 'not_selected'", [a.projectId])).toBe(4);
   });
 
-  it("reset starts a NEW project; the fixtures follow the newest one", async () => {
+  it("reset starts a NEW project; every synthetic project resolves its fixtures from the database marker, anything else resolves nothing", async () => {
     const one = await seedDemoProject(db, { ...opts, reset: true, stage: "map_confirmed" });
     const two = await seedDemoProject(db, { ...opts, reset: true, stage: "map_confirmed" });
     expect(two.projectId).not.toBe(one.projectId);
@@ -55,7 +55,10 @@ describeWithDb("demo seed (PostgreSQL)", () => {
     expect(await loadDemoFixtures(db, { faContext: fa, entitlement: ent })).toBe(two.projectId);
     expect((await fa.read(two.projectId))?.context.company.displayName).toBe(DEMO_COMPANY_NAME);
     expect(await ent.get(two.projectId)).toMatchObject({ premiumActive: true, accessMode: "FULL" });
-    expect(await fa.read(one.projectId)).toBeNull();
+    // a re-seed needs no restart: the earlier synthetic project (same company marker) still answers, a project that is not synthetic never does
+    expect((await fa.read(one.projectId))?.context.company.displayName).toBe(DEMO_COMPANY_NAME);
+    expect(await fa.read("00000000-0000-4000-8000-000000000001")).toBeNull();
+    expect(await ent.get("00000000-0000-4000-8000-000000000001")).toMatchObject({ premiumActive: false, accessMode: "REVOKED" }); // unknown means closed
   });
 
   it("mints a one-time link: stored only as a hash, usable once, never part of the result twice", async () => {

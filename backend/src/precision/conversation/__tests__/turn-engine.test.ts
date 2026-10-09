@@ -209,6 +209,7 @@ describe("AI failure: client turn preserved, no effects, safe retry with the sam
       describe(): ModelProviderDescriptor {
         return { port: "model_provider", implementation: "scripted", mode: "SIMULATED", verification: "NOT_VERIFIED" };
       }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       complete<R extends ModelRequest>(_req: R): Promise<ModelResponseFor<R>> {
         return new Promise(() => undefined);
       }
@@ -285,7 +286,7 @@ describe("model-call budget (<= 2 per turn) and verified output", () => {
     const w = new World({ surface: "category", locale: "en", fixture: { "category:operating_model": { write: claim } }, facts: { dest_country: A(["CL"]) } });
     const opened = await w.open();
     expect(opened.turns[0]?.text).not.toContain("import license");
-    expect(opened.turns[0]?.text).toContain("I can't yet confirm that requirement for that country from an approved source");
+    expect(opened.turns[0]?.text).toContain("I can't confirm that requirement for that country yet");
     expect(opened.turns[0]?.text).toContain("Who will run day-to-day operations?");
     expect(opened.pendingSignals.map((s) => s.kind)).toEqual(["country_claim_unverified"]);
     expect(opened.meta.modelCalls).toBe(1); // R10 is replaced, never regenerated
@@ -403,7 +404,7 @@ describe("reading the client's answer", () => {
     const r = await w.say("Queremos entrar a Chile");
     expect(r.factsToWrite).toEqual([]);
     expect(w.facts.dest_country).toBeUndefined();
-    expect(assistantText(r)).toContain("Necesito precisarlo");
+    expect(assistantText(r)).toContain("Necesito precisar");
     expect(w.lastAssistant().structured).toMatchObject({ state: { fieldKey: "dest_country", clarifyCount: 1 } });
   });
 
@@ -477,7 +478,7 @@ describe("reading the client's answer", () => {
     const inherited = [{ fieldKey: "dest_country", value: ["CL"], displayText: "Chile", sourcePinId: "pin-1", sourceItemRef: "fa:q12" }];
     const w = new World({ surface: "category", locale: "es", inherited });
     const o = await w.open();
-    expect(o.turns[0]?.text).toContain("Con lo que nos contaste en tu First Assessment, ya tenemos esto: Chile. ¿Sigue siendo así?");
+    expect(o.turns[0]?.text).toContain("Con lo que me contaste en tu First Assessment, entiendo esto: Chile. ¿Sigue siendo así?");
     expect(o.turns[0]?.confirmCard).toMatchObject({ kind: "inherited_value", body: "Chile" });
     expect(o.meta.modelCalls).toBe(0);
     const token = o.turns[0]?.confirmCard?.token as string;

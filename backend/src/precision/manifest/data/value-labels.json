@@ -16,7 +16,7 @@
   },
   "CAP_SA_GS_PARTNERSHIP": {
    "en": "Partnership and capability strategy",
-   "es": "Qué capacidades y alianzas necesitas"
+   "es": "Estrategia de alianzas y capacidades"
   },
   "CAP_SA_GS_PLAYBOOK": {
    "en": "Growth strategy playbook",
@@ -24,7 +24,7 @@
   },
   "CAP_SA_ME_APPETITE": {
    "en": "Opportunity fit",
-   "es": "Encaje de la oportunidad con tu empresa"
+   "es": "Encaje de la oportunidad"
   },
   "CAP_SA_ME_COUNTRY_BRIEF": {
    "en": "Country and market brief",
@@ -32,7 +32,7 @@
   },
   "CAP_SA_ME_FEASIBILITY": {
    "en": "Feasibility report",
-   "es": "Viabilidad del proyecto"
+   "es": "Informe de viabilidad"
   },
   "CAP_SA_ME_MARKET_ACCESS": {
    "en": "Market access strategy",
@@ -123,8 +123,8 @@
    "es": "Aéreo"
   },
   "apa_safe_harbor_support": {
-   "en": "APA and safe harbor support",
-   "es": "Apoyo en APA y safe harbor"
+   "en": "Advance pricing agreement (APA) and safe harbor support",
+   "es": "Apoyo en acuerdos anticipados de precios (APA) y puerto seguro"
   },
   "apostille_and_document_legalization": {
    "en": "Apostille and document legalization",
@@ -151,8 +151,8 @@
    "es": "Auditorías e inspecciones"
   },
   "beps_compliance": {
-   "en": "BEPS compliance",
-   "es": "Cumplimiento BEPS"
+   "en": "BEPS compliance (base erosion and profit shifting)",
+   "es": "Cumplimiento BEPS (erosión de la base imponible y traslado de beneficios)"
   },
   "bonded_warehouse": {
    "en": "Bonded warehouse",
@@ -192,7 +192,7 @@
   },
   "clinic_on_site": {
    "en": "On-site clinic",
-   "es": "Consultorio en sitio"
+   "es": "Consultorio en las instalaciones"
   },
   "commercial_contracts": {
    "en": "Commercial contracts",
@@ -391,8 +391,8 @@
    "es": "Nivel inicial"
   },
   "eor_peo": {
-   "en": "Employer of record or PEO",
-   "es": "Empleador de registro o PEO"
+   "en": "Employer of record or professional employer organization (PEO)",
+   "es": "Empleador de registro u organización de empleadores profesionales (PEO)"
   },
   "evaluating": {
    "en": "Evaluating",
@@ -499,7 +499,7 @@
    "es": "Alta"
   },
   "hr_administration": {
-   "en": "HR administration",
+   "en": "Human resources administration",
    "es": "Administración de recursos humanos"
   },
   "hybrid": {
@@ -507,12 +507,12 @@
    "es": "Mixta"
   },
   "ifrs": {
-   "en": "IFRS",
-   "es": "IFRS"
+   "en": "International Financial Reporting Standards (IFRS)",
+   "es": "Normas Internacionales de Información Financiera (NIIF)"
   },
   "ifrs_reporting_adoption": {
-   "en": "IFRS reporting and adoption",
-   "es": "Reporte y adopción de IFRS"
+   "en": "Reporting and adoption of IFRS",
+   "es": "Reporte y adopción de NIIF"
   },
   "immex": {
    "en": "IMMEX",
@@ -904,7 +904,7 @@
   },
   "senior": {
    "en": "Senior",
-   "es": "Senior"
+   "es": "Sénior"
   },
   "services": {
    "en": "Services",
@@ -955,8 +955,8 @@
    "es": "Gestión de créditos y devoluciones fiscales"
   },
   "tax_due_diligence": {
-   "en": "Tax due diligence",
-   "es": "Revisión fiscal de adquisición"
+   "en": "Tax review ahead of a transaction",
+   "es": "Revisión fiscal previa a una operación"
   },
   "temporary_import_export": {
    "en": "Temporary import or export",
@@ -1003,11 +1003,11 @@
    "es": "Sin registro"
   },
   "us_gaap": {
-   "en": "US GAAP",
-   "es": "US GAAP"
+   "en": "US generally accepted accounting principles (US GAAP)",
+   "es": "Principios de contabilidad generalmente aceptados de EE. UU. (US GAAP)"
   },
   "us_gaap_conversion": {
-   "en": "US GAAP conversion",
+   "en": "Conversion to US GAAP",
    "es": "Conversión a US GAAP"
   },
   "valuation": {

@@ -53,7 +53,7 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
 .pz-noprint {}
 
 /* ------------------------------------------------------------ controls */
-.pz-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 0 22px; border-radius: 999px; border: 1.5px solid transparent; font: 600 15px/1 var(--pz-font-body); cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s, color .15s; white-space: normal; text-align: center; }
+.pz-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 12px 22px; border-radius: 999px; border: 1.5px solid transparent; font: 600 15px/1.25 var(--pz-font-body); cursor: pointer; text-decoration: none; transition: background .15s, border-color .15s, color .15s; white-space: normal; text-align: center; }
 .pz-btn-primary { background: var(--pz-fill); color: var(--pz-on-fill) !important; }
 .pz-btn-primary:hover { background: var(--pz-fill-hover); }
 .pz-btn-secondary { background: transparent; color: var(--pz-brand) !important; border-color: var(--pz-brand-2); }
@@ -64,7 +64,7 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
 .pz-btn[disabled] { opacity: .5; cursor: not-allowed; }
 .pz-btn[aria-busy="true"] { cursor: progress; }
 .pz-block { width: 100%; }
-.pz-cta-lg { min-height: 52px; padding: 0 28px; font-size: 16px; }
+.pz-cta-lg { min-height: 52px; padding: 14px 28px; font-size: 16px; }
 .pz-spinner { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: pz-spin .8s linear infinite; }
 @keyframes pz-spin { to { transform: rotate(360deg); } }
 .pz-iconbtn { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--pz-brand); cursor: pointer; }

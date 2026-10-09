@@ -6,9 +6,15 @@ import { FaClientSafeContext, FaContextRead, FaContextReader } from "../ports/fa
 /** FA context reader over synthetic, client-safe contexts supplied by configuration. */
 export class FixtureFaContextReader implements FaContextReader {
   private readonly contexts = new Map<string, FaContextRead>();
+  private fallback: ((projectId: string) => Promise<{ projectId: string; resultId: string; context: FaClientSafeContext; deliveredAt?: string } | null>) | null = null;
 
   constructor(entries: { projectId: string; resultId: string; context: FaClientSafeContext; deliveredAt?: string }[] = []) {
     for (const e of entries) this.add(e);
+  }
+
+  /** Resolves projects that were registered after start-up (configuration lookup on a miss). */
+  setFallback(resolve: (projectId: string) => Promise<{ projectId: string; resultId: string; context: FaClientSafeContext; deliveredAt?: string } | null>): void {
+    this.fallback = resolve;
   }
 
   add(e: { projectId: string; resultId: string; context: FaClientSafeContext; deliveredAt?: string }): void {
@@ -36,6 +42,11 @@ export class FixtureFaContextReader implements FaContextReader {
   }
 
   async read(projectId: string): Promise<FaContextRead | null> {
+    const known = this.contexts.get(projectId);
+    if (known || !this.fallback) return known ?? null;
+    const entry = await this.fallback(projectId);
+    if (!entry) return null;
+    this.add(entry);
     return this.contexts.get(projectId) ?? null;
   }
 }

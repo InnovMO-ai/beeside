@@ -33,6 +33,7 @@ export const createCrpRouter: RouterFactory = (deps) => {
 
   const handle =
     (kind: "read" | "write", fn: (req: Request, actor: CrpActor) => Promise<unknown>, status = 200): RequestHandler =>
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express recognises an error handler by its four parameters
     async (req: Request, res: Response, _next: NextFunction) => {
       let locale = req.precision?.locale ?? "en";
       try {

@@ -1,5 +1,5 @@
 /**
- * CONV public surface (Track A, Embassy Release Candidate). Other owners rely on:
+ * CONV public surface (Track A, release candidate). Other owners rely on:
  *   - `createConversationEngine(deps)` / `processTurn(deps, input)` / `openThread(deps, input)`
  *   - ports: ModelProvider, ConversationStore, ContextReader, FactWriter, EvaluateCategory, Clock, ValueRenderer
  *   - stores: DrizzleConversationStore (precision_turn), MemoryConversationStore (tests)

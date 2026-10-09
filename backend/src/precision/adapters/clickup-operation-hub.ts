@@ -128,6 +128,7 @@ const projectRef = (projectId: string): string => `P-${sha(projectId).slice(0, 1
 export { projectRef as clickUpProjectRef };
 const normName = (s: string): string => s.trim().replace(/\s+/g, " ").toLowerCase();
 const cleanLabel = (s: unknown, fallback: string, max = 60): string => {
+  // eslint-disable-next-line no-control-regex -- strips control characters on purpose
   const t = typeof s === "string" ? s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim() : "";
   return (t || fallback).slice(0, max);
 };
@@ -268,7 +269,7 @@ export class ClickUpOperationHub implements OperationHubPort {
     const structure = await this.ensureStructure(payload);
 
     // One search of the project's deliveries: identity check, existing delivery, overview presence.
-    let projectTasks = await this.searchTasks({ tags: [projectTag(projectId)] });
+    const projectTasks = await this.searchTasks({ tags: [projectTag(projectId)] });
     this.assertIdentity(projectTasks, payload.identity.company_id);
 
     if (kind !== "psm_update") await this.ensureOverview(payload, structure, projectTasks);
@@ -639,6 +640,7 @@ export class ClickUpOperationHub implements OperationHubPort {
 }
 
 function stripSentAt(contract: OhHandoffPayload["contract"]): Omit<OhHandoffPayload["contract"], "sent_at"> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- omits sent_at on purpose
   const { sent_at: _s, ...rest } = contract;
   return rest;
 }

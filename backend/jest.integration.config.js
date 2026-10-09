@@ -4,4 +4,5 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   testMatch: ["**/__integration__/**/*.int.test.ts"],
+  testSequencer: "<rootDir>/jest.integration.sequencer.js",
 };

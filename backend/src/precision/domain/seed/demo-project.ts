@@ -228,12 +228,21 @@ export function demoFixtureEntries(projectId: string): DemoFixtureEntries {
 
 /** Anything exposing the fixture providers' configuration methods (the real Core-backed providers expose neither). */
 export interface FixtureTargets {
-  faContext?: FaContextReader & { add?: (e: DemoFixtureEntries["faContext"]) => void };
-  entitlement?: { set?: (s: EntitlementState) => void };
+  faContext?: FaContextReader & { add?: (e: DemoFixtureEntries["faContext"]) => void; setFallback?: (r: (projectId: string) => Promise<DemoFixtureEntries["faContext"] | null>) => void };
+  entitlement?: { set?: (s: EntitlementState) => void; setFallback?: (r: (projectId: string) => Promise<EntitlementState | null>) => void };
 }
 
 /** Registers the demo project (found in the database by its company marker) with the fixture providers. Returns its id, or null when none is seeded. */
 export async function loadDemoFixtures(db: Db, targets: FixtureTargets): Promise<string | null> {
+  // Projects seeded after this process started (a re-seed) are resolved from the database by the same company marker,
+  // so the app never needs a restart to serve a fresh synthetic project.
+  const isSeededDemoProject = async (projectId: string): Promise<boolean> =>
+    (await db.query(
+      "SELECT 1 FROM project p JOIN company c ON c.company_id = p.company_id WHERE p.project_id = $1 AND c.name = $2 AND c.website = $3",
+      [projectId, DEMO_COMPANY_NAME, DEMO_COMPANY_WEBSITE],
+    )).rows.length > 0;
+  targets.faContext?.setFallback?.(async (projectId) => ((await isSeededDemoProject(projectId)) ? demoFixtureEntries(projectId).faContext : null));
+  targets.entitlement?.setFallback?.(async (projectId) => ((await isSeededDemoProject(projectId)) ? demoFixtureEntries(projectId).entitlement : null));
   const proj = await findDemoProject(db);
   if (!proj) return null;
   const e = demoFixtureEntries(proj.projectId);

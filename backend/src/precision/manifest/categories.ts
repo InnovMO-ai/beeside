@@ -1,6 +1,6 @@
 /**
  * Customer-facing category names and one-line descriptions (EN/ES), from data/category-labels.json.
- * The wording is neutral and drafted for the Embassy Release Candidate; approved Spanish labels are a content
+ * The wording is neutral and drafted for the release candidate; approved Spanish labels are a content
  * dependency (Build Readiness K-3 / N-13) — change the JSON, not the callers.
  */
 import labelsJson from "./data/category-labels.json";

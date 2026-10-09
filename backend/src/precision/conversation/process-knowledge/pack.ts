@@ -52,8 +52,8 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("pc-2", "The client decides when to continue and when to pause; there is no paused state.", "Voice Pack intro_once; pause_note"),
     ],
     sentences: {
-      es: ["Precision Center es tu espacio para convertir lo que ya nos contaste en un mapa de servicios y en los requisitos de cada uno.", "Avanzas a tu ritmo y puedes pausar cuando quieras."],
-      en: ["Precision Center is your space to turn what you already told us into a map of services and the requirements for each one.", "You move at your own pace and can pause whenever you like."],
+      es: ["Precision Center es tu espacio para convertir lo que ya nos contaste en tu My Service Map y en los requisitos de cada servicio.", "Avanzas a tu ritmo y puedes pausar cuando quieras."],
+      en: ["Precision Center is your space to turn what you already told us into your My Service Map and the requirements for each service.", "You move at your own pace and can pause whenever you like."],
     },
     factIds: ["pc-1", "pc-2"],
     variants: [],
@@ -70,8 +70,8 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("pu-3", "What the client says there is what builds My Service Map.", "Build Readiness A-4"),
     ],
     sentences: {
-      es: ["Precision Understanding es una conversación para entender tu proyecto completo.", "No muestra porcentajes, y tú decides cuándo seguir y cuándo pausar.", "Con lo que cuentes armamos tu My Service Map."],
-      en: ["Precision Understanding is a conversation to understand your whole project.", "It shows no percentages, and you decide when to continue and when to pause.", "With what you tell me we build your My Service Map."],
+      es: ["Precision Understanding es una conversación para entender tu proyecto completo.", "No muestra porcentajes, y tú decides cuándo seguir y cuándo pausar.", "Lo que me cuentes es lo que arma tu My Service Map."],
+      en: ["Precision Understanding is a conversation to understand your whole project.", "It shows no percentages, and you decide when to continue and when to pause.", "What you tell me is what builds your My Service Map."],
     },
     factIds: ["pu-1", "pu-2", "pu-3"],
     variants: [],
@@ -184,8 +184,8 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("pbs-2", "If something changed between preview and send, a new preview is generated; nothing leaves Precision until the client sends.", "Build Readiness E-4 (PREVIEW_STALE)"),
     ],
     sentences: {
-      es: ["Antes de enviar ves exactamente lo que se enviaría a Operation Hub.", "Si algo cambia entre la vista previa y el envío, se genera una vista previa nueva.", "Nada sale de Precision hasta que tú lo envías."],
-      en: ["Before sending, you see exactly what would be sent to Operation Hub.", "If something changes between the preview and the sending, a new preview is generated.", "Nothing leaves Precision until you send it."],
+      es: ["Antes de enviar ves exactamente lo que se enviaría a Operation Hub.", "Si algo cambia entre la vista previa y el envío, se prepara una vista previa nueva.", "Nada sale de Precision hasta que tú lo envías."],
+      en: ["Before sending, you see exactly what would be sent to Operation Hub.", "If something changes between the preview and the send, a new preview is prepared.", "Nothing leaves Precision until you send it."],
     },
     factIds: ["pbs-1", "pbs-2"],
     variants: [],
@@ -237,7 +237,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
         when: { ohDeliveryState: "sending" },
         sentences: {
           es: ["Confirmado y enviado son cosas distintas.", "El envío está en curso y todavía no aparece como enviado.", "Aparecerá como enviado cuando Operation Hub lo reciba y lo verifique."],
-          en: ["Confirmed and sent are different things.", "The sending is in progress and does not appear as sent yet.", "It will appear as sent when Operation Hub receives and verifies it."],
+          en: ["Confirmed and sent are different things.", "The send is in progress and does not appear as sent yet.", "It will appear as sent when Operation Hub receives and verifies it."],
         },
         factIds: ["cvs-1", "cvs-2"],
       },
@@ -245,7 +245,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
         when: { ohDeliveryState: "failed" },
         sentences: {
           es: ["Confirmado y enviado son cosas distintas.", "El último envío no se completó, así que no aparece como enviado.", "Tu contenido sigue guardado y puedes intentar el envío de nuevo."],
-          en: ["Confirmed and sent are different things.", "The last sending did not complete, so it does not appear as sent.", "Your content is still saved and you can try sending again."],
+          en: ["Confirmed and sent are different things.", "The last send did not complete, so it does not appear as sent.", "Your content is still saved and you can try sending again."],
         },
         factIds: ["cvs-1", "cvs-2"],
       },
@@ -253,7 +253,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
         when: { ohDeliveryState: "sent" },
         sentences: {
           es: ["Confirmado y enviado son cosas distintas.", "Tu envío ya fue recibido y verificado por Operation Hub, por eso aparece como enviado."],
-          en: ["Confirmed and sent are different things.", "Your sending was received and verified by Operation Hub, which is why it appears as sent."],
+          en: ["Confirmed and sent are different things.", "Your send was received and verified by Operation Hub, which is why it appears as sent."],
         },
         factIds: ["cvs-1", "cvs-2"],
       },
@@ -270,16 +270,16 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("aas-2", "It is a conversation: the client confirms the need, not the taxonomy; a need that is not mapped is not out of scope.", "Voice Guide principle 8; add_service_confirm_need"),
     ],
     sentences: {
-      es: ["Add a Service está disponible cuando confirmas tu My Service Map.", "Es una conversación en la que me cuentas qué necesitas y tú confirmas esa necesidad; no eliges categorías.", "Si la necesidad no está en el mapa, igual la entiendo y la capturo con el detalle suficiente."],
-      en: ["Add a Service is available once you confirm your My Service Map.", "It is a conversation where you tell me what you need and you confirm that need; you do not pick categories.", "If the need is not on the map, I still understand it and capture it with enough detail."],
+      es: ["Add a Service está disponible cuando confirmas tu My Service Map.", "Es una conversación en la que me cuentas qué necesitas y tú confirmas esa necesidad; no eliges categorías.", "Si la necesidad no está en tu My Service Map, igual la entiendo y la capturo con el detalle suficiente."],
+      en: ["Add a Service is available once you confirm your My Service Map.", "It is a conversation where you tell me what you need and you confirm that need; you do not pick categories.", "If the need is not in your My Service Map, I still understand it and capture it with enough detail."],
     },
     factIds: ["aas-1", "aas-2"],
     variants: [
       {
         when: { serviceMapConfirmed: false },
         sentences: {
-          es: ["Todavía no está disponible: se habilita cuando confirmas tu My Service Map.", "Mientras tanto, cuéntame lo que necesitas y lo incluyo en tu mapa."],
-          en: ["It is not available yet: it is enabled once you confirm your My Service Map.", "In the meantime, tell me what you need and I include it in your map."],
+          es: ["Todavía no está disponible: se habilita cuando confirmas tu My Service Map.", "Mientras tanto, cuéntame lo que necesitas y lo incluyo en tu My Service Map."],
+          en: ["It is not available yet: it is enabled once you confirm your My Service Map.", "In the meantime, tell me what you need and I include it in your My Service Map."],
         },
         factIds: ["aas-1"],
       },
@@ -297,10 +297,27 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("pi-3", "Pending does not block by itself unless the item is critical (blocking); readiness is separate from progress.", "Build Readiness C-4 (closure B2)"),
     ],
     sentences: {
-      es: ["Si no sabes un dato, lo dejamos como pendiente; no necesitas inventar una respuesta.", "Los pendientes aparecen siempre a la vista en el resumen.", "Un pendiente no bloquea por sí mismo, salvo que sea un punto crítico."],
-      en: ["If you do not know something, we leave it as pending; you do not need to make up an answer.", "Pending items always appear in plain sight in the summary.", "A pending item does not block by itself, unless it is a critical point."],
+      es: ["Si no sabes un dato, lo dejamos como pendiente; no necesitas inventar una respuesta.", "Los pendientes quedan siempre visibles en el resumen.", "Un pendiente no bloquea por sí mismo, salvo que sea un punto crítico."],
+      en: ["If you do not know something, we leave it as pending; you do not need to make up an answer.", "Pending items always stay visible in the summary.", "A pending item does not block by itself, unless it is a critical point."],
     },
     factIds: ["pi-1", "pi-2", "pi-3"],
+    variants: [],
+    mustNotSay: [NO_PROMISE],
+    terms: [],
+    resumeHint: "Return to the pending question.",
+  },
+  {
+    topicKey: "pause_and_resume",
+    status: "draft",
+    facts: [
+      F("pr-1", "The client decides when to continue and when to pause; there is no paused state.", "Voice Pack intro_once; pause_note"),
+      F("pr-2", "What the client answers is saved as part of the project.", "Build Readiness L-7"),
+    ],
+    sentences: {
+      es: ["Sí, tú decides cuándo seguir y cuándo pausar.", "Lo que ya respondiste queda guardado en tu proyecto, así que puedes retomar después."],
+      en: ["Yes, you decide when to continue and when to pause.", "What you have already answered is saved in your project, so you can pick it up again later."],
+    },
+    factIds: ["pr-1", "pr-2"],
     variants: [],
     mustNotSay: [NO_PROMISE],
     terms: [],
@@ -358,8 +375,8 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("sh-3", "The Sherpa never edits Precision; clarifications are requested from Operation Hub.", "Build Readiness A-10b (B3)"),
     ],
     sentences: {
-      es: ["Un Sherpa es la persona de beeside que coordina la ejecución de un proyecto en Operation Hub.", "Ese rol entra en escena cuando el proyecto pasa a Operation Hub, después del primer envío.", "Por ahora no hay ninguna asignación que pueda confirmarte."],
-      en: ["A Sherpa is the beeside person who coordinates the execution of a project in Operation Hub.", "That role comes into play when the project moves to Operation Hub, after the first send.", "For now there is no assignment that I can confirm to you."],
+      es: ["Un Sherpa es la persona de beeside que coordina la ejecución de un proyecto en Operation Hub.", "Ese rol participa cuando el proyecto pasa a Operation Hub, después del primer envío.", "Por ahora no hay ninguna asignación que pueda confirmarte."],
+      en: ["A Sherpa is the beeside person who coordinates the execution of a project in Operation Hub.", "That role takes part once the project moves to Operation Hub, after the first send.", "For now there is no assignment that I can confirm to you."],
     },
     factIds: ["sh-1", "sh-2"],
     variants: [
@@ -436,16 +453,16 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("rd-2", "If it stays pending it is always visible; nothing goes to Operation Hub until the client sends explicitly; confirming does not send.", "Build Readiness L-7, E-1"),
     ],
     sentences: {
-      es: ["Lo que respondes se guarda como parte de tu proyecto y alimenta el {crp} de esta categoría.", "Si queda como pendiente, aparece siempre a la vista en el resumen.", "Confirmar el {crp} no lo envía: solo un envío explícito lo lleva a Operation Hub."],
-      en: ["What you answer is saved as part of your project and feeds the {crp} of this category.", "If it stays pending, it always appears in plain sight in the summary.", "Confirming the {crp} does not send it: only an explicit send takes it to Operation Hub."],
+      es: ["Lo que respondes se guarda como parte de tu proyecto y alimenta el {crp} de esta categoría.", "Si queda como pendiente, se mantiene siempre visible en el resumen.", "Confirmar el {crp} no lo envía: solo un envío explícito lo lleva a Operation Hub."],
+      en: ["What you answer is saved as part of your project and feeds the {crp} of this category.", "If it stays pending, it always stays visible in the summary.", "Confirming the {crp} does not send it: only an explicit send takes it to Operation Hub."],
     },
     factIds: ["rd-1", "rd-2"],
     variants: [
       {
         when: { surface: "understanding" },
         sentences: {
-          es: ["Lo que respondes se guarda como parte de tu proyecto y alimenta tu My Service Map.", "Si queda como pendiente, aparece siempre a la vista.", "Nada se envía a Operation Hub hasta que tú lo envías de forma explícita."],
-          en: ["What you answer is saved as part of your project and feeds your My Service Map.", "If it stays pending, it always appears in plain sight.", "Nothing is sent to Operation Hub until you send it explicitly."],
+          es: ["Lo que respondes se guarda como parte de tu proyecto y alimenta tu My Service Map.", "Si queda como pendiente, se mantiene siempre visible.", "Nada se envía a Operation Hub hasta que tú lo envías de forma explícita."],
+          en: ["What you answer is saved as part of your project and feeds your My Service Map.", "If it stays pending, it always stays visible.", "Nothing is sent to Operation Hub until you send it explicitly."],
         },
         factIds: ["rd-1", "rd-2"],
       },
@@ -487,8 +504,8 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
       F("ct-2", "After the first send the work with beeside continues in Operation Hub.", "Build Readiness E-7"),
     ],
     sentences: {
-      es: ["No puedo darte un plazo de contacto ni de respuesta.", "Lo que sí es cierto es que, después de tu primer envío, el trabajo continúa en Operation Hub.", "Mientras tanto, puedes escribir a beeside desde la ayuda general."],
-      en: ["I cannot give you a contact or response time.", "What is certain is that, after your first send, the work continues in Operation Hub.", "In the meantime, you can write to beeside from the general help."],
+      es: ["No puedo darte un plazo de contacto ni de respuesta.", "Lo que sí puedo decirte es que, después de tu primer envío, el trabajo continúa en Operation Hub.", "Mientras tanto, puedes escribir a beeside desde Contactar a beeside."],
+      en: ["I cannot give you a contact or response time.", "What I can tell you is that, after your first send, the work continues in Operation Hub.", "In the meantime, you can write to beeside through Contact beeside."],
     },
     factIds: ["ct-1", "ct-2"],
     variants: [],

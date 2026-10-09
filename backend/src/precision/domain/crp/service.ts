@@ -43,6 +43,8 @@ export interface CrpActor {
   canWrite: boolean;
 }
 
+import { formatDate } from "../../manifest/value-render";
+
 type CrpDeps = Pick<PrecisionDomainDeps, "db" | "registry" | "log">;
 
 const OF = { en: ["Objective", "Product or service", "Time window"], es: ["Objetivo", "Producto o servicio", "Horizonte de tiempo"] } as const;
@@ -52,7 +54,7 @@ function contextLines(p: ProjectFacts, locale: Locale): string[] {
   const lines: string[] = [];
   if (p.objective) lines.push(`${obj}: ${p.objective}`);
   if (p.productOrService) lines.push(`${prod}: ${p.productOrService}`);
-  if (p.timeWindow) lines.push(`${win}: ${p.timeWindow}`);
+  if (p.timeWindow) lines.push(`${win}: ${formatDate(p.timeWindow, locale)}`);
   return lines;
 }
 

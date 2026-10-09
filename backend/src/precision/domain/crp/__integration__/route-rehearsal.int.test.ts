@@ -31,9 +31,9 @@ interface Step { say: string; expect: RegExp }
 /** The utterances of docs/f5/demo-route.md section D, with the question each one must receive next. */
 export const UNDERSTANDING: Record<Loc, { open: RegExp; steps: Step[] }> = {
   en: {
-    open: /already have this: Start selling our packaged food products in Mexico/,
+    open: /I understand this: Start selling our packaged food products in Mexico/,
     steps: [
-      { say: "Yes", expect: /already have this: Mexico/ },
+      { say: "Yes", expect: /I understand this: Mexico/ },
       { say: "Yes", expect: /What product or service do you want to bring to this market\?/ },
       { say: "We make dry packaged food products with a long shelf life, mainly snacks and cereals", expect: /Which company or entity will operate in the destination\?/ },
       { say: "We plan to set up a local company in Mexico", expect: /When would you like to start\?/ },
@@ -41,9 +41,9 @@ export const UNDERSTANDING: Record<Loc, { open: RegExp; steps: Step[] }> = {
     ],
   },
   es: {
-    open: /ya tenemos esto: Start selling our packaged food products in Mexico/,
+    open: /entiendo esto: Start selling our packaged food products in Mexico/,
     steps: [
-      { say: "Sí", expect: /ya tenemos esto: México/ },
+      { say: "Sí", expect: /entiendo esto: México/ },
       { say: "Sí", expect: /¿Qué producto o servicio quieres llevar a este mercado\?/ },
       { say: "Fabricamos alimentos secos empacados de larga vida útil, sobre todo botanas y cereales", expect: /¿Qué empresa o entidad operará en el destino\?/ },
       { say: "Vamos a constituir una empresa local en México", expect: /¿Cuándo te gustaría empezar\?/ },
@@ -57,16 +57,16 @@ export const LOGISTICS: Record<Loc, { process: string; steps: Step[] }> = {
     process: "What is a CRP and what happens with this?",
     steps: [
       { say: "Third-party logistics provider", expect: /hazardous or regulated materials\?/ },
-      { say: "No", expect: /services in scope/ },
-      { say: "Third-party logistics and Freight transportation", expect: /primary product type/ },
-      { say: "General cargo", expect: /\(Origin country\)/ },
-      { say: "Chile", expect: /\(Destination country\)/ },
-      { say: "Mexico", expect: /\(Product being moved\)/ },
-      { say: "Packaged dry food products", expect: /\(Volume\)/ },
-      { say: "20 pallets", expect: /\(Frequency\)/ },
-      { say: "Monthly", expect: /\(Mode of transport\)/ },
-      { say: "Ocean", expect: /Is dedicated warehousing\/storage needed\?/ },
-      { say: "No", expect: /licensing status/i },
+      { say: "No", expect: /Which logistics services do you need/ },
+      { say: "Third-party logistics and Freight transportation", expect: /What main type of product/ },
+      { say: "General cargo", expect: /Which country do the products leave from\?/ },
+      { say: "Chile", expect: /Which country do they arrive in\?/ },
+      { say: "Mexico", expect: /What product moves in this flow\?/ },
+      { say: "Packaged dry food products", expect: /What volume do you move/ },
+      { say: "20 pallets", expect: /How often is this shipment made\?/ },
+      { say: "Monthly", expect: /Which mode of transport/ },
+      { say: "Ocean", expect: /Do you need dedicated warehousing/ },
+      { say: "No", expect: /status of your import or export licenses/ },
       { say: "Not sure yet", expect: /prepare the summary of this category: your CRP\./ },
     ],
   },
@@ -74,16 +74,16 @@ export const LOGISTICS: Record<Loc, { process: string; steps: Step[] }> = {
     process: "¿Qué es un CRP y qué va a pasar con esto?",
     steps: [
       { say: "Proveedor logístico externo", expect: /materiales peligrosos o regulados\?/ },
-      { say: "No", expect: /Servicios en alcance/i },
-      { say: "Logística con terceros y Transporte de carga", expect: /tipo principal de producto/i },
-      { say: "Carga general", expect: /País de origen/i },
-      { say: "Chile", expect: /País de destino/i },
-      { say: "México", expect: /Producto a mover/i },
-      { say: "Alimentos secos empacados", expect: /Volumen/i },
-      { say: "20 pallets", expect: /Frecuencia/i },
-      { say: "Mensual", expect: /Modo de transporte/i },
-      { say: "Marítimo", expect: /almacenamiento/i },
-      { say: "No", expect: /licencias/i },
+      { say: "No", expect: /Qué servicios de logística necesitas/ },
+      { say: "Logística con terceros y Transporte de carga", expect: /Qué tipo de producto vas a mover/ },
+      { say: "Carga general", expect: /Desde qué país salen los productos/ },
+      { say: "Chile", expect: /A qué país llegan/ },
+      { say: "México", expect: /Qué producto se mueve en este flujo/ },
+      { say: "Alimentos secos empacados", expect: /Qué volumen mueves/ },
+      { say: "20 pallets", expect: /Con qué frecuencia se hace este envío/ },
+      { say: "Mensual", expect: /Qué modo de transporte usarás/ },
+      { say: "Marítimo", expect: /Necesitas almacenamiento dedicado/ },
+      { say: "No", expect: /estado de tus licencias/ },
       { say: "Todavía no lo sé", expect: /resumen de esta categoría: tu CRP\./ },
     ],
   },
@@ -113,7 +113,7 @@ describeWithDb("demo route rehearsal (scripted model, simulated Operation Hub)",
   beforeAll(async () => { h = await createHarness(); });
   afterAll(() => h.close());
 
-  async function engineFor(projectId: string) {
+  async function engineFor(projectId: string, opts: { demoFixture?: boolean } = {}) {
     const fa = new FixtureFaContextReader();
     const ent = new FixtureEntitlementProvider();
     await loadDemoFixtures(h.db, { faContext: fa, entitlement: ent });
@@ -125,7 +125,7 @@ describeWithDb("demo route rehearsal (scripted model, simulated Operation Hub)",
         if (st === "confirmed") await moveCategoryLifecycle(tx, info.scopeInstanceId, "in_progress");
       },
     });
-    const provider = new ScriptedModelProvider({ fixture: DEMO_SCRIPT_FIXTURE });
+    const provider = new ScriptedModelProvider(opts.demoFixture === false ? {} : { fixture: DEMO_SCRIPT_FIXTURE });
     const engine = createConversationEngine({ store: new DrizzleConversationStore(h.pool), context, facts, evaluate: evaluateCategory, provider, renderer: engineValueRenderer });
     return { engine, projectId, provider };
   }
@@ -229,6 +229,27 @@ describeWithDb("demo route rehearsal (scripted model, simulated Operation Hub)",
       if (process.env.ROUTE_DUMP) {
         writeFileSync(`${process.env.ROUTE_DUMP}.${loc}.json`, JSON.stringify({ transcript, view: view.body, confirmed: conf.body, preview: pv.body, sent: sent.body, after: after.body }, null, 2));
       }
+    }, 60_000);
+  }
+
+  for (const loc of ["en", "es"] as const) {
+    it(`L: without the demo fixture the default scripted provider tells the two ends of a lane apart (${loc})`, async () => {
+      const seeded = await seedDemoProject(h.db, { reset: true, stage: "map_confirmed", mintLink: false, bootstrapFaConfig: true });
+      const catId = seeded.categories.find((c) => c.categoryKey === "logistics")!.categoryId;
+      const { engine } = await engineFor(seeded.projectId, { demoFixture: false });
+      const base = { projectId: seeded.projectId, surface: "category" as const, scopeInstanceId: catId, locale: loc };
+      await engine.openThread(base);
+      let n = 0;
+      for (const s of LOGISTICS[loc].steps) {
+        const r = await engine.processTurn({ ...base, turnKey: `rehearsal-nofix-${loc}-${++n}`, text: s.say });
+        expect(r.status).toBe("ok");
+        // no process question was asked first, so the closing statement spells the pack out in full
+        expect(text(r)).toMatch(n === LOGISTICS[loc].steps.length ? /\(CRP\)/ : s.expect);
+      }
+      const view = await request(h.app).get(`/api/precision/categories/${catId}/crp`).set({ "x-test-project": seeded.projectId, "x-precision-locale": loc });
+      const flows = JSON.stringify(view.body.sections);
+      expect(flows).toMatch(loc === "en" ? /Origin country: Chile · Destination country: Mexico/ : /País de origen: Chile · País de destino: México/);
+      expect(flows).not.toMatch(/Chile · (?:Destination country|País de destino): Chile/);
     }, 60_000);
   }
 });

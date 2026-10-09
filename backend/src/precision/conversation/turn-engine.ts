@@ -148,6 +148,7 @@ function validate(input: ProcessTurnInput): { text: string | null } {
   const provided = [input.text !== undefined, input.quickReply !== undefined, input.confirmAction !== undefined].filter(Boolean).length;
   if (provided !== 1) throw new ConversationInputError("INVALID_INPUT", "exactly one of text, quickReply or confirmAction is required");
   if (input.text !== undefined) {
+    // eslint-disable-next-line no-control-regex -- strips NUL on purpose
     const t = input.text.replace(/\u0000/g, "").trim();
     if (t.length < 1 || t.length > 8000) throw new ConversationInputError("INVALID_INPUT", "text must be 1..8000 characters");
     return { text: t };

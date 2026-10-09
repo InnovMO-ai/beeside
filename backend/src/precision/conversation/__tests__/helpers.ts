@@ -6,7 +6,7 @@
 import type { CategoryManifestContent, FieldDefinition } from "../../manifest/effective-fields";
 import type { CategoryEvaluation, EvaluationInput, FactMap, FactView, RequirementStatus } from "../../manifest/types";
 import { createConversationEngine, type ConversationEngine, type EngineOptions } from "../turn-engine";
-import { groupCursor, isGroup } from "../fields";
+import { groupCursor, isGroup, type ValueRenderer } from "../fields";
 import type { ContextReader, EvaluateCategory, FactWriter, StoredTurn } from "../ports";
 import { ScriptedModelProvider, type ScriptedFixture } from "../providers/scripted-model";
 import { MemoryConversationStore } from "../stores/memory-store";
@@ -133,6 +133,8 @@ export interface WorldOptions {
   scopeId?: string;
   /** Replace the fake evaluator (engine-compat test uses ENGINE's real evaluateCategory). */
   evaluate?: EvaluateCategory;
+  /** The renderer of the app (labels of options and values); the default is the plain one. */
+  renderer?: ValueRenderer;
 }
 
 let projectCounter = 0;
@@ -172,6 +174,7 @@ export class World {
       context,
       facts: this.writer,
       evaluate: o.evaluate ?? fakeEvaluate,
+      ...(o.renderer ? { renderer: o.renderer } : {}),
       provider: this.provider,
       ...(o.options ? { options: o.options } : {}),
     });

@@ -230,7 +230,7 @@
    "iconKey": "strategic_advisory",
    "label": {
     "en": "Strategic Advisory",
-    "es": "Asesoría estratégica"
+    "es": "Strategic Advisory"
    },
    "description": {
     "en": "Studies and advisory work to inform your expansion decisions.",
@@ -243,7 +243,7 @@
    "iconKey": "ecosystem_development",
    "label": {
     "en": "Ecosystem Development",
-    "es": "Desarrollo de ecosistema"
+    "es": "Ecosystem Development"
    },
    "description": {
     "en": "Finding and connecting with local partners and counterparts.",

@@ -11,6 +11,7 @@ import {
   type ExtractRequest,
   type ExtractResponse,
   type ExtractedValue,
+  type FieldBrief,
   type ModelProvider,
   type ModelProviderDescriptor,
   type ModelRequest,
@@ -20,6 +21,7 @@ import {
   type WriteRequest,
   type WriteResponse,
 } from "../ports";
+import { lookupGroup, lookupQuestion } from "../copy/field-questions";
 import { hashNumber, lowerFirst, normalizeText } from "../text-utils";
 
 export interface ScriptedStep {
@@ -144,27 +146,159 @@ function heuristicExtract(spec: ExtractRequest["specs"][number], text: string): 
   }
 }
 
+// ------------------------------------------------------------------ kind exclusivity and lane roles
+const COUNTRY_ALT = Object.keys(COUNTRIES).sort((a, b) => b.length - a.length).join("|");
+const FROM_CUE = "(?:de|desde|from|saliendo de|sale de|salen de|salimos de|leaves from|leave from|ship from|shipping from|origen|origin|originating in)";
+const TO_CUE = "(?:a|hacia|hasta|para|to|into|destino|destination|llega a|llegan a|arrive in|arrives in|arrive at)";
+const LANE_RE = new RegExp(`(?:^|\\s)${FROM_CUE}\\s+(${COUNTRY_ALT})\\s+${TO_CUE}\\s+(${COUNTRY_ALT})(?=\\s|$)`);
+const ORIGIN_RE = new RegExp(`(?:^|\\s)${FROM_CUE}\\s+(${COUNTRY_ALT})(?=\\s|$)`);
+const DEST_RE = new RegExp(`(?:^|\\s)${TO_CUE}\\s+(${COUNTRY_ALT})(?=\\s|$)`);
+
+type CountryRole = "origin" | "destination";
+
+/** The role a country question has, read from the English description the engine always sends. */
+function countryRoleOf(spec: ExtractRequest["specs"][number]): CountryRole | null {
+  const d = spec.description.toLowerCase();
+  if (/\b(origin|source|departure)\b/.test(d)) return "origin";
+  if (/\b(destination|arrival|delivery)\b/.test(d)) return "destination";
+  return null;
+}
+
+/** Roles the client's own words give to countries: "de Chile a México", "desde Chile", "hacia México". */
+function laneRoles(norm: string): Partial<Record<CountryRole, string>> {
+  const lane = LANE_RE.exec(norm);
+  if (lane) return { origin: COUNTRIES[lane[1] as string], destination: COUNTRIES[lane[2] as string] };
+  const roles: Partial<Record<CountryRole, string>> = {};
+  const o = ORIGIN_RE.exec(norm);
+  if (o) roles.origin = COUNTRIES[o[1] as string];
+  const d = DEST_RE.exec(norm);
+  if (d && COUNTRIES[d[1] as string] !== roles.origin) roles.destination = COUNTRIES[d[1] as string];
+  return roles;
+}
+
+function isCountrySpec(spec: ExtractRequest["specs"][number]): boolean {
+  return spec.type === "multi_enum" && !(spec.enumValues && spec.enumValues.length > 0) && (/country|pais/i.test(spec.description) || /ISO 3166/.test(spec.description));
+}
+
+/** Kind of free value a spec takes; specs of other types (enum, multi_enum lists) keep their own matching. */
+function exclusiveKind(spec: ExtractRequest["specs"][number]): string | null {
+  if (isCountrySpec(spec)) return "country";
+  if (spec.type === "number" || spec.type === "boolean" || spec.type === "date") return spec.type;
+  if (spec.type === "string" && !/currency|ISO 4217/.test(spec.description)) return "string";
+  return null;
+}
+
+/**
+ * One piece of the client's text answers one field. The target field takes the value of its kind; a field that is not
+ * the target takes it only when the words give it away (a lane's origin and destination, or the only other field of
+ * that kind while the target is of a different kind). This keeps "de Chile a México" from filling both countries and a
+ * bare answer from being copied into every free-text field.
+ */
+function reconcile(specs: ExtractRequest["specs"], text: string, raw: ExtractedValue[]): ExtractedValue[] {
+  const norm = normalizeText(text);
+  const roles = laneRoles(norm);
+  const out = raw.slice();
+  const target = specs.find((s) => s.isTarget);
+  const targetKind = target ? exclusiveKind(target) : null;
+  specs.forEach((spec, i) => {
+    const kind = exclusiveKind(spec);
+    if (!kind) return;
+    if (kind === "country") {
+      const role = countryRoleOf(spec);
+      const code = role ? roles[role] : undefined;
+      // a target keeps its own matching unless both ends of a lane were named (then each end is told apart)
+      const useCue = code && (!spec.isTarget || Object.keys(roles).length === 2);
+      if (useCue && code) {
+        out[i] = { name: spec.name, status: "ok", value: [code], confidence: 0.88, source: (Object.entries(COUNTRIES).find(([, c]) => c === code) ?? ["", ""])[0] };
+        return;
+      }
+      if (spec.isTarget) {
+        // the client named only the other end of the lane: nothing was said about this one
+        if (role && Object.keys(roles).length > 0 && !roles[role]) out[i] = nf(spec);
+        return;
+      }
+      // a volunteered country with no role words belongs to a role-less country field, and only when no other country field competes
+      if (!specs.some((s) => s !== spec && isCountrySpec(s))) return;
+      out[i] = nf(spec);
+      return;
+    }
+    if (spec.isTarget) return;
+    if (kind === "boolean" || kind === "string") {
+      out[i] = nf(spec);
+      return;
+    }
+    // number / date: a non-target field of that kind only when it is the single one and the target is of another kind
+    const sameKind = specs.filter((s) => !s.isTarget && exclusiveKind(s) === kind).length;
+    if (targetKind === kind || sameKind > 1) out[i] = nf(spec);
+  });
+  return out;
+}
+
 const ACK_ES: Record<string, string[]> = {
   recorded: ["Anotado.", "Entendido.", "Gracias, ya lo tengo."],
   corrected: ["Corrección anotada.", "Gracias por aclararlo, ya lo corregí."],
   confirmed: ["Confirmado.", "Gracias por confirmarlo."],
-  clarify: ["Necesito precisarlo un poco."],
+  clarify: ["Necesito precisar un poco esa respuesta."],
 };
 const ACK_EN: Record<string, string[]> = {
   recorded: ["Noted.", "Understood.", "Thanks, I have that."],
   corrected: ["Correction noted.", "Thanks for clarifying, I have corrected it."],
   confirmed: ["Confirmed.", "Thanks for confirming."],
-  clarify: ["I need to pin that down a little."],
+  clarify: ["I need to clarify that answer a little."],
 };
 
-function questionFromLabel(label: string, groupLabel: string | undefined, locale: "es" | "en"): string {
-  const isQuestion = /[?¿]/.test(label);
-  if (isQuestion) {
+type Locale2 = "es" | "en";
+
+/** "¿Desde qué país…?" becomes "desde qué país…?" so that a short lead can precede it: "Para el flujo 2, ¿desde…?". */
+function withLead(lead: string, question: string, locale: Locale2): string {
+  const body = lowerFirst(question.replace(/^¿/, ""));
+  return locale === "es" ? `${lead} ¿${body}` : `${lead} ${body}`;
+}
+
+function endSentence(t: string): string {
+  const x = t.trim();
+  return /[.!?]$/.test(x) ? x : `${x}.`;
+}
+
+/** Last resort for a field that has no entry in the question bank: the label (or a question label) with a neutral frame. */
+function questionFromLabel(label: string, groupLabel: string | undefined, locale: Locale2): string {
+  if (/[?¿]/.test(label)) {
     const q = label.trim();
     return locale === "es" && !q.startsWith("¿") ? `¿${q}` : q;
   }
-  const subject = lowerFirst(groupLabel ? `${groupLabel} (${label})` : label);
-  return locale === "es" ? `¿Qué puedes contarme sobre ${subject}?` : `What can you tell me about ${subject}?`;
+  const subject = lowerFirst(groupLabel ? `${groupLabel} - ${label}` : label);
+  return locale === "es" ? `¿Qué puedes indicarme sobre este punto: ${subject}?` : `What can you tell me about this point: ${subject}?`;
+}
+
+/** A recorded value worth repeating back: short, a real value, not clipped, not a bare yes/no. */
+function echoable(recorded: string): boolean {
+  const r = recorded.trim();
+  if (r.length < 3 || r.length > 40 || /[?!…]|\.\.\./.test(r)) return false;
+  return !/^(?:si|sí|no|yes|nope|claro|correcto)$/i.test(r);
+}
+
+function optionsHint(options: { label: string }[], locale: Locale2): string {
+  const labels = options.map((o) => o.label).filter((l) => l.length > 0);
+  if (labels.length < 2 || labels.length > 6) return "";
+  const head = labels.slice(0, -1).join(", ");
+  const last = labels[labels.length - 1] as string;
+  return locale === "es" ? `Las opciones son ${head} o ${last}.` : `The options are ${head} or ${last}.`;
+}
+
+/** The field question: from the bank when it has one (with the group lead for later items), else from the label. */
+function composeQuestion(req: WriteRequest, field: FieldBrief): { intro: string; why: string; question: string; fromBank: boolean } {
+  const locale = req.locale;
+  const entry = lookupQuestion(field.fieldKey, field.subKey);
+  if (!entry) return { intro: "", why: "", question: questionFromLabel(field.label, field.groupLabel, locale), fromBank: false };
+  const group = field.subKey ? lookupGroup(field.fieldKey) : undefined;
+  const item = field.itemIndex ?? 0;
+  let intro = "";
+  let question = entry.q[locale];
+  if (group && field.subKey === group.first) {
+    if (item === 0) intro = group.intro[locale];
+    else question = withLead(`${group.lead[locale]} ${item + 1},`, question, locale);
+  }
+  return { intro, why: item === 0 && entry.why ? entry.why[locale] : "", question, fromBank: true };
 }
 
 export class ScriptedModelProvider implements ModelProvider {
@@ -227,7 +361,7 @@ export class ScriptedModelProvider implements ModelProvider {
       return { task: "extract", fields: req.specs.map((s) => byName.get(s.name) ?? nf(s)), physicalCalls: 1 };
     }
     if (!this.heuristics) return { task: "extract", fields: req.specs.map(nf), physicalCalls: 1 };
-    return { task: "extract", fields: req.specs.map((s) => heuristicExtract(s, req.clientText)), physicalCalls: 1 };
+    return { task: "extract", fields: reconcile(req.specs, req.clientText, req.specs.map((s) => heuristicExtract(s, req.clientText))), physicalCalls: 1 };
   }
 
   private write(req: WriteRequest, script: ScriptedStep | undefined): WriteResponse {
@@ -238,17 +372,22 @@ export class ScriptedModelProvider implements ModelProvider {
     }
     const es = req.locale === "es";
     const f = req.intent.field;
-    const question = questionFromLabel(f.label, f.groupLabel, req.locale);
-    if (req.intent.kind === "ask_field_after_process") return { task: "write", text: question, physicalCalls: 1 };
+    const { intro, why, question, fromBank } = composeQuestion(req, f);
+    const helpSentence = !fromBank && f.helpText && f.helpText.length <= 160 && !/[?¿]/.test(f.helpText) ? endSentence(f.helpText) : "";
+    if (req.intent.kind === "ask_field_after_process") return { task: "write", text: [question, helpSentence].filter(Boolean).join(" "), physicalCalls: 1 };
     const pool = (es ? ACK_ES : ACK_EN)[req.intent.ack];
     let ack = "";
     if (pool && pool.length > 0) {
-      ack = pool[hashNumber(req.turnKey) % pool.length] as string;
-      if (req.intent.ack === "recorded" && req.intent.recorded && req.intent.recorded.length <= 70 && !/[?!]/.test(req.intent.recorded)) {
-        ack = es ? `Anotado: ${req.intent.recorded}.` : `Noted: ${req.intent.recorded}.`;
-      }
+      // rotate by the question's ordinal so that consecutive turns never open with the same words
+      const h = hashNumber(req.turnKey) + (req.intent.kind === "ask_field" ? req.intent.nextOrdinal : 0);
+      ack = pool[h % pool.length] as string;
+      // echo the recorded value only when it is short and says something (never a bare yes/no or a clipped sentence), and not every turn
+      const rec = req.intent.kind === "ask_field" ? req.intent.recorded : null;
+      if (req.intent.ack === "recorded" && rec && echoable(rec) && h % 3 !== 2) ack = es ? `Anotado: ${rec}.` : `Noted: ${rec}.`;
     }
-    return { task: "write", text: ack ? `${ack} ${question}` : question, physicalCalls: 1 };
+    const hint = req.intent.ack === "clarify" ? optionsHint(f.options, req.locale) : "";
+    const parts = [ack, hint, intro, question, why, helpSentence].filter((x) => x.length > 0);
+    return { task: "write", text: parts.join(" "), physicalCalls: 1 };
   }
 
   private route(req: RouteRequest, script: ScriptedStep | undefined): RouteResponse {

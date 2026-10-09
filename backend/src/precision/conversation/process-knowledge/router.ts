@@ -67,6 +67,16 @@ const RULES: readonly Rule[] = [
     topic: () => "why_this_question",
   },
   {
+    id: "pause_resume",
+    re: /\b(?:parar|pausar|pausa|detener\w*|interrumpir|dejarlo|seguir|continuar|retomar|volver|stop\w*|pause|pausing|take a break|come back|continue|resume|pick (?:it|this) up|finish\w*|terminar\w*|answer\w*|responder\w*|contestar\w*)\b.{0,40}\b(?:despues|luego|mas tarde|mas adelante|otro dia|despues de|later|afterwards|another time|another day|tomorrow|manana)\b/,
+    topic: () => "pause_and_resume",
+  },
+  {
+    id: "skip_or_required",
+    re: /\b(?:saltar\w*|omitir\w*|omitirla|skip\w*|no responder|not answer\w*|leave (?:it|this|this one|a question) (?:blank|empty|unanswered)|sin (?:responder|contestar))\b|\b(?:tengo que|debo|es obligatori\w*|es necesario|do i (?:have|need) to|must i|is it (?:required|mandatory|necessary))\b.{0,30}\b(?:contest\w*|respond\w*|answer\w*|todo|todas|tod[oa]s las|everything|all)\b/,
+    topic: () => "pending_information",
+  },
+  {
     id: "ai_use",
     re: /\b(?:inteligencia artificial|usan? (?:ia|ai)\b|usas (?:ia|ai)\b|eres (?:un |una )?(?:bot|robot|ia|humano|humana|persona)|hablo con (?:un |una )?(?:bot|robot|humano|persona|ia)|es (?:esto )?(?:una )?(?:ia|persona real|humano)|artificial intelligence|are you (?:a |an )?(?:bot|robot|ai|human|real person)|am i (?:talking|speaking) (?:to|with)|is this (?:an? )?(?:ai|bot|human|person)|do you use (?:ai|artificial))\b/,
     topic: () => "ai_use",
@@ -174,7 +184,12 @@ const PROCESS_ANCHOR = /\b(?:precision|beeside|operation hub|este proceso|el pro
 const PROCESS_PHRASES = /\b(?:como funciona(?:n)?\s+(?:esto|precision|el proceso)|how does (?:it|this|precision) work|que sigue|what s next|what comes next|que viene despues|siguiente paso|next step|quien (?:ve|puede ver)\s+(?:mis|mi|esto)|who (?:sees|can see)\s+(?:my|this)|mis datos|my data)\b/;
 const PROCESS_COST_TIME = /\b(?:cuanto (?:cuesta|cuestan|cobran|tarda|tardan|dura|demora)|how (?:much|long)|precio|price|pricing|tarifa|fee|honorarios|garantia|guarantee|privacidad|privacy|confidencial\w*|seguridad|security|cancelar|cancel)\b/;
 
+/** Privacy and confidentiality: the pack has no approved fact, so the honest answer is "I can't confirm that". */
+const PRIVACY_RE = /\b(?:confidencial\w*|confidential\w*|privacidad|privacy|protegid\w*|protected|secure|secret\w*)\b/;
+const PRIVACY_SUBJECT = /\b(?:informacion|datos|respuestas|detalles|proyecto|information|data|answers|details|project|esto|this)\b/;
+
 function isProcessLike(norm: string): boolean {
+  if (PRIVACY_RE.test(norm) && PRIVACY_SUBJECT.test(norm)) return true;
   if (PROCESS_PHRASES.test(norm)) return true;
   if (/\b(?:precision|beeside|operation hub|premium)\b/.test(norm)) return true;
   return PROCESS_COST_TIME.test(norm) && PROCESS_ANCHOR.test(norm);

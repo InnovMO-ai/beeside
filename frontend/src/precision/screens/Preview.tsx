@@ -42,6 +42,9 @@ export function PreviewScreen({ id }: { id: string }) {
   const [contact, setContact] = useState(false);
   const [long, setLong] = useState(false);
   const lock = useRef(false);
+  const failedRef = useRef<HTMLElement | null>(null);
+  // A failure appears below the fold on a phone (the action bar is sticky): bring it into view so it is never missed.
+  useEffect(() => { if (failed) failedRef.current?.scrollIntoView?.({ block: "center" }); }, [failed]);
   const p: PreviewDto | null = res.data;
   usePage(t("pv.eyebrow"), !!p || !!res.error);
 
@@ -58,7 +61,8 @@ export function PreviewScreen({ id }: { id: string }) {
   }, [serverSending]);
   useEffect(() => {
     if (p?.sendState === "sent") { void refreshCenter(); navigate({ name: "sent", id }, { replace: true }); }
-    if (p?.sendState === "failed" && failed === null) setFailed("try_again_later");
+    // A failure found on load (reload, another tab) keeps the server's own category: a non-retryable one never offers "Try again".
+    if (p?.sendState === "failed" && failed === null) setFailed(p.clientAction ?? (p.retryable === false ? "needs_attention" : "try_again_later"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p?.sendState]);
 
@@ -97,7 +101,7 @@ export function PreviewScreen({ id }: { id: string }) {
         {stale ? <Banner tone="warn" role="alert" title={t("pv.stale.title")}>{t("pv.stale.body")}</Banner> : null}
         {sendError ? <Banner tone="warn" role="alert">{t("pv.sendError")}</Banner> : null}
         {failed ? (
-          <section className="pz-failed" role="alert" aria-labelledby="pz-failed-h">
+          <section className="pz-failed" role="alert" aria-labelledby="pz-failed-h" ref={failedRef}>
             <Icon name="alert" size={24} />
             <div>
               <h2 id="pz-failed-h" className="pz-h3">{t("failed.title")}</h2>

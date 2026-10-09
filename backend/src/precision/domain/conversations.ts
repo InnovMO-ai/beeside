@@ -12,7 +12,7 @@
  */
 import { describeError } from "../../security/redact";
 import type {
-  AddServiceThreadDto, CategoryDto, Locale, ThreadDto, ThreadSurface, TurnRequest, TurnResultDto, UnderstandingState,
+  AddServiceThreadDto, CategoryDto, Locale, ThreadDto, ThreadSurface, TurnRequest, TurnResultDto,
 } from "../api/dto";
 import { ApiError } from "../api/errors";
 import { plainCopy } from "../conversation/copy";
@@ -61,6 +61,7 @@ export function parseTurnRequest(body: unknown): Pick<ProcessTurnInput, "turnKey
     return { turnKey, quickReply: { value: q.value, intent: q.intent } };
   }
   if (typeof b.text !== "string") throw new ApiError("INVALID_INPUT");
+  // eslint-disable-next-line no-control-regex -- strips NUL on purpose
   const text = b.text.replace(/\u0000/g, "").trim();
   if (text.length < 1 || text.length > 8000) throw new ApiError("INVALID_INPUT");
   return { turnKey, text };
@@ -207,7 +208,11 @@ export function createThreadServices(deps: PrecisionDomainDeps, fa: FaContextSer
       const { projectId, locale } = actor;
       let pa = canWrite(actor) ? await ensurePaInstance(deps.db, projectId) : await loadPaState(deps.db, projectId);
       if (!pa) throw new ApiError("NOT_FOUND");
-      if (canWrite(actor)) await syncProposals(deps, projectId, await fa.read(projectId));
+      const ctx = await fa.readWithStatus(projectId);
+      // The opening offers the inherited values for confirmation. If the First Assessment reader failed just now and the thread has not
+      // been opened yet, opening it would permanently lose those offers: ask the client to try again instead (nothing is saved, nothing is lost).
+      if (canWrite(actor) && ctx.failed && (await store.loadThread(projectId, pa.instanceId, 1)).length === 0) throw new ApiError("TEMPORARILY_UNAVAILABLE", true);
+      if (canWrite(actor)) await syncProposals(deps, projectId, ctx.read);
       const open = await deps.conversation.openThread({ projectId, surface: "understanding", scopeInstanceId: pa.instanceId, locale });
       pa = (await loadPaState(deps.db, projectId)) ?? pa;
       return threadOf(actor, "understanding", pa.instanceId, TITLES.understanding[locale], open, { understandingState: understandingStateOf(pa.status) });

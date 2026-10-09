@@ -137,7 +137,7 @@ export async function classifyForProject(
   const signals = suggestSignals(need, pm.manifest);
   const cls: EngineClassification = classifyNeed({ text: need, ...signals, existing_instance_keys: refs.map((r) => r.categoryKey) }, pm.manifest, bundledCatalog());
   const scenario = String(cls.scenario);
-  if (scenario === "out_of_scope") return { outOfScope: NOTICE_BY_TOPIC[String(cls.topic_key ?? "")] ?? "add_service_not_available_yet", targetKey: "", effective: scenario, signals };
+  if (scenario === "out_of_scope") return { outOfScope: NOTICE_BY_TOPIC[String(cls.topic_key ?? "")] ?? "add_service_not_supported_now", targetKey: "", effective: scenario, signals };
   if (scenario === "strategic_advisory" || scenario === "ecosystem_development") return { outOfScope: null, targetKey: String(cls.instance_key), effective: scenario, signals };
   if (scenario === "known_service") return { outOfScope: null, targetKey: String(cls.category_key), effective: scenario, signals };
   if (scenario === "unmapped_known_category" || scenario === "known_category_exists") return { outOfScope: null, targetKey: String(cls.category_key), effective: "unmapped_known_category", signals };

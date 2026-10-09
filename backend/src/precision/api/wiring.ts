@@ -77,7 +77,10 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   const now = options.now ?? ((): Date => new Date());
   const db = options.db ?? createPoolDb(options.pool);
   const integrations = options.integrations ?? integrationsFromEnv(env, db);
-  const provider = options.provider ?? selectModelProvider({ env });
+  // Synthetic-project mode (explicit env switch): the scripted provider also gets the lane fixture of the rehearsal route.
+  const demoMode = env.PRECISION_DEMO_FIXTURES === "true";
+  const laneFixture = demoMode && !options.provider ? (await import("../domain/seed/demo-script")).DEMO_SCRIPT_FIXTURE : undefined;
+  const provider = options.provider ?? selectModelProvider({ env, ...(laneFixture ? { fixture: laneFixture } : {}) });
   const registry = createManifestRegistry(db);
   const delivery = new OhDeliveryService({ db, port: integrations.operationHub });
 
@@ -99,7 +102,7 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 
-  if (env.PRECISION_DEMO_FIXTURES === "true") {
+  if (demoMode) {
     const { loadDemoFixtures } = await import("../domain/seed/demo-project");
     await loadDemoFixtures(db, { faContext: integrations.faContext as never, entitlement: integrations.entitlement as never });
   }

@@ -35,12 +35,12 @@ const RULES_EN = [
 ];
 
 const EXAMPLES_ES = [
-  "Entendido, destino Chile. ¿En qué trimestre del año quieren iniciar operaciones allí?",
+  "Entendido, destino Chile. ¿En qué trimestre del año quieres iniciar operaciones allí?",
   "Gracias por la aclaración. ¿Quién se encargaría de la operación logística día a día?",
   "¿Cuántas personas trabajarían en esa operación durante el primer año?",
 ];
 const EXAMPLES_EN = [
-  "Got it, destination Chile. In which quarter do you want to start operating there?",
+  "Understood, destination Chile. In which quarter do you want to start operating there?",
   "Thanks for clarifying. Who would run the logistics day to day?",
   "How many people would work on that operation during the first year?",
 ];

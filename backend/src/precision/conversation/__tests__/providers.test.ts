@@ -6,7 +6,7 @@ import type { FetchLike } from "../../engine/gateway";
 import { cleanModelText, GatewayModelProvider } from "../providers/gateway-model";
 import { providerNameFromEnv, selectModelProvider } from "../providers/select";
 import { ScriptedModelProvider } from "../providers/scripted-model";
-import { ModelUnavailableError, type ExtractRequest, type RouteRequest, type WriteRequest } from "../ports";
+import { ModelUnavailableError, type ExtractRequest, type FieldBrief, type RouteRequest, type WriteRequest } from "../ports";
 
 const DUMMY_ENV = {
   PRECISION_GATEWAY_PRIMARY_MODEL: "model-a",
@@ -233,5 +233,133 @@ describe("ScriptedModelProvider", () => {
     expect((await p.complete(writeReq)).text).toBe("especifico");
     expect((await p.complete({ ...writeReq, step: "otro" })).text).toBe("superficie");
     expect((await p.complete({ ...writeReq, surface: "understanding" })).text).toBe("global");
+  });
+});
+
+describe("ScriptedModelProvider extraction: one piece of text answers one field", () => {
+  const countrySpec = (name: string, role: string, isTarget: boolean) => ({ name, type: "multi_enum" as const, description: `${role}. List of countries (ISO 3166-1 alpha-2 country codes)`, isTarget });
+  const lane = (clientText: string, targetRole: "Origin country" | "Destination country"): Record<string, unknown> => {
+    const specs = [
+      countrySpec("logistics_flows__origin_country", "Origin country", targetRole === "Origin country"),
+      countrySpec("logistics_flows__destination_country", "Destination country", targetRole === "Destination country"),
+    ];
+    return { specs, clientText };
+  };
+  const run = async (over: Record<string, unknown>): Promise<Map<string, { status: string; value: unknown }>> => {
+    const p = new ScriptedModelProvider();
+    const out = await p.complete(extractReq(over as Partial<ExtractRequest>));
+    return new Map(out.fields.map((f) => [f.name, f]));
+  };
+
+  it("a bare country answers only the field being asked, not the other end of the lane", async () => {
+    const asked = await run(lane("Chile", "Origin country"));
+    expect(asked.get("logistics_flows__origin_country")).toMatchObject({ status: "ok", value: ["CL"] });
+    expect(asked.get("logistics_flows__destination_country")?.status).toBe("not_found");
+    const dest = await run(lane("México", "Destination country"));
+    expect(dest.get("logistics_flows__destination_country")).toMatchObject({ status: "ok", value: ["MX"] });
+    expect(dest.get("logistics_flows__origin_country")?.status).toBe("not_found");
+  });
+
+  it.each([
+    ["de Chile a México", "CL", "MX"],
+    ["Salen desde Chile hacia México", "CL", "MX"],
+    ["from Chile to Mexico", "CL", "MX"],
+    ["We ship from Brazil into Chile", "BR", "CL"],
+  ])("reads both ends of a lane told in one sentence: %s", async (text, from, to) => {
+    const r = await run(lane(text, "Origin country"));
+    expect(r.get("logistics_flows__origin_country")).toMatchObject({ status: "ok", value: [from] });
+    expect(r.get("logistics_flows__destination_country")).toMatchObject({ status: "ok", value: [to] });
+  });
+
+  it("a role word with one country fills the matching field only when it is volunteered", async () => {
+    const r = await run(lane("Salen desde Chile", "Destination country"));
+    expect(r.get("logistics_flows__destination_country")?.status).toBe("not_found");
+    expect(r.get("logistics_flows__origin_country")).toMatchObject({ status: "ok", value: ["CL"] });
+  });
+
+  it("a country volunteered while another field is asked still lands in a lone country field", async () => {
+    const r = await run({
+      clientText: "We want to enter Chile",
+      specs: [
+        { name: "objective", type: "string", description: "Objective", isTarget: true },
+        { name: "destinations", type: "multi_enum", description: "Destination countries (ISO 3166-1 alpha-2 country codes)", isTarget: false },
+      ],
+    });
+    expect(r.get("objective")?.status).toBe("ok");
+    expect(r.get("destinations")).toMatchObject({ status: "ok", value: ["CL"] });
+  });
+
+  it("free text, yes/no and numbers are never copied into the fields that were not asked", async () => {
+    const r = await run({
+      clientText: "Sí",
+      specs: [
+        { name: "a", type: "boolean", description: "Is it needed", isTarget: true },
+        { name: "b", type: "boolean", description: "Another yes/no", isTarget: false },
+        { name: "c", type: "string", description: "Notes", isTarget: false },
+      ],
+    });
+    expect(r.get("a")).toMatchObject({ status: "ok", value: true });
+    expect(r.get("b")?.status).toBe("not_found");
+    expect(r.get("c")?.status).toBe("not_found");
+    const n = await run({
+      clientText: "20 pallets",
+      specs: [
+        { name: "vol__value", type: "number", description: "Volume (number only)", isTarget: true },
+        { name: "other", type: "number", description: "Orders per month", isTarget: false },
+      ],
+    });
+    expect(n.get("vol__value")).toMatchObject({ status: "ok", value: 20 });
+    expect(n.get("other")?.status).toBe("not_found");
+  });
+});
+
+describe("ScriptedModelProvider phrasing (Voice Guide)", () => {
+  interface Over { ack?: "none" | "recorded" | "corrected" | "confirmed" | "clarify"; recorded?: string | null; field: Partial<FieldBrief> & { fieldKey: string; label: string } }
+  const field = (over: Over): WriteRequest => ({
+    ...writeReq,
+    intent: {
+      kind: "ask_field",
+      ack: over.ack ?? "none",
+      nextOrdinal: 1,
+      recorded: over.recorded ?? null,
+      field: { helpText: null, type: "string", options: [], requirementLevel: "required", ...over.field },
+    },
+  });
+  const write = async (req: WriteRequest): Promise<string> => ((await new ScriptedModelProvider().complete(req)) as { text: string }).text;
+
+  it("asks the field's own question (bank), in the client's language, with one question mark", async () => {
+    const es = await write(field({ field: { fieldKey: "logistics_warehousing_needed", label: "Dedicated warehousing needed?" } }));
+    expect(es).toBe("¿Necesitas almacenamiento dedicado para este proyecto?");
+    const en = await write({ ...field({ field: { fieldKey: "logistics_warehousing_needed", label: "x" } }), locale: "en" });
+    expect(en).toBe("Do you need dedicated warehousing for this project?");
+  });
+
+  it("introduces a group once, then numbers the later items", async () => {
+    const first = await write(field({ field: { fieldKey: "logistics_flows", subKey: "origin_country", itemIndex: 0, label: "Origin country", groupLabel: "Logistics flows" } }));
+    expect(first).toBe("Describamos tus flujos de envío, uno a la vez. ¿Desde qué país salen los productos?");
+    const second = await write(field({ field: { fieldKey: "logistics_flows", subKey: "origin_country", itemIndex: 1, label: "Origin country", groupLabel: "Logistics flows" } }));
+    expect(second).toBe("Para el flujo 2, ¿desde qué país salen los productos?");
+    const sub = await write(field({ field: { fieldKey: "logistics_flows", subKey: "destination_country", itemIndex: 1, label: "Destination country", groupLabel: "Logistics flows" } }));
+    expect(sub).toBe("¿A qué país llegan?");
+  });
+
+  it("puts the reason after the question and keeps an acknowledgement short", async () => {
+    const t = await write(field({ ack: "recorded", recorded: "No", field: { fieldKey: "logistics_hazardous_materials_flag", label: "Hazmat?" } }));
+    expect(t).toMatch(/^(?:Anotado\.|Entendido\.|Gracias, ya lo tengo\.) ¿Alguno de tus envíos incluye materiales peligrosos o regulados\? Lo pregunto porque/);
+    expect(t).not.toMatch(/Anotado: No/);
+  });
+
+  it("a clarification offers the options in one plain sentence", async () => {
+    const t = await write({
+      ...field({ ack: "clarify", field: { fieldKey: "logistics_operating_responsibility", label: "x", type: "enum", options: [{ value: "a", label: "Nosotros" }, { value: "b", label: "Un tercero" }] } }),
+    });
+    expect(t).toContain("Las opciones son Nosotros o Un tercero.");
+    expect((t.match(/\?/g) ?? []).length).toBe(1);
+  });
+
+  it("a field without a bank entry gets a neutral single question from its label, never a list or a key", async () => {
+    const t = await write(field({ field: { fieldKey: "some_new_field", label: "Preferred carrier", helpText: "Name one if you have it." } }));
+    expect(t).toBe("¿Qué puedes indicarme sobre este punto: preferred carrier? Name one if you have it.");
+    expect((t.match(/[?¿]/g) ?? []).length).toBe(2);
   });
 });

@@ -32,6 +32,7 @@ export type EvaluateCategory = (input: EvaluationInput) => CategoryEvaluation;
 // ------------------------------------------------------------------ ModelProvider
 export interface ModelProviderDescriptor {
   readonly port: "model_provider";
+  // eslint-disable-next-line @typescript-eslint/ban-types -- keeps the literal union open for autocomplete
   readonly implementation: "scripted" | "gateway" | (string & {});
   readonly mode: IntegrationMode;
   readonly verification: IntegrationVerification;

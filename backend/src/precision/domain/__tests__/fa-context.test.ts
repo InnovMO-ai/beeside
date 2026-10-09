@@ -23,6 +23,19 @@ describe("First Assessment context service", () => {
     expect(await svc.read("p")).not.toBeNull();
   });
 
+  it("readWithStatus tells a failed read apart from nothing delivered (the Understanding opening depends on it)", async () => {
+    let mode: "fail" | "empty" | "ok" = "fail";
+    const r = reader(async () => { if (mode === "fail") throw new Error("boom"); return mode === "empty" ? null : read(); });
+    const svc = createFaContextService(r, () => undefined);
+    expect(await svc.readWithStatus("p")).toEqual({ read: null, failed: true });
+    mode = "empty";
+    expect(await svc.readWithStatus("p")).toEqual({ read: null, failed: false });
+    mode = "ok";
+    const ok = await svc.readWithStatus("p");
+    expect(ok.failed).toBe(false);
+    expect(ok.read?.sourceResultId).toBe("r1");
+  });
+
   it("caches a delivered context briefly, then asks again", async () => {
     let now = 1_000;
     const r = reader(async () => read());

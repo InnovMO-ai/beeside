@@ -269,10 +269,15 @@ export function securityOptionsFromEnv(env: NodeJS.ProcessEnv = process.env, db:
  * Precision Center API. Off unless PRECISION_API_ENABLED=true. It uses its own connection pool because the conversation store
  * takes a session-level lock per project on a dedicated connection. Providers default to the isolated ones (see api/wiring.ts).
  */
-export async function precisionFromEnv(env: NodeJS.ProcessEnv = process.env, limiter?: RateLimiter): Promise<{ router: Router } | undefined> {
+export function precisionPoolFromEnv(env: NodeJS.ProcessEnv = process.env): Pool | undefined {
   if (env.PRECISION_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL) throw new Error("PRECISION_API_ENABLED requires DATABASE_URL");
-  const pool = new Pool({ connectionString: env.DATABASE_URL, max: Number(env.PRECISION_DB_POOL_MAX ?? 10) });
+  return new Pool({ connectionString: env.DATABASE_URL, max: Number(env.PRECISION_DB_POOL_MAX ?? 10) });
+}
+
+export async function precisionFromEnv(env: NodeJS.ProcessEnv = process.env, limiter?: RateLimiter, existingPool?: Pool): Promise<{ router: Router } | undefined> {
+  const pool = existingPool ?? precisionPoolFromEnv(env);
+  if (!pool) return undefined;
   const runtime = await createPrecisionRuntime({ env, pool, ...(limiter ? { limiter } : {}) });
   return { router: runtime.router };
 }
@@ -289,9 +294,12 @@ async function main(): Promise<void> {
   const admin = adminDepsFromEnv();
   const stripe = stripeDepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
   const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db);
-  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db ?? fa4?.db ?? null;
+  // When only Precision is enabled there is no other database handle: its own pool then backs the shared rate-limit counters and
+  // the readiness probe too, so limits are shared by all instances and /ready reflects the real database.
+  const precisionPool = precisionPoolFromEnv(process.env);
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db ?? fa4?.db ?? (precisionPool ? createPoolDb(precisionPool) : null);
   const security = securityOptionsFromEnv(process.env, db);
-  const precision = await precisionFromEnv(process.env, security.limiter);
+  const precision = await precisionFromEnv(process.env, security.limiter, precisionPool);
   const app = createApp({
     ...(precision ? { precision } : {}),
     fa,

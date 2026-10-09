@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /** Conversation drivers and the customer-safety scan shared by the Precision API suites. */
 import { FORBIDDEN_INTERNAL_TERMS, UNAPPROVED_VARIANTS } from "../../conversation/process-knowledge/term-registry";
 import type { ApiClient, Seen } from "./harness";
@@ -20,7 +21,7 @@ export const key = (tag: string): string => `${tag}-${Date.now().toString(36)}-$
 
 /** Answers the Understanding conversation until the engine says it is ready to confirm. Returns the last thread state. */
 export async function completeUnderstanding(api: ApiClient, maxTurns = 14): Promise<{ state: string; turns: TurnLike[] }> {
-  let thread = (await api.get("/understanding")).body as { understandingState: string; turns: TurnLike[] };
+  const thread = (await api.get("/understanding")).body as { understandingState: string; turns: TurnLike[] };
   let state = thread.understandingState;
   let turns = thread.turns;
   for (let i = 0; i < maxTurns && state !== "ready_to_confirm" && state !== "confirmed"; i++) {

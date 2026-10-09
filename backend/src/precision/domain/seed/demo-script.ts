@@ -1,10 +1,10 @@
 /**
  * Fixture DATA for the scripted model provider, used by the demo route (docs/f5/demo-route.md).
  *
- * Why it exists: the provider's built-in heuristics cannot tell the two country fields of one logistics lane apart. Whatever
- * country the client names while answering "origin country" is also written to "destination country", so a lane from Chile to
- * Mexico would read "Chile to Chile". This fixture reads a lane answer ONLY for the field being asked (the target) and leaves
- * the rest alone, so each lane field gets exactly what the client said for it.
+ * History: the provider's built-in heuristics used to write the country named for "origin country" into "destination country"
+ * as well ("Chile to Chile"). That is fixed in the provider itself (it now reads one answer for one field and tells the two ends
+ * of a lane apart), and a test plays the route without this fixture. The fixture stays as a stricter, explicit script for the
+ * lane step: it reads a lane answer ONLY for the field being asked and leaves the rest alone.
  *
  * It is script/fixture, not product behaviour: the real model reads the same text with its own judgement, and nothing here
  * is imported by product code. Pass it to the scripted provider (`new ScriptedModelProvider({ fixture })` or

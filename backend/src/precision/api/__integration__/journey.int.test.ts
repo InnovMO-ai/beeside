@@ -75,6 +75,7 @@ describeWithDb("Precision API — client journey", () => {
   describe("Understanding -> My Service Map -> categories", () => {
     let projectId: string;
     let api: ReturnType<Harness["api"]>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cards: Record<string, any>;
     beforeAll(async () => {
       ({ projectId } = await h.newProject());
@@ -118,7 +119,7 @@ describeWithDb("Precision API — client journey", () => {
       const m = r.body;
       expect(m).toMatchObject({ canConfirm: true, canWrite: true, hasUnconfirmedChanges: false, confirmed: null });
       expect(m.live.title).toBe("My Service Map");
-      expect(m.live.summary).toMatchObject({ objective: "Open a distribution hub for our packaged foods", destinations: [{ code: "MX", label: "Mexico" }], timeWindow: "2027-04" });
+      expect(m.live.summary).toMatchObject({ objective: "Open a distribution hub for our packaged foods", destinations: [{ code: "MX", label: "Mexico" }], timeWindow: "April 2027" });
       expect(m.live.groups.map((g: { label: string }) => g.label)).toEqual(["Tax, Accounting and Audit", "Logistics"]);
       expect(m.live.groups.every((g: { categoryId: string | null }) => g.categoryId === null)).toBe(true); // no workstream before confirmation
       expect(m.live.groups[1].items.map((i: { label: string; priority: string }) => [i.label, i.priority])).toEqual([["Third-party logistics", "high"], ["Freight transportation", "medium"]]);
@@ -205,10 +206,10 @@ describeWithDb("Precision API — client journey", () => {
       const logistics = cards.Logistics;
       const turn = (body: object) => api.post(`/categories/${logistics.id}/turns`, { turnKey: key("r"), ...body });
       let last = await turn({ text: "", quickReply: { value: "false", intent: "answer" } }); // hazardous materials: no
-      for (let i = 0; i < 8 && !last.body.progress.ready; i++) {
+      for (let i = 0; i < 16 && !last.body.progress.ready; i++) {
         const asked = (last.body.turns as Array<{ role: string; text: string; quickReplies?: Array<{ value: string; intent: string }> }>).filter((t) => t.role === "assistant").at(-1)!;
         const choice = asked.quickReplies?.find((x) => x.intent === "answer");
-        last = choice ? await turn({ text: "", quickReply: { value: choice.value, intent: "answer" } }) : await turn({ text: /services in scope/i.test(asked.text) ? "Warehousing" : /origin country/i.test(asked.text) ? "Spain" : /destination country/i.test(asked.text) ? "Mexico" : "yes" });
+        last = choice ? await turn({ text: "", quickReply: { value: choice.value, intent: "answer" } }) : await turn({ text: /logistics services/i.test(asked.text) ? "Warehousing" : /leave from/i.test(asked.text) ? "Spain" : /arrive in/i.test(asked.text) ? "Mexico" : /what volume/i.test(asked.text) ? "20 pallets" : /product moves/i.test(asked.text) ? "Packaged food" : "yes" });
       }
       expect(last.body.progress.ready).toBe(true);
       expect(last.body.progress.status).toBe("ready_for_review");

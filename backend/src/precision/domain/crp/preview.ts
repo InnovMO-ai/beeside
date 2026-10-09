@@ -4,6 +4,7 @@
  * My Service Map, company context, delivery kind): a stale checksum can never send a body the client did not see.
  */
 import type { Locale, PreviewBlockDto, PreviewDto, ServiceMapGroupDto, ServiceMapViewDto } from "../../api/dto";
+import { formatDate } from "../../manifest/value-render";
 import { categoryInfo } from "../../manifest/categories";
 import type { PrecisionDomainDeps } from "../deps";
 import { emitEvent } from "../events";
@@ -40,7 +41,7 @@ function serviceMapView(psm: PayloadPsm, asOf: string, locale: Locale): ServiceM
     summary: {
       objective: psm.objectives[0] ?? null,
       destinations: psm.destinations.map((d) => ({ code: "", label: d })),
-      timeWindow: psm.time_window,
+      timeWindow: psm.time_window ? formatDate(psm.time_window, locale) : null,
       productOrService: psm.product_or_service,
     },
     groups,
@@ -58,7 +59,7 @@ export function previewBlocks(h: Handoff, locale: Locale): PreviewBlockDto[] {
     ...line(T("company", locale), h.companyName),
     ...line(T("objective", locale), psm.objectives[0] ?? null),
     ...line(T("destination", locale), psm.destinations.join(", ") || null),
-    ...line(T("timeWindow", locale), psm.time_window),
+    ...line(T("timeWindow", locale), psm.time_window ? formatDate(psm.time_window, locale) : null),
     ...line(T("product", locale), psm.product_or_service),
     ...line(T("operatingEntity", locale), psm.operating_entity),
   ];

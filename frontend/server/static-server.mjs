@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
  * configured — the customer app and the API must be same-origin for the browser.
  */
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "dist");
+// STATIC_ROOT lets a local run serve a build made elsewhere (rehearsal stack); the image uses ./dist next to this file.
+const ROOT = process.env.STATIC_ROOT ? path.resolve(process.env.STATIC_ROOT) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "dist");
 const PORT = Number(process.env.PORT ?? 8080);
 const UPSTREAM = process.env.API_UPSTREAM_URL ? new URL(process.env.API_UPSTREAM_URL) : null;
 const PRODUCTION = process.env.NODE_ENV === "production";

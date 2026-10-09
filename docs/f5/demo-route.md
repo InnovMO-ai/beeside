@@ -25,7 +25,7 @@ Because Operation Hub is a simulator, "Sent" here proves the Precision side only
    ```
    Stages: `start` (company and project only, for the whole route A–J), `map_confirmed` (Understanding done and My Service Map confirmed, start at C), `logistics_ready` (Logistics answered, start at H). Without `--reset` the command is idempotent and reuses the existing Northwind project; `--reset` creates a new one. `--no-link` skips the access code.
 4. Restart the app after every `--reset`: the fixtures (First Assessment context and Premium state) are loaded for the newest Northwind project at start-up through `loadDemoFixtures`.
-5. For the lane step (D-5) the scripted provider needs `DEMO_SCRIPT_FIXTURE` (see section N, gap G-1). Without it, naming a country on the origin question also fills the destination.
+5. The lane step needs no extra setting: the scripted provider now tells the origin country from the destination country by itself (section N, gap G-1). `DEMO_SCRIPT_FIXTURE` is optional.
 6. Open the one-time access path the seed prints (`/precision?code=...`, on the host of the app) in a clean browser profile. The code is exchanged once for a session and is never logged. Choose the language on the first screen; the route is identical in both.
 
 **Time:** about 12 minutes at presenting pace.
@@ -43,7 +43,7 @@ Because Operation Hub is a simulator, "Sent" here proves the Precision side only
 | First Assessment | Synthetic, client-safe: objective, destination, timeframe, five needs (third-party logistics, international freight, import and customs support, local company set-up, a feasibility review). |
 
 **Say (EN).** "This is Northwind Foods, a made-up exporter of packaged food. They already did the First Assessment and have Premium. Everything you will see is synthetic."
-**Di (ES).** "Esta es Northwind Foods, una exportadora de alimentos empacados inventada. Ya hizo la Primera Evaluación y tiene Premium. Todo lo que verán es sintético."
+**Di (ES).** "Esta es Northwind Foods, una exportadora de alimentos empacados inventada. Ya hizo el First Assessment y tiene Premium. Todo lo que verán es sintético."
 
 ## B. Destination
 
@@ -64,17 +64,17 @@ Corporate, Legal and Administrative and International Trade and Customs stay "No
 
 ## D. What to type, turn by turn
 
-Type the text exactly (or click the matching button). Text in the **Expect** column is the assistant reply; the wording of the question stage ("What can you tell me about ...") is produced by the scripted provider and will read more naturally with the real model. The facts, states and order do not change.
+Type the text exactly (or click the matching button). Text in the **Expect** column is the assistant reply. The questions are fixed, reviewed wording in both languages ("copy bank"); the real model will phrase some turns differently. The facts, states and order do not change. Short acknowledgements ("Noted", "Thanks, I have that") rotate, so the first words of a reply can differ from this table.
 
 ### D1. Understanding (English)
 
 | # | Type | Expect |
 |---|---|---|
-| 0 | (opening) | One-time notice that Precision uses artificial intelligence. Then: "From what you told us in your First Assessment, we already have this: *Start selling our packaged food products in Mexico through local distributors*. Is that still the case?" with the buttons **Yes, that is correct** / **I want to correct it**. |
-| 1 | `Yes` (or click the button) | "From what you told us in your First Assessment, we already have this: *Mexico*. Is that still the case?" |
-| 2 | `Yes` | "Thanks for confirming. What product or service do you want to bring to this market?" (quick reply: Not sure yet) |
-| 3 | `We make dry packaged food products with a long shelf life, mainly snacks and cereals` | "Noted ... Which company or entity will operate in the destination?" |
-| 4 | `We plan to set up a local company in Mexico` | "Noted: We plan to set up a local company in Mexico. When would you like to start?" |
+| 0 | (opening) | One-time notice that Precision uses artificial intelligence. Then: "From what you told me in your First Assessment, I understand this: *Start selling our packaged food products in Mexico through local distributors*. Is that still the case?" with the buttons **Yes, that is correct** / **I want to correct it**. |
+| 1 | `Yes` (or click the button) | "From what you told me in your First Assessment, I understand this: *Mexico*. Is that still the case?" |
+| 2 | `Yes` | "Confirmed. What product or service do you want to bring to this market? It tells us what the services have to support." (quick reply: Not sure yet) |
+| 3 | `We make dry packaged food products with a long shelf life, mainly snacks and cereals` | "Noted. Which company or entity will operate in the destination? A company name or a short description is enough; you can leave it pending." |
+| 4 | `We plan to set up a local company in Mexico` | "Understood. When would you like to start? A month and year are enough." |
 | 5 | `April 2027` | "I have what I need to put together your My Service Map. Review it and, when you agree, confirm it." Understanding is now **ready to confirm**. |
 
 No percentage is ever shown during Understanding. The time window is asked (not offered) because the synthetic timeframe ("within the next nine months") is not a date.
@@ -83,12 +83,12 @@ No percentage is ever shown during Understanding. The time window is asked (not 
 
 | # | Escribe | Esperado |
 |---|---|---|
-| 0 | (apertura) | Aviso único de uso de inteligencia artificial. Después: "Con lo que nos contaste en tu Primera Evaluación, ya tenemos esto: *Start selling our packaged food products in Mexico through local distributors*. ¿Sigue siendo así?" con **Sí, es correcto** / **Quiero corregirlo**. |
-| 1 | `Sí` | "... ya tenemos esto: *México*. ¿Sigue siendo así?" |
-| 2 | `Sí` | "Gracias por confirmarlo. ¿Qué producto o servicio quieres llevar a este mercado?" |
-| 3 | `Fabricamos alimentos secos empacados de larga vida útil, sobre todo botanas y cereales` | "Anotado ... ¿Qué empresa o entidad operará en el destino?" |
-| 4 | `Vamos a constituir una empresa local en México` | "... ¿Cuándo te gustaría empezar?" |
-| 5 | `Abril de 2027` | Pasa a **listo para confirmar** el My Service Map. |
+| 0 | (apertura) | Aviso único de uso de inteligencia artificial. Después: "Con lo que me contaste en tu First Assessment, entiendo esto: *Start selling our packaged food products in Mexico through local distributors*. ¿Sigue siendo así?" con **Sí, es correcto** / **Quiero corregirlo**. |
+| 1 | `Sí` | "Con lo que me contaste en tu First Assessment, entiendo esto: *México*. ¿Sigue siendo así?" |
+| 2 | `Sí` | "Confirmado. ¿Qué producto o servicio quieres llevar a este mercado? Nos indica qué deben respaldar los servicios." |
+| 3 | `Fabricamos alimentos secos empacados de larga vida útil, sobre todo botanas y cereales` | "Anotado. ¿Qué empresa o entidad operará en el destino? Basta con el nombre de la empresa o una descripción breve; puedes dejarlo pendiente." |
+| 4 | `Vamos a constituir una empresa local en México` | "Entendido. ¿Cuándo te gustaría empezar? Basta con un mes y un año." |
+| 5 | `Abril de 2027` | El My Service Map queda **por confirmar**: "Ya tengo lo necesario para armar tu My Service Map. Revísalo y, cuando estés de acuerdo, confírmalo." |
 
 (The objective text appears in English in the Spanish run because the synthetic First Assessment is in English. It is data, not a translation gap.)
 
@@ -98,47 +98,47 @@ Click **Confirm** on My Service Map. Expected: an immutable dated snapshot is st
 
 ### D3. Logistics, process question first (F), then answers
 
-Open the **Logistics** card. Expect: "Let's work on Logistics. I will ask one question at a time, and if you do not know something yet, we leave it as pending. Who will run day-to-day logistics?" with four quick replies.
+Open the **Logistics** card. Expect: "Let's work on Logistics. I will ask one question at a time, and if you do not know something yet, we leave it as pending. Who will take care of the day-to-day logistics operation?" with four quick replies.
 
 **Process questions (F), asked before answering.** They are answered from the Process Knowledge pack, write **nothing**, and the pending question is repeated.
 
 | Id | Type (EN / ES) | Expect |
 |---|---|---|
-| P-01 | `What is a CRP and what happens with this?` / `¿Qué es un CRP y qué va a pasar con esto?` | Introduces "Category Requirement Pack (CRP)", says it is the category summary of what was captured and what is pending, with no documents, not a quote and not a promise of a provider; says pending items stay in plain sight; then "Back to where we were. Who will run day-to-day logistics?" |
+| P-01 | `What is a CRP and what happens with this?` / `¿Qué es un CRP y qué va a pasar con esto?` | Introduces "Category Requirement Pack (CRP)", says it is the category summary of what was captured and what is pending, with no documents, not a quote and not a promise of a provider; says pending items always stay visible; then "Back to where we left off. Who will take care of the day-to-day logistics operation?" (ES: "Retomamos donde nos quedamos.") |
 | P-02 | `What role does the Sherpa play and when does it appear?` / `¿Qué papel juega el Sherpa y cuándo aparece?` | Explains the role in Operation Hub, says it begins after the first send and that nothing is assigned yet. Never "your Sherpa". Then the same question again. |
 
 **Answers (English).** Run these after P-01 and P-02.
 
 | # | Type | Expect (next question) |
 |---|---|---|
-| 1 | `Third-party logistics provider` | Do any flows involve hazardous or regulated materials? |
-| 2 | `No` | Services in scope for this workstream |
-| 3 | `Third-party logistics and Freight transportation` | Primary product type being moved |
-| 4 | `General cargo` | Logistics flows, **Origin country** |
-| 5 | `Chile` | Logistics flows, **Destination country** |
-| 6 | `Mexico` | Logistics flows, **Product being moved** |
-| 7 | `Packaged dry food products` | Logistics flows, **Volume** |
-| 8 | `20 pallets` | Logistics flows, **Frequency** |
-| 9 | `Monthly` | Logistics flows, **Mode of transport** |
-| 10 | `Ocean` | Is dedicated warehousing/storage needed? |
-| 11 | `No` | Import/export licensing status |
+| 1 | `Third-party logistics provider` | Do any of your shipments include hazardous or regulated materials? |
+| 2 | `No` | Which logistics services do you need for this project? |
+| 3 | `Third-party logistics and Freight transportation` | What main type of product will you be moving? |
+| 4 | `General cargo` | Which country do the products leave from? (**origin**) |
+| 5 | `Chile` | Which country do they arrive in? (**destination**) |
+| 6 | `Mexico` | What product moves in this flow? |
+| 7 | `Packaged dry food products` | What volume do you move in this flow? |
+| 8 | `20 pallets` | How often is this shipment made? |
+| 9 | `Monthly` | Which mode of transport will you use in this flow? |
+| 10 | `Ocean` | Do you need dedicated warehousing for this project? |
+| 11 | `No` | What is the status of your import or export licenses? |
 | 12 | `Not sure yet` (button) | "That is fine, we leave it as pending; you do not need to make up an answer. I have the essential details to prepare the summary of this category: your CRP. You can review it, request changes or confirm it. Confirming it does not send it to Operation Hub." |
 
 **Respuestas (Español).**
 
 | # | Escribe | Esperado (siguiente pregunta) |
 |---|---|---|
-| 1 | `Proveedor logístico externo` | ¿Algún flujo involucra materiales peligrosos o regulados? |
-| 2 | `No` | Servicios en alcance de este frente de trabajo |
-| 3 | `Logística con terceros y Transporte de carga` | Tipo principal de producto a mover |
-| 4 | `Carga general` | Flujos logísticos, **País de origen** |
-| 5 | `Chile` | **País de destino** |
-| 6 | `México` | **Producto a mover** |
-| 7 | `Alimentos secos empacados` | **Volumen** |
-| 8 | `20 pallets` | **Frecuencia** (se registra "20 tarimas") |
-| 9 | `Mensual` | **Modo de transporte** |
-| 10 | `Marítimo` | ¿Se necesita almacenamiento dedicado? |
-| 11 | `No` | Estado de licencias de importación/exportación |
+| 1 | `Proveedor logístico externo` | ¿Alguno de tus envíos incluye materiales peligrosos o regulados? |
+| 2 | `No` | ¿Qué servicios de logística necesitas para este proyecto? |
+| 3 | `Logística con terceros y Transporte de carga` | ¿Qué tipo de producto vas a mover principalmente? |
+| 4 | `Carga general` | ¿Desde qué país salen los productos? (**origen**) |
+| 5 | `Chile` | ¿A qué país llegan? (**destino**) |
+| 6 | `México` | ¿Qué producto se mueve en este flujo? |
+| 7 | `Alimentos secos empacados` | ¿Qué volumen mueves en este flujo? |
+| 8 | `20 pallets` | ¿Con qué frecuencia se hace este envío? (se registra "20 tarimas") |
+| 9 | `Mensual` | ¿Qué modo de transporte usarás en este flujo? |
+| 10 | `Marítimo` | ¿Necesitas almacenamiento dedicado para este proyecto? |
+| 11 | `No` | ¿Cuál es el estado de tus licencias de importación o exportación? |
 | 12 | `Todavía no lo sé` (botón) | "Está bien, lo dejamos como pendiente ... Ya tengo los datos esenciales para preparar el resumen de esta categoría: tu CRP ..." |
 
 ### E. State transitions across the route
@@ -161,7 +161,7 @@ See D3 (P-01, P-02). Both are answered with zero model calls and never write a f
 
 Shown as the confirmed, dated snapshot (also the "My Service Map" block of the Preview).
 
-**Summary.** Objective: *Start selling our packaged food products in Mexico through local distributors*. Destination: Mexico. Time window: 2027-04. Product or service: *Dry packaged food products with a long shelf life*.
+**Summary.** Objective: *Start selling our packaged food products in Mexico through local distributors*. Destination: Mexico. Time window: April 2027. Product or service: *Dry packaged food products with a long shelf life*.
 
 | Group | Items (priority) |
 |---|---|
@@ -177,7 +177,7 @@ All items are shown with their client-language reason. The seeded map (`--stage=
 Title: **Logistics — Category Requirement Pack (CRP)**. State **Ready for review**, then **Confirmed** (read-only).
 
 - **Context.** Destination: Mexico · Objective · Product or service · Time window.
-- **Part 1 (confirmed, read-only text).** Services in scope: Third-party logistics and Freight transportation · Who will run day-to-day logistics: Third-party logistics provider · Primary product type: General cargo · Logistics flows (lanes): Origin Chile · Destination Mexico · Packaged dry food products · 20 pallets · Monthly · Ocean · Dedicated warehousing: No · Hazardous or regulated materials: No.
+- **Part 1 (confirmed, read-only text).** Services in scope: Third-party logistics and Freight transportation · Who will run day-to-day logistics: Third-party logistics provider · Primary product type: General cargo · Logistics flows: Origin country: Chile · Destination country: Mexico · Packaged dry food products · 20 pallets · Monthly · Ocean · Dedicated warehousing: No · Hazardous or regulated materials: No.
 - **Part 2 / Pending Information (always visible, never inside prose).** Import/export licensing status (pending).
 - **Information required later.** Empty.
 - No documents, attachments or upload area (by design).
@@ -257,10 +257,10 @@ Expect the same "summary of this category: your CRP" message. Confirm, then Prev
 
 | Id | Gap | Effect | Route handling |
 |---|---|---|---|
-| G-1 | The scripted provider cannot tell the origin country from the destination country of one lane: whatever country is named on the origin question is also written to the destination. | Without a fix a lane would read "Chile to Chile". | `DEMO_SCRIPT_FIXTURE` (`domain/seed/demo-script.ts`) reads each lane field only when it is the one being asked. The scripted provider accepts a programmatic fixture but not an external script file, so the app must pass it when it builds the provider (`selectModelProvider({ fixture })`). Owner: lead / DOMAIN-A wiring. |
-| G-2 | Question wording from the scripted provider is mechanical ("What can you tell me about services in scope for this workstream?"). | Reads less natural than the real model. | Cosmetic. Facts, order and states are the real ones. |
+| G-1 | Resolved. The scripted provider told the origin country from the destination country badly: the country named on the origin question was also written to the destination. | None now. | The provider reads lane cues ("from", "to", "leave from", "arrive in") and the field being asked, and fills only the matching end. `route-rehearsal.int.test.ts` plays the route in EN and ES without the demo script and checks "Origin country: Chile · Destination country: Mexico". `DEMO_SCRIPT_FIXTURE` is optional. |
+| G-2 | Resolved for the route. The questions come from a reviewed bilingual copy bank (`conversation/copy/field-questions.ts`). Fields outside the bank use a neutral wrapper ("What can you tell me about this point: ...?"). | A manifest field added later reads more generic until it has a bank entry. | Add a bank entry (EN and ES) when a field is added. |
 | G-3 | The Spanish run shows the English synthetic objective and product text. | Mixed-language lines in two CRP context rows. | Fixture data language, not a defect. |
-| G-4 | Time window is shown as `2027-04` in the CRP and Preview. | Not a friendly date. | Content/format item for the date renderer. |
+| G-4 | Resolved. The time window reads "April 2027" (EN) and "abril de 2027" (ES) in the CRP and Preview. | None. | The first screen in the Spanish run may show the English synthetic objective (G-3). |
 | G-5 | `Start a new version` is refused until the first send has succeeded. | Avoids a deadlock with the first-send rule. | Do not demo it before J. |
 | G-6 | After `--reset` the app must restart to register the new project's fixtures. | A fresh project would show no First Assessment context. | Step 0.4. |
 | G-7 | The licensing-status question is the single pending item by design. | It is what makes Pending Information visible. | None. |

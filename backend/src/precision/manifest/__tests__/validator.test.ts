@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { validateManifest, validateProjectManifest, CROSSWALK_SERVICE_ADDITIONS, type Finding, type RegistryEntry } from "../validator";
 import { ALL_KEYS, PM, catalog, load } from "./helpers";
 

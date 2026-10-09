@@ -97,7 +97,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
       const body: InternalStatusDto & { manifests: { project: string | null; categories: Record<string, string> } } = {
         integrations,
         dataset: env.PRECISION_DATASET === "CUSTOMER" ? "CUSTOMER" : "SYNTHETIC",
-        build: { sha: env.BUILD_SHA ?? null, releaseLabel: env.PRECISION_RELEASE_LABEL ?? "Embassy RC" },
+        build: { sha: env.BUILD_SHA ?? null, releaseLabel: env.PRECISION_RELEASE_LABEL ?? "Track A RC" },
         manifests: { project: project?.version ?? null, categories: Object.fromEntries(cats.map((c) => [c.category_key, c.version])) },
       };
       res.json(body);

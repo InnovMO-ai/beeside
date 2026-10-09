@@ -8,6 +8,7 @@ import { EntitlementProvider, EntitlementState } from "../ports/entitlement";
  */
 export class FixtureEntitlementProvider implements EntitlementProvider {
   private readonly states = new Map<string, EntitlementState>();
+  private fallback: ((projectId: string) => Promise<EntitlementState | null>) | null = null;
 
   constructor(states: EntitlementState[] = []) {
     for (const s of states) this.states.set(s.projectId, s);
@@ -15,6 +16,11 @@ export class FixtureEntitlementProvider implements EntitlementProvider {
 
   set(state: EntitlementState): void {
     this.states.set(state.projectId, state);
+  }
+
+  /** Resolves projects that were registered after start-up (configuration lookup on a miss). Explicit `set` always wins. */
+  setFallback(resolve: (projectId: string) => Promise<EntitlementState | null>): void {
+    this.fallback = resolve;
   }
 
   describe(): IntegrationDescriptor {
@@ -28,6 +34,10 @@ export class FixtureEntitlementProvider implements EntitlementProvider {
   }
 
   async get(projectId: string): Promise<EntitlementState> {
-    return this.states.get(projectId) ?? { projectId, premiumActive: false, accessMode: "REVOKED" };
+    const known = this.states.get(projectId);
+    if (known) return known;
+    const resolved = this.fallback ? await this.fallback(projectId) : null;
+    if (resolved) { this.states.set(projectId, resolved); return resolved; }
+    return { projectId, premiumActive: false, accessMode: "REVOKED" };
   }
 }

@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import type { Db } from "../../db/database";
 import type { ConfirmServiceMapResponse, ItemState, Locale, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto } from "../api/dto";
 import { ApiError } from "../api/errors";
+import { formatDate } from "../manifest/value-render";
 import { categoryInfo, buildServiceMapContent, openItemsFromEvaluations, type PsmV1Content } from "../manifest";
 import type { FaContextRead } from "../ports/fa-context";
 import { confirmPrecisionAssessment } from "../repository";
@@ -146,7 +147,7 @@ function viewOf(content: StoredContent, codes: string[], locale: Locale, asOf: s
     summary: {
       objective: p?.objective ?? null,
       destinations: destinationsOf(codes, locale),
-      timeWindow: p?.timeWindow ?? null,
+      timeWindow: p?.timeWindow ? formatDate(p.timeWindow, locale) : null,
       productOrService: p?.productOrService ?? null,
     },
     groups,
@@ -162,6 +163,7 @@ function codesOf(content: StoredContent, fallback: string[]): string[] {
 /** Added / removed / changed vs. the confirmed snapshot, in client language. */
 export function diffAgainst(live: PsmV1Content, liveCodes: string[], snap: StoredContent, locale: Locale): ServiceMapViewDto["changesSinceConfirmed"] {
   const out: ServiceMapViewDto["changesSinceConfirmed"] = [];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the call sites
   const labelOf = (key: string, _fallback: string): string => categoryInfo(key).label[locale];
   const snapGroups = new Map((snap.groups ?? []).map((g) => [g.categoryKey, g]));
   const liveGroups = new Map(live.groups.map((g) => [g.categoryKey, g]));

@@ -186,29 +186,31 @@ describeWithDb("Precision API — reliability", () => {
       expect(await one(h, "SELECT count(*) AS n FROM context_pin WHERE project_id = $1", [projectId])).toBe(0);
     });
 
-    it("a reader that throws is a normal state, never an error for the client; the next request asks again", async () => {
+    it("a reader that throws never reaches the client as a technical error; the first Understanding opening waits for the context (no opening without the inherited values) and later requests are untouched", async () => {
       const { projectId } = await h.newProject();
       const api = h.api(await h.session(projectId));
       const original = h.fa.read.bind(h.fa);
       h.runtime.domain.fa.invalidate();
       h.fa.read = async () => { throw new Error("fa upstream: ECONNRESET 10.1.2.3"); };
       try {
-        for (const path of ["/entry", "/center", "/understanding", "/help"]) {
+        for (const path of ["/entry", "/center", "/help"]) {
           const r = await api.get(path);
           expect([path, r.status]).toEqual([path, 200]);
         }
-        const th = (await api.get("/understanding")).body;
-        expect(th.turns.at(-1).confirmCard).toBeUndefined();
+        // The very first opening needs the inherited values: it is NOT created without them (that would make the confirmation cards unreachable).
+        const first = await api.get("/understanding");
+        expect(first.status).toBe(500);
+        expect(first.body).toMatchObject({ error: "TEMPORARILY_UNAVAILABLE", retryable: true });
+        expect(JSON.stringify(first.body)).not.toMatch(/ECONNRESET|10\.1\.2\.3|upstream/);
+        expect(await one(h, "SELECT count(*) AS n FROM precision_turn WHERE project_id = $1", [projectId])).toBe(0);
         expect(JSON.stringify(h.seen.slice(-6))).not.toMatch(/ECONNRESET|10\.1\.2\.3|upstream/);
         expect(h.logs.join("\n")).not.toMatch(/10\.1\.2\.3.*Bearer/);
       } finally {
         h.fa.read = original;
       }
-      // the context comes back: offered for confirmation on the next read of a fresh question
-      const { projectId: p2 } = await h.newProject();
-      const api2 = h.api(await h.session(p2));
-      expect((await api2.get("/understanding")).body.turns.at(-1).confirmCard).toMatchObject({ kind: "inherited_value" });
-      void projectId;
+      // the context is back: the same project now opens WITH the inherited-value confirmation
+      h.runtime.domain.fa.invalidate();
+      expect((await api.get("/understanding")).body.turns.at(-1).confirmCard).toMatchObject({ kind: "inherited_value" });
     });
   });
 

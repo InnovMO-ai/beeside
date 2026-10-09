@@ -139,6 +139,7 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
   }
 
   async function contact(actor: Actor, message: unknown): Promise<{ ok: true }> {
+    // eslint-disable-next-line no-control-regex -- strips NUL on purpose
     const text = typeof message === "string" ? message.replace(/\u0000/g, "").trim() : "";
     if (text.length < 1 || text.length > 2000) throw new ApiError("INVALID_INPUT");
     // The message is stored for the team; no response time is promised to the client.

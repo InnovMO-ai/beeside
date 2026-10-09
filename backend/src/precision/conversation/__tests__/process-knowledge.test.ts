@@ -3,7 +3,8 @@
  * on all three surfaces, in both locales. Also: pack integrity, state variants, CRP first-mention rule, Sherpa rule,
  * unknown process questions, country-specific legal questions and false-positive guards.
  */
-import { PACK_VERSION, PROCESS_TOPICS, getTopic } from "../process-knowledge/pack";
+import { copyText } from "../copy";
+import { PACK_VERSION, PROCESS_TOPICS } from "../process-knowledge/pack";
 import { composeProcessAnswer, MAX_ANSWER_WORDS } from "../process-knowledge/answer";
 import { routeProcessQuestion } from "../process-knowledge/router";
 import { CRP_FULL } from "../process-knowledge/term-registry";
@@ -49,6 +50,14 @@ const EXTRA: { en: string; es: string; topic: string }[] = [
   { en: "Is confirming the same as sending it?", es: "¿Confirmar es lo mismo que enviarlo?", topic: "confirmed_vs_sent" },
   { en: "Can I see what is sent before sending?", es: "¿Puedo ver una vista previa antes de enviar?", topic: "preview_before_send" },
   { en: "What if I don't know the answer?", es: "¿Qué pasa si no sé la respuesta?", topic: "pending_information" },
+  { en: "Is it possible to skip a question?", es: "¿Es posible saltarme una pregunta?", topic: "pending_information" },
+  { en: "Can I skip this question?", es: "¿Puedo saltarme una pregunta?", topic: "pending_information" },
+  { en: "Can I leave this one unanswered?", es: "¿Puedo omitir esta pregunta?", topic: "pending_information" },
+  { en: "Do I have to answer everything?", es: "¿Tengo que contestar todo?", topic: "pending_information" },
+  { en: "Is it mandatory to answer all of them?", es: "¿Es obligatorio responder todas?", topic: "pending_information" },
+  { en: "Can I stop and continue later?", es: "¿Puedo parar y continuar después?", topic: "pause_and_resume" },
+  { en: "Can I pause and come back tomorrow?", es: "¿Puedo pausar y volver mañana?", topic: "pause_and_resume" },
+  { en: "Can I finish this later?", es: "¿Puedo seguir luego?", topic: "pause_and_resume" },
 ];
 
 const COMBINED = { es: "¿Qué es un CRP y qué va a pasar con esto?", en: "What is a CRP and what will happen with this?" };
@@ -216,7 +225,7 @@ describe("pre-router", () => {
   });
 
   it("recognises process questions the pack cannot answer as unknown", () => {
-    for (const q of ["¿Cuánto cuesta esto?", "How much does this cost?", "¿Cuánto tarda el proceso?", "Is my data private?"]) {
+    for (const q of ["¿Cuánto cuesta esto?", "How much does this cost?", "¿Cuánto tarda el proceso?", "Is my data private?", "Is my information confidential?", "¿Mi información es confidencial?", "¿Mis datos están protegidos?", "Is my data secure?"]) {
       expect(routeProcessQuestion(q, { surface: "category", flags }).kind).toBe("unknown");
     }
   });
@@ -250,7 +259,7 @@ describe("P-01 / P-02 through the turn engine (every surface, both locales)", ()
     expect(r.confirmedServiceNeed).toBeNull();
 
     const reply = assistantText(r);
-    const lead = locale === "es" ? "Volviendo a lo que estábamos viendo." : "Back to where we were.";
+    const lead = copyText("process_resume_lead", locale).text;
     expect(reply.endsWith(openQuestion.split(CRP_FULL).join("CRP"))).toBe(true);
     expect(reply).toContain(lead);
     // the pending question is still the same one for the next turn
@@ -293,6 +302,34 @@ describe("P-01 / P-02 through the turn engine (every surface, both locales)", ()
   });
 });
 
+describe("questions about pace and privacy never write (QA-LIVE regression)", () => {
+  const PHRASES: Record<"en" | "es", string[]> = {
+    en: ["Is it possible to skip a question?", "Can I skip this question?", "Is my information confidential?", "Can I stop and continue later?", "Do I have to answer everything?"],
+    es: ["¿Puedo saltarme una pregunta?", "¿Puedo omitir esta pregunta?", "¿Mi información es confidencial?", "¿Puedo parar y continuar después?", "¿Tengo que contestar todo?"],
+  };
+  it.each(SURFACES.flatMap((s) => (["en", "es"] as const).map((l) => [s, l] as const)))("%s/%s: answered as a process question, nothing written, question resumed", async (surface, locale) => {
+    for (const text of PHRASES[locale]) {
+      const w = new World({ surface, locale });
+      await w.open();
+      const q = (w.lastAssistant().structured as { state: { pendingQuestion: string } }).state.pendingQuestion;
+      const r = await w.say(text);
+      const reply = assistantText(r);
+      expect(r.meta.turnKind).toBe("process_question");
+      expect(r.factsToWrite).toEqual([]);
+      expect(w.writer.applied.size).toBe(0);
+      expect(reply.endsWith(q)).toBe(true);
+      expect(verifyAssistantText(reply, vctx(locale, surface)).filter((v) => v.critical)).toEqual([]);
+    }
+  });
+  it("answers the confidentiality question with the honest cannot-confirm copy, not with a recorded pending fact", async () => {
+    const w = new World({ surface: "category", locale: "es" });
+    await w.open();
+    const r = await w.say("¿Mi información es confidencial?");
+    expect(assistantText(r)).toMatch(/No puedo confirmar ese detalle/);
+    expect(assistantText(r)).not.toMatch(/no necesitas compartirlo/);
+  });
+});
+
 describe("unknown and legal process questions", () => {
   it.each(SURFACES.flatMap((s) => (["en", "es"] as const).map((l) => [s, l] as const)))("%s/%s: honest 'I can't confirm that' + resume, nothing written, signal for DOMAIN", async (surface, locale) => {
     const w = new World({ surface, locale });
@@ -313,7 +350,7 @@ describe("unknown and legal process questions", () => {
     const w = new World({ surface: "category", locale: "en", countries: ["BR"] });
     await w.open();
     const r = await w.say("What are the tax requirements in Brazil?");
-    expect(assistantText(r)).toContain("I can't yet confirm that requirement for that country from an approved source");
+    expect(assistantText(r)).toContain("I can't confirm that requirement for that country yet");
     expect(r.pendingSignals.map((s) => s.kind)).toEqual(["country_claim_unverified"]);
     expect(r.factsToWrite).toEqual([]);
     expect(r.meta.modelCalls).toBe(0);

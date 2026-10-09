@@ -140,6 +140,7 @@ export function canonicalJson(value: unknown): string {
  * yields the same checksum.
  */
 export function payloadChecksum(payload: OhHandoffPayload): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- sent_at is not part of the contract hash
   const { sent_at: _sentAt, ...contract } = payload.contract;
   return createHash("sha256").update(canonicalJson({ ...payload, contract })).digest("hex");
 }
