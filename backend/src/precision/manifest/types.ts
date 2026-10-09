@@ -1,7 +1,7 @@
 // Precision manifest & readiness engine — shared types (the contract between the engine, the domain
 // services and the conversation module). Implementations live next to this file (index.ts re-exports).
 // Pure and deterministic: nothing here touches the database, the clock or a model.
-import type { CategoryManifestContent, FieldDefinition } from "../manifest";
+import type { CategoryManifestContent, FieldDefinition } from "./effective-fields";
 
 /** Stored answer states (fact.answer_state) plus the derived NOT_APPLICABLE. */
 export type AnswerState = "NOT_ASKED" | "UNKNOWN" | "WITHHELD" | "EXPLICIT_NO" | "ZERO" | "ANSWERED" | "ASSUMED" | "NOT_APPLICABLE";

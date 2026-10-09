@@ -13,6 +13,8 @@ const WEB = 4177;
 const API = 8087;
 export default defineConfig({
   testDir: "e2e",
+  // The Precision customer app has its own config and needs no database: playwright.precision.config.ts.
+  testIgnore: "precision/**",
   timeout: 60_000,
   workers: 1,
   fullyParallel: false,

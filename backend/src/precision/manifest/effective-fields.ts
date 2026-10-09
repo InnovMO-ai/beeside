@@ -6,7 +6,9 @@
  * code — so it is deterministic and reproducible by construction, exactly as required for
  * pack.context_snapshot (§10) to stay reconstructable.
  *
- * NOT VERIFIED BY THE TOOLCHAIN in this pass — see repository.ts's header note.
+ * F5 (Track A): moved from precision/manifest.ts to precision/manifest/effective-fields.ts (the file and the
+ * directory could not share the name `manifest`). `../manifest` keeps resolving through manifest/index.ts.
+ * Added here: `effectiveFieldsMulti` (D1 multi-country union) and `normalizeCountries`.
  */
 
 export interface FieldDefinition {
@@ -20,6 +22,14 @@ export interface FieldDefinition {
   help_text?: Record<string, string> | null;
   // Set only when type === 'repeatable_group' (§13A).
   group_item_schema?: FieldDefinition[] | null;
+  // Authored extras the engine reads when present (all optional; unknown keys are tolerated by design).
+  values?: string[];
+  unit_values?: string[];
+  min_items?: number;
+  execution_dependency?: boolean;
+  derived?: boolean;
+  change_policy?: "any" | "threshold" | "operational";
+  change_threshold?: { relative_pct?: number; period_shift_months?: number; [k: string]: unknown };
   [extra: string]: unknown;
 }
 
@@ -47,7 +57,7 @@ export interface CategoryManifestContent {
  * calling it twice with the same two inputs always yields the same effective manifest (§15).
  */
 export function effectiveFields(content: CategoryManifestContent, country: string | null): FieldDefinition[] {
-  const overlay = country ? content.country_overlays[country] : undefined;
+  const overlay = country ? content.country_overlays?.[country] : undefined;
   if (!overlay) return content.fields;
 
   const deactivated = new Set(overlay.deactivate ?? []);
@@ -82,4 +92,50 @@ export function findOverlayFieldKeysMissingFromBase(content: CategoryManifestCon
     }
   }
   return Array.from(missing);
+}
+
+const LEVEL_ORDER: ReadonlyArray<FieldDefinition["requirement_level"]> = ["blocking", "required", "conditional", "supporting", "informational"];
+
+/** Upper-cases, trims, drops empties and duplicates (first occurrence wins) — deterministic scope key for overlays. */
+export function normalizeCountries(countries: readonly string[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const raw of countries ?? []) {
+    const c = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+    if (c && !out.includes(c)) out.push(c);
+  }
+  return out;
+}
+
+/**
+ * Multi-country scope (D1). Single country (or none) is EXACTLY `effectiveFields` (equivalence is tested).
+ * For several countries: a base field survives when at least one scoped country keeps it active (a deactivation
+ * is effective only when every scoped country deactivates it); when several variants of a field survive the
+ * strictest requirement_level wins; fields added by an overlay are appended once, marked with the countries
+ * whose overlay adds them (`applies_to_countries`).
+ */
+export function effectiveFieldsMulti(content: CategoryManifestContent, countries: readonly string[] | null | undefined): FieldDefinition[] {
+  const list = normalizeCountries(countries);
+  if (list.length === 0) return effectiveFields(content, null);
+  const only = list[0];
+  if (list.length === 1 && only !== undefined) return effectiveFields(content, only);
+  const per = list.map((c) => effectiveFields(content, c));
+  const out: FieldDefinition[] = [];
+  const seen = new Set<string>();
+  for (const base of content.fields) {
+    const variants = per.map((p) => p.find((f) => f.field_key === base.field_key)).filter((f): f is FieldDefinition => f !== undefined);
+    const first = variants[0];
+    if (first === undefined) continue;
+    const strictest = variants.reduce((a, b) => (LEVEL_ORDER.indexOf(b.requirement_level) < LEVEL_ORDER.indexOf(a.requirement_level) ? b : a), first);
+    out.push(strictest);
+    seen.add(base.field_key);
+  }
+  for (const fields of per) {
+    for (const f of fields) {
+      if (seen.has(f.field_key)) continue;
+      const applied = list.filter((_, i) => per[i]?.some((x) => x.field_key === f.field_key));
+      out.push({ ...f, applies_to_countries: applied });
+      seen.add(f.field_key);
+    }
+  }
+  return out;
 }

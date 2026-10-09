@@ -1,0 +1,267 @@
+{
+ "schema": "category-labels.v1",
+ "status": "PROVISIONAL_PENDING_CONTENT_APPROVAL",
+ "note": "Customer-facing category names and one-line descriptions. Neutral wording drafted for the Embassy Release Candidate; the approved Spanish labels of the 17 categories are a content dependency (Build Readiness K-3 / N-13).",
+ "categories": {
+  "corporate_legal_admin": {
+   "order": 1,
+   "kind": "catalog",
+   "iconKey": "corporate_legal_admin",
+   "label": {
+    "en": "Corporate, Legal and Administrative",
+    "es": "Corporativo, legal y administrativo"
+   },
+   "description": {
+    "en": "Company setup and legal administration: incorporation, contracts, translations and intellectual property.",
+    "es": "Constitución y administración legal de la empresa: contratos, traducciones y propiedad intelectual."
+   }
+  },
+  "tax_accounting_audit": {
+   "order": 2,
+   "kind": "catalog",
+   "iconKey": "tax_accounting_audit",
+   "label": {
+    "en": "Tax, Accounting and Audit",
+    "es": "Impuestos, contabilidad y auditoría"
+   },
+   "description": {
+    "en": "Taxes, accounting and audit: compliance, reporting, transfer pricing and assurance.",
+    "es": "Impuestos, contabilidad y auditoría: cumplimiento, reportes, precios de transferencia y aseguramiento."
+   }
+  },
+  "banking_finance_insurance": {
+   "order": 3,
+   "kind": "catalog",
+   "iconKey": "banking_finance_insurance",
+   "label": {
+    "en": "Banking, Finance and Insurance",
+    "es": "Banca, finanzas y seguros"
+   },
+   "description": {
+    "en": "Banking, financing and insurance for your operation.",
+    "es": "Banca, financiamiento y seguros para tu operación."
+   }
+  },
+  "corporate_real_estate": {
+   "order": 4,
+   "kind": "catalog",
+   "iconKey": "corporate_real_estate",
+   "label": {
+    "en": "Corporate Real Estate",
+    "es": "Inmuebles corporativos"
+   },
+   "description": {
+    "en": "Offices and corporate spaces: rental, search, fit-out and relocation.",
+    "es": "Oficinas y espacios corporativos: renta, búsqueda, acondicionamiento y mudanza."
+   }
+  },
+  "industrial_real_estate": {
+   "order": 5,
+   "kind": "catalog",
+   "iconKey": "industrial_real_estate",
+   "label": {
+    "en": "Industrial Real Estate",
+    "es": "Inmuebles industriales"
+   },
+   "description": {
+    "en": "Industrial land, parks and buildings.",
+    "es": "Terrenos, parques y naves industriales."
+   }
+  },
+  "industrial_infrastructure": {
+   "order": 6,
+   "kind": "catalog",
+   "iconKey": "industrial_infrastructure",
+   "label": {
+    "en": "Industrial Infrastructure",
+    "es": "Infraestructura industrial"
+   },
+   "description": {
+    "en": "Building and equipping industrial facilities: construction, engineering and installations.",
+    "es": "Construcción y equipamiento de instalaciones industriales: obra, ingeniería e instalaciones."
+   }
+  },
+  "people_payroll_employment": {
+   "order": 7,
+   "kind": "catalog",
+   "iconKey": "people_payroll_employment",
+   "label": {
+    "en": "People, Payroll and Employment",
+    "es": "Personas, nómina y empleo"
+   },
+   "description": {
+    "en": "Hiring and employing people: payroll, recruitment, employment models and benefits.",
+    "es": "Contratación y empleo de personal: nómina, reclutamiento, modelos de contratación y prestaciones."
+   }
+  },
+  "technology_it": {
+   "order": 8,
+   "kind": "catalog",
+   "iconKey": "technology_it",
+   "label": {
+    "en": "Technology and IT",
+    "es": "Tecnología y TI"
+   },
+   "description": {
+    "en": "Business systems and IT infrastructure: software, networks and cybersecurity.",
+    "es": "Sistemas de negocio e infraestructura de TI: software, redes y ciberseguridad."
+   }
+  },
+  "automation_security_systems": {
+   "order": 9,
+   "kind": "catalog",
+   "iconKey": "automation_security_systems",
+   "label": {
+    "en": "Automation and Security Systems",
+    "es": "Automatización y sistemas de seguridad"
+   },
+   "description": {
+    "en": "Automation, tracking and monitoring systems for operations.",
+    "es": "Sistemas de automatización, rastreo y monitoreo para la operación."
+   }
+  },
+  "physical_security": {
+   "order": 10,
+   "kind": "catalog",
+   "iconKey": "physical_security",
+   "label": {
+    "en": "Physical Security",
+    "es": "Seguridad física"
+   },
+   "description": {
+    "en": "Security personnel, facility protection and cargo protection.",
+    "es": "Personal de seguridad, protección de instalaciones y protección de carga."
+   }
+  },
+  "logistics": {
+   "order": 11,
+   "kind": "catalog",
+   "iconKey": "logistics",
+   "label": {
+    "en": "Logistics",
+    "es": "Logística"
+   },
+   "description": {
+    "en": "Moving and storing goods: transport, warehousing, inventory and delivery.",
+    "es": "Movimiento y almacenaje de mercancías: transporte, almacenes, inventario y entrega."
+   }
+  },
+  "international_trade_customs": {
+   "order": 12,
+   "kind": "catalog",
+   "iconKey": "international_trade_customs",
+   "label": {
+    "en": "International Trade and Customs",
+    "es": "Comercio exterior y aduanas"
+   },
+   "description": {
+    "en": "Importing and exporting: customs procedures, tariff classification, origin and trade programs.",
+    "es": "Importación y exportación: trámites aduaneros, clasificación arancelaria, origen y programas de comercio."
+   }
+  },
+  "procurement_supply_chain": {
+   "order": 13,
+   "kind": "catalog",
+   "iconKey": "procurement_supply_chain",
+   "label": {
+    "en": "Procurement and Supply Chain",
+    "es": "Compras y cadena de suministro"
+   },
+   "description": {
+    "en": "Purchasing and supply chain: sourcing, supplier development and planning.",
+    "es": "Compras y cadena de suministro: abastecimiento, desarrollo de proveedores y planeación."
+   }
+  },
+  "certifications_quality": {
+   "order": 14,
+   "kind": "catalog",
+   "iconKey": "certifications_quality",
+   "label": {
+    "en": "Certifications and Quality",
+    "es": "Certificaciones y calidad"
+   },
+   "description": {
+    "en": "Product certifications, standards and quality control.",
+    "es": "Certificaciones de producto, normas y control de calidad."
+   }
+  },
+  "market_intelligence": {
+   "order": 15,
+   "kind": "catalog",
+   "iconKey": "market_intelligence",
+   "label": {
+    "en": "Market Intelligence",
+    "es": "Inteligencia de mercado"
+   },
+   "description": {
+    "en": "Market, industry and consumer research.",
+    "es": "Investigación de mercado, industria y consumidores."
+   }
+  },
+  "marketing_communications": {
+   "order": 16,
+   "kind": "catalog",
+   "iconKey": "marketing_communications",
+   "label": {
+    "en": "Marketing and Communications",
+    "es": "Marketing y comunicación"
+   },
+   "description": {
+    "en": "Branding, marketing, digital presence and public relations.",
+    "es": "Marca, mercadotecnia, presencia digital y relaciones públicas."
+   }
+  },
+  "travel_mobility": {
+   "order": 17,
+   "kind": "catalog",
+   "iconKey": "travel_mobility",
+   "label": {
+    "en": "Travel and Fleet",
+    "es": "Viajes y flotillas"
+   },
+   "description": {
+    "en": "Corporate travel, fleets and transportation for your team.",
+    "es": "Viajes corporativos, flotillas y transporte para tu equipo."
+   }
+  },
+  "strategic_advisory": {
+   "order": 18,
+   "kind": "reserved_platform",
+   "iconKey": "strategic_advisory",
+   "label": {
+    "en": "Strategic Advisory",
+    "es": "Asesoría estratégica"
+   },
+   "description": {
+    "en": "Studies and advisory work to inform your expansion decisions.",
+    "es": "Estudios y asesoría para respaldar tus decisiones de expansión."
+   }
+  },
+  "ecosystem_development": {
+   "order": 19,
+   "kind": "reserved_platform",
+   "iconKey": "ecosystem_development",
+   "label": {
+    "en": "Ecosystem Development",
+    "es": "Desarrollo de ecosistema"
+   },
+   "description": {
+    "en": "Finding and connecting with local partners and counterparts.",
+    "es": "Búsqueda y vinculación con socios y contrapartes locales."
+   }
+  },
+  "to_review": {
+   "order": 20,
+   "kind": "to_review",
+   "iconKey": "to_review",
+   "label": {
+    "en": "Under review",
+    "es": "En revisión"
+   },
+   "description": {
+    "en": "A need under review before it is matched to a service.",
+    "es": "Una necesidad en revisión antes de asociarla a un servicio."
+   }
+  }
+ }
+}
