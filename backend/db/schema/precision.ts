@@ -1,5 +1,6 @@
 import {
   AnyPgColumn,
+  bigint,
   boolean,
   check,
   foreignKey,
@@ -99,6 +100,11 @@ export const categoryAssessment = pgTable(
     // for that constraint. Kept consistent with the owning instance by the guard trigger (0017).
     projectId: uuid("project_id").notNull().references(() => project.projectId),
     categoryKey: text("category_key").notNull(),
+    // Derived from category_key (0019, M-B): a need that is not in the catalog ("new:<slug>") always
+    // uses the generic manifest. Stored + generated => immutable and coherent by construction.
+    manifestCategoryKey: text("manifest_category_key").generatedAlwaysAs(
+      sql`CASE WHEN category_key LIKE 'new:%' THEN '_generic' ELSE category_key END`,
+    ),
     lifecycleStatus: categoryStatusEnum("lifecycle_status").notNull().default("proposed"),
     // Pinned at creation: the category's currently-published manifest version at the moment this
     // row is inserted (PA detection, or Add Category using the then-current version, §19/§22) —
@@ -117,11 +123,14 @@ export const categoryAssessment = pgTable(
     // Permanent v1 rule (§6, frozen final by Patch #3 item 8) — no requirement_scope_key in v1.
     uniqueIndex("category_assessment_project_category_unique").on(t.projectId, t.categoryKey),
     index("category_assessment_project_id_idx").on(t.projectId),
-    check("category_assessment_category_key_format", sql`${t.categoryKey} ~ '^[a-z][a-z0-9_]{1,63}$'`),
+    check(
+      "category_assessment_category_key_format",
+      sql`${t.categoryKey} ~ '^(new:[a-z][a-z0-9_]{1,63}|[a-z][a-z0-9_]{1,63})$'`,
+    ),
     // Composite FK to the exact pinned (category_key, version) row — never a bare version lookup
     // that could silently resolve against a different category's manifest.
     foreignKey({
-      columns: [t.categoryKey, t.manifestVersion],
+      columns: [t.manifestCategoryKey, t.manifestVersion],
       foreignColumns: [categoryManifestVersion.categoryKey, categoryManifestVersion.version],
       name: "category_assessment_manifest_version_fk",
     }),
@@ -169,8 +178,13 @@ export const fact = pgTable(
     // No .references() here on purpose, same reason as answer.superseded_by (assessment.ts): Drizzle
     // cannot express DEFERRABLE INITIALLY DEFERRED. The real FK is added by hand in 0017.
     supersededBy: uuid("superseded_by"),
+    // Origin of an inherited value (0019, M-D): which FA 4.0 context pin and item it came from.
+    sourcePinId: uuid("source_pin_id").references((): AnyPgColumn => contextPin.id),
+    sourceItemRef: text("source_item_ref"),
   },
   (t) => [
+    check("fact_source_item_requires_pin", sql`${t.sourceItemRef} IS NULL OR ${t.sourcePinId} IS NOT NULL`),
+    check("fact_source_item_ref_format", sql`${t.sourceItemRef} IS NULL OR ${t.sourceItemRef} ~ '^[A-Za-z0-9_.:-]{1,80}$'`),
     // UNIQUE(scope_instance_id, field_key) WHERE superseded_by IS NULL — unchanged shape from the
     // frozen design; only scope_instance_id's own nullability changed (Patch #3 item 5).
     uniqueIndex("fact_current_value_idx").on(t.scopeInstanceId, t.fieldKey).where(sql`${t.supersededBy} IS NULL`),
@@ -260,7 +274,7 @@ export const categoryManifestVersion = pgTable(
       .on(t.categoryKey)
       .where(sql`${t.isCurrent} = true`),
     index("category_manifest_version_category_key_idx").on(t.categoryKey),
-    check("category_manifest_version_category_key_format", sql`${t.categoryKey} ~ '^[a-z][a-z0-9_]{1,63}$'`),
+    check("category_manifest_version_category_key_format", sql`${t.categoryKey} ~ '^(_generic|[a-z][a-z0-9_]{1,63})$'`),
     check("category_manifest_version_content_object", sql`jsonb_typeof(${t.content}) = 'object'`),
     check(
       "category_manifest_version_current_requires_published",
@@ -326,5 +340,77 @@ export const pack = pgTable(
     index("pack_instance_idx").on(t.categoryAssessmentInstanceId, t.generatedAt),
     check("pack_content_object", sql`jsonb_typeof(${t.content}) = 'object'`),
     check("pack_context_snapshot_object", sql`jsonb_typeof(${t.contextSnapshot}) = 'object'`),
+  ],
+);
+
+// =====================================================================================
+// F5 additive layer (0019) — F1 additive-migrations spec M-C / M-F
+// =====================================================================================
+
+// Reference to the FA 4.0 result a Precision project was activated from. Stores references and a hash
+// that proves what was read; it never copies the context itself. Append-only (guard trigger, 0019).
+export const contextPin = pgTable(
+  "context_pin",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    sourceSystem: text("source_system").notNull(),
+    sourceProjectId: uuid("source_project_id").notNull(),
+    sourceResultId: uuid("source_result_id").notNull(),
+    catalogVersion: text("catalog_version").notNull(),
+    contractVersion: text("contract_version").notNull(),
+    crosswalkVersion: text("crosswalk_version").notNull(),
+    contextHash: text("context_hash").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+    status: text("status").notNull().default("current"),
+    supersededByPinId: uuid("superseded_by_pin_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("context_pin_id_project_unique").on(t.id, t.projectId),
+    uniqueIndex("context_pin_one_current").on(t.projectId).where(sql`${t.status} = 'current'`),
+    uniqueIndex("context_pin_project_result_unique").on(t.projectId, t.sourceResultId),
+    index("context_pin_project_idx").on(t.projectId),
+    check("context_pin_source_system", sql`${t.sourceSystem} = 'fa4'`),
+    check("context_pin_status", sql`${t.status} IN ('current','superseded')`),
+    check("context_pin_superseded_coherent", sql`(${t.status} = 'superseded') = (${t.supersededByPinId} IS NOT NULL)`),
+    foreignKey({
+      columns: [t.supersededByPinId, t.projectId],
+      foreignColumns: [t.id, t.projectId],
+      name: "context_pin_superseded_same_project_fk",
+    }),
+  ],
+);
+
+// Append-only delivery ledger toward Operation Hub. Each state change is a new row; the current state
+// of a delivery is the latest row per idempotency key (view oh_delivery_current, 0019).
+export const ohDelivery = pgTable(
+  "oh_delivery",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    kind: text("kind").notNull(),
+    packId: uuid("pack_id").references(() => pack.id),
+    snapshotId: uuid("snapshot_id").references(() => serviceMapSnapshot.id),
+    artifactVersion: integer("artifact_version").notNull(),
+    status: text("status").notNull(),
+    ohReference: text("oh_reference"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("oh_delivery_project_idx").on(t.projectId, t.createdAt),
+    uniqueIndex("oh_delivery_idem_status_unique").on(t.idempotencyKey, t.status),
+    check("oh_delivery_kind", sql`${t.kind} IN ('crp','psm','update_note')`),
+    check("oh_delivery_status", sql`${t.status} IN ('queued','delivered','failed')`),
+    check("oh_delivery_artifact_version", sql`${t.artifactVersion} >= 1`),
+    check(
+      "oh_delivery_kind_artifact",
+      sql`(${t.kind} IN ('crp','update_note') AND ${t.packId} IS NOT NULL AND ${t.snapshotId} IS NULL) OR (${t.kind} = 'psm' AND ${t.snapshotId} IS NOT NULL AND ${t.packId} IS NULL)`,
+    ),
+    check("oh_delivery_error_only_failed", sql`(${t.status} = 'failed') = (${t.errorCode} IS NOT NULL)`),
+    check("oh_delivery_error_code_format", sql`${t.errorCode} IS NULL OR ${t.errorCode} ~ '^[A-Z0-9_]{1,40}$'`),
   ],
 );

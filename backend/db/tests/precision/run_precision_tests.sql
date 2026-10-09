@@ -110,6 +110,7 @@ END $$;
 \ir 20_fact_model.sql
 \ir 30_manifest_versioning.sql
 \ir 40_outputs_immutability.sql
+\ir 50_additive.sql
 
 \echo '--- DONE: rolling back, no test data persists ---'
 ROLLBACK;

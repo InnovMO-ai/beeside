@@ -127,4 +127,5 @@ export const factAnswerStateEnum = pgEnum("fact_answer_state", [
   "EXPLICIT_NO",
   "ZERO",
   "ANSWERED",
+  "ASSUMED",
 ]);

@@ -134,6 +134,20 @@
       "when": 1791156702289,
       "tag": "0018_precision_persistence_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791570363746,
+      "tag": "0019_precision_additive",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791570373888,
+      "tag": "0020_precision_additive_integrity",
+      "breakpoints": true
     }
   ]
 }
