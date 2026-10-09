@@ -1,7 +1,7 @@
 import { ohPortConformance, samplePayload } from "../../__tests__/helpers/oh-conformance";
 import { makeClickUpHarness } from "../../__tests__/helpers/clickup-harness";
 import { OhHandoffPayload, OhPortError, payloadChecksum } from "../ports/operation-hub";
-import { buildDescription, clickUpProjectRef, keyTag, parseMarker, projectTag } from "./clickup-operation-hub";
+import { buildDescription, clickUpConfigFromEnv, clickUpProjectRef, keyTag, parseMarker, projectTag } from "./clickup-operation-hub";
 
 // The SAME conformance suite as the simulator. Retries are off here (maxAttempts 1) so every injected fault surfaces as its error code.
 ohPortConformance("clickup (local fake)", () => {
@@ -323,5 +323,18 @@ describe("ClickUp adapter — marker format", () => {
     const p: OhHandoffPayload = samplePayload();
     const q = { ...p, contract: { ...p.contract, sent_at: "2030-01-01T00:00:00.000Z" } };
     expect(payloadChecksum(p)).toBe(payloadChecksum(q));
+  });
+});
+
+describe("clickUpConfigFromEnv", () => {
+  const env = { CLICKUP_TOKEN: "t", CLICKUP_WORKSPACE_ID: "1", CLICKUP_SPACE_ID: "2" };
+  it("reads the required ids and defaults to the public API and REAL mode", () => {
+    expect(clickUpConfigFromEnv(env)).toMatchObject({ apiBaseUrl: "https://api.clickup.com/api/v2", workspaceId: "1", spaceId: "2", mode: "REAL" });
+  });
+  it("fails loudly on missing or invalid settings without echoing the token", () => {
+    expect(() => clickUpConfigFromEnv({ ...env, CLICKUP_SPACE_ID: "" })).toThrow(/CLICKUP_SPACE_ID/);
+    expect(() => clickUpConfigFromEnv({ ...env, CLICKUP_MODE: "x" })).toThrow(/CLICKUP_MODE/);
+    expect(() => clickUpConfigFromEnv({ ...env, CLICKUP_TOKEN: "" })).toThrow(/CLICKUP_TOKEN is required/);
+    try { clickUpConfigFromEnv({ ...env, CLICKUP_MODE: "x" }); } catch (e) { expect(String(e)).not.toContain('"t"'); }
   });
 });

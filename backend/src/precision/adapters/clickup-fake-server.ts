@@ -16,7 +16,9 @@ import { OhFaultInjector } from "./simulator-operation-hub";
  *   GET    /api/v2/list/:id/task          (page size 100, include_closed, zero-based page)
  *   POST   /api/v2/list/:id/task
  *   GET    /api/v2/task/:id
+ *   PUT    /api/v2/task/:id               (only used by the sandbox verification script to tamper with a body)
  *   DELETE /api/v2/task/:id
+ *   DELETE /api/v2/folder/:id             (sandbox verification cleanup)
  *   GET    /api/v2/team/:id/task          (tags[], space_ids[], include_closed, zero-based page, 100 per page)
  */
 
@@ -211,6 +213,21 @@ export class FakeClickUpServer {
       if (idx < 0) return send(404, { err: "Task not found", ECODE: "ITEM_013" });
       if (method === "GET") return send(200, this.render(this.tasks[idx]!));
       if (method === "DELETE") { this.tasks.splice(idx, 1); return send(200, {}); }
+      if (method === "PUT") {
+        const b = (info.body ?? {}) as { name?: string; description?: string };
+        const t = this.tasks[idx]!;
+        if (b.name !== undefined) t.name = b.name;
+        if (b.description !== undefined) t.description = b.description;
+        return send(200, this.render(t));
+      }
+    }
+    if ((m = /^\/api\/v2\/folder\/([^/]+)$/.exec(path)) && method === "DELETE") {
+      const f = this.folders.find((x) => x.id === m![1]);
+      if (!f) return send(404, { err: "Folder not found", ECODE: "FOLDER_001" });
+      const listIds = new Set(f.lists.map((l) => l.id));
+      this.tasks = this.tasks.filter((t) => !listIds.has(t.listId));
+      this.folders = this.folders.filter((x) => x !== f);
+      return send(200, {});
     }
     if ((m = /^\/api\/v2\/team\/([^/]+)\/task$/.exec(path)) && method === "GET") {
       if (m[1] !== this.opts.workspaceId) return send(404, { err: "Team not found", ECODE: "TEAM_001" });

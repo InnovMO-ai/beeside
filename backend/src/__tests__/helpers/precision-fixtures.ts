@@ -16,16 +16,19 @@ export interface PrecisionFixture {
   newSnapshot(projectId: string): Promise<string>;
 }
 
-const bundle = (name: string): string => readFileSync(join(__dirname, "../../../db/config-bundles/placeholder", name), "utf8");
+// A marker key keeps the bundle different from the placeholder bundles that db/tests/precision publishes (the registry
+// refuses an identical re-publish), so this fixture and the SQL suite can share one scratch database.
+const bundle = (name: string, run: string): string =>
+  JSON.stringify({ ...JSON.parse(readFileSync(join(__dirname, "../../../db/config-bundles/placeholder", name), "utf8")), fixture_run: run });
 
 export async function setupPrecisionFixture(db: Db): Promise<PrecisionFixture> {
   const run = randomUUID().slice(0, 8);
   const admin = (await db.query<{ id: string }>("INSERT INTO admin_user (role, auth_identity) VALUES ('ADMIN', $1) RETURNING admin_user_id AS id", [`oh-${run}@beeside.internal`])).rows[0]!.id;
   // The config registry refuses to publish a bundle identical to the current one, so a re-run reuses what is current.
   const registries: Array<[string, string, string, string]> = [
-    ["QUESTION_BANK", `ohd-qb-${run}`, bundle("question-bank.json"), "question_bank_version"],
-    ["RULES_ENGINE", `ohd-re-${run}`, bundle("rules-engine.json"), "rules_engine_version"],
-    ["SNAPSHOT_TEMPLATE", `ohd-st-${run}`, bundle("snapshot-template.json"), "snapshot_template_version"],
+    ["QUESTION_BANK", `ohd-qb-${run}`, bundle("question-bank.json", run), "question_bank_version"],
+    ["RULES_ENGINE", `ohd-re-${run}`, bundle("rules-engine.json", run), "rules_engine_version"],
+    ["SNAPSHOT_TEMPLATE", `ohd-st-${run}`, bundle("snapshot-template.json", run), "snapshot_template_version"],
   ];
   for (const reg of registries) {
     const [type, version, content, table] = reg;

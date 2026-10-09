@@ -648,3 +648,24 @@ function taskOrder(a: CuTask, b: CuTask): number {
   const da = Number(a.date_created ?? 0), db = Number(b.date_created ?? 0);
   return da !== db ? da - db : idCompare(a.id, b.id);
 }
+
+/** Builds the adapter configuration from the environment. The token is read here and nowhere else; it is never logged. */
+export function clickUpConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ClickUpConfig {
+  const need = (k: string): string => {
+    const v = env[k];
+    if (!v) throw new Error(`${k} is required when PRECISION_OH_PROVIDER=clickup`);
+    return v;
+  };
+  const mode = env.CLICKUP_MODE ?? "REAL";
+  if (mode !== "REAL" && mode !== "SANDBOX") throw new Error('CLICKUP_MODE must be "REAL" or "SANDBOX"');
+  const timeout = env.CLICKUP_REQUEST_TIMEOUT_MS ? Number(env.CLICKUP_REQUEST_TIMEOUT_MS) : undefined;
+  if (timeout !== undefined && !(timeout > 0)) throw new Error("CLICKUP_REQUEST_TIMEOUT_MS must be a positive number");
+  return {
+    apiBaseUrl: env.CLICKUP_API_BASE ?? "https://api.clickup.com/api/v2",
+    token: need("CLICKUP_TOKEN"),
+    workspaceId: need("CLICKUP_WORKSPACE_ID"),
+    spaceId: need("CLICKUP_SPACE_ID"),
+    mode,
+    ...(timeout !== undefined ? { requestTimeoutMs: timeout } : {}),
+  };
+}
