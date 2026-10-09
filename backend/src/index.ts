@@ -13,6 +13,12 @@ import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
 import { BillingDeps, createBillingRouter } from "./premium/billing-router";
 import { devSimulatedCheckout } from "./premium/premium-service";
+import { premiumPolicyFromEnv } from "./premium/premium-policy";
+import { StripeCheckout } from "./premium/stripe/checkout-adapter";
+import { StripeClient } from "./premium/stripe/client";
+import { stripeConfigFromEnv, stripeLivemodeExpected } from "./premium/stripe/config";
+import { createPaymentStateRouter } from "./premium/stripe/payment-state";
+import { StripeWebhookDeps, createStripeWebhookRouter } from "./premium/stripe/webhook";
 import { healthRouter } from "./routes/health";
 import { readinessRouter, shippedMigrationCount } from "./routes/readiness";
 import { MAX_REQUEST_BYTES, errorHandler, notFoundJson, originGuard, rejectOversizedBodies, requestContext, securityHeaders } from "./security/http-hardening";
@@ -39,6 +45,8 @@ export interface AppOptions {
   fa4?: Fa4Deps;
   /** Provider-agnostic subscription event endpoint; mounted only when provided. */
   billing?: BillingDeps;
+  /** Stripe webhook endpoint (STRIPE_CHECKOUT_ENABLED=true); mounted only when provided. */
+  stripe?: StripeWebhookDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
   admin?: AdminDeps;
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
@@ -59,8 +67,12 @@ export function createApp(options: AppOptions = {}) {
   if (security.allowedOrigins) app.use(originGuard(security.allowedOrigins));
   app.use(healthRouter);
   if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
+  // Payment-confirmation read model for the client's return page: one word, same session auth as /api/fa/session.
+  if (options.fa) app.use("/api/fa/session/premium/payment-state", rateLimit(security.limiter, RATE_LIMITS.faAddress), createPaymentStateRouter(options.fa));
   if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
   if (options.fa4) app.use("/api/fa4", createFa4Router(options.fa4, { limiter: security.limiter }));
+  // Raw-body Stripe webhook (signature verified in the handler). Mounted before the generic billing router.
+  if (options.stripe) app.use("/api/billing/stripe", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createStripeWebhookRouter(options.stripe));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   app.use(notFoundJson());
@@ -103,6 +115,11 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
   const base = baseDepsFromEnv(env);
   const simulate = env.PREMIUM_DEV_SIMULATION === "true" && env.NODE_ENV !== "production";
+  if (simulate && env.STRIPE_CHECKOUT_ENABLED === "true") throw new Error("PREMIUM_DEV_SIMULATION and STRIPE_CHECKOUT_ENABLED are mutually exclusive");
+  if (env.STRIPE_CHECKOUT_ENABLED === "true") {
+    // Stripe Hosted Checkout: redirect only. Premium is activated solely by the verified webhook / reconciliation.
+    return { ...base, premium: { checkout: new StripeCheckout(new StripeClient(stripeConfigFromEnv(env)), jsonLogger) } };
+  }
   return { ...base, ...(simulate ? { premium: { checkout: devSimulatedCheckout({ bundles: base.bundles }) } } : {}) };
 }
 
@@ -165,6 +182,18 @@ export function billingDepsFromEnv(env: NodeJS.ProcessEnv = process.env): Billin
   if (!env.BILLING_WEBHOOK_SECRET || env.BILLING_WEBHOOK_SECRET.length < 32) throw new Error("BILLING_EVENTS_ENABLED requires a BILLING_WEBHOOK_SECRET of at least 32 characters");
   const db = createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
   return { db, bundles: new BundleStore(db), secret: env.BILLING_WEBHOOK_SECRET };
+}
+
+/**
+ * Stripe webhook (STRIPE_CHECKOUT_ENABLED=true). Core owns the Premium duration (PREMIUM_ACCESS_PERIOD_DAYS) and the
+ * read-only window (PRECISION_READONLY_GRACE_DAYS); Stripe only reports that a payment happened.
+ */
+export function stripeDepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): StripeWebhookDeps | undefined {
+  if (env.STRIPE_CHECKOUT_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL) throw new Error("STRIPE_CHECKOUT_ENABLED requires DATABASE_URL");
+  const config = stripeConfigFromEnv(env);
+  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  return { db, bundles: new BundleStore(db), webhookSecrets: config.webhookSecrets, livemode: stripeLivemodeExpected(config), policy: premiumPolicyFromEnv(env), log: jsonLogger };
 }
 
 /**
@@ -236,12 +265,14 @@ if (require.main === module) {
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
-  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
-  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
+  const stripe = stripeDepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
+  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db);
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db ?? fa4?.db ?? null;
   const app = createApp({
     fa,
     fa4,
     billing,
+    stripe,
     admin,
     security: securityOptionsFromEnv(process.env, db),
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),

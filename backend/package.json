@@ -23,6 +23,8 @@
     "db:sync-fields": "tsx src/scripts/sync-field-registry.ts",
     "config:publish-dev": "tsx src/scripts/publish-dev-config.ts",
     "billing:inject-event": "tsx src/scripts/inject-subscription-event.ts",
+    "billing:jobs": "tsx src/scripts/run-billing-jobs.ts",
+    "stripe:sandbox-verify": "tsx scripts/stripe-sandbox-verify.ts",
     "worker": "node dist/worker.js",
     "jobs:run": "tsx src/scripts/run-job.ts",
     "admin:provision": "tsx src/scripts/provision-admin.ts",

@@ -2,6 +2,10 @@ import { baseDepsFromEnv, fa4DepsFromEnv } from "./index";
 import { deliverDueFa4Emails } from "./fa4/email";
 import { integrationsFromEnv } from "./integrations/config";
 import { JobName, runJob } from "./operations/jobs";
+import { premiumPolicyFromEnv } from "./premium/premium-policy";
+import { StripeClient } from "./premium/stripe/client";
+import { stripeConfigFromEnv } from "./premium/stripe/config";
+import { runBillingJobs } from "./premium/stripe/jobs";
 import { jsonLogger } from "./security/redact";
 import { assertRuntimeConfig } from "./security/runtime-config";
 
@@ -60,6 +64,28 @@ if (require.main === module) {
     };
     void tickFa4();
     timers.push(setInterval(() => void tickFa4(), 30_000));
+  }
+  // Premium/Stripe: Core access sweep (always) + Stripe reconciliation (only when Stripe is configured). Idempotent.
+  {
+    const policy = premiumPolicyFromEnv(process.env);
+    const client = process.env.STRIPE_CHECKOUT_ENABLED === "true" ? new StripeClient(stripeConfigFromEnv(process.env)) : undefined;
+    let billingRunning = false;
+    const tickBilling = async () => {
+      if (billingRunning) return;
+      billingRunning = true;
+      try {
+        const result = await runBillingJobs({ db: deps.db, bundles: deps.bundles, policy, ...(client ? { client } : {}) });
+        // eslint-disable-next-line no-console
+        console.log(`[worker] billing_jobs ${JSON.stringify(result)}`);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`[worker] billing_jobs crashed: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        billingRunning = false;
+      }
+    };
+    void tickBilling();
+    timers.push(setInterval(() => void tickBilling(), 10 * 60_000));
   }
   for (const job of Object.keys(DEFAULT_INTERVALS) as JobName[]) {
     void tick(job);

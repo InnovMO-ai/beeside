@@ -111,6 +111,7 @@ END $$;
 \ir 30_manifest_versioning.sql
 \ir 40_outputs_immutability.sql
 \ir 50_additive.sql
+\ir 60_stripe_core.sql
 
 \echo '--- DONE: rolling back, no test data persists ---'
 ROLLBACK;

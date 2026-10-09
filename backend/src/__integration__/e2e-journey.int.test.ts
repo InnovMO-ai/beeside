@@ -1,5 +1,4 @@
 import { getFirstAssessmentPrecisionContext } from "../precision-context/first-assessment-context";
-import { getPrecisionStartContext } from "../premium/precision-handoff";
 import { processSubscriptionEvent } from "../premium/subscription-events";
 import { MANUFACTURER, describeWithDb, identity, lastLinkToken, runJourney, useHarness } from "./fa-harness";
 
@@ -39,7 +38,7 @@ describeWithDb("End-to-end journeys (PostgreSQL, rolled back)", () => {
 
   const count = async (sql: string, params: unknown[] = []) => (await h.client.query<{ n: number }>(sql, params)).rows[0]?.n ?? 0;
 
-  it("carries one identity from entry to the Precision handoff: Finish Later, private link, resume, Snapshot, feedback and Premium", async () => {
+  it("carries one identity from entry to Premium activation: Finish Later, private link, resume, Snapshot, feedback and Premium", async () => {
     // --- entry and identity -------------------------------------------------------------------
     await h.api().post("/api/fa/events").send({
       anonymousSessionId: "3f2b1a0c-5d4e-4f6a-9b8c-7d6e5f4a3b2c",
@@ -117,21 +116,13 @@ describeWithDb("End-to-end journeys (PostgreSQL, rolled back)", () => {
         periodEnd: new Date(h.clock.now.getTime() + 30 * DAY),
       }),
     );
-    expect(activation).toMatchObject({ premiumAccessActive: true, premiumEverActivated: true, precisionState: "STARTED", handoffGenerated: true });
+    expect(activation).toMatchObject({ premiumAccessActive: true, premiumEverActivated: true, precisionState: "STARTED" });
     expect(await count("SELECT count(*)::int AS n FROM premium_activation_request WHERE project_id = $1 AND status = 'FULFILLED'", [project.project_id])).toBe(1);
 
-    // --- Precision starts from the frozen handoff and the canonical First Assessment ------------------
-    const precision = await getPrecisionStartContext(h.deps.db, h.deps.bundles, project.project_id);
-    expect(precision.handoffPackage.content).toMatchObject({
-      projectId: project.project_id,
-      personId: project.created_by_person_id,
-      companyId: project.company_id,
-      guardrails: { findingsAreNotContractedServices: true, clientProviderDirectContact: "not_authorized", regeneratedOnReactivation: false },
-    });
-    expect(precision.firstAssessment?.assessment.status).toBe("COMPLETED_LOCKED");
-    expect(precision.precisionAnswers).toEqual([]);
-    // One handoff package, one Snapshot, one Internal Assessment: no duplicated First Assessment context.
-    expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [project.project_id])).toBe(1);
+    // --- F5: no legacy push handoff; Precision pulls its context and is gated by the Core entitlement ----
+    expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [project.project_id])).toBe(0);
+    expect(await count("SELECT count(*)::int AS n FROM entitlement WHERE project_id = $1 AND precision_access_mode = 'FULL'", [project.project_id])).toBe(1);
+    // One Snapshot, one Internal Assessment: no duplicated First Assessment context.
     expect(await count("SELECT count(*)::int AS n FROM snapshot WHERE project_id = $1", [project.project_id])).toBe(1);
     expect(await count("SELECT count(*)::int AS n FROM internal_assessment WHERE project_id = $1", [project.project_id])).toBe(1);
   });

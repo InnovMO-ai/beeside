@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { subscriptionEventTypeEnum, subscriptionStatusEnum } from "./enums";
 import { person } from "./identity";
@@ -53,6 +53,14 @@ export const entitlement = pgTable("entitlement", {
   effectiveFrom: timestamp("effective_from", { withTimezone: true }),
   effectiveUntil: timestamp("effective_until", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // F5 Track B — Precision access state (Core-owned, contract §G): FULL | READ_ONLY | REVOKED. Driven by the
+  // subscription sync trigger (0022) and the Core sweep; the coherence CHECKs live in 0022 (backfill first).
+  precisionAccessMode: text("precision_access_mode").notNull().default("FULL"),
+  premiumEndedAt: timestamp("premium_ended_at", { withTimezone: true }),
+  readonlyUntil: timestamp("readonly_until", { withTimezone: true }),
+  // Snapshot of the configurable read-only window (days) that was applied when readonly_until was set.
+  graceDaysApplied: integer("grace_days_applied"),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
 
 export const operationHubLink = pgTable(

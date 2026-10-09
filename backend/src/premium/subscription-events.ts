@@ -3,7 +3,6 @@ import { recordJourneyEvent } from "../fa/services/analytics";
 import { BundleStore } from "../fa/services/bundle-store";
 import { FaError } from "../fa/services/errors";
 import { enqueueEmail } from "../operations/email-outbox";
-import { buildPrecisionHandoffPackage } from "./precision-handoff";
 
 /**
  * Provider-agnostic subscription lifecycle (Technical Change Note v1.1 §G, Technical Architecture
@@ -38,8 +37,6 @@ export interface SubscriptionEventResult {
   premiumAccessActive: boolean;
   premiumEverActivated: boolean;
   precisionState: string;
-  handoffPackageId: string | null;
-  handoffGenerated: boolean;
 }
 
 interface SubscriptionRow {
@@ -51,20 +48,18 @@ export function isSubscriptionEventType(value: unknown): value is SubscriptionEv
   return typeof value === "string" && (SUBSCRIPTION_EVENT_TYPES as readonly string[]).includes(value);
 }
 
-async function currentState(tx: Db, projectId: string, eventId: string, duplicate: boolean, handoffGenerated: boolean): Promise<SubscriptionEventResult> {
+async function currentState(tx: Db, projectId: string, eventId: string, duplicate: boolean): Promise<SubscriptionEventResult> {
   const { rows } = await tx.query<{
     subscription_id: string | null;
     status: string | null;
     premium_access_active: boolean | null;
     premium_ever_activated: boolean;
     precision_state: string;
-    package_id: string | null;
   }>(
-    `SELECT s.subscription_id, s.status, e.premium_access_active, p.premium_ever_activated, p.precision_state, h.package_id
+    `SELECT s.subscription_id, s.status, e.premium_access_active, p.premium_ever_activated, p.precision_state
        FROM project p
        LEFT JOIN LATERAL (SELECT subscription_id, status FROM subscription WHERE project_id = p.project_id ORDER BY created_at DESC, current_period_start DESC LIMIT 1) s ON true
        LEFT JOIN entitlement e ON e.project_id = p.project_id
-       LEFT JOIN precision_handoff_package h ON h.project_id = p.project_id
       WHERE p.project_id = $1`,
     [projectId],
   );
@@ -78,8 +73,6 @@ async function currentState(tx: Db, projectId: string, eventId: string, duplicat
     premiumAccessActive: row?.premium_access_active === true,
     premiumEverActivated: row?.premium_ever_activated === true,
     precisionState: row?.precision_state ?? "NOT_STARTED",
-    handoffPackageId: row?.package_id ?? null,
-    handoffGenerated,
   };
 }
 
@@ -101,7 +94,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
     const previous = seen.rows[0];
     if (previous) {
       if (previous.project_id !== input.projectId) throw new FaError("INVALID_INPUT", "idempotency key already used for another project");
-      return currentState(tx, input.projectId, previous.event_id, true, false);
+      return currentState(tx, input.projectId, previous.event_id, true);
     }
   }
 
@@ -134,7 +127,6 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
   };
 
   let eventId: string;
-  let handoffGenerated = false;
   switch (input.eventType) {
     case "premium_activated": {
       if (project.assessment_state !== "COMPLETED_LOCKED") throw new FaError("NOT_APPLICABLE", "Premium continues a completed First Assessment");
@@ -154,21 +146,11 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
         enqueuedBy: "premium.subscription_event",
         now: at,
       });
-      // Exactly-once initial handoff, gated by precision_state (Technical Architecture v1.1 §10).
+      // Premium entered. The legacy FA-3.0 handoff package (build + precision_handoff_package row + outbox event) is
+      // SUPERSEDED by the Precision F5 pull model: Precision reads its context through its own ports and is gated by the
+      // Core entitlement. precision_state remains the Core "Precision available" milestone (written once, as before).
       if (project.precision_state === "NOT_STARTED") {
         await tx.query("UPDATE project SET precision_state = 'STARTED', precision_started_at = $2, updated_at = $2 WHERE project_id = $1", [input.projectId, at]);
-        const pkg = await buildPrecisionHandoffPackage(tx, bundles, input.projectId, at);
-        const inserted = await tx.query<{ package_id: string }>(
-          `INSERT INTO precision_handoff_package (project_id, generated_at, content, contract_version, source_snapshot_id, source_internal_assessment_id, generated_by_event_id)
-           VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7) RETURNING package_id`,
-          [input.projectId, at, JSON.stringify(pkg.content), pkg.content.contractVersion, pkg.sourceSnapshotId, pkg.sourceInternalAssessmentId, eventId],
-        );
-        handoffGenerated = true;
-        await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, 'precision.handoff_package_generated', $2::jsonb, $3)", [
-          input.projectId,
-          JSON.stringify({ package_id: inserted.rows[0]?.package_id, project_id: input.projectId, contract_version: pkg.content.contractVersion }),
-          at,
-        ]);
       }
       break;
     }
@@ -192,7 +174,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       if (!project.premium_ever_activated || !latest || latest.status !== "PREMIUM_INACTIVE") {
         throw new FaError("NOT_APPLICABLE", "only a project whose Premium access has ended can be reactivated");
       }
-      // A new cycle on the same project_id: never reopens the ended row, never a second handoff package.
+      // A new cycle on the same project_id: never reopens the ended row.
       const subscriptionId = await createSubscription();
       eventId = await insertEvent(subscriptionId);
       await enqueueEmail(tx, {
@@ -212,7 +194,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       WHERE project_id = $1 AND status = 'REQUESTED' AND $4 IN ('premium_activated', 'premium_reactivated')`,
     [input.projectId, at, eventId, input.eventType],
   );
-  const state = await currentState(tx, input.projectId, eventId, false, handoffGenerated);
+  const state = await currentState(tx, input.projectId, eventId, false);
   await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, $2, $3::jsonb, $4)", [
     input.projectId,
     `subscription.${input.eventType}`,

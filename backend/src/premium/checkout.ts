@@ -18,6 +18,12 @@ export interface CheckoutRequest {
 export interface CheckoutAdapter {
   readonly name: string;
   begin(tx: Db, request: CheckoutRequest): Promise<{ outcome: CheckoutOutcome; reference: string | null }>;
+  /**
+   * Optional (F5 Track B): the client comes back while a request is already pending (closed the payment tab, followed the
+   * private link again). Returns the way to continue the SAME payment attempt, or null to keep waiting for confirmation.
+   * Never starts a second concurrent attempt and never activates anything.
+   */
+  resume?(tx: Db, request: CheckoutRequest): Promise<{ outcome: CheckoutOutcome; reference: string | null } | null>;
 }
 
 /** Default: no provider, no charge, no activation — the request waits for beeside's confirmation. */

@@ -148,6 +148,20 @@
       "when": 1791570373888,
       "tag": "0020_precision_additive_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791570978627,
+      "tag": "0021_stripe_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791570993686,
+      "tag": "0022_stripe_billing_integrity",
+      "breakpoints": true
     }
   ]
 }

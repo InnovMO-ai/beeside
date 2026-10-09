@@ -4,6 +4,13 @@ import { BundleStore } from "../fa/services/bundle-store";
 import { FaError } from "../fa/services/errors";
 import { getFirstAssessmentPrecisionContext } from "../precision-context/first-assessment-context";
 
+/**
+ * SUPERSEDED (F5): the legacy FA-3.0 "push" handoff. Premium activation no longer builds this package nor emits
+ * `precision.handoff_package_generated` (see subscription-events.ts). Precision F5 pulls its First Assessment context
+ * through the FaContextReader port and its access through the EntitlementProvider port. Kept only so projects activated
+ * before F5 keep their stored package readable; nothing new writes to precision_handoff_package. Do not build on it;
+ * delete after the retention decision for pre-F5 packages.
+ */
 export const PRECISION_HANDOFF_CONTRACT_VERSION = 1;
 
 export const PRECISION_START_INSTRUCTION =

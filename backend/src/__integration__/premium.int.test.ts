@@ -79,7 +79,7 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
 
   const count = async (sql: string, params: unknown[]) => (await h.client.query<{ n: number }>(sql, params)).rows[0]?.n;
 
-  it("activates, cancels, lapses and reactivates one project with exactly one Precision handoff", async () => {
+  it("activates, cancels, lapses and reactivates one project and never builds the superseded FA-3.0 handoff package", async () => {
     const { token, project } = await completedProject();
     const id = project.project_id as string;
     const auth = { Authorization: `Bearer ${token}` };
@@ -107,7 +107,7 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
     const activated = await sendEvent(activationPayload);
     expect(activated.status).toBe(201);
     expect(activated.body).toMatchObject({
-      duplicate: false, subscriptionStatus: "PREMIUM_ACTIVE", premiumAccessActive: true, premiumEverActivated: true, precisionState: "STARTED", handoffGenerated: true,
+      duplicate: false, subscriptionStatus: "PREMIUM_ACTIVE", premiumAccessActive: true, premiumEverActivated: true, precisionState: "STARTED",
     });
     const activationEventId = activated.body.eventId as string;
     const request1 = await h.client.query("SELECT status, fulfilled_by_event_id FROM premium_activation_request WHERE project_id = $1", [id]);
@@ -117,7 +117,8 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
     // A redelivered event is acknowledged, never re-applied; a forged one is refused.
     const replay = await sendEvent(activationPayload);
     expect(replay.status).toBe(200);
-    expect(replay.body).toMatchObject({ duplicate: true, eventId: activationEventId, handoffGenerated: false });
+    expect(replay.body).toMatchObject({ duplicate: true, eventId: activationEventId });
+    expect(replay.body).not.toHaveProperty("handoffGenerated");
     expect((await sendEvent(event(id, "cancellation_requested", "evt-forged-0001"), `sha256=${"0".repeat(64)}`)).status).toBe(401);
     expect((await sendEvent(event(id, "premium_activated", "evt-activation-0002", 30))).status).toBe(409);
 
@@ -152,19 +153,17 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
     h.advanceDays(5);
     const reactivated = await sendEvent(event(id, "premium_reactivated", "evt-reactivation-0001", 30));
     expect(reactivated.status).toBe(201);
-    expect(reactivated.body).toMatchObject({ projectId: id, subscriptionStatus: "PREMIUM_ACTIVE", premiumAccessActive: true, handoffGenerated: false });
+    expect(reactivated.body).toMatchObject({ projectId: id, subscriptionStatus: "PREMIUM_ACTIVE", premiumAccessActive: true });
     expect(reactivated.body.subscriptionId).not.toBe(activated.body.subscriptionId);
     expect((await h.api().post("/api/fa/links/open").send({ token: link })).body.premium).toEqual({ everActivated: true, accessActive: true });
     expect((await operationHubAccess(h.deps.db, id)).accessActive).toBe(true);
 
     // Invariants of the whole lifecycle.
     expect(await count("SELECT count(*)::int AS n FROM subscription WHERE project_id = $1", [id])).toBe(2);
-    const packages = await h.client.query("SELECT generated_by_event_id, source_snapshot_id, source_internal_assessment_id FROM precision_handoff_package WHERE project_id = $1", [id]);
-    expect(packages.rows).toEqual([
-      { generated_by_event_id: activationEventId, source_snapshot_id: before.snapshot[0].snapshot_id, source_internal_assessment_id: before.internal[0].internal_assessment_id },
-    ]);
+    // F5: the legacy FA-3.0 push handoff is retired — activation writes no package and emits no handoff event.
+    expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [id])).toBe(0);
     expect((await h.client.query("SELECT premium_first_activated_at, precision_started_at FROM project WHERE project_id = $1", [id])).rows[0]).toEqual(milestones);
-    expect(await count("SELECT count(*)::int AS n FROM outbox_event WHERE project_id = $1 AND event_type = 'precision.handoff_package_generated'", [id])).toBe(1);
+    expect(await count("SELECT count(*)::int AS n FROM outbox_event WHERE project_id = $1 AND event_type = 'precision.handoff_package_generated'", [id])).toBe(0);
     expect(await count("SELECT count(*)::int AS n FROM outbox_event WHERE project_id = $1 AND event_type LIKE 'subscription.%'", [id])).toBe(4);
     const transitions = await h.client.query("SELECT from_state, to_state FROM subscription_state_transition WHERE project_id = $1 ORDER BY occurred_at, to_state", [id]);
     expect(transitions.rows).toHaveLength(4);
@@ -173,37 +172,21 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
     expect(h.email.messages.length).toBe(emailsBefore);
   });
 
-  it("starts Precision from the frozen handoff and the canonical First Assessment context, adding only precision.* data", async () => {
+  it("Premium activation no longer pushes anything to Precision: no package, no handoff event, Core entitlement is the gate", async () => {
     const { project } = await completedProject();
     const id = project.project_id as string;
-    await expect(getPrecisionStartContext(h.deps.db, h.deps.bundles, id)).rejects.toMatchObject({ code: "NOT_APPLICABLE" });
     const now = h.clock.now;
-    await h.deps.db.transaction((tx) =>
+    const result = await h.deps.db.transaction((tx) =>
       processSubscriptionEvent(tx, h.deps.bundles, {
         projectId: id, eventType: "premium_activated", occurredAt: now, source: "manual_admin_injection", idempotencyKey: "manual-precision-0001", periodStart: now, periodEnd: new Date(now.getTime() + 30 * DAY),
       }),
     );
-
-    const internal = (await h.client.query("SELECT internal_assessment_id, content FROM internal_assessment WHERE project_id = $1", [id])).rows[0];
-    const snapshot = (await h.client.query("SELECT snapshot_id FROM snapshot WHERE project_id = $1", [id])).rows[0];
-    const start = await getPrecisionStartContext(h.deps.db, h.deps.bundles, id);
-    const pkg = start.handoffPackage.content;
-    expect(pkg).toMatchObject({
-      contractVersion: 1, projectId: id, personId: project.created_by_person_id, companyId: project.company_id,
-      source: { snapshotId: snapshot.snapshot_id, internalAssessmentId: internal.internal_assessment_id, rulesEngineVersion: "re-1.0.0", snapshotTemplateVersion: "st-1.0.0" },
-      guardrails: { findingsAreNotContractedServices: true, clientProviderDirectContact: "not_authorized", precisionNamespace: "precision.*", regeneratedOnReactivation: false },
-    });
-    expect(pkg.instruction).toMatch(/^Do not restart discovery/);
-    expect(pkg.precisionFocus).toEqual(internal.content.precision_focus);
-    expect(pkg.findings).toEqual(internal.content.findings);
-    expect(pkg.executiveSummary).toEqual(internal.content.executive_summary);
-    // Known structured information is declared as known, so Precision validates instead of re-asking.
-    expect(pkg.knownInformation.structuredFieldKeys).toEqual(Object.keys(start.firstAssessment.structuredAnswers).sort());
-    expect(pkg.knownInformation.structuredFieldKeys.length).toBeGreaterThan(10);
-    expect(start.firstAssessment).toMatchObject({ projectId: id, personId: project.created_by_person_id, companyId: project.company_id });
-    expect(start.precisionAnswers).toEqual([]);
-
-    // Precision writes under its own namespace on the same project; First Assessment answers stay frozen.
+    expect(result).toMatchObject({ premiumAccessActive: true, premiumEverActivated: true, precisionState: "STARTED" });
+    expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [id])).toBe(0);
+    expect(await count("SELECT count(*)::int AS n FROM outbox_event WHERE project_id = $1 AND event_type = 'precision.handoff_package_generated'", [id])).toBe(0);
+    // The superseded reader has nothing to read: Precision pulls its context through its own ports.
+    await expect(getPrecisionStartContext(h.deps.db, h.deps.bundles, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    // Precision may still write under its own namespace on the same project; First Assessment answers stay frozen.
     await h.client.query("SELECT field_registry_sync('precision', $1::jsonb)", [
       JSON.stringify([{ field_key: "precision.validation.target_market_confirmed", data_type: "boolean", source: "precision", module: "precision" }]),
     ]);
@@ -216,10 +199,6 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
       h.client.query("INSERT INTO answer (project_id, field_key, value, value_type, question_bank_version) VALUES ($1, 'fa.goal.primary_goal', '\"expand\"', 'string', $2)", [id, project.question_bank_version]),
     ).rejects.toMatchObject({ code: "BV409" });
     await h.client.query("ROLLBACK TO SAVEPOINT fa_frozen");
-
-    const later = await getPrecisionStartContext(h.deps.db, h.deps.bundles, id);
-    expect(later.precisionAnswers).toEqual([expect.objectContaining({ fieldKey: "precision.validation.target_market_confirmed", value: true })]);
-    expect(later.handoffPackage).toEqual(start.handoffPackage);
   });
 
   it("activates immediately through the development-only simulated checkout, on the same processor", async () => {
@@ -233,7 +212,7 @@ describeWithDb("Premium transition, Precision handoff and subscription boundary 
       const req = (await h.client.query("SELECT status, checkout_adapter, checkout_reference FROM premium_activation_request WHERE project_id = $1", [project.project_id])).rows[0];
       expect(req).toMatchObject({ status: "FULFILLED", checkout_adapter: "dev_simulated", checkout_reference: expect.stringMatching(/^dev-sim-/) });
       expect((await h.client.query("SELECT source FROM subscription_event WHERE project_id = $1", [project.project_id])).rows).toEqual([{ source: "dev_simulated" }]);
-      expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [project.project_id])).toBe(1);
+      expect(await count("SELECT count(*)::int AS n FROM precision_handoff_package WHERE project_id = $1", [project.project_id])).toBe(0);
     } finally {
       delete h.deps.premium;
     }
