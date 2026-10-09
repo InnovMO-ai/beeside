@@ -176,6 +176,20 @@
       "when": 1791573406126,
       "tag": "0024_precision_oh_delivery_attempt_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791573853893,
+      "tag": "0025_precision_product_surface",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791573875306,
+      "tag": "0026_precision_product_surface_integrity",
+      "breakpoints": true
     }
   ]
 }

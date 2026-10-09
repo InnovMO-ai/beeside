@@ -422,3 +422,141 @@ export const ohDelivery = pgTable(
     check("oh_delivery_error_code_format", sql`${t.errorCode} IS NULL OR ${t.errorCode} ~ '^[A-Z0-9_]{1,40}$'`),
   ],
 );
+
+// =====================================================================================
+// F5 Track A additive layer (0025) — product-surface tables (Build Readiness §A, §F, §G, §E)
+// Working names from Build Readiness are used where the document gave one.
+// =====================================================================================
+
+// Project-scoped bearer access (FA convention: opaque random token, sha256-hashed at rest, no roles).
+// kind='link' is a one-time code that is exchanged for a kind='session' token; the link never grants access
+// by itself and entitlement is evaluated on every request.
+export const precisionAccessToken = pgTable(
+  "precision_access_token",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    tokenHash: text("token_hash").notNull(),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    kind: text("kind").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("precision_access_token_hash_unique").on(t.tokenHash),
+    index("precision_access_token_project_idx").on(t.projectId, t.kind),
+    check("precision_access_token_kind", sql`${t.kind} IN ('link','session')`),
+    check("precision_access_token_hash_format", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+// A-2: "Cover seen" mark. Written at first render of the Cover (D-6 option A). INSERT … ON CONFLICT DO NOTHING.
+export const precisionCoverSeen = pgTable("precision_cover_seen", {
+  projectId: uuid("project_id").primaryKey().references(() => project.projectId),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A-10: dated client confirmation of an (immutable) pack. Append-only, one per pack. Confirming never sends.
+export const crpConfirmation = pgTable(
+  "crp_confirmation",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    packId: uuid("pack_id").notNull().references(() => pack.id),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("crp_confirmation_pack_unique").on(t.packId), index("crp_confirmation_project_idx").on(t.projectId)],
+);
+
+// F: Precision analytics. event_key UNIQUE + ON CONFLICT DO NOTHING, written in the same transaction as the change.
+// No free text, no names, no email, no client content: ids and small technical properties only.
+export const precisionJourneyEvent = pgTable(
+  "precision_journey_event",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    eventName: text("event_name").notNull(),
+    eventKey: text("event_key").notNull(),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    interfaceLanguage: text("interface_language"),
+    properties: jsonb("properties").notNull().default(sql`'{}'::jsonb`),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("precision_journey_event_key_unique").on(t.eventKey),
+    index("precision_journey_event_project_idx").on(t.projectId, t.occurredAt),
+    check("precision_journey_event_name", sql`${t.eventName} ~ '^[a-z][a-z0-9_]{2,60}$'`),
+    check("precision_journey_event_props_object", sql`jsonb_typeof(${t.properties}) = 'object'`),
+  ],
+);
+
+// Conversation log (client message + assistant reply per turn). Never travels to Operation Hub.
+// (project_id, turn_key, role) is the idempotency anchor: a retry with the same turn_key never duplicates a turn.
+export const precisionTurn = pgTable(
+  "precision_turn",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
+    projectId: uuid("project_id").notNull().references(() => project.projectId),
+    scopeInstanceId: uuid("scope_instance_id").notNull().references(() => precisionInstance.id),
+    turnKey: text("turn_key").notNull(),
+    role: text("role").notNull(),
+    surface: text("surface").notNull(),
+    kind: text("kind").notNull().default("message"),
+    locale: text("locale").notNull(),
+    content: text("content").notNull(),
+    structured: jsonb("structured").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("precision_turn_key_role_unique").on(t.projectId, t.turnKey, t.role),
+    index("precision_turn_scope_idx").on(t.scopeInstanceId, t.seq),
+    check("precision_turn_role", sql`${t.role} IN ('client','assistant')`),
+    check("precision_turn_surface", sql`${t.surface} IN ('understanding','category','add_service')`),
+    check("precision_turn_kind", sql`${t.kind} IN ('message','process_question','disclosure','notice')`),
+    check("precision_turn_locale", sql`${t.locale} IN ('en','es')`),
+    check("precision_turn_content_len", sql`char_length(${t.content}) BETWEEN 1 AND 8000`),
+    check("precision_turn_key_format", sql`${t.turnKey} ~ '^[A-Za-z0-9_.:-]{8,120}$'`),
+  ],
+);
+
+// G: Cover assets by destination country. No row => global composition => neutral brand composition.
+export const precisionCoverAsset = pgTable(
+  "precision_cover_asset",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    countryCode: text("country_code").notNull(),
+    assetRef: text("asset_ref").notNull(),
+    isActive: boolean("is_active").notNull().default(false),
+    approved: boolean("approved").notNull().default(false),
+    focalX: real("focal_x").notNull().default(0.5),
+    focalY: real("focal_y").notNull().default(0.5),
+    altText: jsonb("alt_text").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("precision_cover_asset_country_unique").on(t.countryCode),
+    check("precision_cover_asset_country", sql`${t.countryCode} ~ '^([A-Z]{2}|\\*)$'`),
+    check("precision_cover_asset_focal", sql`${t.focalX} BETWEEN 0 AND 1 AND ${t.focalY} BETWEEN 0 AND 1`),
+  ],
+);
+
+// G: operational configuration by key/locale (URLs and policy values). Missing key => defined fallback, never an error.
+export const precisionConfig = pgTable(
+  "precision_config",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    key: text("key").notNull(),
+    locale: text("locale").notNull().default("*"),
+    value: jsonb("value").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    changeReason: text("change_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("precision_config_active_unique").on(t.key, t.locale).where(sql`${t.isActive} = true`),
+    check("precision_config_key", sql`${t.key} ~ '^[a-z][a-z0-9_.]{1,80}$'`),
+    check("precision_config_locale", sql`${t.locale} IN ('*','en','es')`),
+  ],
+);
