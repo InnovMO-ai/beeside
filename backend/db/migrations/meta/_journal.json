@@ -162,6 +162,20 @@
       "when": 1791570993686,
       "tag": "0022_stripe_billing_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791573404432,
+      "tag": "0023_precision_oh_delivery_attempt",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791573406126,
+      "tag": "0024_precision_oh_delivery_attempt_integrity",
+      "breakpoints": true
     }
   ]
 }

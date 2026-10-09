@@ -112,6 +112,7 @@ END $$;
 \ir 40_outputs_immutability.sql
 \ir 50_additive.sql
 \ir 60_stripe_core.sql
+\ir 60_oh_delivery_attempts.sql
 
 \echo '--- DONE: rolling back, no test data persists ---'
 ROLLBACK;

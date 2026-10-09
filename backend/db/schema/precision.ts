@@ -398,11 +398,19 @@ export const ohDelivery = pgTable(
     ohReference: text("oh_reference"),
     idempotencyKey: text("idempotency_key").notNull(),
     errorCode: text("error_code"),
+    // 0021: one send attempt = one (queued, delivered|failed) pair sharing the same attempt number, so a user may retry
+    // a failed delivery of the same idempotency key without violating the ledger's uniqueness.
+    attempt: integer("attempt").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("oh_delivery_project_idx").on(t.projectId, t.createdAt),
-    uniqueIndex("oh_delivery_idem_status_unique").on(t.idempotencyKey, t.status),
+    uniqueIndex("oh_delivery_idem_status_attempt_unique").on(t.idempotencyKey, t.status, t.attempt),
+    // At most ONE delivered row per key: the database-level duplicate-publish guard.
+    uniqueIndex("oh_delivery_one_delivered").on(t.idempotencyKey).where(sql`${t.status} = 'delivered'`),
+    index("oh_delivery_project_status_idx").on(t.projectId, t.status),
+    check("oh_delivery_attempt_positive", sql`${t.attempt} >= 1`),
+    check("oh_delivery_reference_only_delivered", sql`(${t.status} = 'delivered') = (${t.ohReference} IS NOT NULL)`),
     check("oh_delivery_kind", sql`${t.kind} IN ('crp','psm','update_note')`),
     check("oh_delivery_status", sql`${t.status} IN ('queued','delivered','failed')`),
     check("oh_delivery_artifact_version", sql`${t.artifactVersion} >= 1`),
