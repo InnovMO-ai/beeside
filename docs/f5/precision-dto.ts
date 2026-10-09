@@ -24,7 +24,12 @@ export interface ApiErrorDto {
     | "TEMPORARILY_UNAVAILABLE";
   message: string;
   retryable: boolean;
+  /** Present on UNAUTHENTICATED answers of the link exchange when support contact is configured; absent -> the client hides it. */
+  support?: SupportDto;
 }
+
+/** Support contact for the invalid-link page, from configuration (`support_contact_url` / `support_email`). Either field may be null. */
+export interface SupportDto { contactUrl: string | null; email: string | null }
 
 // ---------------------------------------------------------------- session & entry
 export interface SessionExchangeRequest { code: string }
@@ -111,6 +116,8 @@ export interface ThreadDto {
   /** True after the one-time AI disclosure was delivered in this project. */
   aiDisclosureShown: boolean;
   canWrite: boolean;
+  /** A client turn saved without an assistant answer yet (reload mid-processing or AI unavailable): retry with the SAME turnKey. */
+  pendingTurn?: { turnKey: string; status: "processing" | "ai_unavailable" } | null;
 }
 
 export interface CategoryProgressDto {
@@ -229,6 +236,11 @@ export interface PreviewDto {
   notSent: string[];
   sendState: SendStateDto;
   canSend: boolean;
+  /** Present when sendState is "failed": what the client can do and whether "Try again" makes sense. */
+  clientAction?: "try_again_later" | "needs_attention" | null;
+  retryable?: boolean;
+  /** Present when sending is blocked until the first send succeeds. */
+  blockedReason?: "first_send_required" | null;
 }
 export interface SendRequest { previewChecksum: string }
 export interface SendResultDto {

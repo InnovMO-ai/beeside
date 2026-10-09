@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router } from "express";
 import { Pool } from "pg";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { OidcIdentityProvider } from "./admin/oidc";
@@ -19,6 +19,7 @@ import { StripeClient } from "./premium/stripe/client";
 import { stripeConfigFromEnv, stripeLivemodeExpected } from "./premium/stripe/config";
 import { createPaymentStateRouter } from "./premium/stripe/payment-state";
 import { StripeWebhookDeps, createStripeWebhookRouter } from "./premium/stripe/webhook";
+import { createPrecisionRuntime } from "./precision/api/wiring";
 import { healthRouter } from "./routes/health";
 import { readinessRouter, shippedMigrationCount } from "./routes/readiness";
 import { MAX_REQUEST_BYTES, errorHandler, notFoundJson, originGuard, rejectOversizedBodies, requestContext, securityHeaders } from "./security/http-hardening";
@@ -49,6 +50,8 @@ export interface AppOptions {
   stripe?: StripeWebhookDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
   admin?: AdminDeps;
+  /** Precision Center API (`/api/precision/*`, absolute paths); mounted only when provided (PRECISION_API_ENABLED=true). */
+  precision?: { router: Router };
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
   readiness?: { db: Db; expectedMigrations: number };
   security?: SecurityOptions;
@@ -63,7 +66,9 @@ export function createApp(options: AppOptions = {}) {
   app.set("trust proxy", security.trustProxyHops ?? 0);
   app.use(requestContext());
   app.use(securityHeaders({ production: security.production === true }));
-  app.use(rejectOversizedBodies(MAX_REQUEST_BYTES));
+  // Precision enforces its own (smaller) body cap and answers in its own error shape.
+  const oversized = rejectOversizedBodies(MAX_REQUEST_BYTES);
+  app.use((req, res, next) => (req.path.startsWith("/api/precision/") ? next() : oversized(req, res, next)));
   if (security.allowedOrigins) app.use(originGuard(security.allowedOrigins));
   app.use(healthRouter);
   if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
@@ -75,6 +80,7 @@ export function createApp(options: AppOptions = {}) {
   if (options.stripe) app.use("/api/billing/stripe", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createStripeWebhookRouter(options.stripe));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
+  if (options.precision) app.use(options.precision.router);
   app.use(notFoundJson());
   app.use(errorHandler(log));
   return app;
@@ -259,8 +265,24 @@ export function securityOptionsFromEnv(env: NodeJS.ProcessEnv = process.env, db:
   };
 }
 
+/**
+ * Precision Center API. Off unless PRECISION_API_ENABLED=true. It uses its own connection pool because the conversation store
+ * takes a session-level lock per project on a dedicated connection. Providers default to the isolated ones (see api/wiring.ts).
+ */
+export async function precisionFromEnv(env: NodeJS.ProcessEnv = process.env, limiter?: RateLimiter): Promise<{ router: Router } | undefined> {
+  if (env.PRECISION_API_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL) throw new Error("PRECISION_API_ENABLED requires DATABASE_URL");
+  const pool = new Pool({ connectionString: env.DATABASE_URL, max: Number(env.PRECISION_DB_POOL_MAX ?? 10) });
+  const runtime = await createPrecisionRuntime({ env, pool, ...(limiter ? { limiter } : {}) });
+  return { router: runtime.router };
+}
+
 /* istanbul ignore next -- exercised by real deployment, not unit tests */
 if (require.main === module) {
+  void main();
+}
+
+async function main(): Promise<void> {
   assertRuntimeConfig(process.env, (level, message) => jsonLogger(level, message));
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
@@ -268,13 +290,16 @@ if (require.main === module) {
   const stripe = stripeDepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
   const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db);
   const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db ?? fa4?.db ?? null;
+  const security = securityOptionsFromEnv(process.env, db);
+  const precision = await precisionFromEnv(process.env, security.limiter);
   const app = createApp({
+    ...(precision ? { precision } : {}),
     fa,
     fa4,
     billing,
     stripe,
     admin,
-    security: securityOptionsFromEnv(process.env, db),
+    security,
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
   const port = Number(process.env.PORT ?? 8080);
