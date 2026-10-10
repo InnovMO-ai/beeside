@@ -1,7 +1,7 @@
 # Precision Center V2.0 - Product QA on the live stack (F5 Track A)
 
 Date of the runs: 2026-10-09 to 2026-10-10. Author: QA-LIVE.
-Commit under test: `4be394fbbd69bc6f2f0ad2eea1b34c1b1a8c1b19` (branch `feature/precision-v2-f5`). **The changes made by this QA pass are NOT committed**; they are in the working tree for the lead to commit (file list in section 8). Every result below was produced by a command run in this pass against the working tree, unless a line says otherwise.
+Commit under test: `4be394fbbd69bc6f2f0ad2eea1b34c1b1a8c1b19` (branch `feature/precision-v2-f5`). The changes made by this QA pass were committed afterwards as `73b5d46` (tag `embassy-rc-1`, branch `embassy-rc`); file list in section 8. Every result below was produced by a command run in this pass against the working tree, unless a line says otherwise.
 
 **Embassy Ready is not declared.** The Design Proof v3.3 is not accessible to this team (WI-1 is OPEN), so the visual comparison against it was not done. Everything else below is a product-quality result against a simulated environment (section 3).
 
