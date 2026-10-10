@@ -36,15 +36,18 @@ export function ServiceMapBody({ view, compact }: { view: ServiceMapViewDto; com
   );
   return (
     <div className={`pz-docbody ${compact ? "pz-compact" : ""}`}>
-      <section className="pz-docsec" aria-label={t("sm.summary")}>
-        <h3 className="pz-h3">{t("sm.summary")}</h3>
-        <dl className="pz-kvlist">
-          <Row label={t("sm.objective")} value={s.objective} />
-          <Row label={t("sm.destinations")} value={s.destinations.length ? s.destinations.map((d) => d.label).join(", ") : null} />
-          <Row label={t("sm.timeWindow")} value={s.timeWindow} />
-          <Row label={t("sm.product")} value={s.productOrService} />
-        </dl>
-      </section>
+      {/* compact = inside Preview before Send, whose first block already lists the project facts */}
+      {!compact ? (
+        <section className="pz-docsec" aria-label={t("sm.summary")}>
+          <h3 className="pz-h3">{t("sm.summary")}</h3>
+          <dl className="pz-kvlist">
+            <Row label={t("sm.objective")} value={s.objective} />
+            <Row label={t("sm.destinations")} value={s.destinations.length ? s.destinations.map((d) => d.label).join(", ") : null} />
+            <Row label={t("sm.timeWindow")} value={s.timeWindow} />
+            <Row label={t("sm.product")} value={s.productOrService} />
+          </dl>
+        </section>
+      ) : null}
       <section className="pz-docsec" aria-label={t("sm.services")}>
         <h3 className="pz-h3">{t("sm.services")}</h3>
         {view.groups.map((g) => (

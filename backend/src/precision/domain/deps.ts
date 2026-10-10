@@ -1,7 +1,7 @@
 /**
  * Shared contract between the two DOMAIN owners (F5 phase 2). Do not change signatures without
  * telling the lead: DOMAIN-A (auth/session/entry/center/cover/config/events, Understanding, My Service Map, category conversations, Add a Service, router, createApp wiring) and
- * DOMAIN-B (CRP lifecycle, preview/payload builder, send, demo seed + route A–J, SQL guard tests) compile against this file.
+ * DOMAIN-B (CRP lifecycle, preview/payload builder, send, synthetic-project seed + route A–J, SQL guard tests) compile against this file.
  */
 import type { Request, Router } from "express";
 import type { Db } from "../../db/database";

@@ -64,7 +64,8 @@ function CategoryRow({ c }: { c: CategoryCardDto }) {
         <div className="pz-catmeta">
           {showProgress ? <><Meter pct={c.progressPct} label={`${c.label}: ${t("center.cat.captured", { pct: c.progressPct ?? 0 })}`} /><span className="pz-pct">{t("center.cat.captured", { pct: c.progressPct ?? 0 })}</span></> : <span className="pz-muted">{t("center.cat.noProgress")}</span>}
         </div>
-        {c.status === "in_progress" || c.status === "ready_for_review" || c.pendingCount > 0 || c.criticalOpen > 0 ? (
+        {/* Nothing has been asked in a category that is Not started: its open and pending counts would read as work the client left undone. */}
+        {c.status !== "not_started" && (c.status === "in_progress" || c.status === "ready_for_review" || c.pendingCount > 0 || c.criticalOpen > 0) ? (
           <p className="pz-counts">
             {c.criticalOpen > 0 ? <span>{tn("center.cat.critical", c.criticalOpen)}</span> : null}
             {c.pendingCount > 0 ? <span>{tn("center.cat.pending", c.pendingCount)}</span> : null}

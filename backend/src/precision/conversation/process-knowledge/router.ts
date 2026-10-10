@@ -42,8 +42,11 @@ const NONE: RouteDecision = { kind: "none", topicKeys: [], mixed: false, rules: 
 const QUESTION_STARTERS =
   /^(?:y |and |pero |but |oye |hey |perdon |disculpa |una duda |una pregunta |quick question )?(?:que|cual|cuales|como|cuando|donde|quien|quienes|cuanto|cuantos|por que|para que|puedo|puedes|podemos|podria|podrian|se puede|existe|hay|sera|seran|tengo que|debo|what|which|how|when|where|who|why|can|could|do|does|did|is|are|will|would|should|explain|tell me|explicame|explica|dime|cuentame|ayudame a entender|i would like to know|me gustaria saber|quisiera saber|i want to know|quiero saber)\b/;
 
+/** "I do not understand ..." is a request for help even without a question mark. */
+const CLARIFY_STATEMENT = /^(?:no entiendo|no comprendo|no me queda claro|i (?:do not|don t|dont) (?:understand|get)\b|not sure (?:what|i understand))/;
+
 function hasQuestionCue(raw: string, norm: string): boolean {
-  return /[?¿]/.test(raw) || QUESTION_STARTERS.test(norm);
+  return /[?¿]/.test(raw) || QUESTION_STARTERS.test(norm) || CLARIFY_STATEMENT.test(norm);
 }
 
 // ------------------------------------------------------------------ rules
@@ -64,6 +67,12 @@ const RULES: readonly Rule[] = [
   {
     id: "why_this_question",
     re: /\b(?:por que|para que)\b.{0,30}\b(?:pregunt\w*|pid\w*|necesit(?:as|an)|requier(?:es|en)|sirve|sirven|importa)\b|\bwhy\b.{0,22}\b(?:ask\w*|need\w*|important|relevant|matters?)\b|\bwhat (?:s|is) (?:this|that|the point of this)(?: question)? for\b|\bwhy this question\b/,
+    topic: () => "why_this_question",
+  },
+  {
+    // "I do not understand the question": the answer is the reason and help text of the pending question, then the question again.
+    id: "clarify_question",
+    re: /\b(?:no entiendo|no comprendo|no me queda claro|a que te refieres|que quieres decir|que quiere decir|me puedes (?:explicar|aclarar)|puedes (?:explicar|aclarar|repetir)\w*|podrias (?:explicar|aclarar)\w*|i (?:do not|don t|dont) (?:understand|get)\b|not sure (?:what|i understand)|what do you mean|what does that mean|what does this (?:question )?mean|can you (?:explain|clarify|rephrase)|could you (?:explain|clarify|rephrase)|explain (?:this|the) question)\b/,
     topic: () => "why_this_question",
   },
   {

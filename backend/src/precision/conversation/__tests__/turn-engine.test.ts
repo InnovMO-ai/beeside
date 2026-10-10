@@ -352,6 +352,28 @@ describe("reading the client's answer", () => {
     expect(r.progress?.criticalOpen).toBe(1);
   });
 
+  it.each([
+    ["en", "skip"],
+    ["en", "Skip this question"],
+    ["en", "next"],
+    ["es", "omitir"],
+    ["es", "Saltar esta"],
+    ["es", "siguiente"],
+  ] as const)("a bare skip (%s: %j) is a pending answer, never a value", async (locale, text) => {
+    const w = new World({ surface: "category", locale, facts: { dest_country: A(["CL"]) } });
+    await w.open();
+    const r = await w.say(text);
+    expect(r.factsToWrite[0]).toMatchObject({ fieldKey: "operating_model", value: null, answerState: "UNKNOWN", provenanceStage: "client_answered" });
+    expect(assistantText(r)).toContain(copyText("pending_accept", locale).text);
+  });
+
+  it("a sentence that merely contains the word skip is not read as a skip", async () => {
+    const w = new World({ surface: "category", locale: "en", facts: { dest_country: A(["CL"]) } });
+    await w.open();
+    const r = await w.say("We never skip customs checks");
+    expect(r.factsToWrite.every((f) => f.answerState !== "UNKNOWN")).toBe(true);
+  });
+
   it("WITHHELD: 'prefiero no compartirlo' and the chip", async () => {
     const w = new World({ surface: "category", locale: "es", facts: { dest_country: A(["CL"]) } });
     await w.open();

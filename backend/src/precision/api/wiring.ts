@@ -9,7 +9,7 @@
  *   PRECISION_FA_CONTEXT_PROVIDER         fixture (default) | reader (no adapter yet: refuses to start)
  *   PRECISION_INTERNAL_KEY                enables GET /api/precision/internal/status (absent -> 404)
  *   PRECISION_PUBLISH_MANIFESTS_ON_BOOT   true|false (default: true outside production) -> idempotent publish of the bundled manifests
- *   PRECISION_DEMO_FIXTURES=true          load the synthetic demo project into the fixture providers (never with real providers)
+ *   PRECISION_FIXTURE_PROJECT=true        register the synthetic seeded project with the fixture providers (no effect with real providers)
  */
 import type { Router } from "express";
 import type { Pool } from "pg";
@@ -77,10 +77,8 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   const now = options.now ?? ((): Date => new Date());
   const db = options.db ?? createPoolDb(options.pool);
   const integrations = options.integrations ?? integrationsFromEnv(env, db);
-  // Synthetic-project mode (explicit env switch): the scripted provider also gets the lane fixture of the rehearsal route.
-  const demoMode = env.PRECISION_DEMO_FIXTURES === "true";
-  const laneFixture = demoMode && !options.provider ? (await import("../domain/seed/demo-script")).DEMO_SCRIPT_FIXTURE : undefined;
-  const provider = options.provider ?? selectModelProvider({ env, ...(laneFixture ? { fixture: laneFixture } : {}) });
+  const fixtureProject = env.PRECISION_FIXTURE_PROJECT === "true";
+  const provider = options.provider ?? selectModelProvider({ env });
   const registry = createManifestRegistry(db);
   const delivery = new OhDeliveryService({ db, port: integrations.operationHub });
 
@@ -102,9 +100,9 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 
-  if (demoMode) {
-    const { loadDemoFixtures } = await import("../domain/seed/demo-project");
-    await loadDemoFixtures(db, { faContext: integrations.faContext as never, entitlement: integrations.entitlement as never });
+  if (fixtureProject) {
+    const { loadFixtureProject } = await import("../domain/seed");
+    await loadFixtureProject(db, { faContext: integrations.faContext as never, entitlement: integrations.entitlement as never });
   }
   const router = createPrecisionRouter(deps, domain, { ...(options.limiter ? { limiter: options.limiter } : {}), modelProvider: provider, env });
   return { deps, domain, router, provider };

@@ -182,7 +182,7 @@ export function diffAgainst(live: PsmV1Content, liveCodes: string[], snap: Store
   const bp = snap.project;
   const lp = live.project;
   if ((bp?.objective ?? null) !== lp.objective) out.push({ kind: "changed", text: CHANGE_COPY.objective[locale] });
-  if (JSON.stringify([...codesOf(snap, []) ].sort()) !== JSON.stringify([...liveCodes].sort())) out.push({ kind: "changed", text: CHANGE_COPY.destinations[locale] });
+  if (Array.isArray(snap.destination_codes) && JSON.stringify([...codesOf(snap, [])].sort()) !== JSON.stringify([...liveCodes].sort())) out.push({ kind: "changed", text: CHANGE_COPY.destinations[locale] });
   if ((bp?.timeWindow ?? null) !== lp.timeWindow) out.push({ kind: "changed", text: CHANGE_COPY.timeWindow[locale] });
   if ((bp?.productOrService ?? null) !== lp.productOrService) out.push({ kind: "changed", text: CHANGE_COPY.product[locale] });
   return out;

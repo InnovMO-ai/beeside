@@ -304,7 +304,7 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
 .pz-pendingbox[data-empty="true"] { background: var(--pz-paper-2); border-color: var(--pz-line); }
 .pz-pendingbox[data-empty="true"] > .pz-h3 { color: var(--pz-brand); border-bottom-color: var(--pz-line); }
 .pz-reqs { list-style: none; padding: 0; }
-.pz-req { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) auto; gap: 6px 22px; padding: 12px 0; border-top: 1px solid var(--pz-line); align-items: start; }
+.pz-req { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) 11.5rem; gap: 6px 22px; padding: 12px 0; border-top: 1px solid var(--pz-line); align-items: start; }
 .pz-pendingbox .pz-req { border-top-color: var(--pz-note-line); }
 .pz-req-label { color: var(--pz-ink-2); font-size: 15px; }
 .pz-req-value { font-weight: 600; overflow-wrap: anywhere; }
@@ -378,6 +378,11 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
   .pz-dialog-actions .pz-btn { width: 100%; }
 }
 @media (max-width: 480px) {
+  /* Document view on a phone: one slim sticky row (back chevron, language, Night Shift) instead of two stacked rows; the back path is not repeated in the sticky action bar. */
+  .pz-docbar { flex-wrap: nowrap; gap: 8px; padding-block: 6px; }
+  .pz-docbar .pz-backlink { min-width: 44px; justify-content: center; }
+  .pz-docbar .pz-backlink span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pz-doc:not(.pz-sent) .pz-actionbar > .pz-btn-quiet { display: none; }
   .pz-tools .pz-theme-toggle span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .pz-tools .pz-theme-toggle { width: 44px; padding: 0; justify-content: center; }
 }
@@ -389,6 +394,7 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
 /* ------------------------------------------------------------ print: My Service Map and the CRP read as documents */
 @media print {
   @page { margin: 16mm; }
+  html, body, .pz-root, .pz-docshell, .pz-docmain, .pz-main, .pz-content { background: #fff !important; }
   .pz-root { background: #fff; color: #000; font-size: 11pt; }
   .pz-side, .pz-mbar, .pz-docbar, .pz-actionbar, .pz-noprint, .pz-banners, .pz-skip, .pz-scrim, .pz-tools { display: none !important; }
   .pz-app { display: block; }
@@ -397,6 +403,15 @@ button.pz-textlink, a.pz-textlink { min-height: 44px; }
   .pz-dochead { border-bottom-color: #000; }
   .pz-h1, .pz-h2, .pz-h3 { color: #000; }
   .pz-item, .pz-req, .pz-kv { break-inside: avoid; }
+  /* Grid rows fragment unreliably across printed pages (text of two rows can overlap): print them as plain blocks. */
+  .pz-item, .pz-req, .pz-kv, .pz-docbody, .pz-docsec, .pz-pvblock, .pz-kvlist, .pz-dochead { display: block; }
+  .pz-docbody > * + *, .pz-pvblock > * + *, .pz-docsec > * + * { margin-top: 10px; }
+  .pz-docbody > * + * { margin-top: 22px; }
+  .pz-pvblock { padding: 14px 0; }
+  .pz-notsent { margin-inline: 0; padding: 12px 14px; border: 1px solid #999; border-radius: 6px; background: none; break-inside: avoid; }
+  .pz-item-meta, .pz-req-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: flex-start; text-align: left; margin-top: 4px; }
+  .pz-kv dt { margin-bottom: 2px; }
+  .pz-group-title, .pz-pvblock > .pz-h3 { break-after: avoid; }
   .pz-docsec { break-inside: auto; }
   .pz-docsec > .pz-h3 { break-after: avoid; }
   .pz-chip { border: 1px solid #555; background: none; color: #000; }

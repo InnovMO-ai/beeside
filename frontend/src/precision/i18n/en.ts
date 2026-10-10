@@ -269,6 +269,7 @@ export const en = {
   "pv.block.service_map": "My Service Map",
   "pv.block.crp": "Category Requirement Pack (CRP)",
   "pv.block.context": "Company and project context",
+  "pv.block.empty": "Nothing to add here.",
   "sent.eyebrow": "Sent",
   "sent.title": "Sent to Operation Hub",
   "sent.body": "Your category was sent. You can still review it from Precision Center.",

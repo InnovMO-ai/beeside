@@ -261,6 +261,7 @@ export const es: Record<DictKey, string> = {
   "pv.block.service_map": "My Service Map",
   "pv.block.crp": "Category Requirement Pack (CRP)",
   "pv.block.context": "Contexto de la empresa y del proyecto",
+  "pv.block.empty": "No hay nada que agregar aquí.",
   "sent.eyebrow": "Enviado",
   "sent.title": "Enviado a Operation Hub",
   "sent.body": "Enviaste tu categoría. Puedes revisarla de nuevo desde Precision Center.",

@@ -1,6 +1,6 @@
-# Precision Center V2.0 - Performance, live stack (2026-10-09)
+# Precision Center V2.0 - Performance, live stack (2026-10-09, re-run 2026-10-10)
 
-Commit under test: `63f874866f9442cabac7870bb2b6a3e2292c745f` plus the uncommitted QA-LIVE changes of this day.
+Commit under test: `4be394fbbd69bc6f2f0ad2eea1b34c1b1a8c1b19` plus the uncommitted QA-LIVE changes (uncommitted at the time of the re-run). All figures below are from the re-run of 2026-10-10 with the final frontend and backend of this QA pass; the first run of 2026-10-09 gave the same picture within noise.
 Machine: shared 8 GB Linux VM (the same VM runs Postgres, the backend, the static server and Chromium), Node 22, PostgreSQL 16, Chromium from `/opt/pw-browsers`.
 Internal QA document. It says nothing about production capacity.
 
@@ -41,31 +41,31 @@ Spec: `frontend/e2e/precision-live/perf.live.spec.ts`. Raw output: `/tmp/precisi
 
 | Scenario | p50 | worst of 5 | Notes |
 |---|---|---|---|
-| Desktop, cold, first content | 432 ms | 528 ms | 14 requests, 326 KB transferred |
-| Desktop, warm reload | 386 ms | 518 ms | |
-| Desktop FCP / LCP (cold) | 272 ms / 460 ms | 324 ms / 540 ms | |
-| Mobile throttled, cold, first content | 2217 ms | 2276 ms | 9 requests, 285 KB; time is bandwidth bound |
-| Mobile throttled, warm reload | 1173 ms | 1260 ms | |
-| Mobile throttled FCP / LCP (cold) | 2140 ms | 2184 ms | |
+| Desktop, cold, first content | 411 ms | 654 ms | 14 requests, 327 KB transferred |
+| Desktop, warm reload | 402 ms | 592 ms | |
+| Desktop FCP / LCP (cold) | 248 ms / 488 ms | 336 ms / 612 ms | |
+| Mobile throttled, cold, first content | 2213 ms | 2230 ms | 9 requests, 286 KB; time is bandwidth bound |
+| Mobile throttled, warm reload | 1320 ms | 1482 ms | |
+| Mobile throttled FCP / LCP (cold) | 2068 ms | 2152 ms | |
 
 ### Navigation between screens (desktop)
 
 | Step | p50 | worst of 6 |
 |---|---|---|
-| Center to Understanding | 134 ms | 379 ms (first one, loads the screen chunk) |
-| Understanding to Center | 122 ms | 145 ms |
-| Center to a category (Logistics) | 168 ms | 227 ms |
-| Category to Center | 119 ms | 164 ms |
+| Center to Understanding | 137 ms | 299 ms (first one, loads the screen chunk) |
+| Understanding to Center | 97 ms | 142 ms |
+| Center to a category (Logistics) | 133 ms | 195 ms |
+| Category to Center | 116 ms | 133 ms |
 
 ### Conversation round trip (51 turns)
 
 | Series | n | p50 | p95 | max |
 |---|---|---|---|---|
-| All turns | 51 | 34 ms | 51 ms | 80 ms |
-| Through the proxy | 39 | 34 ms | 52 ms | 80 ms |
-| Straight to the backend | 12 | 32 ms | 51 ms | 51 ms |
-| Answers (extraction + next question) | 33 | 36 ms | 51 ms | 52 ms |
-| Process questions (no model call) | 18 | 27 ms | 80 ms | 80 ms |
+| All turns | 51 | 32 ms | 53 ms | 89 ms |
+| Through the proxy | 39 | 32 ms | 53 ms | 89 ms |
+| Straight to the backend | 12 | 30 ms | 66 ms | 66 ms |
+| Answers (extraction + next question) | 33 | 35 ms | 53 ms | 66 ms |
+| Process questions (no model call) | 18 | 30 ms | 89 ms | 89 ms |
 
 The proxy adds no measurable time. Model time is zero here (scripted provider).
 
@@ -73,37 +73,37 @@ The proxy adds no measurable time. Model time is zero here (scripted provider).
 
 | Call | p50 | p95 |
 |---|---|---|
-| `GET /center` | 13 ms | 35 ms |
-| `GET /categories/:id` (category switch, data part) | 18 ms | 56 ms |
-| `GET /categories/:id/crp` (CRP view) | 8 ms | 14 ms |
-| `POST .../crp/confirm` | 15 ms | 33 ms |
-| `GET .../preview` (Preview generation) | 11 ms | 18 ms |
-| `POST .../send` (to the simulator, delivered) | 17 ms | 25 ms |
-| `GET /service-map` | 14 ms | 22 ms |
+| `GET /center` | 15 ms | 18 ms |
+| `GET /categories/:id` (category switch, data part) | 20 ms | 27 ms |
+| `GET /categories/:id/crp` (CRP view) | 9 ms | 11 ms |
+| `POST .../crp/confirm` | 16 ms | 21 ms |
+| `GET .../preview` (Preview generation) | 13 ms | 20 ms |
+| `POST .../send` (to the simulator, delivered) | 21 ms | 28 ms |
+| `GET /service-map` | 16 ms | 19 ms |
 
 ### Screens in the browser (desktop, n = 4)
 
 | Screen | p50 | worst |
 |---|---|---|
-| CRP screen from a page load (incl. code, session, chunk) | 276 ms | 352 ms |
-| Preview screen after CRP confirm | 163 ms | 178 ms |
-| Click Send until the Sent screen is visible | 268 ms | 340 ms |
-| Sent to Center | 118 ms | 246 ms |
+| CRP screen from a page load (incl. code, session, chunk) | 281 ms | 368 ms |
+| Preview screen after CRP confirm | 181 ms | 241 ms |
+| Click Send until the Sent screen is visible | 288 ms | 437 ms |
+| Sent to Center | 130 ms | 218 ms |
 
 ## Provider-dependent parts (not measured, stated honestly)
 
 * A free-text answer needs one model call (extraction) and sometimes a second (wording check). With the real model the round trip is the provider's latency, in seconds, not milliseconds. The app already shows honest staged waiting copy and, after 15 s, a "your answer is saved" state (live error suite, `a long wait says the answer is saved`). A budget for the real model has to be measured with the real provider.
-* Deterministic answers (quick replies, confirmation cards, process questions) make no model call: 27 to 36 ms here.
-* Send: the delivery service retries up to 3 times with backoff and reads back after a timeout. With the simulator a normal send is 17 ms; a timeout-after-store case is resolved by the read-back (error suite: one delivery, Sent only after acceptance). Real Operation Hub time and rate limits are not represented.
+* Deterministic answers (quick replies, confirmation cards, process questions) make no model call: 30 to 35 ms here.
+* Send: the delivery service retries up to 3 times with backoff and reads back after a timeout. With the simulator a normal send is 21 ms; a timeout-after-store case is resolved by the read-back (error suite: one delivery, Sent only after acceptance). Real Operation Hub time and rate limits are not represented.
 
 ## Hot spots checked
 
 * Indexes: `fact(project_id)`, `precision_turn(scope...)`, `oh_delivery(project...)`, `precision_access_token(hash, project)` exist; no sequential scan problem seen at about 3,200 facts and 3,900 turns in the QA database.
 * Transactions per request, counted from `pg_stat_database` around one request (includes pool and auth reads): Center 31, category open 23, CRP view 13, Preview 7, process question 15, answer turn 23.
 * Manifest loads: the registry caches the published manifests per version; no repeated manifest load per turn found.
-* Debt (not fixed, MINOR): `GET /center` evaluates each category separately, about 6 to 7 queries per category. With 4 categories that is 13 ms; with the full 17 categories expect roughly 4x the queries. Batch the per-category state loads before a project with many categories goes live.
+* Debt (not fixed, MINOR): `GET /center` evaluates each category separately, about 6 to 7 queries per category. With 4 categories that is 15 ms; with the full 17 categories expect roughly 4x the queries. Batch the per-category state loads before a project with many categories goes live.
 * Rate limiting counters now live in PostgreSQL when only Precision is enabled (see the QA report, defect D-14), one small upsert per authenticated request.
 
 ## Observations on the bundle
 
-First load on a throttled phone is bandwidth bound (about 285 KB, 2.2 s). Screens are code split; the first screen loads only the shell and its own chunk. No change proposed for the Embassy RC.
+First load on a throttled phone is bandwidth bound (about 286 KB, 2.2 s). Screens are code split; the first screen loads only the shell and its own chunk. No change proposed for the release candidate.

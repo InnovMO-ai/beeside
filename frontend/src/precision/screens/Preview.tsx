@@ -21,7 +21,9 @@ function Block({ b }: { b: PreviewBlockDto }) {
   return (
     <section className="pz-pvblock" aria-label={title}>
       <h2 className="pz-h3">{title}</h2>
-      {b.lines.length ? <ul className="pz-bullets">{b.lines.map((l) => <li key={l}>{l}</li>)}</ul> : null}
+      {/* The structured view already carries every line; showing both would print each block twice. */}
+      {!view && b.lines.length ? <ul className="pz-bullets">{b.lines.map((l) => <li key={l}>{l}</li>)}</ul> : null}
+      {!view && b.lines.length === 0 ? <p className="pz-muted">{t("pv.block.empty")}</p> : null}
       {view && "groups" in view ? <ServiceMapBody view={view as ServiceMapViewDto} compact /> : null}
       {view && "sections" in view ? <CrpBody view={view as CrpViewDto} compact /> : null}
     </section>

@@ -111,6 +111,56 @@ test("the real stack opens in a browser: Cover, Center, Understanding, with the 
   void openWithCode;
 });
 
+for (const locale of ["en", "es"] as const) {
+  test(`the real stack carries the whole journey in the browser (${locale}): Cover, Understanding, My Service Map, Logistics, CRP, Preview, Send once, Sent`, async ({ page }, info) => {
+    const { shotDir } = await import("./support/qa");
+    const live = await import("./support/live");
+    const t = live.T[locale];
+    const sc = live.SCRIPT[locale];
+    const problems: string[] = [];
+    page.on("pageerror", (e) => problems.push(e.message));
+    page.on("console", (m) => { if (m.type() === "error" && !/favicon/.test(m.text())) problems.push(m.text()); });
+    const dir = shotDir(info, `real-${locale}`);
+    const shot = async (n: string) => { await page.waitForLoadState("networkidle").catch(() => undefined); await page.waitForTimeout(500); await page.screenshot({ path: `${dir}/real-${n}.png`, fullPage: false }); };
+    const code = codeOf(newLink("start", true));
+    await page.addInitScript((l) => { try { localStorage.setItem("beeside.precision.locale", l); } catch { /* blocked */ } }, locale);
+    await page.goto(`${FRONT}/precision?code=${encodeURIComponent(code)}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(t.coverH1);
+    await shot("01-cover");
+    await page.getByRole("button", { name: t.cont }).or(page.getByRole("link", { name: t.cont })).first().click();
+    await page.getByRole("link", { name: /^(Start|Empezar)/ }).first().click();
+    await expect(page.locator(".pz-confirm")).toBeVisible();
+    await live.say(page, locale === "en" ? "Yes" : "Sí");
+    await live.confirmCard(page, sc.yes);
+    for (const u of sc.understanding) await live.say(page, u);
+    await shot("02-understanding");
+    await page.getByRole("link", { name: t.mapCta }).first().click();
+    await page.getByRole("button", { name: t.confirmMap }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^(Confirm|Confirmar)$/ }).click();
+    await expect(page.getByRole("status").filter({ hasText: t.mapConfirmed }).first()).toBeVisible();
+    await shot("03-map");
+    await page.getByRole("link", { name: /Precision Center/ }).first().click();
+    await page.getByRole("link", { name: /(Start|Empezar): (Logistics|Logística)/ }).click();
+    await live.say(page, locale === "en" ? "What is a CRP and what happens with this?" : "¿Qué es un CRP y qué va a pasar con esto?");
+    await live.say(page, locale === "en" ? "What role does the Sherpa play and when does it appear?" : "¿Qué papel juega el Sherpa y cuándo aparece?");
+    for (const a of sc.logistics) await live.say(page, a);
+    await live.pick(page, sc.unknown);
+    await shot("04-category");
+    await page.getByRole("link", { name: t.reviewSummary }).first().click();
+    await shot("05-crp");
+    await page.getByRole("button", { name: t.confirmCrp }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^(Confirm|Confirmar)$/ }).click();
+    await expect(page.getByText(t.crpConfirmed).first()).toBeVisible();
+    await page.getByRole("link", { name: t.preview }).or(page.getByRole("button", { name: t.preview })).first().click();
+    await shot("06-preview");
+    await page.getByRole("button", { name: t.send }).dblclick();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(t.sentH1, { timeout: 30_000 });
+    await shot("07-sent");
+    expect(live.scanForbidden(await live.pageText(page), { allowSherpa: false })).toEqual([]);
+    expect(problems, "no console or page errors").toEqual([]);
+  });
+}
+
 test("internal status: 404 without the key and with a wrong key; 200 with the key and free of secrets", async () => {
   const keyFile = path.join(RUN, "internal-key");
   const key = fs.readFileSync(keyFile, "utf8").trim();

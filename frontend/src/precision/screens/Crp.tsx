@@ -31,7 +31,7 @@ export function CrpBody({ view, compact }: { view: CrpViewDto; compact?: boolean
   const { t } = useI18n();
   return (
     <div className={`pz-docbody ${compact ? "pz-compact" : ""}`}>
-      {view.context.length ? (
+      {view.context.length && !compact ? (
         <section className="pz-docsec" aria-label={t("crp.context")}>
           <h3 className="pz-h3">{t("crp.context")}</h3>
           <ul className="pz-bullets">{view.context.map((c) => <li key={c}>{c}</li>)}</ul>

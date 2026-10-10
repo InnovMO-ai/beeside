@@ -232,8 +232,7 @@ test.describe("secrets and product hygiene", () => {
       }
     };
     for (const r of roots) walk(path.join(REPO, r));
-    // the one tolerated place is a free-text "note" in the approved-label data file owned by the copy work
-    expect(hits.filter((h) => !h.endsWith("category-labels.json:4"))).toEqual([]);
+    expect(hits).toEqual([]);
   });
 });
 

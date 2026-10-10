@@ -31,6 +31,7 @@ import {
   recordFact,
 } from "../../repository";
 import { createLinkToken, DEFAULT_LINK_TTL_MS } from "../tokens";
+import { appendMapNeeds, type MapNeed } from "../categories";
 import {
   DEMO_COMPANY_NAME,
   DEMO_COMPANY_WEBSITE,
@@ -143,7 +144,8 @@ async function confirmMap(db: Db, projectId: string): Promise<void> {
     categories: DEMO_MAP_CATEGORIES.map((c) => ({ categoryKey: c.categoryKey, needs: c.needs.map((n) => ({ ...n, state: "pending" as const })) })),
     locale: "en",
   });
-  await confirmPrecisionAssessment(db, pa, content);
+  // The same keys a live confirmation stores, so the live view of this project equals its snapshot (no "changes to review").
+  await confirmPrecisionAssessment(db, pa, { ...content, destination_codes: ["MX"] } as typeof content);
 }
 
 async function ensureCategories(db: Db, projectId: string): Promise<Array<{ categoryKey: string; categoryId: string }>> {
@@ -152,6 +154,8 @@ async function ensureCategories(db: Db, projectId: string): Promise<Array<{ cate
     const r = await getOrCreateCategoryAssessment(db, projectId, c.categoryKey, "pa_detected");
     const st = (await db.query<{ lifecycle_status: string }>("SELECT lifecycle_status FROM category_assessment WHERE instance_id = $1", [r.instanceId])).rows[0]!.lifecycle_status;
     if (st === "proposed") await moveCategoryLifecycle(db, r.instanceId, "confirmed");
+    // The needs that put the category on My Service Map, as the First Assessment proposal records them (ids match the snapshot items).
+    await appendMapNeeds(db, projectId, r.instanceId, c.needs.map((n): MapNeed => ({ id: n.id, label: n.label, priority: n.priority, source: "fa" })));
     out.push({ categoryKey: c.categoryKey, categoryId: r.instanceId });
   }
   return out;

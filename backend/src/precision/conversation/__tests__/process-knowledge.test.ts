@@ -356,3 +356,21 @@ describe("unknown and legal process questions", () => {
     expect(r.meta.modelCalls).toBe(0);
   });
 });
+
+describe("a client who does not understand the question gets its reason and the question again", () => {
+  const phrases = {
+    en: ["What do you mean by hazardous?", "I do not understand the question", "Can you explain this question?", "Could you clarify?"],
+    es: ["¿A qué te refieres con peligrosos?", "No entiendo la pregunta", "¿Me puedes explicar esta pregunta?", "¿Puedes aclarar?"],
+  } as const;
+  it.each((["en", "es"] as const).flatMap((l) => phrases[l].map((p) => [l, p] as const)))("%s %j", async (locale, text) => {
+    const w = new World({ surface: "category", locale, facts: { dest_country: { value: ["CL"], answerState: "ANSWERED" } } });
+    await w.open();
+    const before = JSON.stringify(w.facts);
+    const r = await w.say(text);
+    expect(r.meta.turnKind).toBe("process_question");
+    expect(r.meta.topicKeys).toContain("why_this_question");
+    expect(r.factsToWrite).toEqual([]);
+    expect(JSON.stringify(w.facts)).toBe(before);
+    expect(r.meta.modelCalls).toBe(0);
+  });
+});

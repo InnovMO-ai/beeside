@@ -17,6 +17,9 @@ const ZERO_RE = /^(?:cero|0|zero|ninguno|ninguna|none|nada|no tenemos|no tengo)$
 const YES_RE = /^(?:si|sii|claro|correcto|asi es|exacto|efectivamente|por supuesto|yes|yeah|yep|yup|sure|correct|that s right|that is right|right|exactly|of course|affirmative)$/;
 const NO_RE = /^(?:no|nope|nel|para nada|no es asi|no lo es|not really|negative|nah|no gracias|no thanks)$/;
 
+/** A bare "skip": the client moves on without answering. It is a pending answer, never a value ("skip" must not be recorded as a company name). */
+const SKIP_RE = /^(?:(?:please |por favor )?(?:skip(?: it| this| this one| this question| that| for now)?|pass(?: on this)?|next(?: question| one)?|(?:omitir|omite|saltar|salta|saltame|omiteme)(?:la|lo)?(?: esta| esta pregunta| por ahora| por el momento)?|siguiente(?: pregunta)?|la siguiente|pasar(?: a la siguiente)?|paso|prefiero seguir|seguimos|sigamos))$/;
+
 export type AnswerSignal = "UNKNOWN" | "WITHHELD" | null;
 
 function strip(norm: string): string {
@@ -28,6 +31,7 @@ export function detectAnswerSignal(text: string): { signal: AnswerSignal; pure: 
   const norm = normalizeText(text);
   if (WITHHELD_RE.test(norm)) return { signal: "WITHHELD", pure: wordCount(text) <= 10 };
   if (UNKNOWN_RE.test(norm)) return { signal: "UNKNOWN", pure: wordCount(text) <= 10 };
+  if (SKIP_RE.test(strip(norm))) return { signal: "UNKNOWN", pure: true };
   return { signal: null, pure: false };
 }
 

@@ -1,7 +1,7 @@
 {
  "schema": "category-labels.v1",
  "status": "PROVISIONAL_PENDING_CONTENT_APPROVAL",
- "note": "Customer-facing category names and one-line descriptions. Neutral wording drafted for the Embassy Release Candidate; the approved Spanish labels of the 17 categories are a content dependency (Build Readiness K-3 / N-13).",
+ "note": "Customer-facing category names and one-line descriptions. Neutral wording drafted for the release candidate; the approved Spanish labels of the 17 categories are a content dependency (Build Readiness K-3 / N-13).",
  "categories": {
   "corporate_legal_admin": {
    "order": 1,
