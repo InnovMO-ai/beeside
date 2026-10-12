@@ -10,6 +10,8 @@ import type { EntryDto } from "./api/dto";
 import { LinkPage } from "./screens/LinkPages";
 import { LoadErrorPage, NotFoundPage, RevokedPage } from "./screens/SystemPages";
 import "./precision.css";
+import "./workspace.css";
+import "./docs.css";
 
 // Screens are code-split so the first view (Cover or Center) stays light. React.lazy caches a failed import
 // forever, so each screen is wrapped: after a failed load (connection lost, an asset replaced by a new release)
