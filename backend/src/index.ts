@@ -4,7 +4,8 @@ import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
-import { LogEmailTransport } from "./fa/email/email-adapter";
+import { EmailTransport, LogEmailTransport } from "./fa/email/email-adapter";
+import { SmtpEmailTransport, smtpConfigFromEnv } from "./fa/email/smtp-transport";
 import { createFaRouter } from "./fa/routes";
 import { FA4_RATE_LIMITS, Fa4Deps, createFa4Router } from "./fa4/routes";
 import { LegalConfig } from "./fa4/repository";
@@ -117,8 +118,7 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
   const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
   return {
     db,
-    // Internal staging never sends email: it logs (with links, so testers can follow resume / result links) through the log transport.
-    email: new LogEmailTransport(staging || (env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production")),
+    email: fa4EmailTransportFromEnv(env, staging),
     config: {
       appBaseUrl: env.APP_BASE_URL,
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
@@ -126,6 +126,9 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
       emailRecipientDailyQuota: Number(env.FA4_EMAIL_RECIPIENT_DAILY_QUOTA ?? 6),
       resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
+      contactAddress: env.FA4_CONTACT_ADDRESS ?? FA4_CONTACT_ADDRESS,
+      premiumResourceUrl: { es: env.FA4_PREMIUM_RESOURCE_URL_ES || undefined, en: env.FA4_PREMIUM_RESOURCE_URL_EN || undefined },
+      emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
@@ -133,6 +136,26 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
     // Internal staging delivers inline (no worker needed); everywhere else a worker delivers the outbox.
     emailDispatch: staging ? "inline" : "deferred",
   };
+}
+
+/** The single operational mailbox of FA4: sender, Reply-To and the recipient of "Hablar con beeside". */
+export const FA4_CONTACT_ADDRESS = "contact@beeside.you";
+
+/**
+ * FA4_EMAIL_TRANSPORT=log|smtp. Production must use smtp (a log-only transport would report emails as sent that nobody received), so it
+ * refuses to start otherwise. Internal staging defaults to log (links visible to testers) and may be switched to smtp for verification.
+ * SMTP_PASSWORD comes from Secret Manager; it is read here and never logged.
+ */
+export function fa4EmailTransportFromEnv(env: NodeJS.ProcessEnv, staging: boolean): EmailTransport {
+  const mode = env.FA4_EMAIL_TRANSPORT ?? (staging ? "log" : env.NODE_ENV === "production" ? "smtp" : "log");
+  if (mode === "smtp") {
+    const { config, missing } = smtpConfigFromEnv({ ...env, MAIL_FROM: env.MAIL_FROM ?? FA4_CONTACT_ADDRESS, SMTP_USER: env.SMTP_USER ?? FA4_CONTACT_ADDRESS });
+    if (!config) throw new Error(`FA4_EMAIL_TRANSPORT=smtp requires ${missing.join(", ")}`);
+    return new SmtpEmailTransport({ ...config, replyTo: env.MAIL_REPLY_TO ?? FA4_CONTACT_ADDRESS });
+  }
+  if (mode !== "log") throw new Error("FA4_EMAIL_TRANSPORT must be log or smtp");
+  if (env.NODE_ENV === "production" && !staging) throw new Error("FA4_EMAIL_TRANSPORT=log is refused in production: use smtp");
+  return new LogEmailTransport(staging || (env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"));
 }
 
 /**
@@ -152,12 +175,14 @@ export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): bool
  * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
  * is recorded so no environment silently stores a plausible-looking version.
  */
-const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://www.beeside.you/termsandconditions" } as const;
+const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://beeside.you/termsandconditions" } as const;
+/** Canonical Privacy page. Its document VERSION is not supplied: it stays an explicit launch configuration (FA4_PRIVACY_VERSION), never defaulted. */
+const OFFICIAL_PRIVACY_URL = "https://beeside.you/PolíticaPrivacidad";
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
   // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
   // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
   // FA4_TERMS_URL / FA4_PRIVACY_URL set one document for both languages (FA4_*_URL_ES|EN still override per language).
-  const privacyEs = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL; const privacyEn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL;
+  const privacyEs = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL; const privacyEn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL;
   // INTERNAL STAGING only: an explicit, visibly non-legal TEST value is recorded as the acceptance evidence for Privacy.
   if (fa4IsInternalStaging(env) && !env.FA4_PRIVACY_VERSION) {
     const base = (env.APP_BASE_URL ?? "").replace(/\/$/, "");

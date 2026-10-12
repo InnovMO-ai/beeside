@@ -48,18 +48,24 @@ if (require.main === module) {
   // FA Public v1.0 email outbox (own table; same lease / backoff semantics as the legacy outbox). Only when FA4_API_ENABLED=true.
   const fa4 = fa4DepsFromEnv(process.env, deps.db);
   if (fa4) {
+    let fa4Busy = false;   // never overlap two ticks of this process (other processes are safe too: FOR UPDATE SKIP LOCKED + lease)
     const tickFa4 = async () => {
+      if (fa4Busy) return;
+      fa4Busy = true;
       try {
-        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now } });
+        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl } });
         // eslint-disable-next-line no-console
         if (r.sent + r.failed + r.dead > 0) console.log(`[worker] fa4_email_outbox ${JSON.stringify(r)}`);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error(`[worker] fa4_email_outbox crashed: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        fa4Busy = false;
       }
     };
     void tickFa4();
-    timers.push(setInterval(() => void tickFa4(), 30_000));
+    // 5 s: a person is waiting on "Guardar y seguir después" / "Hablar con beeside"; an empty poll is a single indexed query.
+    timers.push(setInterval(() => void tickFa4(), Number(process.env.FA4_WORKER_POLL_MS ?? 5_000)));
   }
   for (const job of Object.keys(DEFAULT_INTERVALS) as JobName[]) {
     void tick(job);

@@ -18,6 +18,8 @@ export interface EmailMessage {
   /** Optional secondary call to action (never the primary one). */
   secondaryCtaLabel?: string;
   secondaryCtaUrl?: string;
+  /** Overrides the transport's default Reply-To (contact messages reply to the person who wrote). */
+  replyTo?: string;
   projectId: string | null;
 }
 

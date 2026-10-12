@@ -141,8 +141,9 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
     it("delivery failures back off, never leak the address, and succeed on retry", async () => {
       const token = await start();
       email.failNext.push(new Error("smtp refused laura@nubia.example"));
-      deps.emailDispatch = "deferred";
-      await api().post("/api/fa4/session/finish-later").set(auth(token));
+      deps.emailDispatch = "deferred"; deps.config.emailConfirmWaitMs = 0;
+      const queued = await api().post("/api/fa4/session/finish-later").set(auth(token));
+      expect(queued.status).toBe(202); expect(queued.body.state).toBe("pending");          // queued is NOT sent
       const emailDeps = { db, email, config: { appBaseUrl: "https://fa.test", resumeLinkDays: 30, now: () => clock.now } };
       expect(await deliverDueFa4Emails(emailDeps)).toEqual({ sent: 0, failed: 1, dead: 0 });
       const row = (await client.query("SELECT status, last_error, attempts, next_attempt_at FROM fa4_email_delivery")).rows[0];
@@ -150,7 +151,7 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
       expect(await deliverDueFa4Emails(emailDeps)).toEqual({ sent: 0, failed: 0, dead: 0 });     // not due yet
       clock.now = new Date(row.next_attempt_at.getTime() + 1000);
       expect(await deliverDueFa4Emails(emailDeps)).toEqual({ sent: 1, failed: 0, dead: 0 });
-      deps.emailDispatch = "inline";
+      deps.emailDispatch = "inline"; delete deps.config.emailConfirmWaitMs;
     });
   });
 

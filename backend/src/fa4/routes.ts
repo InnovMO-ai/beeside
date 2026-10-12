@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
 import {
   answersSchema,
@@ -10,7 +11,10 @@ import { EmailTransport } from "../fa/email/email-adapter";
 import { FaError } from "../fa/services/errors";
 import { looksLikeAccessToken } from "../fa/services/tokens";
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../security/rate-limit";
-import { Fa4EmailDeps, deliverDueFa4Emails, enqueueFa4Email } from "./email";
+import {
+  DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, latestDelivery, retryFa4Delivery, stateOfStatus,
+} from "./email";
+import { parseClientEvent, recordEvent } from "./events";
 import {
   Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeResumeToken, latestResult, loadPublishedCatalog, normalizeEmail,
   projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
@@ -26,6 +30,12 @@ export interface Fa4Deps {
     emailRecipientDailyQuota: number;
     /** Max projects a "resume by email" request sends project-specific links for. */
     resumeProjectsPerRequest: number;
+    /** Operational mailbox for "Hablar con beeside" (contact@beeside.you). */
+    contactAddress?: string;
+    /** Optional secondary CTA of the YEV email (FA4_PREMIUM_RESOURCE_URL_ES|EN). */
+    premiumResourceUrl?: { es?: string; en?: string };
+    /** How long an interactive request waits for the provider's answer before it reports `pending` (the UI then polls). */
+    emailConfirmWaitMs?: number;
     /** Approved Terms / Privacy identifiers recorded as immutable acceptance evidence (LEGAL-1 / CHK-1 pending). */
     legal: LegalConfig;
     /** Overrides of the technical abuse-prevention limits (see FA4_RATE_LIMITS). */
@@ -47,6 +57,10 @@ export const FA4_RATE_LIMITS = {
   linkToken: policy("fa4_link_token_address", 60, 600),
   sessionWrites: policy("fa4_session_writes", 900, 600),
   mail: policy("fa4_mail_session", 6, 600),
+  /** Contact messages reach a human inbox: tighter than the automatic emails. */
+  contact: policy("fa4_contact_session", 4, 600),
+  /** Anonymous event capture (pre-Identity included): generous per address, bounded body. */
+  events: policy("fa4_events_address", 600, 600),
 } as const;
 
 type Handler = (req: Request, res: Response) => Promise<void>;
@@ -67,9 +81,28 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   router.use("/session", rateLimit(limiter, lim('sessionWrites'), bearer));
   router.use("/links", rateLimit(limiter, lim('linkToken')));
 
-  const emailDeps: Fa4EmailDeps = { db: deps.db, email: deps.email, config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now } };
+  const emailDeps: Fa4EmailDeps = {
+    db: deps.db, email: deps.email,
+    config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl },
+  };
   const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };
+
+  const waitMs = deps.config.emailConfirmWaitMs ?? 8000;
+  /**
+   * Reports an email request TRUTHFULLY. `sent` only after the provider accepted the message; `pending` while it is still in flight
+   * (HTTP 202 — the UI polls /session/email-status); `failed` otherwise (HTTP 502). A queued row is never reported as sent.
+   * A repeated request while the delivery is FAILED/DEAD makes exactly one more attempt of the same delivery.
+   */
+  const settle = async (res: Response, deliveryId: string, extra: Record<string, unknown> = {}) => {
+    let status = await deliveryStatus(deps.db, deliveryId);
+    if (status === "FAILED" || status === "DEAD") { await retryFa4Delivery(deps.db, deliveryId, deps.config.now()); status = "FAILED"; }
+    await dispatch();
+    const state: DeliveryState = await awaitDelivery(deps.db, deliveryId, waitMs);
+    if (state === "sent") res.status(200).json({ state, ...extra });
+    else if (state === "pending") res.status(202).json({ state, ...extra });
+    else res.status(502).json({ error: "EMAIL_NOT_SENT", message: "the email could not be sent", details: { state } });
+  };
 
   const handle = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => {
     fn(req, res).catch((error: unknown) => {
@@ -100,6 +133,8 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (missing.length) throw new FaError("INVALID_INPUT", "identity is incomplete", { fields: missing });
     const now = deps.config.now();
     const created = await createProject(deps.db, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : "company", new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000), deps.config.legal);
+    await recordEvent(deps.db, { name: "project_created", source: "server", projectId: created.projectId, locale: a.locale, step: "identity", props: { marketingOptIn: a.identity.marketingConsent === true } });
+    if (a.identity.marketingConsent === true) await recordEvent(deps.db, { name: "marketing_opt_in_changed", source: "server", projectId: created.projectId, locale: a.locale, props: { consented: true } });
     res.status(201).json({ sessionToken: created.sessionToken });
   }));
 
@@ -125,18 +160,32 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     // Email and the two legal acknowledgements are pinned to what was captured at identity: the email can't be swapped silently
     // and acceptance evidence (fa4_legal_acceptance) can't diverge from the stored flags. Name / company / role stay editable.
     const a = { ...parsed.data, identity: { ...parsed.data.identity, email: p.email, termsAccepted: p.answers.identity.termsAccepted, privacyAcknowledged: p.answers.identity.privacyAcknowledged } };
-    await saveProject(deps.db, p.projectId, a, typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey);
+    const step = typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey;
+    await saveProject(deps.db, p.projectId, a, step);
+    const before = await latestMarketingConsent(deps.db, p.projectId);
     await recordMarketingConsent(deps.db, p.projectId, parsed.data.identity.marketingConsent === true, a.locale);   // optional, independent of Terms / Privacy; appends only on change
+    if (step !== p.stepKey) await recordEvent(deps.db, { name: "step_reached", source: "server", projectId: p.projectId, locale: a.locale, step: step.split(":")[0]! });
+    if (before !== (parsed.data.identity.marketingConsent === true)) await recordEvent(deps.db, { name: "marketing_opt_in_changed", source: "server", projectId: p.projectId, locale: a.locale, props: { consented: parsed.data.identity.marketingConsent === true } });
     res.json({ ok: true });
   }));
 
-  // "Guardar y seguir después": a resume link to the email already captured (never asked again).
+  // "Guardar y seguir después": a resume link to the email already captured (never asked again). The answer reflects the real delivery state.
   router.post("/session/finish-later", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
     const p = await session(req);
-    const now = deps.config.now();
-    await enqueueFa4Email(deps.db, p.projectId, "fa4_resume_link", now, emailLimits);
-    await dispatch();
-    res.json({ ok: true, email: maskEmail(p.email) });
+    const r = await enqueueFa4Email(deps.db, p.projectId, "fa4_resume_link", deps.config.now(), emailLimits);
+    if (r.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
+    if (!r.deliveryId) throw new FaError("NOT_FOUND", "no such project");
+    if (r.queued) await recordEvent(deps.db, { name: "resume_email_requested", source: "server", projectId: p.projectId, locale: p.answers.locale });
+    await settle(res, r.deliveryId, { email: maskEmail(p.email) });
+  }));
+
+  // State of the latest email of a kind, for the UI to poll while a send is `pending`.
+  router.get("/session/email-status", handle(async (req, res) => {
+    const p = await session(req);
+    const kind = req.query.kind === "result" ? "fa4_result_link" : req.query.kind === "resume" ? "fa4_resume_link" : null;
+    if (!kind) throw new FaError("INVALID_INPUT", "unknown kind");
+    const d = await latestDelivery(deps.db, p.projectId, kind as Fa4EmailTemplate);
+    res.set("Cache-Control", "no-store").json({ state: d ? stateOfStatus(d.status) : "none" });
   }));
 
   router.get("/session/result", handle(async (req, res) => {
@@ -149,17 +198,56 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   router.post("/session/result", handle(async (req, res) => {
     const p = await session(req);
     if (p.answers.company.hasExistingBusiness === false) throw new FaError("NOT_APPLICABLE", "this First Assessment is for existing businesses");
-    res.json(await deliverResult(deps.db, p.projectId, p.answers, deps.config.now()));
+    const delivered = await deliverResult(deps.db, p.projectId, p.answers, deps.config.now());
+    const m = delivered.model;
+    await recordEvent(deps.db, {
+      name: "result_generated", source: "server", projectId: p.projectId, locale: p.answers.locale, step: "result", catalogVersion: m.catalogVersion,
+      props: {
+        destinations: m.destinations.map((d) => d.destination), destinationCount: m.destinations.length, applies: m.counts.applies, depends: m.counts.depends,
+        shortcut: m.shortcut, activities: [...new Set(p.answers.components.flatMap((c) => c.activities))],
+        noCoverageDestinations: m.destinations.filter((d) => d.countryMessage).map((d) => d.destination),
+      },
+    });
+    res.json(delivered);
   }));
 
   router.post("/session/result/email", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
     const p = await session(req);
     const r = await latestResult(deps.db, p.projectId);
     if (!r) throw new FaError("NOT_FOUND", "no result yet");
-    const now = deps.config.now();
-    await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", now, emailLimits, `${r.resultId}:`);
-    await dispatch();
-    res.json({ ok: true });
+    const q = await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", deps.config.now(), emailLimits, `${r.resultId}:`);
+    if (q.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
+    if (!q.deliveryId) throw new FaError("NOT_FOUND", "no such project");
+    if (q.queued) await recordEvent(deps.db, { name: "yev_email_requested", source: "server", projectId: p.projectId, locale: p.answers.locale });
+    await settle(res, q.deliveryId, { email: maskEmail(p.email) });
+  }));
+
+  // "Hablar con beeside": an operational message to contact@beeside.you. Not marketing (never touches marketingConsent), not a provider
+  // referral, not The Hive. Idempotent per clientRequestId; success is reported only when the mailbox's SMTP server accepted it.
+  router.post("/session/contact", rateLimit(limiter, lim('contact'), bearer), handle(async (req, res) => {
+    const p = await session(req);
+    const b = bodyOf(req);
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const name = str(b.name, 120), company = str(b.company, 160), email = str(b.email, 254), message = str(b.message, 4000);
+    if (!name || !company || !isValidEmail(email) || message.length < 3) throw new FaError("INVALID_INPUT", "the message is incomplete");
+    const clientRequestId = /^[A-Za-z0-9_-]{8,64}$/.test(str(b.clientRequestId, 64)) ? str(b.clientRequestId, 64) : randomUUID();
+    const c = await enqueueContact(deps.db, p.projectId, { name, company, email, message, shareProgress: b.shareProgress === true, clientRequestId }, p.answers.locale, deps.config.now());
+    if (c.created) await recordEvent(deps.db, { name: "contact_submitted", source: "server", projectId: p.projectId, locale: p.answers.locale, props: { shareProgress: b.shareProgress === true } });
+    await settle(res, c.deliveryId, { email: maskEmail(email) });
+  }));
+
+  // Minimal event capture. Anonymous (visit id only) before Identity; project-linked when a valid session header is present. Never fails the UI.
+  router.post("/events", rateLimit(limiter, lim('events')), handle(async (req, res) => {
+    const ev = parseClientEvent(req.body);
+    if (!ev) { res.status(204).end(); return; }
+    const token = bearer(req);
+    const project = token && looksLikeAccessToken(token) ? await projectByToken(deps.db, token, "SESSION", deps.config.now()).catch(() => null) : null;
+    await recordEvent(deps.db, {
+      name: ev.name, source: "client", visitId: ev.visitId, projectId: project?.projectId ?? null, step: ev.step ?? null,
+      locale: project?.answers.locale ?? (typeof ev.props.locale === "string" ? (ev.props.locale as "es" | "en") : null),
+      props: ev.props as Record<string, string>,
+    });
+    res.status(204).end();
   }));
 
   // "Continuar con beeside": explicit request tied to the same email; no marketing consent implied (LEGAL-1 pending).
@@ -168,6 +256,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const r = await latestResult(deps.db, p.projectId);
     if (!r || !r.model.premium.shown) throw new FaError("NOT_APPLICABLE", "no continuation is offered for this result");
     await requestContinuation(deps.db, p.projectId, r.resultId);
+    await recordEvent(deps.db, { name: "premium_continuation_requested", source: "server", projectId: p.projectId, locale: p.answers.locale, catalogVersion: r.model.catalogVersion });
     res.json({ ok: true });
   }));
 
@@ -178,6 +267,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const now = deps.config.now();
     const exchanged = looksLikeAccessToken(raw) ? await exchangeResumeToken(deps.db, raw, now, new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000)) : null;
     if (!exchanged) throw new FaError("NOT_FOUND", "this link is not valid or has expired");
+    await recordEvent(deps.db, { name: "resume_link_used", source: "server", projectId: exchanged.projectId });
     res.json({ sessionToken: exchanged.sessionToken });
   }));
 
