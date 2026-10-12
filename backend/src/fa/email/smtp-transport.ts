@@ -1,6 +1,6 @@
 import nodemailer, { Transporter } from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { EmailMessage, EmailSendOptions, EmailTransport } from "./email-adapter";
+import { EmailMessage, EmailSendOptions, EmailTransport, maskEmail } from "./email-adapter";
 
 /**
  * Real SMTP delivery behind the same EmailTransport contract. It sends only when the SMTP server ACCEPTED the message for every recipient;
@@ -28,10 +28,11 @@ export function renderBodies(m: EmailMessage): { text: string; html: string } {
 export class SmtpEmailTransport implements EmailTransport {
   readonly name = "smtp";
   private readonly transporter: Transporter;
-  constructor(private readonly config: SmtpConfig, transporter?: Transporter) {
+  constructor(private readonly config: SmtpConfig, transporter?: Transporter, private readonly log: (line: string) => void = console.log) {
     this.transporter = transporter ?? nodemailer.createTransport({
       host: config.host, port: config.port, secure: config.secure,
       auth: { user: config.user, pass: config.password },
+      requireTLS: !config.secure,   // port 587: STARTTLS is mandatory, never a plaintext fallback
       connectionTimeout: config.connectionTimeoutMs ?? 10_000, greetingTimeout: 10_000, socketTimeout: config.sendTimeoutMs ?? 20_000,
       // a per-message connection keeps a failing/slow server from wedging later sends; volume here is tiny
       pool: false,
@@ -52,6 +53,8 @@ export class SmtpEmailTransport implements EmailTransport {
     });
     if (info.rejected && info.rejected.length > 0) throw new Error("SMTP_RECIPIENT_REJECTED");
     if (!info.accepted || info.accepted.length === 0) throw new Error("SMTP_NOT_ACCEPTED");
+    // metadata only: masked recipient, template, delivery id — never the link, the body or any credential
+    this.log(`[email:smtp] template=${message.template} to=${maskEmail(message.to)} delivery=${options?.idempotencyKey ?? "-"} accepted=${info.accepted.length}`);
     return { providerReference: typeof info.messageId === "string" ? info.messageId.slice(0, 200) : null };
   }
 }
