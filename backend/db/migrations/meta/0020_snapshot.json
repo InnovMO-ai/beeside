@@ -1,6 +1,6 @@
 {
-  "id": "9ee1dc60-e4c9-4d39-bad0-d90f10f39891",
-  "prevId": "7ed87af7-c223-40c7-85db-9b8ff425dd2f",
+  "id": "be14a317-0c9d-4355-bb7d-a114d7356403",
+  "prevId": "f643e59c-d1d8-4623-acfd-9417bb72fc9d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6204,7 +6204,7 @@
           "name": "project_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "name": {
           "name": "name",
@@ -6282,12 +6282,6 @@
         "fa4_contact_request_idem_unique": {
           "name": "fa4_contact_request_idem_unique",
           "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "client_request_id",
               "isExpression": false,
@@ -6641,7 +6635,7 @@
           "name": "project_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "template": {
           "name": "template",

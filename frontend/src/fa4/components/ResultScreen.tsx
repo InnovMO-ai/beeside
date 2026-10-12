@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import type { ReactNode } from 'react';
 import type { YourExpansionViewModel } from '@beeside/fa-public-engine';
@@ -12,8 +13,11 @@ export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRes
   model: YourExpansionViewModel; locale: Locale; onEdit?: () => void; email?: string; actions?: ReactNode;
   onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean>; onRestart?: () => void;
 }) {
+  // The result is ready: announce it politely and move focus to its title (screen-reader and keyboard users do not lose their place).
+  useEffect(() => { const h = document.getElementById('yev-title'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } }, [model]);
   return (
     <div data-testid="result-screen" className="result">
+      <p className="sr-only" role="status" aria-live="polite">{UI.ready[locale]}</p>
       {actions && <div className="res-actions">{actions}</div>}
       <YourExpansionView model={model} locale={locale} onEdit={onEdit} />
       <BeesideValueSection locale={locale} />

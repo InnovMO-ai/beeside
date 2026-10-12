@@ -15,27 +15,27 @@ export const HELP_URL: Record<Locale, string> = {
 };
 
 export interface ContactPrefill { name: string; company: string; email: string }
-export type ContactSend = (p: ContactPrefill & { message: string; shareProgress: boolean }) => Promise<boolean>;
+export type ContactSend = (p: ContactPrefill & { message: string; shareProgress: boolean; clientRequestId: string }) => Promise<boolean>;
 
 const HelpIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" /><path d="M12 17h.01" /></svg>;
 const TalkIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 5h16v11H9l-5 4z" /></svg>;
 const Ext = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5" /></svg>;
 
 /** Top-bar actions. Desktop: three text actions. Phone: Save stays visible; Help + Talk sit behind one compact "?" button. */
-export function TopActions({ locale, onSave, prefill, onSend, saveSlot = true }: { locale: Locale; onSave?: () => void; prefill: ContactPrefill; onSend?: ContactSend; saveSlot?: boolean }) {
+export function TopActions({ locale, onSave, prefill, onSend, saveSlot = true, onHelp, onOpenContact }: { locale: Locale; onSave?: () => void; prefill: ContactPrefill; onSend?: ContactSend; saveSlot?: boolean; onHelp?: () => void; onOpenContact?: () => void }) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   return (
     <div className="top-actions">
-      <a className="ta-link ta-wide" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer"><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
-      <button type="button" className="ta-link ta-wide" onClick={() => setOpen(true)}><TalkIcon />{UI.talk[locale]}</button>
+      <a className="ta-link ta-wide" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={onHelp}><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
+      <button type="button" className="ta-link ta-wide" onClick={() => { setOpen(true); onOpenContact?.(); }}><TalkIcon />{UI.talk[locale]}</button>
       {saveSlot && onSave && <button type="button" className="linkbtn ta-save" onClick={onSave}>{UI.saveLater[locale]}</button>}
       <div className="ta-narrow">
         <button type="button" className="ta-icon" aria-expanded={menu} aria-label={UI.menu[locale]} onClick={() => setMenu((x) => !x)}><HelpIcon /></button>
         {menu && (
           <div className="ta-menu" role="menu">
-            <a role="menuitem" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)}><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
-            <button role="menuitem" type="button" onClick={() => { setMenu(false); setOpen(true); }}><TalkIcon />{UI.talk[locale]}</button>
+            <a role="menuitem" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={() => { setMenu(false); onHelp?.(); }}><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
+            <button role="menuitem" type="button" onClick={() => { setMenu(false); setOpen(true); onOpenContact?.(); }}><TalkIcon />{UI.talk[locale]}</button>
           </div>
         )}
       </div>
@@ -48,9 +48,13 @@ export function ContactDialog({ locale, prefill, onSend, onClose, initial = 'idl
   const [f, setF] = useState(prefill); const [msg, setMsg] = useState(''); const [share, setShare] = useState(false);
   const [st, setSt] = useState(initial);
   const ref = useRef<HTMLDialogElement>(null); const tid = useId();
+  const requestId = useRef(`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);   // same form → same id: a retry / double click is idempotent
   useEffect(() => { const d = ref.current; if (d && !d.open) d.showModal?.(); }, []);
-  const ok = f.name.trim() && f.email.includes('@') && msg.trim();
-  async function send() { setSt('busy'); setSt((await onSend?.({ ...f, message: msg, shareProgress: share })) ? 'sent' : 'error'); }
+  const ok = f.name.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim()) && msg.trim().length >= 3;
+  async function send() {
+    if (st === 'busy') return;   // duplicate clicks while a send is in flight do nothing
+    setSt('busy'); setSt((await onSend?.({ ...f, message: msg, shareProgress: share, clientRequestId: requestId.current })) ? 'sent' : 'error');
+  }
   return (
     <dialog ref={ref} className="sheet" aria-labelledby={tid} onClose={onClose} onCancel={onClose}>
       <div className="sheet-head"><h2 id={tid}>{UI.talkTitle[locale]}</h2><button type="button" className="ta-icon" aria-label={UI.close[locale]} onClick={onClose}>×</button></div>

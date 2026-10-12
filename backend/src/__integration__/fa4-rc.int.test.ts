@@ -177,6 +177,17 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       expect((await api().post("/api/fa4/session/contact").send(body)).status).toBe(401);
     });
 
+    it("is also available BEFORE Identity (cover): anonymous, no project, no progress even if asked", async () => {
+      const r = await api().post("/api/fa4/contact").send({ ...body, company: "", shareProgress: true, clientRequestId: "req-anon-0001" });
+      expect(r.status).toBe(200); expect(r.body.state).toBe("sent");
+      const m = email.messages.at(-1)!;
+      expect(m.to).toBe("contact@beeside.you"); expect(m.replyTo).toBe("lucia@nortica.example"); expect(m.body).not.toContain("Avance compartido"); expect(m.projectId).toBeNull();
+      expect((await client.query("SELECT project_id FROM fa4_contact_request")).rows[0].project_id).toBeNull();
+      email.failNext.push(new Error("down"));
+      expect((await api().post("/api/fa4/contact").send({ ...body, clientRequestId: "req-anon-0002" })).status).toBe(502);
+      expect((await api().post("/api/fa4/contact").send({ ...body, email: "bad", clientRequestId: "req-anon-0003" })).status).toBe(400);
+    });
+
     it("header injection in the name cannot add headers or recipients", async () => {
       const t = await start();
       await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, name: "Eve\r\nBcc: attacker@evil.example", clientRequestId: "req-0003-abcd" });

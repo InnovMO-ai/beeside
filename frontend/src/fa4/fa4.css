@@ -437,3 +437,8 @@ details.conditions summary:hover { color: var(--purple); }
 .toast { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 .toast.err { background: #fff; color: var(--ink); border: 1.5px solid #b42318; }
 .toast-btn { flex: none; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--purple); background: #fff; color: var(--purple); font: inherit; font-weight: 600; cursor: pointer; }
+
+/* ---- Presentation RC: recovery states ---- */
+.fa4 .offline-banner { position: sticky; top: 0; z-index: 60; background: #fff7e0; color: #5a4100; border-bottom: 1px solid #e8c766; padding: 10px 16px; font-size: 14px; text-align: center; }
+.fa4 .recovery-form { max-width: 440px; margin-top: 16px; }
+.fa4 .state.err { border: 1px solid #b3261e; background: #fdecea; color: #7a1712; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }

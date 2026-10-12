@@ -13,6 +13,9 @@ REVOKE UPDATE ON fa4_event FROM beeside_runtime_role;
 ALTER TABLE fa4_email_delivery ADD CONSTRAINT fa4_email_delivery_contact_ref
   CHECK ((template = 'fa4_contact_request') = (contact_request_id IS NOT NULL));
 --> statement-breakpoint
+ALTER TABLE fa4_email_delivery ADD CONSTRAINT fa4_email_delivery_project_ref
+  CHECK (template = 'fa4_contact_request' OR project_id IS NOT NULL);
+--> statement-breakpoint
 ALTER TABLE fa4_email_delivery ADD CONSTRAINT fa4_email_delivery_contact_fk
   FOREIGN KEY (contact_request_id) REFERENCES fa4_contact_request(contact_id);
 --> statement-breakpoint

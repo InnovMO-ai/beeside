@@ -11,12 +11,12 @@ const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const rows = [];
 const add = (id, ok, detail) => rows.push({ id, ok, detail });
 
-// CHK-1 — Terms (official defaults exist) and Privacy (must be provided)
-add('CHK-1 Terms', true, `version ${env.FA4_TERMS_VERSION ?? '1.0-2026-08-27 (default)'} · ${env.FA4_TERMS_URL ?? env.FA4_TERMS_URL_ES ?? 'https://www.beeside.you/termsandconditions (default)'}`);
-const pv = env.FA4_PRIVACY_VERSION, pe = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL, pn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL;
-add('CHK-1 Privacy (backend evidence)', !!(pv && pe && pn), pv && pe && pn ? `version ${pv} · ${pe}` : 'FA4_PRIVACY_VERSION and FA4_PRIVACY_URL (or _ES/_EN) not set');
-const fe = env.VITE_FA4_PRIVACY_URL_ES ?? env.VITE_FA4_PRIVACY_URL, fn = env.VITE_FA4_PRIVACY_URL_EN ?? env.VITE_FA4_PRIVACY_URL;
-add('CHK-1 Privacy (frontend link)', !!(fe && fn), fe && fn ? fe : 'VITE_FA4_PRIVACY_URL (or _ES/_EN) not set — the build would link a placeholder');
+// CHK-1 — Terms and Privacy URLs are canonical defaults; the Privacy document VERSION is not supplied and must be configured (external dependency)
+add('CHK-1 Terms', true, `version ${env.FA4_TERMS_VERSION ?? '1.0-2026-08-27 (default)'} · ${env.FA4_TERMS_URL ?? env.FA4_TERMS_URL_ES ?? 'https://beeside.you/termsandconditions (default)'}`);
+const pv = env.FA4_PRIVACY_VERSION;
+add('CHK-1 Privacy URL', true, `${env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? 'https://beeside.you/PolíticaPrivacidad (default)'}`);
+add('CHK-1 Privacy VERSION (EXTERNAL)', !!pv, pv ? `version ${pv}` : 'FA4_PRIVACY_VERSION not set — the document version/date has not been supplied; production refuses to start without it');
+add('CHK-2 Help Center', true, `${env.VITE_FA4_HELP_URL_ES ?? 'https://beeside.you/HelpCenter (default)'}`);
 
 // BRAND — assets still null/placeholder in brand.ts
 const brand = read('frontend/src/fa4/brand.ts');
@@ -29,8 +29,11 @@ const inv = read('docs/fa4/COPY_INVENTORY.md');
 const n = (inv.match(/^\| `/gm) || []).length;
 add('LEGAL-1 / blocked copy', n === 0, `${n} NEEDS_CANONICAL_COPY entr${n === 1 ? 'y' : 'ies'} (docs/fa4/COPY_INVENTORY.md)`);
 
-// Email provider
-add('Email provider', !!env.FA4_EMAIL_PROVIDER_CONFIGURED, env.FA4_EMAIL_PROVIDER_CONFIGURED ? 'configured' : 'no provider behind EmailTransport (logs/captures only)');
+// Email: real SMTP behind EmailTransport; contact@beeside.you is sender, Reply-To and contact recipient
+const smtpOk = env.FA4_EMAIL_TRANSPORT === 'smtp' && !!env.SMTP_HOST && !!env.SMTP_PASSWORD;
+add('Email transport (SMTP)', smtpOk, smtpOk ? `smtp · from ${env.MAIL_FROM ?? 'contact@beeside.you'} · reply-to ${env.MAIL_REPLY_TO ?? 'contact@beeside.you'}` : 'FA4_EMAIL_TRANSPORT=smtp, SMTP_HOST and SMTP_PASSWORD (Secret Manager) not all set — production refuses log-only email');
+add('Email worker', !!env.FA4_WORKER_CONFIRMED, env.FA4_WORKER_CONFIRMED ? 'FA4 outbox worker deployed (npm run start:fa4-worker)' : 'deploy the FA4 outbox worker (node dist/fa4/worker.js) — set FA4_WORKER_CONFIRMED=true once running');
+add('Premium resource URL (optional)', true, env.FA4_PREMIUM_RESOURCE_URL_ES || env.FA4_PREMIUM_RESOURCE_URL_EN ? 'configured' : 'not configured — the YEV email omits the secondary link (not a blocker)');
 
 const w = Math.max(...rows.map((r) => r.id.length));
 for (const r of rows) console.log(`${r.ok === true ? 'READY  ' : r.ok === 'partial' ? 'PARTIAL' : 'PENDING'}  ${r.id.padEnd(w)}  ${r.detail}`);

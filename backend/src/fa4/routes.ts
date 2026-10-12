@@ -224,17 +224,22 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   // "Hablar con beeside": an operational message to contact@beeside.you. Not marketing (never touches marketingConsent), not a provider
   // referral, not The Hive. Idempotent per clientRequestId; success is reported only when the mailbox's SMTP server accepted it.
-  router.post("/session/contact", rateLimit(limiter, lim('contact'), bearer), handle(async (req, res) => {
-    const p = await session(req);
+  // Available with a working session (can attach the progress, only when ticked) and before Identity (cover): anonymous, no progress.
+  const contact = (withSession: boolean): Handler => async (req, res) => {
+    const p = withSession ? await session(req) : null;
     const b = bodyOf(req);
     const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
     const name = str(b.name, 120), company = str(b.company, 160), email = str(b.email, 254), message = str(b.message, 4000);
-    if (!name || !company || !isValidEmail(email) || message.length < 3) throw new FaError("INVALID_INPUT", "the message is incomplete");
+    if (!name || !isValidEmail(email) || message.length < 3 || (withSession && !company)) throw new FaError("INVALID_INPUT", "the message is incomplete");
     const clientRequestId = /^[A-Za-z0-9_-]{8,64}$/.test(str(b.clientRequestId, 64)) ? str(b.clientRequestId, 64) : randomUUID();
-    const c = await enqueueContact(deps.db, p.projectId, { name, company, email, message, shareProgress: b.shareProgress === true, clientRequestId }, p.answers.locale, deps.config.now());
-    if (c.created) await recordEvent(deps.db, { name: "contact_submitted", source: "server", projectId: p.projectId, locale: p.answers.locale, props: { shareProgress: b.shareProgress === true } });
+    const share = withSession && b.shareProgress === true;
+    const locale = p?.answers.locale ?? (b.locale === "en" ? "en" : "es");
+    const c = await enqueueContact(deps.db, p?.projectId ?? null, { name, company, email, message, shareProgress: share, clientRequestId }, locale, deps.config.now());
+    if (c.created) await recordEvent(deps.db, { name: "contact_submitted", source: "server", projectId: p?.projectId ?? null, locale, props: { shareProgress: share, anonymous: !p } });
     await settle(res, c.deliveryId, { email: maskEmail(email) });
-  }));
+  };
+  router.post("/session/contact", rateLimit(limiter, lim('contact'), bearer), handle(contact(true)));
+  router.post("/contact", rateLimit(limiter, lim('contact')), handle(contact(false)));
 
   // Minimal event capture. Anonymous (visit id only) before Identity; project-linked when a valid session header is present. Never fails the UI.
   router.post("/events", rateLimit(limiter, lim('events')), handle(async (req, res) => {

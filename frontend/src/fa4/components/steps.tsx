@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { proxyFor } from "@beeside/fa-public-engine";
-import type { Answers, ProjectComponent, ScaleProxy } from '@beeside/fa-public-engine';
-import { frontKey, OPEN_DEST } from '@beeside/fa-public-engine';
+import type { Answers, ProjectComponent } from '@beeside/fa-public-engine';
+import { frontKey, OPEN_DEST, proxyFor } from '@beeside/fa-public-engine';
 import type { Activity, ClientResolution, FrontKey, Locale, PublicCatalog } from '@beeside/fa-public-engine';
 import { BRAND } from '../brand';
 import { activatorFields, isValidEmail } from '@beeside/fa-public-engine';

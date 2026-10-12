@@ -149,7 +149,8 @@ export const fa4EmailDelivery = pgTable(
   {
     deliveryId: uuid("delivery_id").primaryKey().default(sql`gen_random_uuid()`),
     dedupeKey: text("dedupe_key").notNull(),
-    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    /** Null only for a contact message written before Identity. */
+    projectId: uuid("project_id").references(() => fa4Project.projectId),
     template: text("template").notNull(),
     status: text("status").notNull().default("PENDING"),
     attempts: integer("attempts").notNull().default(0),
@@ -252,7 +253,8 @@ export const fa4ContactRequest = pgTable(
   "fa4_contact_request",
   {
     contactId: uuid("contact_id").primaryKey().default(sql`gen_random_uuid()`),
-    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    /** Null when the message is written before Identity (the cover offers "Hablar con beeside" too). */
+    projectId: uuid("project_id").references(() => fa4Project.projectId),
     name: text("name").notNull(),
     company: text("company").notNull(),
     email: text("email").notNull(),
@@ -265,7 +267,7 @@ export const fa4ContactRequest = pgTable(
   },
   (t) => [
     index("fa4_contact_request_project_idx").on(t.projectId, t.createdAt),
-    uniqueIndex("fa4_contact_request_idem_unique").on(t.projectId, t.clientRequestId),
+    uniqueIndex("fa4_contact_request_idem_unique").on(t.clientRequestId),
     check("fa4_contact_request_language", sql`${t.language} IN ('es','en')`),
   ],
 );

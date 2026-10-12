@@ -24,7 +24,7 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
     if (url === "/api/fa4/session/resolution") return json(clientResolution((c.body as { answers: never }).answers, SEED_CATALOG));
     if (url === "/api/fa4/sessions") return json({ sessionToken: "S".repeat(43) }, 201);
     if (url === "/api/fa4/session" && c.method === "PUT") return json({ ok: true });
-    if (url === "/api/fa4/session/finish-later") return json({ ok: true, email: "l***@nubia.example" });
+    if (url === "/api/fa4/session/finish-later") return json({ state: "sent", email: "l***@nubia.example" });
     return json({ error: "NOT_FOUND" }, 404);
   }));
   return calls;
@@ -81,11 +81,37 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(window.location.hash).toBe("");
   });
 
-  it("an invalid or expired link falls back to the cover without leaking the token", async () => {
+  it("an invalid or expired link shows the calm recovery screen (no raw error), drops the token, and offers a new link / a fresh start", async () => {
     window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
-    mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : null));
+    const calls = mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : c.url === "/api/fa4/links/request" ? json({ ok: true }) : null));
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Comienza tu evaluación" });
+    await screen.findByRole("heading", { name: "Este enlace ya no es válido" });
+    expect(window.location.hash).toBe("");
+    expect(document.body.textContent).not.toMatch(/NOT_FOUND|404|undefined/);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Correo de trabajo"), "ana@acme.example");
+    await user.click(screen.getByRole("button", { name: "Enviarme un enlace nuevo" }));
+    await screen.findByText(/recibirás un enlace nuevo/);
+    expect(calls.find((c) => c.url === "/api/fa4/links/request")!.body).toEqual({ email: "ana@acme.example" });
+    await user.click(screen.queryByRole("button", { name: "Empezar uno nuevo" }) ?? document.body);   // hidden once requested: nothing breaks
+  });
+
+  it("Queued ≠ sent: 'save and continue later' says sent only on confirmation; a failure offers retry and never claims delivery", async () => {
+    const a = journeyA("es");
+    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43));
+    let fail = true;
+    mockApi((c) => {
+      if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "extra", status: "IN_PROGRESS" });
+      if (c.url === "/api/fa4/session/finish-later") { if (fail) { fail = false; return json({ error: "EMAIL_NOT_SENT" }, 502); } return json({ state: "sent", email: "l***@nubia.example" }); }
+      return null;
+    });
+    render(<Fa4App />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Guardar y seguir después" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("no pudimos enviarte el enlace"); expect(document.body.textContent).not.toMatch(/Te enviamos a/);
+    await user.click(screen.getByRole("button", { name: "Intentar de nuevo" }));
+    await screen.findByText(/Te enviamos a l\*\*\*@nubia\.example/);
   });
 
   it("generates the result through the API and renders the three components; 'save for later' uses the stored email", async () => {

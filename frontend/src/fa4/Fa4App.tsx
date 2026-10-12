@@ -3,7 +3,7 @@ import {
   buildFlow, emptyAnswers, isStepComplete, nextStep, prevStep, STAGE_OF, stepKey, syncComponents,
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
 } from '@beeside/fa-public-engine';
-import { api, ApiError, sessionStore } from './api';
+import { api, ApiError, confirmSend, sessionStore, track } from './api';
 import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
 import { Logo } from './components/Logo';
@@ -11,6 +11,7 @@ import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
 import { TopActions } from './components/HelpContact';
+import { RecoveryScreen } from './components/Recovery';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
@@ -36,10 +37,18 @@ export function Fa4App() {
   const [booting, setBooting] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [recovery, setRecovery] = useState<null | 'link' | 'stale'>(null);   // invalid / used / expired link · working session lost
+  const [resolveFailed, setResolveFailed] = useState(false);
+  const online = useOnline();
+  const [resolveTick, setResolveTick] = useState(0);
   const desktop = useDesktop();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locale = a.locale;
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);   // <html lang> follows the language chosen on the cover (a11y)
+
+  // launch-day capture (anonymous before Identity; see docs/fa4/ANALYTICS_EVENTS.md). Never blocks the UI.
+  useEffect(() => { track('visit'); }, []);
+  useEffect(() => { if (!booting && !recovery) track('step_viewed', { step: step.id }); }, [step.id, booting, recovery]);
 
   // boot: catalog + resume (emailed link fragment, or this tab's working session)
   useEffect(() => {
@@ -52,20 +61,27 @@ export function Fa4App() {
       const link = linkFromLocation();
       try {
         if (link) {
-          const { sessionToken } = await api.exchangeLink(link.token);
-          sessionStore.set(sessionToken);
+          let exchanged: { sessionToken: string };
+          try { exchanged = await api.exchangeLink(link.token); } catch (e) {
+            // used, expired or unknown link: one generic screen, nothing about which (no enumeration); the fragment is dropped either way
+            window.history.replaceState({}, '', window.location.pathname);
+            if (e instanceof ApiError && e.status < 500) { if (alive) { setRecovery('link'); setBooting(false); } return; }
+            throw e;
+          }
+          sessionStore.set(exchanged.sessionToken);
           window.history.replaceState({}, '', window.location.pathname);
         }
         if (sessionStore.get()) {
           const s = await api.session();
           if (!alive) return;
           setA(s.answers); setHasSession(true);
+          if (link) setToast(UI.resumed[s.answers.locale]);
           if (link?.view === 'result' || s.step === 'result') {
             try { const r = await api.latestResult(); setModel(r.model); setStep({ id: 'result' }); } catch { setStep({ id: 'extra' }); }
           } else setStep(parseKey(s.step === 'cover' || s.step === 'identity' ? 'company' : s.step));
         }
       } catch (e) {
-        if (e instanceof ApiError && (e.status === 401 || e.status === 404)) sessionStore.clear();
+        if (e instanceof ApiError && (e.status === 401 || e.status === 404)) { sessionStore.clear(); if (!link) setRecovery('stale'); }
       }
       if (alive) setBooting(false);
     })().catch(() => setBooting(false));
@@ -81,7 +97,7 @@ export function Fa4App() {
   useEffect(() => {
     if (!hasSession || step.id === 'result') return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { api.save(a, stepKey(step)).catch(() => setToast(UI.saveError[locale])); }, 500);
+    saveTimer.current = setTimeout(() => { api.save(a, stepKey(step)).catch((e) => { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setToast(UI.saveError[locale]); }); }, 500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [a, step, hasSession, locale]);
 
@@ -91,9 +107,9 @@ export function Fa4App() {
   useEffect(() => {
     if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company', 'exit'].includes(step.id)) return;
     const seq = ++resSeq.current;
-    const t = setTimeout(() => { api.resolution(a).then((r) => { if (seq === resSeq.current) setRes(r); }).catch(() => undefined); }, 200);
+    const t = setTimeout(() => { api.resolution(a).then((r) => { if (seq === resSeq.current) { setRes(r); setResolveFailed(false); } }).catch((e) => { if (seq !== resSeq.current) return; if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); }); }, 200);
     return () => clearTimeout(t);
-  }, [a, hasSession, step.id]);
+  }, [a, hasSession, step.id, resolveTick]);
   const flow = useMemo<FlowContext>(() => ({ cargoRouteDestinations: res.cargoRouteDestinations }), [res]);
   const ctx = useMemo<S.StepCtx | null>(() => (catalog ? { a, set, locale, catalog, res, goTo } : null), [a, set, locale, catalog, res, goTo]);
 
@@ -110,7 +126,7 @@ export function Fa4App() {
     setBusy(true); setStep({ id: 'result' }); setModel(null);
     try {
       await api.save(a, 'result');
-      setModel((await api.generateResult()).model);
+      setModel((await api.generateResult()).model); track('result_viewed');
     } catch { setToast(UI.resultError[locale]); } finally { setBusy(false); }
   }
 
@@ -131,31 +147,49 @@ export function Fa4App() {
     setToastRetry(null); setToast(UI.linkSending[locale]);
     try { await api.save(a, stepKey(step)); } catch { setToast(UI.saveError[locale]); setToastRetry(() => saveLater); return; }
     try {
-      const r = await api.finishLater();
-      setToast(fill(UI.savedOk, locale, { email: r.email }));
-    } catch { setToast(UI.linkFailed[locale]); setToastRetry(() => saveLater); }
+      const r = await confirmSend(api.finishLater(), 'resume');       // "sent" only once the mail server accepted it
+      setToast(fill(UI.savedOk, locale, { email: r.email ?? a.identity.email }));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) { setRecovery('stale'); return; }
+      setToast(UI.linkFailed[locale]); setToastRetry(() => saveLater);
+    }
   }
-  const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch { return false; } };
-  const safelyP = <P,>(fn: (p: P) => Promise<unknown>) => async (p: P) => { try { await fn(p); return true; } catch { return false; } };
+  const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); return false; } };
+  const sendResultEmail = safely(() => confirmSend(api.emailResult(), 'result'));
+  // contact: pending after the server's wait is reported as "not confirmed" (the same form can be sent again: it is idempotent)
+  const sendContact = async (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }) => {
+    try { await confirmSend(api.contact(p), null); return true; } catch { return false; }
+  };
 
+  if (recovery) {
+    return (
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
+        <div className="topbar"><Logo /></div>
+        <RecoveryScreen kind={recovery} locale={locale} onNew={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); setRecovery(null); setBooting(false); }} />
+      </div></div>
+    );
+  }
   if (catalogError && !catalog) {
     return (
-      <div className="fa4"><EnvRibbon /><div className="shell" lang={locale}><main className="main" role="alert">
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}><main className="main" role="alert">
         <h1 className="h1">{UI.catalogErrorTitle[locale]}</h1><p className="lead">{UI.catalogErrorBody[locale]}</p>
         <button className="btn primary" style={{ flex: 'none' }} onClick={() => { setBooting(true); setAttempt((n) => n + 1); }}>{UI.retry[locale]}</button>
       </main></div></div>
     );
   }
-  if (booting || !catalog || !ctx) return <div className="fa4"><EnvRibbon /><div className="shell"><main className="main" aria-busy="true"><p className="hint">…</p></main></div></div>;
+  if (booting || !catalog || !ctx) return <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell"><main className="main" aria-busy="true"><p className="hint">…</p></main></div></div>;
 
   if (step.id === 'result') {
     return (
-      <div className="fa4"><EnvRibbon /><div className="shell" lang={locale}>
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
         {!model
-          ? <main className="main" aria-live="polite"><p>{busy ? UI.generating[locale] : UI.resultError[locale]}</p>{!busy && <button className="btn" onClick={generate}>{UI.next[locale]}</button>}</main>
+          ? <main className="main" aria-live="polite" role={busy ? 'status' : 'alert'}>
+              {busy ? <p>{UI.generating[locale]}</p> : <><h1 className="h1">{UI.resolveErrorTitle[locale]}</h1><p className="lead">{UI.resolveErrorBody[locale]}</p>
+                <div className="sheet-actions"><button className="btn" onClick={() => setStep({ id: 'extra' })}>{UI.back[locale]}</button><button className="btn primary" onClick={generate}>{UI.tryAgain[locale]}</button></div></>}
+            </main>
           : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'reflection' })}
-              onContinue={safely(api.continueWithBeeside)} onEmail={safely(api.emailResult)} email={a.identity.email}
-              actions={<TopActions locale={locale} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={safelyP(api.contact)} saveSlot={false} />}
+              onContinue={safely(api.continueWithBeeside)} onEmail={sendResultEmail} email={a.identity.email}
+              actions={<TopActions locale={locale} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} saveSlot={false} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
@@ -164,8 +198,8 @@ export function Fa4App() {
 
   if (step.id === 'cover') {
     return (
-      <div className="fa4"><EnvRibbon /><CoverScreen locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })}
-        actions={<TopActions locale={locale} prefill={{ name: '', company: '', email: '' }} onSend={safelyP(api.contact)} saveSlot={false} />} /></div>
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<CoverScreen locale={locale} setLocale={(l: Locale) => { track('language_selected', { props: { locale: l } }); setA((x) => ({ ...x, locale: l })); }} onStart={() => { track('start_clicked'); setStep({ id: 'identity' }); }}
+        actions={<TopActions locale={locale} prefill={{ name: '', company: '', email: '' }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} saveSlot={false} />} /></div>
     );
   }
 
@@ -176,8 +210,8 @@ export function Fa4App() {
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
 
   return (
-    <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
-      <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={safelyP(api.contact)} /></div>
+    <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
+      <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} /></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
           <ol>{UI.stages.map((_, i) => <li key={i} className={i + 1 < stage ? 'done' : i + 1 === stage ? 'now' : ''} aria-current={i + 1 === stage ? 'step' : undefined} />)}</ol>
@@ -185,7 +219,12 @@ export function Fa4App() {
           <div className="stage-names" aria-hidden>{UI.stages.map((s, i) => <span key={i} className={i + 1 === stage ? 'now' : ''}>{s[locale]}</span>)}</div>
         </nav>
       )}
-      <main className="main" id="main"><StepBody step={step} ctx={ctx}  desktop={desktop} /></main>
+      <main className="main" id="main">
+        {resolveFailed && ['activators', 'activators_sell', 'activators_site', 'fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'cargo_route'].includes(step.id) && (
+          <div className="state err" role="alert"><b>{UI.topicsErrorTitle[locale]}</b> {UI.resolveErrorBody[locale]} <button type="button" className="toast-btn" onClick={() => { setResolveFailed(false); setResolveTick((n) => n + 1); }}>{UI.tryAgain[locale]}</button></div>
+        )}
+        <StepBody step={step} ctx={ctx}  desktop={desktop} />
+      </main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
@@ -248,3 +287,17 @@ function skipCombined(move: typeof nextStep, a: Answers, c: FlowContext, from: S
 }
 
 const NO_RESOLUTION: ClientResolution = { premiumShown: false, cargoRouteDestinations: [], destinations: [] };
+
+/** Browser connectivity (the banner never blocks: answers stay on screen and are saved when the connection returns). */
+function useOnline(): boolean {
+  const [on, setOn] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
+  useEffect(() => {
+    const up = () => setOn(true), down = () => setOn(false);
+    window.addEventListener('online', up); window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+  return on;
+}
+function OfflineBanner({ locale }: { locale: Locale }) {
+  return <div className="offline-banner" role="status"><b>{UI.offlineTitle[locale]}.</b> {UI.offlineBody[locale]}</div>;
+}

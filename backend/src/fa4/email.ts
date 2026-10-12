@@ -101,17 +101,17 @@ export interface ContactInput { name: string; company: string; email: string; me
  * Stores a "Hablar con beeside" message and its delivery to the operational mailbox in ONE transaction. The client request id makes a
  * double click / retry of the same form idempotent (it returns the original delivery instead of creating a second message).
  */
-export async function enqueueContact(db: Db, projectId: string, input: ContactInput, language: Locale, now: Date): Promise<{ contactId: string; deliveryId: string; created: boolean }> {
+export async function enqueueContact(db: Db, projectId: string | null, input: ContactInput, language: Locale, now: Date): Promise<{ contactId: string; deliveryId: string; created: boolean }> {
   return db.transaction(async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_contact:${projectId}`]);
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_contact:${input.clientRequestId}`]);
     const inserted = await tx.query<{ contact_id: string }>(
       `INSERT INTO fa4_contact_request (project_id, name, company, email, message, share_progress, language, client_request_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (project_id, client_request_id) DO NOTHING RETURNING contact_id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (client_request_id) DO NOTHING RETURNING contact_id`,
       [projectId, input.name, input.company, input.email, input.message, input.shareProgress, language, input.clientRequestId, now],
     );
     const created = inserted.rows.length > 0;
     const contactId = inserted.rows[0]?.contact_id
-      ?? (await tx.query<{ contact_id: string }>("SELECT contact_id FROM fa4_contact_request WHERE project_id = $1 AND client_request_id = $2", [projectId, input.clientRequestId])).rows[0]!.contact_id;
+      ?? (await tx.query<{ contact_id: string }>("SELECT contact_id FROM fa4_contact_request WHERE client_request_id = $1", [input.clientRequestId])).rows[0]!.contact_id;
     const delivery = await tx.query<{ delivery_id: string }>(
       `INSERT INTO fa4_email_delivery (dedupe_key, project_id, template, contact_request_id, next_attempt_at, created_at, updated_at)
        VALUES ($1,$2,'fa4_contact_request',$3,$4,$4,$4) ON CONFLICT (dedupe_key) DO NOTHING RETURNING delivery_id`,
@@ -154,7 +154,7 @@ export async function awaitDelivery(db: Db, deliveryId: string, waitMs: number, 
   }
 }
 
-interface Due { delivery_id: string; project_id: string; template: Fa4EmailTemplate; attempts: number; max_attempts: number; contact_request_id: string | null }
+interface Due { delivery_id: string; project_id: string | null; template: Fa4EmailTemplate; attempts: number; max_attempts: number; contact_request_id: string | null }
 
 const EVENT_FOR: Record<Fa4EmailTemplate, { sent: "resume_email_sent" | "yev_email_sent" | "contact_email_sent"; failed: "resume_email_failed" | "yev_email_failed" | "contact_email_failed" }> = {
   fa4_resume_link: { sent: "resume_email_sent", failed: "resume_email_failed" },
@@ -201,15 +201,14 @@ export async function deliverDueFa4Emails(deps: Fa4EmailDeps, options: { limit?:
 const oneLine = (v: string) => v.replace(/[\r\n]+/g, " ").trim();
 
 async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<EmailMessage | null> {
-  const p = (await tx.query<{ email: string; locale: Locale; answers: { company?: { sector?: string }; destinations?: { list?: Array<{ iso: string }> }; components?: Array<{ activities?: string[] }> }; step_key: string }>(
+  const p = !d.project_id ? undefined : (await tx.query<{ email: string; locale: Locale; answers: { company?: { sector?: string }; destinations?: { list?: Array<{ iso: string }> }; components?: Array<{ activities?: string[] }> }; step_key: string }>(
     "SELECT email, locale, answers, step_key FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [d.project_id])).rows[0];
-  if (!p) return null;
   if (d.template === "fa4_contact_request") {
     const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale }>(
       "SELECT name, company, email, message, share_progress, language FROM fa4_contact_request WHERE contact_id = $1", [d.contact_request_id])).rows[0];
     if (!c) return null;
-    const lines = [c.message, "", `— ${c.name} · ${c.company} · ${c.email}`, `Idioma / Language: ${c.language}`];
-    if (c.share_progress) {
+    const lines = [c.message, "", `— ${[c.name, c.company, c.email].filter(Boolean).join(" · ")}`, `Idioma / Language: ${c.language}`];
+    if (c.share_progress && p) {
       const dests = (p.answers.destinations?.list ?? []).map((x) => x.iso).join(", ") || "—";
       const acts = [...new Set((p.answers.components ?? []).flatMap((x) => x.activities ?? []))].join(", ") || "—";
       lines.push("", "Avance compartido / Shared progress (la persona lo autorizó solo para este mensaje):", `Sector: ${p.answers.company?.sector ?? "—"}`, `Destinos / Destinations: ${dests}`, `Actividades / Activities: ${acts}`, `Paso / Step: ${p.step_key}`);
@@ -218,13 +217,14 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
       template: d.template,
       to: deps.config.contactAddress ?? "contact@beeside.you",
       locale: c.language,
-      subject: oneLine(`Hablar con beeside · ${c.name} (${c.company})`),
+      subject: oneLine(`Hablar con beeside · ${c.name}${c.company ? ` (${c.company})` : ""}`),
       body: lines.join("\n"),
       ctaLabel: "", ctaUrl: "",
       replyTo: c.email,
       projectId: d.project_id,
     };
   }
+  if (!p || !d.project_id) return null;
   const token = await issueToken(tx, d.project_id, "RESUME", new Date(now.getTime() + deps.config.resumeLinkDays * 86_400_000));
   const base = deps.config.appBaseUrl.replace(/\/$/, "");
   const view = d.template === "fa4_result_link" ? "&view=result" : "";
