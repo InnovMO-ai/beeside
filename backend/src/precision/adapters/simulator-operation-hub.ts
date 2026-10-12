@@ -24,6 +24,8 @@ export interface SimulatorOptions {
   /** What the client can do in Operation Hub after the first accepted send. */
   accessAfterFirstSend?: SimulatorAccessMode;
   sherpaDisplayName?: string;
+  /** Test control: a direct Sherpa channel provided by the platform. Default none (the real hub's channel is not defined yet). */
+  sherpaContactEmail?: string;
   now?: () => Date;
   /** Projects whose company_id the platform knows; used to emulate IDENTITY_MISMATCH. Omit to skip the check. */
   knownCompanies?: Record<string, string>;
@@ -151,7 +153,7 @@ export class SimulatedOperationHub implements OperationHubPort, OhFaultInjector 
       case "accessible_without_sherpa":
         return { provisioned: true, clientAccessible: true, sherpaAssigned: false };
       case "accessible_with_sherpa":
-        return { provisioned: true, clientAccessible: true, sherpaAssigned: true, sherpaDisplayName: this.sherpaDisplayName };
+        return { provisioned: true, clientAccessible: true, sherpaAssigned: true, sherpaDisplayName: this.sherpaDisplayName, ...(this.options.sherpaContactEmail ? { sherpaContactEmail: this.options.sherpaContactEmail } : {}) };
     }
   }
 

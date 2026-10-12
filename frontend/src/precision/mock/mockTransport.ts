@@ -47,6 +47,8 @@ export interface MockConfig {
   cover: CoverDto["composition"];
   ohMode: "pending_access" | "enter";
   contactSherpa: boolean;
+  /** A direct Sherpa channel exists for the assigned Sherpa (mock knob `sherpachannel`). Default none, like the real configuration today. */
+  sherpaChannel: boolean;
 }
 interface MockState {
   seq: number;
@@ -83,7 +85,7 @@ export interface MockControl {
   setLatency: (ms: number, turnMs?: number) => void;
   setAccess: (mode: AccessMode, readOnlyUntil?: string | null) => void;
   setCover: (c: CoverDto["composition"]) => void;
-  setOh: (mode: "pending_access" | "enter", contactSherpa?: boolean) => void;
+  setOh: (mode: "pending_access" | "enter", contactSherpa?: boolean, sherpaChannel?: boolean) => void;
   setHelpUrl: (u: string | null) => void;
   preset: (name: string) => void;
   stats: () => MockState["stats"];
@@ -93,7 +95,7 @@ export interface MockControl {
 function freshState(): MockState {
   return {
     seq: 0, access: { mode: "FULL", readOnlyUntil: null }, coverSeen: false,
-    cfg: { latency: 120, turnLatency: 1800, ohDelay: 2500, helpUrl: MOCK_LINKS.helpCenterUrl, cover: "neutral", ohMode: "pending_access", contactSherpa: false },
+    cfg: { latency: 120, turnLatency: 1800, ohDelay: 2500, helpUrl: MOCK_LINKS.helpCenterUrl, cover: "neutral", ohMode: "pending_access", contactSherpa: false, sherpaChannel: false },
     understanding: newInterview(), summaryConfirmed: false, smConfirmedAt: null, confirmedCategories: [], smRequestKeys: [], needs: [],
     add: { turns: [], stage: "ask", pendingNeed: null, started: false },
     cats: {}, sends: {}, firstDelivered: false, firstAttemptCat: null, processing: {}, results: {}, failedKeys: {}, inject: {}, salt: 0, contacts: [],
@@ -133,6 +135,7 @@ export function createMockServer(opts: MockOptions = {}) {
       else if (k === "access" && v) st.access = v === "read_only" ? { mode: "READ_ONLY", readOnlyUntil: "2026-12-18T00:00:00.000Z" } : v === "revoked" ? { mode: "REVOKED", readOnlyUntil: null } : st.access;
       else if (k === "ohmode" && (v === "enter" || v === "pending_access")) st.cfg.ohMode = v;
       else if (k === "sherpa") st.cfg.contactSherpa = true;
+      else if (k === "sherpachannel") { st.cfg.contactSherpa = true; st.cfg.sherpaChannel = true; }
       else if (k === "fail" && v) st.inject[v] = (st.inject[v] ?? 0) + 1;
       else if (k === "preset" && v) runPreset(v);
     }
@@ -194,9 +197,13 @@ export function createMockServer(opts: MockOptions = {}) {
   }
 
   function operationHub(): CenterDto["operationHub"] {
-    if (!st.firstDelivered) return { state: "hidden", url: null, contactSherpa: false };
+    if (!st.firstDelivered) return { state: "hidden", url: null, contact: null };
     const enter = st.cfg.ohMode === "enter";
-    return { state: st.cfg.ohMode, url: enter ? "https://operationhub.beeside.example/" : null, contactSherpa: enter && st.cfg.contactSherpa };
+    // same rule as the API: Sherpa assigned + direct channel -> "Contact my Sherpa"; assigned without a channel -> general Contact beeside
+    const contact = enter && st.cfg.contactSherpa
+      ? (st.cfg.sherpaChannel ? { kind: "sherpa" as const, email: "sherpa.channel@beeside.example" } : { kind: "beeside" as const, email: MOCK_LINKS.contactEmail })
+      : null;
+    return { state: st.cfg.ohMode, url: enter ? "https://operationhub.beeside.example/" : null, contact };
   }
   const destinations = (l: Locale) => [{ code: "MX", label: l === "es" ? "México" : "Mexico" }];
 
@@ -651,7 +658,7 @@ export function createMockServer(opts: MockOptions = {}) {
     setLatency(ms, turnMs) { st.cfg.latency = ms; st.cfg.turnLatency = turnMs ?? ms; save(); },
     setAccess(mode, until = null) { st.access = { mode, readOnlyUntil: mode === "READ_ONLY" ? until ?? "2026-12-18T00:00:00.000Z" : null }; save(); },
     setCover(c) { st.cfg.cover = c; save(); },
-    setOh(mode, sherpa = false) { st.cfg.ohMode = mode; st.cfg.contactSherpa = sherpa; save(); },
+    setOh(mode, sherpa = false, channel = false) { st.cfg.ohMode = mode; st.cfg.contactSherpa = sherpa; st.cfg.sherpaChannel = sherpa && channel; save(); },
     setHelpUrl(u) { st.cfg.helpUrl = u; save(); },
     preset(name) { runPreset(name); save(); },
     stats: () => st.stats,

@@ -211,3 +211,13 @@ Needed from the Product Owner:
 * Decision: how a delivery task should look to a Sherpa (name, readable summary, statuses, assignment) and whether the PSM "Project
   Overview" task per PSM version is wanted.
 * Run `scripts/clickup-sandbox-verify.ts` and send back the table; then the label can move to SANDBOX / VERIFIED.
+
+
+## 9. Sherpa direct contact channel (Code stage 2, 13 Oct 2026)
+
+`OhAccessState` gained an optional `sherpaContactEmail`: a direct channel to the assigned Sherpa, provided by the platform per project.
+`ClickUpAccessSignal.sherpaContactEmail` passes it through (only with an accessible hub and an assigned Sherpa). Nothing is invented:
+no default address exists anywhere. A deployment-level fallback can be configured with the `sherpa_contact_email` configuration row
+(or `PRECISION_SHERPA_CONTACT_EMAIL`); it is unset today. Without a channel the Operation Hub block offers general "Contact beeside"
+(`contact@beeside.you`); "Contact my Sherpa" appears only with a valid channel. **Product Owner decision pending (not blocking):** which
+channel the real Operation Hub exposes for the Sherpa (per-project address from the hub, or one shared Sherpa desk address in configuration).

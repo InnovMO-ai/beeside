@@ -17,6 +17,7 @@ import { describeError } from "../../security/redact";
 import { progressOf, projectCountries } from "./categories";
 import { CONFIG_KEYS, configUrl, contactEmail, customerLink } from "./config";
 import { understandingStateOf } from "./context-reader";
+import { ohContactAction } from "./oh-contact";
 import type { PrecisionDomainDeps } from "./deps";
 import { destinationsOf, type FaContextService } from "./fa-context";
 import { buildLiveMap, diffAgainst, type Caller } from "./service-map";
@@ -86,13 +87,13 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
       deps.log("warn", "operation hub state unavailable", { error: describeError(error) });
       return null;
     });
-    if (!state || state.ux.goToOperationHub === "hidden") return { block: { state: "hidden", url: null, contactSherpa: false } };
+    if (!state || state.ux.goToOperationHub === "hidden") return { block: { state: "hidden", url: null, contact: null } };
     if (state.ux.goToOperationHub === "enter") {
       const url = await configUrl(deps.db, CONFIG_KEYS.operationHubUrl, locale);
       // an accessible hub without a configured link cannot be entered from here: honest "pending access", never a dead button
-      if (url) return { block: { state: "enter", url, contactSherpa: state.ux.contactMySherpa } };
+      if (url) return { block: { state: "enter", url, contact: await ohContactAction(deps.db, locale, state) } };
     }
-    return { block: { state: "pending_access", url: null, contactSherpa: false } };
+    return { block: { state: "pending_access", url: null, contact: null } };
   }
 
   async function center(actor: Actor): Promise<CenterDto> {

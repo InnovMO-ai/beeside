@@ -40,13 +40,6 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
     source: `${VP} intro_once (split) + ${NEW}`,
   },
   {
-    key: "intro_once",
-    es: "Este es tu Precision Center. Aquí convertimos lo que ya nos contaste en tu My Service Map, con los servicios que necesitas y, después, en los requisitos de cada uno. Empezamos con tu Precision Understanding: una conversación para entender tu proyecto completo. Tú decides cuándo seguir y cuándo pausar.",
-    en: "This is your Precision Center. Here we turn what you already told us into your My Service Map, with the services you need and, afterwards, into the requirements for each one. We start with your Precision Understanding: a conversation to understand your whole project. You decide when to continue and when to pause.",
-    status: "draft",
-    source: `${VP} intro_once`,
-  },
-  {
     key: "category_intro",
     es: "Vamos con {category}. Te haré una pregunta a la vez, y si algo aún no lo sabes, lo dejamos como pendiente.",
     en: "Let's work on {category}. I will ask one question at a time, and if you do not know something yet, we leave it as pending.",
@@ -70,7 +63,7 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
   {
     key: "ask_correction",
     es: "De acuerdo. ¿Cuál es el dato correcto?",
-    en: "Understood. What is the correct value?",
+    en: "Thanks for flagging it. What is the correct value?",
     status: "draft",
     source: NEW,
   },
@@ -121,7 +114,7 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
   {
     key: "pending_accept_withheld",
     es: "De acuerdo, no necesitas compartirlo ahora. Lo dejo anotado como pendiente.",
-    en: "Understood, you do not need to share it now. I am noting it as pending.",
+    en: "That is fine, you do not need to share it now. I am noting it as pending.",
     status: "draft",
     source: NEW,
   },
@@ -203,7 +196,7 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
     status: "draft",
     source: `${VP} add_service_confirm_need`,
   },
-  { key: "add_service_rephrase", es: "De acuerdo. Cuéntame con otras palabras qué necesitas.", en: "Understood. Tell me in other words what you need.", status: "draft", source: NEW },
+  { key: "add_service_rephrase", es: "De acuerdo. Cuéntame con otras palabras qué necesitas.", en: "Tell me in other words what you need.", status: "draft", source: NEW },
   {
     key: "add_service_confirmed_ack",
     es: "Entendido. Lo agrego a tu proyecto y actualizo tu My Service Map.",
@@ -233,12 +226,10 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
     source: `${VP} oos_mobility (PO approval required)`,
   },
   // ---- service map / category labels and notes
-  { key: "psm_confirmed", es: "Tu My Service Map quedó confirmado. A partir de aquí puedes empezar cada categoría cuando quieras.", en: "Your My Service Map is confirmed. From here you can start each category whenever you like.", status: "draft", source: `${VP} psm_confirmed` },
-  { key: "psm_immutable_note", es: "Tu My Service Map confirmado no se edita. Si cambia algo importante de tu proyecto, creamos una versión nueva y conservamos esta.", en: "Your confirmed My Service Map is not edited. If something important changes in your project, we create a new version and keep this one.", status: "draft", source: `${VP} psm_immutable_note (QA-m2 fixed)` },
   { key: "crp_pending_section_title", es: "Información pendiente", en: "Pending Information", status: "draft", source: `${VP} crp_pending_section_title` },
   { key: "crp_item_state_pending", es: "Pendiente", en: "Pending", status: "draft", source: `${VP} crp_item_state_labels` },
-  { key: "pause_note", es: "Guardé todo. Puedes continuar cuando quieras desde donde lo dejaste.", en: "I saved everything. You can continue whenever you like from where you left off.", status: "draft", source: `${VP} pause_note` },
-  // ---- Company context (CCIR) — PO-approved wording where the Voice Pack says so
+  // ---- Company context (CCIR) — PO-approved wording where the Voice Pack says so.
+  // NON-SHIPPING in this release candidate: the Company Context step is not built yet (docs/f5/precision-ccir-company-context-delta). Kept on purpose, not dead.
   { key: "ccir_intro", es: "Ahora que entiendo tu proyecto de expansión, me gustaría completar algunos datos de tu empresa. Nos ayudarán a preparar los siguientes pasos y a no pedirte lo mismo más adelante.", en: "Now that I understand your expansion project, I'd like to complete a few company details that will help us prepare the next steps and avoid asking for the same information again later.", status: "approved", source: `${VP} §3.1 ccir_intro` },
   { key: "ccir_why_title", es: "¿Por qué te pedimos esta información?", en: "Why we ask for this information", status: "approved", source: `${VP} §3.1` },
   { key: "ccir_why_scale", es: "Nos ayuda a entender la escala real de tu empresa y dimensionar mejor los servicios que puede requerir tu expansión.", en: "It helps us understand the real scale of your company and better size the services your expansion may require.", status: "approved", source: `${VP} §3.1` },

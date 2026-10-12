@@ -56,7 +56,7 @@ describeWithDb("Preview and Send (PostgreSQL, simulated Operation Hub, test-only
     const sn = await send(p, id, pv.body.previewChecksum);
     expect(sn.status).toBe(200);
     expect(sn.body).toMatchObject({ state: "sent", clientAction: null, retryable: false });
-    expect(sn.body.operationHub).toEqual({ state: "pending_access", url: null, contactSherpa: false });
+    expect(sn.body.operationHub).toEqual({ state: "pending_access", url: null, contact: null });
     expect(scanCustomerBody(sn.body)).toEqual([]);
     expect(h.spy.publishCalls).toBe(1);
     expect(h.sim.storedCount()).toBeGreaterThanOrEqual(1);
@@ -329,7 +329,8 @@ describeWithDb("Preview and Send (PostgreSQL, simulated Operation Hub, test-only
       const res = await request(h2.app).post(`/api/precision/categories/${id}/send`).set(auth(p.projectId)).send({ previewChecksum: pv.body.previewChecksum });
       expect(res.body.state).toBe("sent");
       expect(res.body.operationHub.state).toBe("enter");
-      expect(res.body.operationHub.contactSherpa).toBe(true);
+      // a Sherpa is assigned but the hub provides no direct channel: general Contact beeside, never "Contact my Sherpa"
+      expect(res.body.operationHub.contact).toEqual({ kind: "beeside", email: "contact@beeside.you" });
       expect(res.body.operationHub.url === "https://hub.example/enter" || res.body.operationHub.url === null).toBe(true);
     } finally {
       await h2.close();

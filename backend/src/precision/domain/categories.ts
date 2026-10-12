@@ -153,9 +153,10 @@ export function labelOf(ref: Pick<CategoryRef, "categoryKey">, needs: readonly M
   return categoryInfo(ref.categoryKey).label[locale];
 }
 
-export async function loadCategoryState(deps: Pick<PrecisionDomainDeps, "db" | "registry">, ref: CategoryRef, countries: string[], locale: Locale, needs?: MapNeed[]): Promise<CategoryState> {
+/** `prefetchedFacts`: the instance's current fact map when the caller already loaded it in a batch (list views). */
+export async function loadCategoryState(deps: Pick<PrecisionDomainDeps, "db" | "registry">, ref: CategoryRef, countries: string[], locale: Locale, needs?: MapNeed[], prefetchedFacts?: FactMap): Promise<CategoryState> {
   const manifest = await deps.registry.getManifestForCategory(ref.categoryKey, ref.manifestVersion);
-  const facts = await loadFactMap(deps.db, ref.instanceId);
+  const facts = prefetchedFacts ?? (await loadFactMap(deps.db, ref.instanceId));
   const evaluation = evaluateCategory({ manifest: manifest.manifest, facts, countries });
   const sendState = ref.lifecycle === "completed" ? await packSendState(deps.db, ref.currentPackId) : "not_sent";
   const mapNeeds = needs ?? parseMapNeeds(facts[MAP_NEEDS_KEY]?.value);

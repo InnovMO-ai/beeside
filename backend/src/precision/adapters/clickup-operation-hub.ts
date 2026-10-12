@@ -50,6 +50,8 @@ export interface ClickUpAccessSignal {
   clientAccessible: boolean;
   sherpaAssigned: boolean;
   sherpaDisplayName?: string;
+  /** Direct Sherpa channel for this project, when the hub provides one. Validated downstream; never fabricated. */
+  sherpaContactEmail?: string;
 }
 
 export interface ClickUpConfig {
@@ -257,6 +259,7 @@ export class ClickUpOperationHub implements OperationHubPort {
       clientAccessible,
       sherpaAssigned,
       ...(sherpaAssigned && signal?.sherpaDisplayName ? { sherpaDisplayName: signal.sherpaDisplayName } : {}),
+      ...(sherpaAssigned && signal?.sherpaContactEmail ? { sherpaContactEmail: signal.sherpaContactEmail } : {}),
     };
   }
 

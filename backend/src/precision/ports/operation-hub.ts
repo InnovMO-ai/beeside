@@ -111,6 +111,11 @@ export interface OhAccessState {
   clientAccessible: boolean;
   sherpaAssigned: boolean;
   sherpaDisplayName?: string;
+  /**
+   * A direct channel to the assigned Sherpa, only when the platform itself provides one for this project.
+   * Absent = no direct channel is known; Precision then offers general Contact beeside and never invents an address.
+   */
+  sherpaContactEmail?: string;
 }
 
 export interface OperationHubPort extends Described {

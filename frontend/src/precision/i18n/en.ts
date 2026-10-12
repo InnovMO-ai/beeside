@@ -98,6 +98,7 @@ export const en = {
   "center.oh.enter": "Your space in Operation Hub is available.",
   "center.oh.go": "Go to Operation Hub",
   "center.oh.contactSherpa": "Contact my Sherpa",
+  "center.oh.contactBeeside": "Contact beeside",
   "center.help.title": "Need help?",
   "center.help.body": "Help is always available, whatever stage you are in.",
   "center.help.cta": "Help and frequently asked questions",

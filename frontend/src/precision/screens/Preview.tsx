@@ -9,7 +9,7 @@ import { DocShell } from "../ui/Shell";
 import { Icon } from "../ui/icons";
 import { usePage } from "../ui/hooks";
 import { Banner, Button, PageState, Skeleton, StatusChip } from "../ui/primitives";
-import { ContactDialog } from "./Contact";
+import { ContactDialog, OhContactButton, OhContactDialog } from "./Contact";
 import { CrpBody, LineRows } from "./Crp";
 import { ServiceMapBody } from "./ServiceMap";
 import { InlineError } from "./SystemPages";
@@ -185,7 +185,7 @@ export function SentScreen({ id }: { id: string }) {
           </div>
           <div className="pz-actionbar pz-actionbar-flat pz-sentactions pz-noprint">
             <Link to={{ name: "center" }} className="pz-btn pz-btn-secondary"><span>{t("sent.toCenter")}</span><Icon name="arrow-right" size={18} /></Link>
-            {oh?.contactSherpa ? <Button variant="secondary" onClick={() => setSherpa(true)}>{t("center.oh.contactSherpa")}</Button> : null}
+            <OhContactButton contact={oh?.contact} onOpen={() => setSherpa(true)} />
             {!v ? <Link to={{ name: "crp", id }} className="pz-btn pz-btn-quiet"><span>{t("ws.cta.crp.button")}</span></Link> : null}
           </div>
           {v ? (
@@ -207,7 +207,7 @@ export function SentScreen({ id }: { id: string }) {
           <p className="pz-docnote">{t("sent.update")}</p>
         </section>
       )}
-      {sherpa ? <ContactDialog title={t("center.oh.contactSherpa")} onClose={() => setSherpa(false)} /> : null}
+      {sherpa && oh?.contact ? <OhContactDialog contact={oh.contact} onClose={() => setSherpa(false)} /> : null}
     </DocShell>
   );
 }

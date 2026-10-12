@@ -74,7 +74,7 @@ export async function sendCrp(deps: SendDeps, actor: CrpActor, categoryId: strin
   }
 
   if (result.state === "blocked") throw new CrpError("ACTIVATION_PENDING_RETRY_FIRST");
-  const operationHub = await operationHubDto(deps.db, deps.delivery, actor.projectId, actor.locale).catch(() => ({ state: "hidden" as const, url: null, contactSherpa: false }));
+  const operationHub = await operationHubDto(deps.db, deps.delivery, actor.projectId, actor.locale).catch(() => ({ state: "hidden" as const, url: null, contact: null }));
   if (result.state === "sent") {
     await recordSent(deps, actor.projectId, h, result.attempt, actor.locale);
     return { state: "sent", clientAction: null, retryable: false, operationHub };

@@ -63,6 +63,8 @@ export interface CategoryCardDto {
   sendState: SendStateDto;
 }
 
+export interface OhContactDto { kind: "sherpa" | "beeside"; email: string }
+
 export interface CenterDto {
   locale: Locale;
   access: AccessDto;
@@ -72,7 +74,8 @@ export interface CenterDto {
   /** Empty until My Service Map is confirmed. */
   categories: CategoryCardDto[];
   addService: { available: boolean };
-  operationHub: { state: "hidden" | "pending_access" | "enter"; url: string | null; contactSherpa: boolean };
+  /** `contact`: the one contact action next to Operation Hub. "sherpa" only with a valid direct Sherpa channel; "beeside" when a Sherpa is assigned but none exists; null otherwise. */
+  operationHub: { state: "hidden" | "pending_access" | "enter"; url: string | null; contact: OhContactDto | null };
   help: { helpCenterUrl: string | null };
 }
 

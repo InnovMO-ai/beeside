@@ -16,6 +16,8 @@ const R1_RE = WB("usted|ustedes|vos|tenés|querés|podés|sos|vosotros");
 const R2_ES_WORDS = WB("ahorita|chévere|chevere|órale|orale|chido|guay|bacán|bacan|súper|super|genial|perfecto|vale|qué padre|muy padre");
 const R2_DE_UNA = /(?<![\p{L}\p{N}_])de una(?=\s*[.,;:!?¡]|\s*$)/iu;
 const R2_EN_WORDS = WB("awesome|cool|amazing|fantastic|no worries|gotcha|hey|oops|wow|super|perfect|great job|well done");
+/** English filler that echoes a bare yes/no back ("Noted, no on that one"): the acknowledgement must not parrot the answer. */
+const R2_EN_YESNO_ECHO = /(?<![\p{L}\p{N}_])(?:noted|got it|understood)[,:.]?\s+(?:no|yes)(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])no on that one(?![\p{L}\p{N}_])/iu;
 const R2_SYMBOLS = /!|¡|\p{Extended_Pictographic}/u;
 
 const R7_ES = WB(
@@ -73,7 +75,7 @@ export function checkTone(text: string, ctx: Pick<VerifyContext, "locale" | "que
     if (m) out.push(v("R1", "register_usted_vos", m[0], "register must be 'tú' (no usted/vos)"));
   }
 
-  const colloquial = ctx.locale === "es" ? (t.match(R2_ES_WORDS) ?? t.match(R2_DE_UNA)) : t.match(R2_EN_WORDS);
+  const colloquial = ctx.locale === "es" ? (t.match(R2_ES_WORDS) ?? t.match(R2_DE_UNA)) : (t.match(R2_EN_WORDS) ?? t.match(R2_EN_YESNO_ECHO));
   const symbol = t.match(R2_SYMBOLS);
   const m2 = colloquial ?? symbol;
   if (m2) out.push(v("R2", "colloquial_or_exclamation", m2[0], "colloquialism, exclamation or emoji"));

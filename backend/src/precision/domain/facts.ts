@@ -46,6 +46,25 @@ export async function loadFactMap(db: Queryable, scopeInstanceId: string): Promi
   return factMapOf(await loadFactRows(db, scopeInstanceId));
 }
 
+/**
+ * The current fact maps of several scope instances in ONE query (same rows, same order and same last-wins rule as
+ * `loadFactMap`, so each map is identical to the one the single-instance loader returns). Instances without facts get `{}`.
+ */
+export async function loadFactMaps(db: Queryable, scopeInstanceIds: readonly string[]): Promise<Map<string, FactMap>> {
+  const out = new Map<string, FactMap>();
+  for (const id of scopeInstanceIds) out.set(id, {});
+  if (scopeInstanceIds.length === 0) return out;
+  const { rows } = await db.query<{ scope_instance_id: string; id: string; field_key: string; value: unknown; answer_state: FactView["answerState"]; provenance_stage: string }>(
+    "SELECT scope_instance_id, id, field_key, value, answer_state, provenance_stage FROM fact WHERE scope_instance_id = ANY($1::uuid[]) AND superseded_by IS NULL ORDER BY created_at, id",
+    [[...scopeInstanceIds]],
+  );
+  for (const r of rows) {
+    const map = out.get(r.scope_instance_id) as Record<string, FactView | undefined> | undefined;
+    if (map) map[fieldKeyOf(r.field_key)] = { value: r.value, answerState: r.answer_state, provenance: r.provenance_stage };
+  }
+  return out;
+}
+
 export interface WriteStep { fieldKey: string; factId: string; after: FactMap }
 export interface FactWriteInfo {
   projectId: string;

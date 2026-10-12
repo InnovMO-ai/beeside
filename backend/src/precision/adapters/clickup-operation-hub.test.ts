@@ -304,6 +304,12 @@ describe("ClickUp adapter — access state (only what the adapter can honestly k
     expect(await h.port.accessState(p.identity.project_id)).toEqual({ provisioned: true, clientAccessible: false, sherpaAssigned: false });
     signal = { clientAccessible: true, sherpaAssigned: true, sherpaDisplayName: "Ana" };
     expect(await h.port.accessState(p.identity.project_id)).toEqual({ provisioned: true, clientAccessible: true, sherpaAssigned: true, sherpaDisplayName: "Ana" });
+    // a direct Sherpa channel passes through only with an assigned, accessible Sherpa
+    const withChannel = { clientAccessible: true, sherpaAssigned: true, sherpaDisplayName: "Ana", sherpaContactEmail: "ana@channel.example.test" };
+    signal = withChannel;
+    expect((await h.port.accessState(p.identity.project_id)).sherpaContactEmail).toBe("ana@channel.example.test");
+    signal = { ...withChannel, clientAccessible: false };
+    expect((await h.port.accessState(p.identity.project_id)).sherpaContactEmail).toBeUndefined();
   });
 
   it("describes itself as REAL / NOT_VERIFIED by default and SANDBOX when configured", () => {

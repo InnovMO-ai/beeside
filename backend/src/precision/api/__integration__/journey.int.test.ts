@@ -148,7 +148,7 @@ describeWithDb("Precision API — client journey", () => {
       expect(center.serviceMap).toMatchObject({ available: true, hasUnconfirmedChanges: false });
       expect(center.categories.map((c: { label: string; status: string; sendState: string }) => [c.label, c.status, c.sendState])).toEqual([["Tax, Accounting and Audit", "not_started", "not_sent"], ["Logistics", "not_started", "not_sent"]]);
       expect(center.addService.available).toBe(true);
-      expect(center.operationHub).toEqual({ state: "hidden", url: null, contactSherpa: false });
+      expect(center.operationHub).toEqual({ state: "hidden", url: null, contact: null });
       cards = Object.fromEntries(center.categories.map((c: { label: string }) => [c.label, c]));
       const ev = await events(h, projectId);
       expect(ev.my_service_map_ready).toBe(1);
@@ -323,29 +323,55 @@ describeWithDb("Precision API — client journey", () => {
       await setConfig("help_center_url", null);
     });
 
-    it("hidden until the first delivery; pending access; enter with the configured link; Sherpa only when assigned", async () => {
+    it("hidden until the first delivery; pending access; enter with the configured link; Sherpa contact only with a valid direct channel", async () => {
       const { projectId } = await h.newProject();
       const api = h.api(await h.session(projectId));
       const delivery = h.runtime.deps.delivery;
       const original = delivery.getSendState.bind(delivery);
-      const state = (goToOperationHub: "hidden" | "pending_access" | "enter", contactMySherpa: boolean, firstSendDone = goToOperationHub !== "hidden") =>
-        (delivery.getSendState = async () => ({ firstSendDone, ohAccess: { provisioned: firstSendDone, clientAccessible: goToOperationHub === "enter", sherpaAssigned: contactMySherpa }, ux: { goToOperationHub, contactMySherpa } }));
+      const state = (goToOperationHub: "hidden" | "pending_access" | "enter", sherpaAssigned: boolean, sherpaContactEmail?: string, firstSendDone = goToOperationHub !== "hidden") =>
+        (delivery.getSendState = async () => ({
+          firstSendDone,
+          ohAccess: { provisioned: firstSendDone, clientAccessible: goToOperationHub === "enter", sherpaAssigned, ...(sherpaContactEmail ? { sherpaContactEmail } : {}) },
+          ux: { goToOperationHub, contactMySherpa: goToOperationHub === "enter" && sherpaAssigned },
+        }));
+      const hub = async () => (await api.get("/center")).body.operationHub;
       try {
         await setConfig("operation_hub_url", null);
+        await setConfig("sherpa_contact_email", null);
         state("hidden", false);
-        expect((await api.get("/center")).body.operationHub).toEqual({ state: "hidden", url: null, contactSherpa: false });
+        expect(await hub()).toEqual({ state: "hidden", url: null, contact: null });
         state("pending_access", false);
-        expect((await api.get("/center")).body.operationHub).toEqual({ state: "pending_access", url: null, contactSherpa: false });
+        expect(await hub()).toEqual({ state: "pending_access", url: null, contact: null });
         state("enter", true); // accessible but no link configured: honest "pending", never a dead button
-        expect((await api.get("/center")).body.operationHub).toEqual({ state: "pending_access", url: null, contactSherpa: false });
+        expect(await hub()).toEqual({ state: "pending_access", url: null, contact: null });
         await setConfig("operation_hub_url", "https://hub.example.test/enter");
-        expect((await api.get("/center")).body.operationHub).toEqual({ state: "enter", url: "https://hub.example.test/enter", contactSherpa: true });
+        // Sherpa assigned but NO direct channel anywhere: the action is general Contact beeside, never "Contact my Sherpa"
+        expect(await hub()).toEqual({ state: "enter", url: "https://hub.example.test/enter", contact: { kind: "beeside", email: "contact@beeside.you" } });
+        // no Sherpa assigned: no contact action next to Operation Hub (general Help stays available)
         state("enter", false);
-        expect((await api.get("/center")).body.operationHub).toEqual({ state: "enter", url: "https://hub.example.test/enter", contactSherpa: false });
+        expect(await hub()).toEqual({ state: "enter", url: "https://hub.example.test/enter", contact: null });
+        // a direct channel provided by the hub for this project
+        state("enter", true, "ana.sherpa@channel.example.test");
+        expect((await hub()).contact).toEqual({ kind: "sherpa", email: "ana.sherpa@channel.example.test" });
+        // a malformed hub value is not a channel
+        state("enter", true, "not an address");
+        expect((await hub()).contact).toEqual({ kind: "beeside", email: "contact@beeside.you" });
+        // a configured direct channel (no hub value)
+        await setConfig("sherpa_contact_email", "sherpas@channel.example.test");
+        state("enter", true);
+        expect((await hub()).contact).toEqual({ kind: "sherpa", email: "sherpas@channel.example.test" });
+        // the hub's per-project channel wins over the configured one
+        state("enter", true, "ana.sherpa@channel.example.test");
+        expect((await hub()).contact).toEqual({ kind: "sherpa", email: "ana.sherpa@channel.example.test" });
+        // channel present but nobody assigned: nothing
+        state("enter", false, "ana.sherpa@channel.example.test");
+        expect((await hub()).contact).toBeNull();
+        await setConfig("sherpa_contact_email", null);
         delivery.getSendState = async () => { throw new Error("hub down"); };
         expect((await api.get("/center")).body.operationHub.state).toBe("hidden"); // the platform being unreachable never breaks the Center
       } finally {
         delivery.getSendState = original;
+        await setConfig("sherpa_contact_email", null);
         await setConfig("operation_hub_url", null);
       }
     });

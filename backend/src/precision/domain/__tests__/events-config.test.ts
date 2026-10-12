@@ -1,5 +1,5 @@
 import type { Db } from "../../../db/database";
-import { APPROVED_CUSTOMER_LINKS, APPROVED_CONTACT_EMAIL, configEmail, configUrl, contactEmail, customerLink } from "../config";
+import { APPROVED_CUSTOMER_LINKS, APPROVED_CONTACT_EMAIL, configEmail, configUrl, contactEmail, customerLink, sherpaContactChannel } from "../config";
 import { emitEvent, PRECISION_EVENTS } from "../events";
 
 const fakeDb = (rows: unknown[] = [], rowCount = 1) => {
@@ -72,5 +72,16 @@ describe("configuration resolution", () => {
       expect(d.value).not.toMatch(/localhost|example|staging|dev\.|127\.0\.0\.1|\.test|TODO|xxx/i);
     }
     expect(APPROVED_CONTACT_EMAIL.value).toBe("contact@beeside.you");
+  });
+
+  it("the direct Sherpa channel has no shipped default: hub value > configuration row > environment > none; malformed is none", async () => {
+    const none = fakeDb([]).db;
+    expect(await sherpaContactChannel(none, "en", undefined, {})).toBeNull();
+    expect(await sherpaContactChannel(none, "en", null, {})).toBeNull();
+    expect(await sherpaContactChannel(none, "es", "no es un correo", {})).toBeNull();
+    expect(await sherpaContactChannel(none, "en", undefined, { PRECISION_SHERPA_CONTACT_EMAIL: "env@channel.test" })).toBe("env@channel.test");
+    expect(await sherpaContactChannel(fakeDb([{ value: "row@channel.test" }]).db, "en", undefined, { PRECISION_SHERPA_CONTACT_EMAIL: "env@channel.test" })).toBe("row@channel.test");
+    expect(await sherpaContactChannel(fakeDb([{ value: "row@channel.test" }]).db, "en", "hub@channel.test", {})).toBe("hub@channel.test");
+    expect(await sherpaContactChannel(fakeDb([{ value: "bad" }]).db, "en", undefined, { PRECISION_SHERPA_CONTACT_EMAIL: "x y" })).toBeNull();
   });
 });

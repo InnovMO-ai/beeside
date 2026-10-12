@@ -6,6 +6,7 @@ import type { Db } from "../../../db/database";
 import type { CenterDto, Locale, SendStateDto } from "../../api/dto";
 import type { OhDeliveryService } from "../../delivery/oh-delivery-service";
 import type { AnswerState, FactMap } from "../../manifest/types";
+import { ohContactAction } from "../oh-contact";
 import { CrpError } from "./errors";
 import { sanitizeOrNull } from "./sanitize";
 
@@ -227,5 +228,5 @@ export async function operationHubDto(db: Db, delivery: OhDeliveryService, proje
   const view = await delivery.getSendState(projectId);
   const state = view.ux.goToOperationHub;
   const url = state === "enter" ? await readConfigString(db, "operation_hub_url", locale) : null;
-  return { state, url, contactSherpa: view.ux.contactMySherpa };
+  return { state, url, contact: url ? await ohContactAction(db, locale, view) : null };
 }

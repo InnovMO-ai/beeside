@@ -120,7 +120,7 @@ export const QUESTIONS: Readonly<Record<string, QuestionEntry>> = {
   "logistics_flows.origin": e("¿Desde qué ciudad o sitio salen?", "Which city or site do they leave from?"),
   "logistics_flows.destination": e("¿A qué ciudad o sitio llegan?", "Which city or site do they arrive at?"),
   "logistics_flows.product": e("¿Qué producto se mueve en este flujo?", "What product moves in this flow?"),
-  "logistics_flows.volume": e("¿Qué volumen mueves en este flujo? Indícalo con su unidad, por ejemplo tarimas o contenedores.", "What volume do you move in this flow? Include the unit, for example pallets or containers."),
+  "logistics_flows.volume": e("¿Qué volumen mueves en este flujo? Indícalo con su unidad, por ejemplo pallets o contenedores.", "What volume do you move in this flow? Include the unit, for example pallets or containers."),
   "logistics_flows.frequency": e("¿Con qué frecuencia se hace este envío?", "How often is this shipment made?"),
   "logistics_flows.incoterm": e("¿Qué término de entrega (Incoterm) aplica a este flujo?", "Which delivery term (Incoterm) applies to this flow?"),
   "logistics_flows.mode_of_transport": e("¿Qué modo de transporte usarás en este flujo?", "Which mode of transport will you use in this flow?"),

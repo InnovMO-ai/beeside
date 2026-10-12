@@ -1,3 +1,4 @@
+import type { OhContactDto } from "../api/dto";
 import { useI18n } from "../i18n";
 import { useSession } from "../state/app";
 import { useResource } from "../state/resource";
@@ -50,6 +51,27 @@ export function ContactDialog({ title, onClose }: { title: string; onClose: () =
   return (
     <Dialog title={title} onClose={onClose} actions={<Button variant="quiet" onClick={onClose}>{t("shell.close")}</Button>}>
       {help.loading ? <Skeleton lines={2} /> : <ContactPanel email={help.data?.contactEmail ?? null} />}
+    </Dialog>
+  );
+}
+
+/**
+ * The one contact action next to Operation Hub. The label always matches the destination: "Contact my Sherpa" is shown only
+ * when the API says a direct Sherpa channel exists (`kind: "sherpa"`); otherwise it is general "Contact beeside".
+ */
+export const ohContactLabelKey = (c: OhContactDto): "center.oh.contactSherpa" | "center.oh.contactBeeside" => (c.kind === "sherpa" ? "center.oh.contactSherpa" : "center.oh.contactBeeside");
+
+export function OhContactButton({ contact, onOpen }: { contact: OhContactDto | null | undefined; onOpen: () => void }) {
+  const { t } = useI18n();
+  if (!contact) return null;
+  return <Button variant="secondary" onClick={onOpen}>{t(ohContactLabelKey(contact))}</Button>;
+}
+
+export function OhContactDialog({ contact, onClose }: { contact: OhContactDto; onClose: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Dialog title={t(ohContactLabelKey(contact))} onClose={onClose} actions={<Button variant="quiet" onClick={onClose}>{t("shell.close")}</Button>}>
+      <ContactPanel email={contact.email} />
     </Dialog>
   );
 }

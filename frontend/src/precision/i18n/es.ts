@@ -95,6 +95,7 @@ export const es: Record<DictKey, string> = {
   "center.oh.enter": "Tu espacio en Operation Hub está disponible.",
   "center.oh.go": "Ir a Operation Hub",
   "center.oh.contactSherpa": "Contactar a mi Sherpa",
+  "center.oh.contactBeeside": "Contactar a beeside",
   "center.help.title": "¿Necesitas ayuda?",
   "center.help.body": "La ayuda está siempre disponible, sin importar en qué etapa estés.",
   "center.help.cta": "Ayuda y preguntas frecuentes",

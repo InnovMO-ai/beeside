@@ -135,7 +135,7 @@ Open the **Logistics** card. Expect: "Let's work on Logistics. I will ask one qu
 | 5 | `Chile` | ¿A qué país llegan? (**destino**) |
 | 6 | `México` | ¿Qué producto se mueve en este flujo? |
 | 7 | `Alimentos secos empacados` | ¿Qué volumen mueves en este flujo? |
-| 8 | `20 pallets` | ¿Con qué frecuencia se hace este envío? (se registra "20 tarimas") |
+| 8 | `20 pallets` | ¿Con qué frecuencia se hace este envío? (se registra "20 pallets") |
 | 9 | `Mensual` | ¿Qué modo de transporte usarás en este flujo? |
 | 10 | `Marítimo` | ¿Necesitas almacenamiento dedicado para este proyecto? |
 | 11 | `No` | ¿Cuál es el estado de tus licencias de importación o exportación? |
@@ -182,9 +182,9 @@ Title: **Logistics — Category Requirement Pack (CRP)**. State **Ready for revi
 - **Information required later.** Empty.
 - No documents, attachments or upload area (by design).
 
-Buttons while "Ready for review": **Confirm** and **Request changes**. After Confirm: read-only, and **Start a new version** is offered (it is refused until the first send has succeeded; see N).
+Buttons while "For your review": **Confirm** and **Request changes**. After Confirm: read-only, and **Start a new version** is offered (it is refused until the first send has succeeded; see N).
 
-**Request changes** (optional, show once, only while the CRP is not yet confirmed): the category stays In progress, a short notice is added to the thread and the conversation continues so answers can be corrected. After Confirm, a change is made with **Start a new version**: the category goes back to In progress and the confirmed pack stays the current one (and the one that was sent) until a new pack is confirmed.
+**Request changes** (optional, show once, only while the CRP is not yet confirmed): the category stays "For your review" (the content is complete and stays editable), a short notice is added to the thread and the conversation continues so answers can be corrected. After Confirm, a change is made with **Start a new version**: the category goes back to In progress and the confirmed pack stays the current one (and the one that was sent) until a new pack is confirmed.
 
 ## I. Preview
 

@@ -16,6 +16,11 @@ export const CONFIG_KEYS = {
   contactEmail: "contact_beeside_email",
   /** Commercial Notices: reference document for a commercial-communications consent context. Not a navigation or footer link. */
   commercialNoticesUrl: "commercial_notices_url",
+  /**
+   * Direct Sherpa contact channel (deployment-level, optional). NO shipped default: until a real channel exists the key is
+   * simply unset and Precision offers general Contact beeside instead. A per-project channel supplied by the hub wins over it.
+   */
+  sherpaContactEmail: "sherpa_contact_email",
 } as const;
 
 /**
@@ -32,6 +37,8 @@ export const APPROVED_CUSTOMER_LINKS = {
   [CONFIG_KEYS.commercialNoticesUrl]: { env: "PRECISION_COMMERCIAL_NOTICES_URL", value: "https://beeside.you/Policiescommercialnotices" },
 } as const;
 export const APPROVED_CONTACT_EMAIL = { env: "PRECISION_CONTACT_EMAIL", value: "contact@beeside.you" } as const;
+
+export const SHERPA_CONTACT_ENV = "PRECISION_SHERPA_CONTACT_EMAIL";
 
 export const DEFAULT_RESUME_GAP_MINUTES = 30;
 
@@ -95,4 +102,18 @@ export async function customerLink(
 /** The single Contact beeside address. */
 export async function contactEmail(db: ConfigReader, locale: Locale, env: Record<string, string | undefined> = process.env): Promise<string> {
   return (await configEmail(db, CONFIG_KEYS.contactEmail, locale)) ?? emailOrNull(env[APPROVED_CONTACT_EMAIL.env]) ?? APPROVED_CONTACT_EMAIL.value;
+}
+
+/**
+ * The direct Sherpa channel, or null when none is available. Order: the hub's per-project channel, then the
+ * `sherpa_contact_email` configuration row, then the deployment environment. There is deliberately no shipped default:
+ * a missing or malformed value means "no direct channel", never a guessed address.
+ */
+export async function sherpaContactChannel(
+  db: ConfigReader,
+  locale: Locale,
+  fromHub?: string | null,
+  env: Record<string, string | undefined> = process.env,
+): Promise<string | null> {
+  return emailOrNull(fromHub) ?? (await configEmail(db, CONFIG_KEYS.sherpaContactEmail, locale)) ?? emailOrNull(env[SHERPA_CONTACT_ENV]);
 }

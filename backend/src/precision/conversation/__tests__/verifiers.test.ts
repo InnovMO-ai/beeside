@@ -38,8 +38,15 @@ describe("R2 colloquialisms, exclamations, emoji", () => {
     ["Great job! Tell me more.", "en"],
     ["Awesome, let's go.", "en"],
     ["Tell me more 🙂", "en"],
+    ["Noted, no on that one. What is the destination?", "en"],
+    ["Got it, yes. Which month would you start?", "en"],
   ] as const)("flags %j", (t, l) => {
     expect(codes(t, l)).toContain("R2:colloquial_or_exclamation");
+  });
+  it("does not flag ordinary acknowledgements of a value", () => {
+    for (const t of ["Noted: Chile as the destination. Which month would you start?", "Got it, about 20 pallets a month. How often do they ship?", "Thanks. Is there a customs agent in place?"]) {
+      expect(codes(t, "en")).not.toContain("R2:colloquial_or_exclamation");
+    }
   });
   it("does not flag 'de una empresa' (Gate D false positive T-1)", () => {
     expect(codes("Eres dueño de una empresa de manufactura.", "es")).not.toContain("R2:colloquial_or_exclamation");

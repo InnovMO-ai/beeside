@@ -7,7 +7,7 @@ import { AppShell } from "../ui/Shell";
 import { Icon } from "../ui/icons";
 import { usePage } from "../ui/hooks";
 import { Button, CategoryStatusText, Meter, Skeleton, StatusText } from "../ui/primitives";
-import { ContactDialog } from "./Contact";
+import { OhContactButton, OhContactDialog } from "./Contact";
 import { InlineError } from "./SystemPages";
 
 /** Where each category row leads, by status. */
@@ -165,7 +165,7 @@ export function CenterScreen() {
                 </div>
                 <div className="pz-band-actions">
                   {c.operationHub.state === "enter" && c.operationHub.url ? <a className="pz-btn pz-btn-primary" href={c.operationHub.url}><span>{t("center.oh.go")}</span><Icon name="external" size={18} /></a> : null}
-                  {c.operationHub.contactSherpa ? <Button variant="secondary" onClick={() => setSherpa(true)}>{t("center.oh.contactSherpa")}</Button> : null}
+                  <OhContactButton contact={c.operationHub.contact} onOpen={() => setSherpa(true)} />
                 </div>
               </section>
             ) : null}
@@ -184,7 +184,7 @@ export function CenterScreen() {
           </div>
         </div>
       )}
-      {sherpa ? <ContactDialog title={t("center.oh.contactSherpa")} onClose={() => setSherpa(false)} /> : null}
+      {sherpa && c?.operationHub.contact ? <OhContactDialog contact={c.operationHub.contact} onClose={() => setSherpa(false)} /> : null}
     </AppShell>
   );
 }
