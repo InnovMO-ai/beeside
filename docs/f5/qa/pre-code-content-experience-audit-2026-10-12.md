@@ -6,9 +6,9 @@ Scope: every customer-facing string that ships (frontend dictionary EN/ES, 1 336
 
 | Key | Value | Where it appears |
 |---|---|---|
-| `privacy_url` | https://beeside.you/PolíticaPrivacidad | Help → Información legal |
+| `privacy_url` | https://www.beeside.you/privacy (updated 12 Oct) | Help → Información legal |
 | `terms_url` | https://beeside.you/termsandconditions | Help → Información legal |
-| `help_center_url` | https://beeside.you/HelpCenter | Help → Centro de ayuda |
+| `help_center_url` | https://www.beeside.you/helpcenter (updated 12 Oct) | Help → Centro de ayuda |
 | `contact_beeside_email` | contact@beeside.you | Every "Contact beeside" action (`mailto:`), link-error pages, send-failed page, access-ended page |
 | `commercial_notices_url` | https://beeside.you/Policiescommercialnotices | Stored and served by config only; **not** exposed in navigation, Help or footer. No commercial-consent surface exists inside Precision, so it is not rendered anywhere |
 
@@ -24,7 +24,7 @@ Resolution order: database row (`precision_config`, per locale or `*`) > environ
 | 4 | `center.title.sentAll` "up to date / al día" could read as complete / ready | MINOR → fixed | "Everything you started has been sent" / "Todo lo que iniciaste ya fue enviado" |
 | 5 | "Shift and Enter" / "Mayús y Enter" | MINOR → fixed | "Shift + Enter" / "Mayús + Enter" |
 | 6 | `errors.test.ts` still asserted the removed `contactUrl` | MINOR (test) | Updated |
-| 7 | Three of the four approved URLs return "404 Página no encontrada" today (see 5) | CONFIG | Values kept as approved; PO action |
+| 7 | The first three approved URLs returned 404 | CONFIG → closed | PO replaced privacy and help-center URLs (12 Oct); both resolve; the Commercial Notices URL is not rendered anywhere and is not re-validated |
 | 8 | Backend copy entries not referenced by any screen (50 draft, including legacy psm_/pbyc_/ccir_ wording) | CONTENT | Not shipped to the customer; list kept for the Code phase clean-up |
 | 9 | Spanish uses "tarimas" for pallets; "Noted, no on that one" style | MINOR | Left as is |
 | 11 | Top-bar link was labelled "Help Center" but opens the in-app Help page (label promised the external Help Center) | MAJOR (CTA/label) → fixed | Label is now "Help" / "Ayuda"; the external Help Center is its own link inside Help |
@@ -45,16 +45,16 @@ Resolution order: database row (`precision_config`, per locale or `*`) > environ
 
 Confirm never sends (copy and backend: separate transitions); Send requires an existing Preview (`pv.notReady`); a confirmed CRP shows "Read-only / Solo lectura" and offers only "Start a new version"; retry buttons say "Try again" and never show success styling; Pending Information is separate from failures; progress carries "captured, not an evaluation of your project"; "For your review" is not "complete"; "Sent" appears only after delivery acceptance (backend send tests); Operation Hub appears only after the first successful send; Add a Service exposes no internal classification; Possible New Service is not displayed as an error. Covered by the mock and live Playwright suites below.
 
-## 5. Link and contact validation
+## 5. Link and contact validation (revalidated 12 Oct after the PO's URL update)
 
-| URL | Result on 12 Oct 2026 (browser load) |
+| URL | Result (browser load) |
 |---|---|
-| https://beeside.you/termsandconditions | Opens (title "Términos y condiciones \| beeside"). Observations on the page itself (not Precision): section 15 gives **info@beeside.you** as the contact, not contact@beeside.you; section 15 contains the placeholder "[20] días hábiles"; 14.1 ends "Código de Comercio,." |
-| https://beeside.you/HelpCenter | 404 Página no encontrada (also lower case) |
-| https://beeside.you/PolíticaPrivacidad (and percent-encoded) | 404 Página no encontrada |
-| https://beeside.you/Policiescommercialnotices | 404 Página no encontrada |
+| https://beeside.you/termsandconditions | Opens (redirects to www; "Términos y condiciones \| beeside") |
+| https://www.beeside.you/helpcenter | Opens ("beeside Help Center") |
+| https://www.beeside.you/privacy | Opens ("Política de Privacidad \| beeside"). **Content note for the PO:** the page currently shows generic template text ("ofrecen una visión a grandes rasgos sobre cómo redactar tu propio documento de política de privacidad … busca asesoramiento legal"), not beeside's own policy |
+| https://beeside.you/Policiescommercialnotices | Not rendered in Precision; not re-validated (404 on first check) |
 
-No placeholder, localhost, dev or staging URL in any shipped customer string; the only non-beeside URL is the mock transport's Operation Hub address, used only when the app runs against the mock transport (tests and demo). Mail action tested: the button is an anchor with `mailto:contact@beeside.you`.
+Email aliases such as info@beeside.you on external pages are intentional (routed to contact@beeside.you) and are not a finding; Precision uses contact@beeside.you from configuration. No placeholder, localhost, dev or staging URL in any shipped customer string; the only non-beeside URL is the mock transport's Operation Hub address (mock mode only). The Help screen renders the Help Center, Privacy Policy and Terms links and the `mailto:contact@beeside.you` action from the API values (integration test `journey.int` and mock e2e `help-links.spec.ts`).
 
 ## 6. Test evidence (this working tree, uncommitted until the commit that carries this file)
 

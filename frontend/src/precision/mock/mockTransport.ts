@@ -33,8 +33,8 @@ interface TurnResultStored { status: "ok" | "blocked"; turnIds: string[]; mapCha
 
 /** What the API answers from configuration (the approved defaults of the backend configuration layer); never read by a screen directly. */
 const MOCK_LINKS = {
-  helpCenterUrl: "https://beeside.you/HelpCenter",
-  privacyUrl: "https://beeside.you/PolíticaPrivacidad",
+  helpCenterUrl: "https://www.beeside.you/helpcenter",
+  privacyUrl: "https://www.beeside.you/privacy",
   termsUrl: "https://beeside.you/termsandconditions",
   contactEmail: "contact@beeside.you",
 } as const;

@@ -41,7 +41,7 @@ describe("configuration resolution", () => {
     const db = { query: async () => { throw new Error("connection lost"); } } as unknown as Db;
     expect(await configUrl(db, "k", "en")).toBeNull();
     // …and the customer links fall back to the approved values (never an error, never a blank link)
-    expect(await customerLink(db, "privacy_url", "en", {})).toBe("https://beeside.you/PolíticaPrivacidad");
+    expect(await customerLink(db, "privacy_url", "en", {})).toBe("https://www.beeside.you/privacy");
     expect(await contactEmail(db, "en", {})).toBe("contact@beeside.you");
   });
 
@@ -52,8 +52,8 @@ describe("configuration resolution", () => {
 
   it("approved customer links and the contact address: row > environment > approved default; malformed values fall through", async () => {
     const none = fakeDb([]).db;
-    expect(await customerLink(none, "privacy_url", "es", {})).toBe("https://beeside.you/PolíticaPrivacidad");
-    expect(await customerLink(none, "help_center_url", "en", {})).toBe("https://beeside.you/HelpCenter");
+    expect(await customerLink(none, "privacy_url", "es", {})).toBe("https://www.beeside.you/privacy");
+    expect(await customerLink(none, "help_center_url", "en", {})).toBe("https://www.beeside.you/helpcenter");
     expect(await customerLink(none, "terms_url", "en", {})).toBe("https://beeside.you/termsandconditions");
     expect(await customerLink(none, "commercial_notices_url", "en", {})).toBe("https://beeside.you/Policiescommercialnotices");
     expect(await contactEmail(none, "en", {})).toBe("contact@beeside.you");
@@ -68,7 +68,7 @@ describe("configuration resolution", () => {
 
   it("every approved default is https, free of placeholders, localhost and staging hosts, and on the beeside.you domain", () => {
     for (const d of Object.values(APPROVED_CUSTOMER_LINKS)) {
-      expect(d.value).toMatch(/^https:\/\/beeside\.you\/\S+$/);
+      expect(d.value).toMatch(/^https:\/\/(www\.)?beeside\.you\/\S+$/);
       expect(d.value).not.toMatch(/localhost|example|staging|dev\.|127\.0\.0\.1|\.test|TODO|xxx/i);
     }
     expect(APPROVED_CONTACT_EMAIL.value).toBe("contact@beeside.you");

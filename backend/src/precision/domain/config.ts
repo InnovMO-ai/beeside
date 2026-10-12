@@ -26,8 +26,8 @@ export const CONFIG_KEYS = {
  * No UI component or screen carries any of these literally: they reach the client only through the API.
  */
 export const APPROVED_CUSTOMER_LINKS = {
-  [CONFIG_KEYS.privacyUrl]: { env: "PRECISION_PRIVACY_URL", value: "https://beeside.you/PolíticaPrivacidad" },
-  [CONFIG_KEYS.helpCenterUrl]: { env: "PRECISION_HELP_CENTER_URL", value: "https://beeside.you/HelpCenter" },
+  [CONFIG_KEYS.privacyUrl]: { env: "PRECISION_PRIVACY_URL", value: "https://www.beeside.you/privacy" },
+  [CONFIG_KEYS.helpCenterUrl]: { env: "PRECISION_HELP_CENTER_URL", value: "https://www.beeside.you/helpcenter" },
   [CONFIG_KEYS.termsUrl]: { env: "PRECISION_TERMS_URL", value: "https://beeside.you/termsandconditions" },
   [CONFIG_KEYS.commercialNoticesUrl]: { env: "PRECISION_COMMERCIAL_NOTICES_URL", value: "https://beeside.you/Policiescommercialnotices" },
 } as const;
