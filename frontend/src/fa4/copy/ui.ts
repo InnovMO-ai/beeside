@@ -129,7 +129,7 @@ export const UI = {
   concreteQ: L('¿Buscas algo concreto? Escríbelo', 'Looking for something specific? Write it'), concretePh: L('Por ejemplo, grúas', 'For example, cranes'),
   related: L('Lo relacionamos con', 'We linked it to'), change: L('Cambiar', 'Change'), applyHere: L('Aplican a tu proyecto', 'Apply to your project'),
   markedCount: L('Marcados', 'Marked'), notIndicated: L('No indicado', 'Not indicated'), otherTopics: L('Otros temas que aplican', 'Other topics that apply'),
-  criticalTitleQuarter: L('¿Qué debe estar listo antes del', 'What needs to be ready before'), criticalTitleDate: L('¿Qué debe estar listo antes de', 'What needs to be ready before'), criticalTitle: L('¿Qué debe estar listo según tu calendario?', 'What needs to be ready according to your schedule?'), criticalLead: L('Marca los temas atados a una fecha que no puedes mover.', "Mark the topics tied to a date you can't move."),
+  criticalTitleQuarter: L('¿Qué temas deben estar listos antes de', 'Which topics need to be ready before'), criticalTitleDate: L('¿Qué temas deben estar listos antes de', 'Which topics need to be ready before'), criticalTitle: L('¿Qué temas deben estar listos según tu calendario?', 'Which topics need to be ready according to your schedule?'), criticalLead: L('Marca los temas atados a una fecha que no puedes mover.', "Mark the topics tied to a date you can't move."),
   cargoTitle: L('¿Dónde necesitas mover la carga?', 'Where do you need to move the cargo?'),
   cargo: (c: string) => ({ within: L(`Dentro de ${c}`, `Within ${c}`), into_from_abroad: L(`Hacia ${c} desde otro país`, `Into ${c} from another country`), both: L('Ambos', 'Both'), unknown: L('Aún no lo sé', 'Not sure yet') }),
 

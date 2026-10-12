@@ -51,10 +51,19 @@ WEB_URL=https://fa4-staging-web-${PNUM}.${REGION}.run.app
 BACKEND_URL=https://fa4-staging-backend-${PNUM}.${REGION}.run.app
 echo "== backend (private, min 0 / max 1)"
 COMMON=(--region "$REGION" --service-account "$RUN_SA" --min-instances 0 --max-instances 1 --memory 512Mi --cpu 1)
+# Email: log-only by default. To verify real SMTP in staging, set FA4_SMTP_SECRET (the NAME of the existing Secret Manager secret that holds the
+# SMTP password; its value is never read, printed or logged here) and SMTP_HOST (and optionally SMTP_PORT). Sender/Reply-To stay contact@beeside.you.
+EMAIL_ENV="FA4_EMAIL_TRANSPORT=log"; EMAIL_SECRETS=""
+if [ -n "${FA4_SMTP_SECRET:-}" ]; then
+  : "${SMTP_HOST:?SMTP_HOST is required with FA4_SMTP_SECRET}"
+  EMAIL_ENV="FA4_EMAIL_TRANSPORT=smtp,SMTP_HOST=${SMTP_HOST},SMTP_PORT=${SMTP_PORT:-587},SMTP_USER=contact@beeside.you,MAIL_FROM=contact@beeside.you,MAIL_FROM_NAME=beeside,MAIL_REPLY_TO=contact@beeside.you"
+  EMAIL_SECRETS=",SMTP_PASSWORD=${FA4_SMTP_SECRET}:latest"
+  g secrets add-iam-policy-binding "$FA4_SMTP_SECRET" --member "serviceAccount:${RUN_SA}" --role roles/secretmanager.secretAccessor >/dev/null
+fi
 g run deploy fa4-staging-backend "${COMMON[@]}" --image "${REPO}/fa4-staging-backend:${TAG}" --no-allow-unauthenticated \
   --add-cloudsql-instances "$SQL_CONN" \
-  --set-env-vars "NODE_ENV=staging,FA4_ENV=staging,FA4_API_ENABLED=true,APP_BASE_URL=${WEB_URL}" \
-  --set-secrets "DATABASE_URL=fa4-staging-database-url:latest,SECURITY_HASH_SECRET=fa4-staging-hash-secret:latest"
+  --set-env-vars "NODE_ENV=staging,FA4_ENV=staging,FA4_API_ENABLED=true,APP_BASE_URL=${WEB_URL},${EMAIL_ENV}" \
+  --set-secrets "DATABASE_URL=fa4-staging-database-url:latest,SECURITY_HASH_SECRET=fa4-staging-hash-secret:latest${EMAIL_SECRETS}"
 
 echo "== web (frontend; IAP in front)"
 g run deploy fa4-staging-web "${COMMON[@]}" --image "${REPO}/fa4-staging-web:${TAG}" --no-allow-unauthenticated \

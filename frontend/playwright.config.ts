@@ -26,7 +26,7 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   webServer: [
     {
-      command: `FA4_API_ENABLED=true FA4_EMAIL_DISPATCH=inline DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
+      command: `FA4_API_ENABLED=true FA4_EMAIL_DISPATCH=inline FA4_EMAIL_RECIPIENT_DAILY_QUOTA=1000 DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
       url: `http://localhost:${API}/health`,
       timeout: 60_000,
       reuseExistingServer: !!process.env.E2E_REUSE,

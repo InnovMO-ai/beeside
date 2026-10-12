@@ -35,7 +35,7 @@
     "@beeside/fa-public-engine": "1.0.0",
     "drizzle-orm": "^0.45.2",
     "express": "^4.19.2",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^10.1.0",
     "pg": "^8.23.0",
     "zod": "^4.6.7"
   },
