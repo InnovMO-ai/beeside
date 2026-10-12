@@ -51,7 +51,7 @@ describe('copy gate', () => {
     expect(UI.saved.es.includes('{email}') && fill(UI.saved, 'es', { email: 'a***@b.c' })).toBe('Te enviamos el enlace de regreso a a***@b.c.');
     expect(fill(UI.saved, 'en', { email: 'a***@b.c' })).toBe('We sent your return link to a***@b.c.');
     expect(`${UI.coverTitleLead.en} ${UI.coverTitleAccent.en}`).toBe('Your expansion starts with a clearer view.');   // cover (PO design mock)
-    expect(UI.coverNoteStrong.en).toBe('Investing 10-15 minutes to plan today will give you weeks of freedom tomorrow.');   // typo "yoy" fixed
+    expect(UI.coverNoteStrong.en).toBe('Spending 10–15 minutes today can give you more clarity for what comes next.');   // final PO decision 2026-10-12: no "weeks of freedom" claim
     expect(UI.coverNote.en).toBe('You can save and continue later.');                                                     // typo "Yo" fixed
     expect(UI.sizes['251-1000'].es).toBe('251–1.000'); expect(UI.sizes['1000+'].es).toBe('Más de 1.000');
     expect(UI.noPremiumTitle.en).toBe('Your project, with more clarity');

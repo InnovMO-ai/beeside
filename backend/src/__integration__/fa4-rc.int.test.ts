@@ -7,6 +7,7 @@ import { createSavepointDb } from "../db/database";
 import { createApp } from "../index";
 import { CaptureEmailTransport } from "../fa/email/email-adapter";
 import { deliverDueFa4Emails } from "../fa4/email";
+import { purgeExpiredOrphanContacts } from "../fa4/retention";
 import { latestMarketingConsent, seedCatalogIfEmpty } from "../fa4/repository";
 import { Fa4Deps } from "../fa4/routes";
 
@@ -186,6 +187,23 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       email.failNext.push(new Error("down"));
       expect((await api().post("/api/fa4/contact").send({ ...body, clientRequestId: "req-anon-0002" })).status).toBe(502);
       expect((await api().post("/api/fa4/contact").send({ ...body, email: "bad", clientRequestId: "req-anon-0003" })).status).toBe(400);
+    });
+
+    it("retention: orphan (pre-project) contacts are irreversibly anonymized after 180 days; project-linked ones and recent ones are untouched; idempotent", async () => {
+      const t = await start();
+      await api().post("/api/fa4/contact").send({ ...body, clientRequestId: "req-ret-0001" });
+      await api().post("/api/fa4/contact").send({ ...body, clientRequestId: "req-ret-0002" });
+      await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, clientRequestId: "req-ret-0003" });
+      await client.query("UPDATE fa4_contact_request SET created_at = $1 WHERE client_request_id = 'req-ret-0001'", [new Date(clock.now.getTime() - 181 * 86_400_000)]);
+      await client.query("UPDATE fa4_contact_request SET created_at = $1 WHERE client_request_id = 'req-ret-0002'", [new Date(clock.now.getTime() - 179 * 86_400_000)]);
+      await client.query("UPDATE fa4_contact_request SET created_at = $1 WHERE client_request_id = 'req-ret-0003'", [new Date(clock.now.getTime() - 400 * 86_400_000)]);
+      expect(await purgeExpiredOrphanContacts(db, clock.now)).toBe(1);
+      expect(await purgeExpiredOrphanContacts(db, clock.now)).toBe(0);
+      const rows = Object.fromEntries((await client.query("SELECT client_request_id, name, email, message FROM fa4_contact_request")).rows.map((r) => [r.client_request_id, r]));
+      expect(JSON.stringify(rows["req-ret-0001"])).not.toMatch(/Lucía|nortica|logística/); expect(rows["req-ret-0001"].message).toBe("anonymized");
+      expect(rows["req-ret-0002"].message).toContain("logística");          // 179 days: still inside the period
+      expect(rows["req-ret-0003"].message).toContain("logística");          // linked to a project: follows the project's rules
+      expect((await client.query("SELECT count(*)::int n FROM fa4_marketing_consent")).rows[0].n).toBe(1);   // never marketing
     });
 
     it("header injection in the name cannot add headers or recipients", async () => {

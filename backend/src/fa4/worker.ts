@@ -1,5 +1,6 @@
 import { fa4DepsFromEnv } from "../index";
 import { deliverDueFa4Emails } from "./email";
+import { ORPHAN_CONTACT_RETENTION_DAYS, purgeExpiredOrphanContacts } from "./retention";
 import { jsonLogger } from "../security/redact";
 
 /**
@@ -34,8 +35,15 @@ if (require.main === module) {
       jsonLogger("error", "fa4 email outbox tick failed", { error: error instanceof Error ? error.name : "unknown" });
     } finally { busy = false; }
   };
+  // retention: pre-project contact requests are anonymized after 180 days (checked hourly; idempotent, bounded)
+  const retentionDays = Number(process.env.FA4_ORPHAN_CONTACT_RETENTION_DAYS ?? ORPHAN_CONTACT_RETENTION_DAYS);
+  const purge = async () => {
+    try { const n = await purgeExpiredOrphanContacts(fa4.db, new Date(), retentionDays); if (n > 0) jsonLogger("info", "fa4 orphan contacts anonymized", { count: n }); }
+    catch (error) { jsonLogger("error", "fa4 retention failed", { error: error instanceof Error ? error.name : "unknown" }); }
+  };
+  void purge(); const purgeTimer = setInterval(() => void purge(), 3_600_000);
   const timer = setInterval(() => void tick(), pollMs);
   void tick();
-  const stop = () => { stopping = true; clearInterval(timer); const w = setInterval(() => { if (!busy) { clearInterval(w); process.exit(0); } }, 200); };
+  const stop = () => { stopping = true; clearInterval(timer); clearInterval(purgeTimer); const w = setInterval(() => { if (!busy) { clearInterval(w); process.exit(0); } }, 200); };
   process.on("SIGTERM", stop); process.on("SIGINT", stop);
 }

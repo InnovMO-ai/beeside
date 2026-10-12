@@ -1,5 +1,5 @@
 import type { Locale } from '@beeside/fa-public-engine';
-import { L, NC, type L10n } from '@beeside/fa-public-engine';
+import { L, type L10n } from '@beeside/fa-public-engine';
 
 /** Journey + result microcopy. Visible vocabulary only: no "frentes", "activadores", "demand signal", "core/adjacent" (DESIGN_HANDOFF §12). */
 export const UI = {
@@ -9,15 +9,15 @@ export const UI = {
   saved: L('Te enviamos el enlace de regreso a {email}.', 'We sent your return link to {email}.'),
   saveError: L('No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),
 
-  // Cover (PO design): English from the approved mock; Spanish is a proposal pending PO approval (NC).
-  coverEyebrow: NC('cover.eyebrow', 'Un camino más claro. Un mañana más brillante.', 'A clearer path. A brighter tomorrow.'),
-  coverTitleLead: NC('cover.title.lead', 'Tu expansión empieza con una', 'Your expansion starts with a'),
-  coverTitleAccent: NC('cover.title.accent', 'visión más clara.', 'clearer view.'),
-  coverLead: NC('cover.lead', 'Cuéntanos sobre tu proyecto. Te ayudaremos a identificar lo que ya está definido, lo que necesita atención y lo que sigue.', "Tell us about your project. We'll help you identify what's already defined, what needs attention, and what comes next."),
-  coverCta: NC('cover.cta', 'Comienza tu evaluación', 'Start your assessment'),
-  coverNoteStrong: NC('cover.note.strong', 'Dedicar 10–15 minutos a planear hoy te dará semanas de libertad mañana.', 'Investing 10-15 minutes to plan today will give you weeks of freedom tomorrow.'),
-  coverNote: NC('cover.note', 'Puedes guardar y continuar después.', 'You can save and continue later.'),
-  switchLanguage: NC('switchLanguage', 'Cambiar idioma a', 'Switch language to'),
+  // Cover (PO design): English from the approved mock; PO-approved copy (final decisions 2026-10-12).
+  coverEyebrow: L('Un camino más claro. Un mañana más brillante.', 'A clearer path. A brighter tomorrow.'),
+  coverTitleLead: L('Tu expansión empieza con una', 'Your expansion starts with a'),
+  coverTitleAccent: L('visión más clara.', 'clearer view.'),
+  coverLead: L('Cuéntanos sobre tu proyecto. Te ayudaremos a identificar lo que ya está definido, lo que necesita atención y lo que sigue.', "Tell us about your project. We'll help you identify what's already defined, what needs attention, and what comes next."),
+  coverCta: L('Comenzar', 'Start'),
+  coverNoteStrong: L('Dedicar 10–15 minutos hoy puede darte más claridad para lo que sigue.', 'Spending 10–15 minutes today can give you more clarity for what comes next.'),
+  coverNote: L('Puedes guardar y continuar después.', 'You can save and continue later.'),
+  switchLanguage: L('Cambiar idioma a', 'Switch language to'),
   // Product name stays "First Assessment" in both languages. Side words and benefits follow the locale (D-143); ES wording = proposal (LANG-1).
   coverProduct: L('First Assessment', 'First Assessment'),
   coverSideTop: [L('PERSONAS', 'PEOPLE'), L('IDEAS', 'IDEAS'), L('OPORTUNIDADES', 'OPPORTUNITIES'), L('UN MAÑANA MÁS BRILLANTE', 'A BRIGHTER TOMORROW')],   // ES = proposal (D-143 / LANG-1)
@@ -204,9 +204,9 @@ export const UI = {
   offlineBody: L('Tu avance está guardado en este dispositivo. Cuando vuelva la conexión, seguimos.', "Your progress is kept on this device. We'll continue when you're back online."),
   staleTitle: L('Tu sesión se cerró por inactividad', 'Your session closed after inactivity'),
   staleBody: L('Lo que respondiste está guardado. Pide un enlace para continuar donde lo dejaste.', 'Your answers are saved. Ask for a link to continue where you left off.'),
-  linkRequested: L('Si ese correo tiene un proyecto, recibirás un enlace nuevo en unos minutos.', 'If that email has a project, you will receive a new link in a few minutes.'),
-  topicsErrorTitle: L('No pudimos preparar tus temas', "We couldn't prepare your topics"),
-  startNew: L('Empezar uno nuevo', 'Start a new one'),
+  linkRequested: L('Si ese correo tiene un proyecto, te enviaremos un enlace nuevo en unos minutos.', "If that email has a project, we'll send you a new link in a few minutes."),
+  topicsErrorTitle: L('No pudimos preparar esta parte', "We couldn't prepare this section"),
+  startNew: L('Empezar de nuevo', 'Start over'),
   resolveErrorTitle: L('No pudimos preparar tu resultado', "We couldn't prepare your result"),
   resolveErrorBody: L('Tus respuestas están guardadas. Inténtalo de nuevo en un momento.', 'Your answers are saved. Please try again in a moment.'),
   catalogErrorTitle2: L('No pudimos cargar First Assessment', "We couldn't load First Assessment"),

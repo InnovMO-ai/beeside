@@ -3,7 +3,14 @@
 ## Email architecture
 `EmailTransport` (`log` | `smtp`) → `fa4_email_delivery` outbox (lease, retry with backoff, `DEAD` after `max_attempts`, idempotency key = delivery id, per-recipient daily quota, resend cooldown) → worker (`node dist/fa4/worker.js`, `npm run start:fa4-worker`). No direct sends from routes, no second mailer, no legacy `email_delivery`. No DB transaction is open while the provider is contacted. Delivery is at-least-once (a crash between acceptance and the `SENT` update re-sends after the lease expires; Message-ID / `X-Beeside-Delivery` carry the delivery id).
 
-All FA4 operational mail: From `beeside <contact@beeside.you>`, Reply-To `contact@beeside.you` (contact messages: Reply-To = the person who wrote), recipient of "Hablar con beeside" = `contact@beeside.you`. Operational email is never marketing.
+All FA4 operational mail — **final canonical behaviour (PO, 2026-10-12)**:
+
+| Email | To | From | Reply-To |
+|---|---|---|---|
+| Resume / YEV | the project's email | `beeside <contact@beeside.you>` | `contact@beeside.you` |
+| "Hablar con beeside" | `contact@beeside.you` | `beeside <contact@beeside.you>` | **the person who submitted the form** (so beeside's reply reaches them; this supersedes the literal Design §G note) |
+
+Operational email is never marketing.
 
 ### Truthful states (queued ≠ sent)
 `POST /session/finish-later`, `POST /session/result/email`, `POST /session/contact`, `POST /contact` answer:
@@ -44,3 +51,7 @@ Privacy: no IP, user agent, fingerprint, email or free text. `visit_id` is a ran
 | `resume_link_used` | server | resume token exchanged | – |
 
 Every event carries `props.questionBank` (`FA4_QUESTION_BANK_FINAL_2026-10`) and, where relevant, `catalog_version`. Derived metrics: visit → start → Identity (`project_created`) → step progression (`step_reached`) → abandonment (last step without `result_generated`) → completion; destinations and activity signals from `result_generated`; Demand Signals and coverage gaps remain in the internal `fa4_demand_signal` table (never exposed publicly). Suitable for a later Admin console / Tableau extract.
+
+
+## Retention of pre-project contact requests
+A contact request written before Identity (`fa4_contact_request.project_id IS NULL`, e.g. from the cover) is kept **180 days from its latest interaction**; after that its name, company, email and message are irreversibly anonymized (`anonymized+<id>@invalid.invalid`). Linked requests follow the project's rules (`fa4_anonymize_project` also scrubs them). Mechanism: `purgeExpiredOrphanContacts` (`backend/src/fa4/retention.ts`) — idempotent, bounded (500/run), `SKIP LOCKED`, UPDATE-only so it works with the least-privilege runtime role; run hourly by the FA4 worker (`FA4_ORPHAN_CONTACT_RETENTION_DAYS`, default 180). A contact request is never marketing consent and writes nothing to the consent history.

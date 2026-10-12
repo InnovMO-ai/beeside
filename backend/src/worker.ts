@@ -1,5 +1,6 @@
 import { baseDepsFromEnv, fa4DepsFromEnv } from "./index";
 import { deliverDueFa4Emails } from "./fa4/email";
+import { purgeExpiredOrphanContacts } from "./fa4/retention";
 import { integrationsFromEnv } from "./integrations/config";
 import { JobName, runJob } from "./operations/jobs";
 import { jsonLogger } from "./security/redact";
@@ -63,6 +64,8 @@ if (require.main === module) {
         fa4Busy = false;
       }
     };
+    const purgeFa4 = () => void purgeExpiredOrphanContacts(fa4.db, new Date(), Number(process.env.FA4_ORPHAN_CONTACT_RETENTION_DAYS ?? 180)).catch(() => undefined);
+    purgeFa4(); timers.push(setInterval(purgeFa4, 3_600_000));
     void tickFa4();
     // 5 s: a person is waiting on "Guardar y seguir después" / "Hablar con beeside"; an empty poll is a single indexed query.
     timers.push(setInterval(() => void tickFa4(), Number(process.env.FA4_WORKER_POLL_MS ?? 5_000)));

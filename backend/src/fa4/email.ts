@@ -22,12 +22,12 @@ const COPY: Record<"fa4_resume_link" | "fa4_result_link", { subject: ReturnType<
   fa4_resume_link: {
     subject: L("Retoma tu First Assessment", "Pick up your First Assessment"),
     body: L("Usa este enlace para continuar donde lo dejaste.", "Use this link to continue where you left off."),
-    cta: L("Continuar", "Continue"),
+    cta: L("Continuar donde lo dejaste", "Pick up where you left off"),
   },
   // Design D-147: primary CTA = the private single-use link to the YEV; the YEV content is never in the email body.
   fa4_result_link: {
-    subject: L("Your Expansion View de tu proyecto", "Your Expansion View for your project"),
-    body: L("Aquí está Your Expansion View de tu proyecto.", "Here is Your Expansion View for your project."),
+    subject: L("Tu Your Expansion View está listo", "Your Expansion View is ready"),
+    body: L("Ya puedes revisar lo que entendimos de tu proyecto y dónde puede ayudarte beeside.", "You can now review what we understood about your project and where beeside can help."),
     cta: L("Ver mi Your Expansion View", "See my Your Expansion View"),
     secondary: L("Conoce cómo puede ayudarte Premium", "See how Premium can help you"),
   },

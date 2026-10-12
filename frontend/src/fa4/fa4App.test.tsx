@@ -37,10 +37,10 @@ describe("Fa4App (Vite/React) against the API contract", () => {
   it("cover offers ES/EN; the language is only chosen on the cover; identity creates the project and stores the Bearer session", async () => {
     const calls = mockApi();
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Comienza tu evaluación" });
+    await screen.findByRole("button", { name: "Comenzar" });
     fireEvent.click(screen.getByRole("button", { name: "Cambiar idioma a English" }));
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Your expansion starts with a clearer view.");
-    fireEvent.click(screen.getByRole("button", { name: "Start your assessment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
     expect(screen.queryByRole("button", { name: /Switch language/ })).toBeNull();           // no language switcher after the cover
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Name"), "Ana");
@@ -91,7 +91,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Correo de trabajo"), "ana@acme.example");
     await user.click(screen.getByRole("button", { name: "Enviarme un enlace nuevo" }));
-    await screen.findByText(/recibirás un enlace nuevo/);
+    await screen.findByText(/te enviaremos un enlace nuevo/);
     expect(calls.find((c) => c.url === "/api/fa4/links/request")!.body).toEqual({ email: "ana@acme.example" });
     await user.click(screen.queryByRole("button", { name: "Empezar uno nuevo" }) ?? document.body);   // hidden once requested: nothing breaks
   });
@@ -141,6 +141,6 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(alert).toHaveTextContent("No pudimos cargar First Assessment");
     failing = false;
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    await screen.findByRole("button", { name: "Comienza tu evaluación" });
+    await screen.findByRole("button", { name: "Comenzar" });
   });
 });
