@@ -3,7 +3,7 @@
 Date of the runs: 2026-10-09 to 2026-10-10. Author: QA-LIVE.
 Commit under test: `4be394fbbd69bc6f2f0ad2eea1b34c1b1a8c1b19` (branch `feature/precision-v2-f5`). The changes made by this QA pass were committed afterwards as `73b5d46` (tag `embassy-rc-1`, branch `embassy-rc`); file list in section 8. Every result below was produced by a command run in this pass against the working tree, unless a line says otherwise.
 
-**Embassy Ready is not declared.** The Design Proof v3.3 is not accessible to this team (WI-1 is OPEN), so the visual comparison against it was not done. Everything else below is a product-quality result against a simulated environment (section 3).
+**Embassy Ready is not declared in this document.** Update 12 Oct 2026: the Design Proof v3.3 comparison (WI-1) is done and PASS — see `wi-1-design-proof-comparison-2026-10-12.md`. The sections below are the 10 Oct product-quality result against a simulated environment (section 3); the status of the remaining gates (real-model rehearsal, GitHub backup) is in `../f5-status-2026-10-12.md`.
 
 ## 1. Result at a glance
 
@@ -12,7 +12,7 @@ Commit under test: `4be394fbbd69bc6f2f0ad2eea1b34c1b1a8c1b19` (branch `feature/p
 | G1. No CRITICAL or MAJOR defect open | PASS (after fixes) | Two MAJOR defects found and fixed (D-1, D-2), plus one MAJOR content defect fixed earlier by COPY. None open. Section 5 |
 | G2. No broken action (every button, link and card does what it says) | PASS | Journey A-J typed literally, 4 viewports x 2 languages; keyboard-only path; double click; leave and return. Section 4 |
 | G3. Copy gate (tuteo, canonical names, no exclamations, no internal terms, no superseded copy) | PASS with open content items | Static sweep and route tests green; live grep of every API body and every screen for forbidden terms; bundle grep. Open: CI-5, CI-9 to CI-13 (PO decisions, section 6) |
-| G4. Comparison with the Design Proof v3.3 | **OPEN, NOT DONE** | WI-1: the proof is not accessible. Not claimed |
+| G4. Comparison with the Design Proof v3.3 | **PASS (12 Oct)** | `wi-1-design-proof-comparison-2026-10-12.md`; remaining differences are copy/asset/frozen-product only |
 | G5. Desktop and mobile journeys (light and dark) | PASS | `acceptance.live.spec.ts`, 17 passed, 3 skipped by design (print on one project) |
 | G6. Process questions P-01 and P-02 | PASS | `process-surfaces.live.spec.ts` (60 questions on 3 surfaces x 2 languages), `process.live.spec.ts`, `acceptance.live.spec.ts`. D-5 and D-6 found and fixed |
 | G7. Synthetic end-to-end through the real entry point | PASS | `real-stack.live.spec.ts` against the production backend build and production static server: 24 of 24 test/project combinations passed (one first-run failure was the rate limiter, section 4.4) |
@@ -108,7 +108,7 @@ No BLOCKER was found. No MAJOR is open.
 
 | Id | Type | Item |
 |---|---|---|
-| WI-1 | EXTERNAL DEPENDENCY | Design Proof v3.3 is not accessible. The visual comparison (G4) is NOT DONE. Screens were checked for internal consistency, accessibility and brand tokens only. |
+| WI-1 | CLOSED (12 Oct) | Design Proof v3.3 received; visual comparison PASS (`wi-1-design-proof-comparison-2026-10-12.md`). |
 | CI-12 | CONTENT / EXTERNAL DEPENDENCY | Approved copy "We will let you know as soon as you can enter" (Center and Sent) promises a notification, and no notification channel exists in this release candidate. Confirm the promise or approve a wording without it. The real access path to Operation Hub is also not verified (simulator). |
 | CI-5 | CONTENT | "Strategic Advisory" stays in English in the Spanish interface. Confirm or give the Spanish name. |
 | CI-8 | CONTENT | "Is my information confidential?" has no approved answer; the product says it cannot confirm it and keeps a pending item. A legal or privacy statement is needed before launch. |

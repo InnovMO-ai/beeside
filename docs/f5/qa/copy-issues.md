@@ -44,3 +44,13 @@ Not copy: after the router fix the live suite asserts the whole canonical list p
 | CI-11 | CRP document | EN, ES | Eyebrow "Category Requirement Pack (CRP)" and the title "Logistics - Category Requirement Pack (CRP)" both spell the name out | Two spellings on the first screenful. The eyebrow is enforced by `i18n.test.ts`, so it was left alone. Decide whether the title should say only "CRP" once the eyebrow has spelled it out. |
 | CI-12 | Center and Sent | EN, ES | "We will let you know as soon as you can enter." | It promises a notification. No notification channel exists in this release candidate. Approved copy; the PO should confirm the promise is intended or approve a wording that does not promise it. EXTERNAL DEPENDENCY (the access path to Operation Hub). |
 | CI-13 | Category CRP, after "Request changes" | EN | Lifecycle label after Request changes | The category stays at "For your review" with the CRP editable. `docs/f5/demo-route.md` calls it "In progress". Wording of the document or of the label to be aligned by the PO. |
+
+## Closure of 12 Oct 2026 (PO decisions, FINAL EMBASSY CLOSURE)
+
+| Id | Decision | State |
+|---|---|---|
+| CI-5 | "Strategic Advisory" stays untranslated in every locale. | CLOSED |
+| CI-8 / confidentiality | The confidentiality Process Knowledge answer is the PO-approved text (topic `privacy_confidentiality`, pack `pk-2026-10-12.1`); no legal or privacy promise beyond the contract. | CLOSED |
+| CI-10 | Layout of the repeated pending question and inherited-value card checked against the Design Proof v3.3 (WI-1 PASS): no visual difference. Behaviour unchanged. | CLOSED |
+| CI-12 | Notification promise removed. Neutral, state-based copy: "Your information has been sent to Operation Hub. Access will be available here once your workspace is enabled." (ES equivalent). "enabled" instead of "ready" because the copy linter forbids readiness claims. | CLOSED |
+| CI-9, CI-11, CI-13 | Minor wording, not blocking the Embassy RC. | OPEN (MINOR) |
