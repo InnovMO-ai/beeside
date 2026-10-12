@@ -14,9 +14,9 @@ const add = (id, ok, detail) => rows.push({ id, ok, detail });
 // CHK-1 — Terms and Privacy URLs are canonical defaults; the Privacy document VERSION is not supplied and must be configured (external dependency)
 add('CHK-1 Terms', true, `version ${env.FA4_TERMS_VERSION ?? '1.0-2026-08-27 (default)'} · ${env.FA4_TERMS_URL ?? env.FA4_TERMS_URL_ES ?? 'https://beeside.you/termsandconditions (default)'}`);
 const pv = env.FA4_PRIVACY_VERSION;
-add('CHK-1 Privacy URL', true, `${env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? 'https://beeside.you/PolíticaPrivacidad (default)'}`);
+add('CHK-1 Privacy URL', true, `${env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? 'https://www.beeside.you/privacy (default)'}`);
 add('CHK-1 Privacy VERSION (EXTERNAL)', !!pv, pv ? `version ${pv}` : 'FA4_PRIVACY_VERSION not set — the document version/date has not been supplied; production refuses to start without it');
-add('CHK-2 Help Center', true, `${env.VITE_FA4_HELP_URL_ES ?? 'https://beeside.you/HelpCenter (default)'}`);
+add('CHK-2 Help Center', true, `${env.VITE_FA4_HELP_URL_ES ?? 'https://www.beeside.you/helpcenter (default)'}`);
 
 // BRAND — assets still null/placeholder in brand.ts
 const brand = read('frontend/src/fa4/brand.ts');

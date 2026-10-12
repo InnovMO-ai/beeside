@@ -29,7 +29,7 @@ describe("Hablar con beeside", () => {
     const { TopActions } = await import("./components/HelpContact");
     render(<TopActions locale="es" prefill={prefill} />);
     const link = screen.getAllByRole("link", { name: /Necesito ayuda/ })[0] as HTMLAnchorElement;
-    expect(link.href).toBe("https://beeside.you/HelpCenter"); expect(link.target).toBe("_blank"); expect(link.rel).toContain("noopener");
+    expect(link.href).toBe("https://www.beeside.you/helpcenter"); expect(link.target).toBe("_blank"); expect(link.rel).toContain("noopener");
     fireEvent.click(link);
   });
 });

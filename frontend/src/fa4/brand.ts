@@ -13,8 +13,8 @@ const env = (k: string, d: string): string => ((import.meta.env as Record<string
 // Canonical destinations (Design VF, 2026-10-12). Env vars remain only as a deployment override; no placeholder fallbacks.
 export const CANONICAL_URLS = {
   terms: 'https://beeside.you/termsandconditions',
-  privacy: 'https://beeside.you/Pol%C3%ADticaPrivacidad',   // https://beeside.you/PolíticaPrivacidad
-  help: 'https://beeside.you/HelpCenter',
+  privacy: 'https://www.beeside.you/privacy',
+  help: 'https://www.beeside.you/helpcenter',
 } as const;
 /** Human contact for FA: From, Reply-To and contact destination of every FA email (save link, YEV, contact, continuation). */
 export const CONTACT_EMAIL = 'contact@beeside.you';

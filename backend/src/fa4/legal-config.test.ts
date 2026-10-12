@@ -6,7 +6,7 @@ describe("FA4 legal configuration (CHK-1)", () => {
     const l = fa4LegalFromEnv({ NODE_ENV: "development" } as never);
     expect(l.termsVersion).toBe("1.0-2026-08-27");
     expect(l.termsUrl).toEqual({ es: "https://beeside.you/termsandconditions", en: "https://beeside.you/termsandconditions" });
-    expect(l.privacyUrl).toEqual({ es: "https://beeside.you/PolíticaPrivacidad", en: "https://beeside.you/PolíticaPrivacidad" });   // canonical page
+    expect(l.privacyUrl).toEqual({ es: "https://www.beeside.you/privacy", en: "https://www.beeside.you/privacy" });   // canonical page
     expect(l.privacyVersion).toBe("UNSET-LEGAL-1");   // the document VERSION was not supplied: never invented
   });
   it("production refuses to start without Privacy configuration, and only Privacy is required", () => {

@@ -13,7 +13,7 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await open(page, token);
 
   await expect(page.getByText('esto es lo que entendemos')).toBeVisible();
-  await page.getByRole('button', { name: 'Ir directo' }).click();                           // shortcut offered after R1
+  await page.getByRole('button', { name: 'Sí, ir a marcarlo' }).click();                           // shortcut offered after R1
 
   await page.getByLabel('Ejecutar un contrato ganado').check();
   await page.getByLabel(/Escríbelo con tus palabras/).fill('ganamos un contrato');
@@ -21,15 +21,17 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await page.getByLabel('Ya está en marcha').check();
   await page.getByRole('radio', { name: 'Cuanto antes' }).click();
   await page.getByRole('radio', { name: 'Sí', exact: true }).click();
-  await page.getByLabel('Fecha', { exact: true }).fill('2026-12');
+  await page.getByRole('combobox', { name: 'Mes' }).selectOption('12');
+  await page.getByRole('combobox', { name: 'Año' }).selectOption('2026');
   await page.getByLabel('¿Qué ocurre ese día?').fill('Movilización');
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   // no "scale" step in the shortcut; activators split in two thematic steps, BEFORE the list
-  await expect(page.getByRole('heading', { name: 'Lo que vendes' })).toBeVisible();
+  // VT-03: regulation is the only sell-side question → one neutral screen titled by the question itself
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('¿Tu producto o actividad está sujeto a alguna regulación específica?');
   await page.getByLabel('No lo sé', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: 'Lo que montas allí' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sobre tu operación en México' })).toBeVisible();
   await expect(page.getByText('¿Ya sabes dónde estará la obra?')).toBeVisible();      // frozen Journey C wording
   await page.getByLabel('Aún no', { exact: true }).check();
   await page.getByLabel('Personas de tu equipo').check();
@@ -37,7 +39,7 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   // mark what you need + add in your own words (keyword mapping, no AI)
-  await expect(page.getByRole('heading', { name: 'Marca lo que necesitas' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Marca los temas en los que necesitas apoyo' })).toBeVisible();
   const add = async (text: string) => { await page.getByLabel('¿Buscas algo concreto? Escríbelo').fill(text); await page.getByRole('button', { name: 'Añadir' }).click(); };
   await add('grúas de gran capacidad');
   await expect(page.getByText('Lo relacionamos con')).toBeVisible();

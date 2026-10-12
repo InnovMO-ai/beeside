@@ -238,22 +238,28 @@ function DatePick({ locale, value, onChange }: { locale: Locale; value: string; 
     </div>
   );
 }
-export function ScaleStep({ a, set, locale }: StepCtx) {
+/** One size question per component (D-149 decides which). «Aún no lo sé» and an empty answer both store "not yet defined"; «Prefiero no decirlo» stores the explicit decline. */
+function ScaleField({ s, c }: { s: StepCtx; c: ProjectComponent }) {
+  const { a, set, locale } = s;
+  const proxy = proxyFor(c); const cur = a.scale[c.id] ?? { proxy, text: '', declined: false };
+  const [unsure, setUnsure] = useState(false);
+  const setS = (p: Partial<typeof cur>) => set((x) => ({ ...x, scale: { ...x.scale, [c.id]: { ...(x.scale[c.id] ?? { proxy, text: '', declined: false }), proxy, ...p } } }));
+  return (
+    <div>
+      <TextField label={`${UI.scaleQ[proxy][locale]} ${compName(c, locale)}?`} value={cur.declined ? '' : cur.text} onChange={(v) => { setUnsure(false); setS({ text: v, declined: false }); }} />
+      <div className="chips" style={{ marginTop: 8 }}>
+        <button type="button" className={`chip ${unsure && !cur.declined ? 'on' : ''}`} aria-pressed={unsure && !cur.declined} onClick={() => { setUnsure(true); setS({ declined: false, text: '' }); }}>{UI.scaleUnknown[locale]}</button>
+        <button type="button" className={`chip ${cur.declined ? 'on' : ''}`} aria-pressed={cur.declined} onClick={() => { setUnsure(false); setS({ declined: !cur.declined, text: '' }); }}>{UI.scaleDecline[locale]}</button>
+      </div>
+    </div>
+  );
+}
+export function ScaleStep(s: StepCtx) {
+  const { a, locale } = s;
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[2]![locale]} title={UI.scaleTitle[locale]} lead={UI.scaleWhy[locale]} />
-      {a.components.filter((c) => !c.activities.includes('invest_only')).map((c) => {
-        const proxy = proxyFor(c); const cur = a.scale[c.id] ?? { proxy, text: '', declined: false };
-        const setS = (p: Partial<typeof cur>) => set((x) => ({ ...x, scale: { ...x.scale, [c.id]: { ...cur, proxy, ...p } } }));
-        return (
-          <div key={c.id}>
-            <TextField label={`${UI.scaleQ[proxy][locale]} ${compName(c, locale)}?`} value={cur.declined ? '' : cur.text} onChange={(v) => setS({ text: v, declined: false })} />
-            <div className="chips" style={{ marginTop: 8 }}>
-              <button type="button" className={`chip ${cur.declined ? 'on' : ''}`} aria-pressed={cur.declined} onClick={() => setS({ declined: !cur.declined, text: '' })}>{UI.scaleDecline[locale]}</button>
-            </div>
-          </div>
-        );
-      })}
+      {a.components.filter((c) => !c.activities.includes('invest_only')).map((c) => <ScaleField key={c.id} s={s} c={c} />)}
     </div>
   );
 }

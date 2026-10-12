@@ -133,8 +133,9 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
-    // Internal staging delivers inline (no worker needed); everywhere else a worker delivers the outbox.
-    emailDispatch: staging ? "inline" : "deferred",
+    // Internal staging delivers inline (no worker needed); everywhere else the FA4 worker delivers the outbox. FA4_EMAIL_DISPATCH=inline
+    // forces inline delivery (local end-to-end runs / smoke checks); the answer to the person is truthful either way (sent / pending / failed).
+    emailDispatch: staging || env.FA4_EMAIL_DISPATCH === "inline" ? "inline" : "deferred",
   };
 }
 
@@ -177,7 +178,7 @@ export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): bool
  */
 const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://beeside.you/termsandconditions" } as const;
 /** Canonical Privacy page. Its document VERSION is not supplied: it stays an explicit launch configuration (FA4_PRIVACY_VERSION), never defaulted. */
-const OFFICIAL_PRIVACY_URL = "https://beeside.you/PolíticaPrivacidad";
+const OFFICIAL_PRIVACY_URL = "https://www.beeside.you/privacy";
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
   // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
   // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.

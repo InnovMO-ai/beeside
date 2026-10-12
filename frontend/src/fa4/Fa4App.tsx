@@ -135,7 +135,13 @@ export function Fa4App() {
     if (step.id === 'identity' && !(await ensureSession())) return;
     const base = step.id === 'reflection' && a.knowsNeeds === null ? { ...a, projectConfirmed: true, knowsNeeds: false } : a;
     if (base !== a) setA(base);
-    const n = skipCombined(nextStep, base, flow, step, desktop);
+    // The next step depends on the server-side resolution of THESE answers (e.g. the cargo-route question): never navigate on a stale one.
+    let ctxFlow = flow;
+    if (hasSession && !['cover', 'identity', 'company', 'exit'].includes(step.id)) {
+      try { const fresh = await api.resolution(base); setRes(fresh); setResolveFailed(false); ctxFlow = { cargoRouteDestinations: fresh.cargoRouteDestinations }; }
+      catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); return; }   // stay on this step; the alert offers «Intentar de nuevo»
+    }
+    const n = skipCombined(nextStep, base, ctxFlow, step, desktop);
     if (n.id === 'result') await generate(); else setStep(n);
     window.scrollTo?.({ top: 0 });
   }
@@ -220,7 +226,7 @@ export function Fa4App() {
         </nav>
       )}
       <main className="main" id="main">
-        {resolveFailed && ['activators', 'activators_sell', 'activators_site', 'fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'cargo_route'].includes(step.id) && (
+        {resolveFailed && (
           <div className="state err" role="alert"><b>{UI.topicsErrorTitle[locale]}</b> {UI.resolveErrorBody[locale]} <button type="button" className="toast-btn" onClick={() => { setResolveFailed(false); setResolveTick((n) => n + 1); }}>{UI.tryAgain[locale]}</button></div>
         )}
         <StepBody step={step} ctx={ctx}  desktop={desktop} />
