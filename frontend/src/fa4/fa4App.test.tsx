@@ -43,7 +43,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start your assessment" }));
     expect(screen.queryByRole("button", { name: /Switch language/ })).toBeNull();           // no language switcher after the cover
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Your name"), "Ana");
+    await user.type(screen.getByLabelText("Name"), "Ana");
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
@@ -56,7 +56,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
     await user.click(screen.getByRole("button", { name: "Accept and continue" }));
-    await screen.findByRole("heading", { name: "Who are you?" });
+    await screen.findByRole("heading", { name: "Is your company already operating?" });
     const create = calls.find((c) => c.url === "/api/fa4/sessions")!;
     expect(create.method).toBe("POST");
     expect((create.body as { answers: { identity: { email: string }; locale: string } }).answers.identity.email).toBe("ana@acme.example");
@@ -75,7 +75,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
       return null;
     });
     render(<Fa4App />);
-    await screen.findByRole("heading", { name: "¿En qué punto está la decisión?" });
+    await screen.findByRole("heading", { name: "¿En qué punto está la decisión sobre este proyecto?" });
     expect(calls.find((c) => c.url === "/api/fa4/links/continue")!.body).toEqual({ token: linkToken });
     expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe("T".repeat(43));   // X-Fa4-Session (not Authorization, which gateways like IAP consume)
     expect(window.location.hash).toBe("");

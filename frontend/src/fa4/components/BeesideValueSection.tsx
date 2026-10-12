@@ -2,7 +2,12 @@ import type { Locale } from '@beeside/fa-public-engine';
 import { BRAND } from '../brand';
 import { UI } from '../copy/ui';
 import { Logo } from './Logo';
-import { AdvisoryIcon, HiveIcon, HubIcon, SherpaIcon } from './BrandIcons';
+// Official component identifiers: the PO-approved icons of the approved (`.bridge-icon-badge`, authorization 2026-09-30),
+// used unmodified inside a white circle badge. They replace the generic line icons (BrandIcons.tsx), which are no longer used here.
+import sherpaIcon from '../../assets/bridge-sherpa.png';
+import hiveIcon from '../../assets/bridge-the-hive.png';
+import hubIcon from '../../assets/bridge-operation-hub.png';
+import advisoryIcon from '../../assets/bridge-strategic-advisory.png';
 
 /**
  * BeesideValueSection — fixed institutional content (Option A). Takes NO result data: identical for every result,
@@ -10,8 +15,8 @@ import { AdvisoryIcon, HiveIcon, HubIcon, SherpaIcon } from './BrandIcons';
  */
 export function BeesideValueSection({ locale }: { locale: Locale }) {
   const items = [
-    { key: 'sherpa', icon: <SherpaIcon />, t: UI.vsSherpa, d: UI.vsSherpaD }, { key: 'hive', icon: <HiveIcon />, t: UI.vsHive, d: UI.vsHiveD },
-    { key: 'operation-hub', icon: <HubIcon />, t: UI.vsHub, d: UI.vsHubD }, { key: 'strategic-advisory', icon: <AdvisoryIcon />, t: UI.vsAdvisory, d: UI.vsAdvisoryD },
+    { key: 'sherpa', icon: sherpaIcon, t: UI.vsSherpa, d: UI.vsSherpaD }, { key: 'hive', icon: hiveIcon, t: UI.vsHive, d: UI.vsHiveD },
+    { key: 'operation-hub', icon: hubIcon, t: UI.vsHub, d: UI.vsHubD }, { key: 'strategic-advisory', icon: advisoryIcon, t: UI.vsAdvisory, d: UI.vsAdvisoryD },
   ];
   return (
     <section className="night" aria-labelledby="bvs-title" data-testid="beeside-value-section">
@@ -21,7 +26,7 @@ export function BeesideValueSection({ locale }: { locale: Locale }) {
           <Logo onDark />
           <p className="eyebrow" style={{ marginTop: 14 }}>{UI.aboutBeeside[locale]}</p>
           <h2 id="bvs-title">{UI.vsHeadline[locale]}</h2>
-          <ul>{items.map((i) => <li key={i.key} data-component={i.key}><span className="ico">{i.icon}</span><div><b>{i.t[locale]}</b><span>{i.d[locale]}</span></div></li>)}</ul>
+          <ul>{items.map((i) => <li key={i.key} data-component={i.key}><span className={`ico badge ${i.key}`}><img src={i.icon} alt="" /></span><div><b>{i.t[locale]}</b><span>{i.d[locale]}</span></div></li>)}</ul>
         </div>
       </div>
     </section>

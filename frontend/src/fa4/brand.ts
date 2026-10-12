@@ -1,8 +1,7 @@
 /**
  * Configuration points for items that block PRODUCTION LAUNCH but not Build:
  *  BRAND-1 official logo · BRAND-2 official typography · BRAND-3 final Night Shift treatment
- *  CHK-1   final Terms / Privacy links (open in a new tab, ES/EN) · LEGAL-1 commercial-contact legal basis.
- * Nothing here invents final legal language: until CHK-1 closes, the links point at the configured URLs.
+ *  CHK-1   Terms / Privacy / Help Center canonical URLs (closed 2026-10-12, see CANONICAL_URLS).
  */
 // Official assets (supplied by beeside marketing; files unmodified): lockup = wordmark + bee. "dark" = for light backgrounds, "light" = for dark ones.
 import lockupDark from './assets/brand/lockup-dark.svg';
@@ -11,9 +10,14 @@ import beeMarkPurple from './assets/brand/bee-mark-purple.svg';
 import lifestyleRelaxed from './assets/brand/lifestyle-relaxed.jpg';
 
 const env = (k: string, d: string): string => ((import.meta.env as Record<string, string | undefined>)[k]) || d;
-// Internal staging build (VITE_FA4_ENV_LABEL set): until the real Privacy URL exists, link the explicit non-legal TEST page served by the staging server.
-const STAGING = !!(import.meta.env as Record<string, string | undefined>).VITE_FA4_ENV_LABEL;
-const PRIVACY_FALLBACK = { es: STAGING ? '/staging/privacy-test' : 'https://beeside.example/legal/privacidad', en: STAGING ? '/staging/privacy-test' : 'https://beeside.example/legal/privacy' };
+// Canonical destinations (Design VF, 2026-10-12). Env vars remain only as a deployment override; no placeholder fallbacks.
+export const CANONICAL_URLS = {
+  terms: 'https://beeside.you/termsandconditions',
+  privacy: 'https://beeside.you/Pol%C3%ADticaPrivacidad',   // https://beeside.you/PolíticaPrivacidad
+  help: 'https://beeside.you/HelpCenter',
+} as const;
+/** Human contact for FA: From, Reply-To and contact destination of every FA email (save link, YEV, contact, continuation). */
+export const CONTACT_EMAIL = 'contact@beeside.you';
 
 export const BRAND = {
   /** BRAND-1: official logo. The lockup is never redrawn or recoloured; the accessible name is the wordmark itself ("beeside"). */
@@ -26,12 +30,10 @@ export const BRAND = {
   /** BRAND-3: the lifestyle image of the frozen institutional section (Option A) — the approved "relaxed person" photo already used by First Assessment. */
   lifestyleImage: { src: lifestyleRelaxed },
   legal: {
-    // CHK-1 — pages already published on the beeside website; FA links to them and never duplicates them.
-    // Terms: official page (same document for ES and EN in version 1.0, 2026-08-27). Privacy: PENDING (placeholder until its URL is provided).
-    termsUrl: { es: env('VITE_FA4_TERMS_URL_ES', 'https://www.beeside.you/termsandconditions'), en: env('VITE_FA4_TERMS_URL_EN', 'https://www.beeside.you/termsandconditions') },
-    privacyUrl: { es: env('VITE_FA4_PRIVACY_URL_ES', env('VITE_FA4_PRIVACY_URL', PRIVACY_FALLBACK.es)), en: env('VITE_FA4_PRIVACY_URL_EN', env('VITE_FA4_PRIVACY_URL', PRIVACY_FALLBACK.en)) },
-    /** LEGAL-1 pending: no commercial-contact consent control is rendered until legal defines the basis. */
-    commercialContactConsent: null as null | { optional: true },
+    // CHK-1 closed — canonical pages on the beeside website (same page for ES and EN); FA links to them in a new tab and never duplicates them.
+    termsUrl: { es: env('VITE_FA4_TERMS_URL_ES', CANONICAL_URLS.terms), en: env('VITE_FA4_TERMS_URL_EN', CANONICAL_URLS.terms) },
+    privacyUrl: { es: env('VITE_FA4_PRIVACY_URL_ES', CANONICAL_URLS.privacy), en: env('VITE_FA4_PRIVACY_URL_EN', CANONICAL_URLS.privacy) },
+    // Optional marketing consent (D-144): own block in Identity, unchecked, non-blocking. No extra commercial-notices policy link in FA.
   },
   year: 2026,
 } as const;

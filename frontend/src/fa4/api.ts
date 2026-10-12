@@ -39,5 +39,7 @@ export const api = {
   latestResult: () => request<{ resultId: string; model: YourExpansionViewModel }>('GET', '/session/result'),
   emailResult: () => request<{ ok: true }>('POST', '/session/result/email', {}),
   continueWithBeeside: () => request<{ ok: true }>('POST', '/session/continue', {}),
+  /** CONTACT_REQUEST (D-138…D-140). Endpoint to be implemented by Code (CONTACT-4); until then the UI shows its error state. */
+  contact: (p: { name: string; company: string; email: string; message: string; shareProgress: boolean }) => request<{ ok: true }>('POST', '/session/contact', p),
   exchangeLink: (token: string) => request<{ sessionToken: string }>('POST', '/links/continue', { token }, false),
 };

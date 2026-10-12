@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
-import { UI } from '../copy/ui';
+import { UI, fill } from '../copy/ui';
 import type { YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /** PremiumContinuation — next-step conversion. Shown with a CTA only when the result has real value (D-050); otherwise understanding is the deliverable. */
-export function PremiumContinuation({ premium, locale, onContinue, onEmail }: {
-  premium: YourExpansionViewModel['premium']; locale: Locale;
+export function PremiumContinuation({ premium, locale, onContinue, onEmail, email }: {
+  premium: YourExpansionViewModel['premium']; locale: Locale; email?: string;
   onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean>;
 }) {
   const [cont, setCont] = useState<'idle' | 'busy' | 'done' | 'err'>('idle');
@@ -22,15 +22,17 @@ export function PremiumContinuation({ premium, locale, onContinue, onEmail }: {
           {cont === 'done'
             ? <p role="status">{UI.continued[locale]}</p>
             : <button className="btn" disabled={cont === 'busy'} onClick={async () => { setCont('busy'); setCont((await onContinue?.()) ? 'done' : 'err'); }}>{UI.continueWith[locale]}</button>}
-          {cont === 'err' && <p role="alert">{UI.saveError[locale]}</p>}
+          {cont === 'err' && <p className="state err on-dark" role="alert">{UI.saveError[locale]}</p>}
         </div>
       ) : (
         <div className="card soft"><h2 id="pc-title" style={{ fontSize: 20, marginBottom: 6 }}>{UI.noPremiumTitle[locale]}</h2><p>{UI.noPremiumBody[locale]}</p></div>
       )}
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
-        {mail === 'done' ? <p role="status">{UI.emailed[locale]}</p>
-          : <button className="btn ghost" disabled={mail === 'busy'} onClick={async () => { setMail('busy'); setMail((await onEmail?.()) ? 'done' : 'err'); }}>{UI.emailResult[locale]}</button>}
-        <p className="hint" style={{ flex: 1, minWidth: 220 }}>{UI.privacyNotice[locale]}</p>
+      <div className="pc-secondary">
+        {mail === 'err' && <p className="state err" role="alert">{UI.emailFailed[locale]}</p>}
+        {mail === 'done'
+          ? <p className="state ok" role="status">{fill(UI.emailSent, locale, { email: email ?? '' })}</p>
+          : <button className="btn ghost" disabled={mail === 'busy'} aria-busy={mail === 'busy'} onClick={async () => { setMail('busy'); setMail((await onEmail?.()) ? 'done' : 'err'); }}>{mail === 'busy' ? UI.emailSending[locale] : mail === 'err' ? UI.tryAgain[locale] : UI.emailResult[locale]}</button>}
+        <p className="hint pc-privacy">{UI.privacyNotice[locale]}</p>
       </div>
     </section>
   );

@@ -10,6 +10,7 @@ import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
+import { TopActions } from './components/HelpContact';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
@@ -31,6 +32,7 @@ export function Fa4App() {
   const [model, setModel] = useState<YourExpansionViewModel | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
   const [booting, setBooting] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -123,15 +125,18 @@ export function Fa4App() {
   }
   function onBack() { if (catalog) { setStep(skipCombined(prevStep, a, flow, step, desktop)); window.scrollTo?.({ top: 0 }); } }
 
+  // Save-for-later email states (VF): A sending → B confirmed (only on server success) · C failed → D retry. Never "sent" on click.
   async function saveLater() {
     if (!(await ensureSession())) return;
+    setToastRetry(null); setToast(UI.linkSending[locale]);
+    try { await api.save(a, stepKey(step)); } catch { setToast(UI.saveError[locale]); setToastRetry(() => saveLater); return; }
     try {
-      await api.save(a, stepKey(step));
       const r = await api.finishLater();
-      setToast(fill(UI.saved, locale, { email: r.email }));
-    } catch { setToast(UI.saveError[locale]); }
+      setToast(fill(UI.savedOk, locale, { email: r.email }));
+    } catch { setToast(UI.linkFailed[locale]); setToastRetry(() => saveLater); }
   }
   const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch { return false; } };
+  const safelyP = <P,>(fn: (p: P) => Promise<unknown>) => async (p: P) => { try { await fn(p); return true; } catch { return false; } };
 
   if (catalogError && !catalog) {
     return (
@@ -149,16 +154,18 @@ export function Fa4App() {
         {!model
           ? <main className="main" aria-live="polite"><p>{busy ? UI.generating[locale] : UI.resultError[locale]}</p>{!busy && <button className="btn" onClick={generate}>{UI.next[locale]}</button>}</main>
           : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'reflection' })}
-              onContinue={safely(api.continueWithBeeside)} onEmail={safely(api.emailResult)}
+              onContinue={safely(api.continueWithBeeside)} onEmail={safely(api.emailResult)} email={a.identity.email}
+              actions={<TopActions locale={locale} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={safelyP(api.contact)} saveSlot={false} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
-        {toast && <div role="status" className="note" style={{ position: 'fixed', left: 16, right: 16, bottom: 16 }}>{toast}</div>}
+        {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
     );
   }
 
   if (step.id === 'cover') {
     return (
-      <div className="fa4"><EnvRibbon /><CoverScreen locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })} /></div>
+      <div className="fa4"><EnvRibbon /><CoverScreen locale={locale} setLocale={(l: Locale) => setA((x) => ({ ...x, locale: l }))} onStart={() => setStep({ id: 'identity' })}
+        actions={<TopActions locale={locale} prefill={{ name: '', company: '', email: '' }} onSend={safelyP(api.contact)} saveSlot={false} />} /></div>
     );
   }
 
@@ -170,7 +177,7 @@ export function Fa4App() {
 
   return (
     <div className="fa4"><EnvRibbon /><div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
-      <div className="topbar"><Logo /><button className="linkbtn" onClick={saveLater}>{UI.saveLater[locale]}</button></div>
+      <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={safelyP(api.contact)} /></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
           <ol>{UI.stages.map((_, i) => <li key={i} className={i + 1 < stage ? 'done' : i + 1 === stage ? 'now' : ''} aria-current={i + 1 === stage ? 'step' : undefined} />)}</ol>
@@ -184,7 +191,7 @@ export function Fa4App() {
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
       </div></div>
       {!wide && <aside className="deco" aria-hidden />}
-      {toast && <div role="status" className="note" style={{ position: 'fixed', left: 16, right: 16, bottom: 80 }} onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>
   );

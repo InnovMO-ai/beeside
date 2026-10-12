@@ -1,4 +1,5 @@
 import type { Locale } from '@beeside/fa-public-engine';
+import type { ReactNode } from 'react';
 import { BRAND } from '../brand';
 import { UI } from '../copy/ui';
 import clarity from '../assets/cover/benefit-clarity.svg';
@@ -13,8 +14,8 @@ const BENEFITS = [
   { key: 'global', src: globalIcon, w: 142 }, { key: 'real', src: real, w: 172 },
 ] as const;
 
-/** First Assessment cover (PO design). Fixed brand elements (product name, side words, benefits) are English in both languages. */
-export function CoverScreen({ locale, setLocale, onStart }: { locale: Locale; setLocale: (l: Locale) => void; onStart: () => void }) {
+/** First Assessment cover (PO design). Product name fixed; side words and benefit labels follow the locale (D-143). Benefit SVGs are used for the icon only. */
+export function CoverScreen({ locale, setLocale, onStart, actions }: { locale: Locale; setLocale: (l: Locale) => void; onStart: () => void; actions?: ReactNode }) {
   const other = ({ es: 'en', en: 'es' } as const)[locale];
   return (
     <div className="cv" lang={locale}>
@@ -24,12 +25,12 @@ export function CoverScreen({ locale, setLocale, onStart }: { locale: Locale; se
           <span className="cv-sep" aria-hidden />
           <span className="cv-product">{UI.coverProduct[locale]}</span>
         </div>
-        <button type="button" className="cv-lang" lang={other} aria-label={`${UI.switchLanguage[locale]} ${UI.languageNames[other]}`} onClick={() => setLocale(other)}>{UI.languageNames[other]}</button>
+        <div className="cv-right">{actions}<button type="button" className="cv-lang" lang={other} aria-label={`${UI.switchLanguage[locale]} ${UI.languageNames[other]}`} onClick={() => setLocale(other)}>{UI.languageNames[other]}</button></div>
       </header>
 
       <div className="cv-stage">
       <main className="cv-main" id="main">
-        <div className="cv-side" aria-hidden>{UI.coverSideTop.map((w, i) => <span key={i}>{w.en}</span>)}</div>
+        <div className="cv-side" aria-hidden>{UI.coverSideTop.map((w, i) => <span key={i}>{w[locale]}</span>)}</div>
         <div className="cv-copy">
           <p className="cv-eyebrow">{UI.coverEyebrow[locale]}</p>
           <h1 className="cv-title">{UI.coverTitleLead[locale]} <em>{UI.coverTitleAccent[locale]}</em></h1>
@@ -44,8 +45,8 @@ export function CoverScreen({ locale, setLocale, onStart }: { locale: Locale; se
       </main>
 
       <footer className="cv-foot">
-        <ul className="cv-benefits">{BENEFITS.map((b) => <li key={b.key}><img src={b.src} alt={UI.benefits[b.key].en} height={50} /></li>)}</ul>
-        <p className="cv-tagline" aria-hidden><i />{UI.coverSideBottom.map((w, i) => <span key={i}>{w.en}</span>)}</p>
+        <ul className="cv-benefits">{BENEFITS.map((b) => <li key={b.key}><span className="cv-bicon" style={{ backgroundImage: `url(${b.src})` }} aria-hidden /><span className="cv-btext">{UI.benefitsText[b.key][locale]}</span></li>)}</ul>
+        <p className="cv-tagline" aria-hidden><i />{UI.coverSideBottom.map((w, i) => <span key={i}>{w[locale]}</span>)}</p>
       </footer>
       </div>
     </div>
