@@ -37,7 +37,7 @@ describe('Journey A — simple / focused', () => {
   });
   it('shows country-agnostic judgement: not-applicable groups, capped at three', () => {
     const y = buildYourExpansionView(a, cat);
-    expect(naNames(y.destinations[0]!)).toEqual(['Vender y llegar a tus clientes · Proteger tu marca', 'Dónde vas a operar (oficina, planta, local)', 'Importación y aduanas · Logística e inventario']);
+    expect(naNames(y.destinations[0]!)).toEqual(['Vender y llegar a tus clientes · Proteger tu marca', 'Importación y aduanas · Logística e inventario']);
   });
   it('offers Premium continuation (real value) and reports where the user is', () => {
     const y = buildYourExpansionView(a, cat);
@@ -300,7 +300,7 @@ describe('VERIFY fixes — engine', () => {
     expect(ya.glanceMode).toBe('topics');
     expect(ya.glanceItems.map((i) => [i.name.es, i.key])).toEqual([
       ['Estructura legal, impuestos y contabilidad', 'ACTIVE'], ['Encontrar a las personas', 'SOURCEABLE'], ['Contratar legalmente y pagar nómina', 'ACTIVE'], ['Banco y pagos en el país', 'DEPENDENT']]);
-    expect(ya.notApplicableCount).toBe(5);
+    expect(ya.notApplicableCount).toBe(4);
     for (const d of buildYourExpansionView(journeyB('es', 'unknown'), cat).destinations) expect(d.glanceMode).toBe('counts');
     expect(buildYourExpansionView(journeyC('es', 'unknown'), cat).destinations[0]!.glanceMode).toBe('counts');
   });

@@ -100,7 +100,7 @@ describe("frozen summary presentation (VERIFY M6-C)", () => {
     const rows = container.querySelectorAll(".glance .topic-row");
     expect(rows.length).toBe(4);
     for (const r of Array.from(rows)) expect(r.querySelector(".gchip")).toBeTruthy();
-    expect(container.querySelector(".glance")!.textContent).toMatch(/Otros 5 temas no aplican a tu proyecto\. El detalle, abajo\./);
+    expect(container.querySelector(".glance")!.textContent).toMatch(/Otros 4 temas no aplican a tu proyecto\. El detalle, abajo\./);
   });
   it.each([["B", journeyB("es", "unknown")], ["C", journeyC("es", "unknown")]] as const)("Journey %s keeps counts per state in the glance", (_n, a) => {
     const { container } = render(<ResultScreen model={modelFor(a)} locale="es" onContinue={vi.fn()} onEmail={vi.fn()} />);

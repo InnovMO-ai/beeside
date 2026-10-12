@@ -14,4 +14,5 @@ export * from "./engine/publicView";
 export * from "./engine/yev";
 export * from "./engine/demand";
 export * from "./engine/flow";
+export { proxyFor } from "./engine/scale";
 export * from "./i18n/messages";

@@ -65,7 +65,12 @@ export function buildFlow(a: Answers, catalog: Catalog | FlowContext): StepRef[]
   const n = activatorCount(a);
   if (n >= 1) {
     if (n <= 2) s.push({ id: 'activators' });
-    else s.push({ id: 'activators_sell' }, { id: 'activators_site' });
+    else {
+      // VT-03: a thematic screen exists only if it has at least one question to show (never an empty "what you set up there" screen).
+      const f = activatorFields(a);
+      if ((f.regulated ? 1 : 0) + f.sells.length + f.brand.length > 0) s.push({ id: 'activators_sell' });
+      if (f.location.length + f.carries.length > 0) s.push({ id: 'activators_site' });
+    }
   }
   const dests = a.destinations.open ? [OPEN_DEST] : a.destinations.list.map((d) => d.iso);
   const onlyInvestProject = a.components.length > 0 && a.components.every((c) => c.activities.length === 1 && c.activities[0] === 'invest_only');

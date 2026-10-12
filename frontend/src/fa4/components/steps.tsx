@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { proxyFor } from "@beeside/fa-public-engine";
 import type { Answers, ProjectComponent, ScaleProxy } from '@beeside/fa-public-engine';
 import { frontKey, OPEN_DEST } from '@beeside/fa-public-engine';
 import type { Activity, ClientResolution, FrontKey, Locale, PublicCatalog } from '@beeside/fa-public-engine';
@@ -238,7 +239,6 @@ function DatePick({ locale, value, onChange }: { locale: Locale; value: string; 
     </div>
   );
 }
-const proxyFor = (c: ProjectComponent): ScaleProxy => c.permanence === 'temporary' ? 'duration' : c.activities.includes('produce') ? 'investment' : c.activities.includes('hire') && c.activities.length === 1 ? 'people' : c.activities.includes('sell') ? 'products' : c.activities.includes('source') ? 'purchase' : c.activities.includes('hire') ? 'people' : 'investment';
 export function ScaleStep({ a, set, locale }: StepCtx) {
   return (
     <div className="narrow">
