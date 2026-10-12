@@ -4,6 +4,8 @@ import {
   gatewayConfigFromEnv,
   isGatewayConfigured,
   GatewayError,
+  omitsTemperature,
+  resetLearnedModelParams,
   type ChatMessage,
   type FetchLike,
   type GatewayConfig,
@@ -140,5 +142,51 @@ describe("chatJSON()", () => {
     await expect(chatJSON(MESSAGES, BASE_CONFIG, {}, { fetchImpl, env: ENV })).rejects.toMatchObject({
       kind: "chain_exhausted",
     });
+  });
+});
+
+describe("model parameter policy (temperature)", () => {
+  const bodyOf = (init: { body?: string }) => JSON.parse(init.body ?? "{}") as Record<string, unknown>;
+  const cfg = (model: string): GatewayConfig => ({ chain: [{ provider: "primary", model, endpoint: "https://primary.example/v1/chat", apiKeyEnvVar: "P_KEY" }], timeoutMs: 5000 });
+  beforeEach(() => resetLearnedModelParams());
+
+  it("never sends temperature to a model of the family that rejects it", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_u, init) => { seen.push(bodyOf(init)); return okResponse("ok"); };
+    await chat(MESSAGES, cfg("claude-sonnet-5-5"), { temperature: 0, maxTokens: 8 }, { fetchImpl, env: ENV });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toHaveProperty("temperature");
+    expect(seen[0]).toMatchObject({ max_tokens: 8 });
+  });
+
+  it("sends temperature to other models, and honours the env override list", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_u, init) => { seen.push(bodyOf(init)); return okResponse("ok"); };
+    await chat(MESSAGES, cfg("model-a"), { temperature: 0.2 }, { fetchImpl, env: ENV });
+    expect(seen[0]).toMatchObject({ temperature: 0.2 });
+    expect(omitsTemperature("custom-model", { PRECISION_GATEWAY_OMIT_TEMPERATURE: "x, custom-model" })).toBe(true);
+    expect(omitsTemperature("custom-model", {})).toBe(false);
+  });
+
+  it("learns from an HTTP 400 that names temperature: retries once without it and remembers the model", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const fetchImpl: FetchLike = async (_u, init) => {
+      const b = bodyOf(init); seen.push(b);
+      if ("temperature" in b) return { status: 400, ok: false, json: async () => ({}), text: async () => '{"error":"temperature is deprecated for this model"}' };
+      return okResponse("fine");
+    };
+    const r1 = await chat(MESSAGES, cfg("future-model"), { temperature: 0 }, { fetchImpl, env: ENV });
+    expect(r1.content).toBe("fine");
+    expect(seen).toHaveLength(2);
+    await chat(MESSAGES, cfg("future-model"), { temperature: 0 }, { fetchImpl, env: ENV });
+    expect(seen).toHaveLength(3); // second call goes straight without temperature
+    expect(seen[2]).not.toHaveProperty("temperature");
+  });
+
+  it("does not retry a 400 that is not about temperature", async () => {
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => { calls++; return { status: 400, ok: false, json: async () => ({}), text: async () => "bad request" }; };
+    await expect(chat(MESSAGES, cfg("model-a"), { temperature: 0 }, { fetchImpl, env: ENV })).rejects.toBeInstanceOf(GatewayError);
+    expect(calls).toBe(1);
   });
 });

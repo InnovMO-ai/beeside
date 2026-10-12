@@ -102,7 +102,8 @@ for (const locale of ["en", "es"] as const satisfies readonly Loc[]) {
     const pendingRaw = (await api.get(`/categories/${catId}`)).body.thread.turns.at(-1).text as string;
     // the first question of the opening turn ("Who will take care of ...?"), the sentence the resume line repeats
     const pendingQ = (pendingRaw.match(/¿?[^?¿.!]*\?/g) ?? [pendingRaw])[0].replace(/^¿/, "").trim();
-    const factsBefore = JSON.stringify((await facts(project.projectId)).facts);
+    const stableFacts = async () => JSON.stringify((await facts(project.projectId)).facts.map((f) => JSON.stringify(f)).sort());
+    const factsBefore = await stableFacts();
     await say(page, R.p01);
     const a1 = await lastAssistant(page);
     expect(a1, "P-01 spells the Category Requirement Pack (CRP) out, once, at first mention").toContain(R.full);
@@ -115,7 +116,7 @@ for (const locale of ["en", "es"] as const satisfies readonly Loc[]) {
     expect(a2, "P-02 explains the role and never says your Sherpa").not.toMatch(/\b(tu|your) sherpa\b/i);
     expect(a2).toMatch(R.resume);
     expect(a2, "after P-01 the CRP is called CRP, not spelled out again").not.toContain(R.full);
-    expect(JSON.stringify((await facts(project.projectId)).facts), "P-01 and P-02 write nothing").toBe(factsBefore);
+    expect(await stableFacts(), "P-01 and P-02 write nothing").toBe(factsBefore);
     await full(c, "08-category-p02");
     for (const a of R.answers) await say(page, a);
     await pick(page, s.unknown);

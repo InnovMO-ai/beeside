@@ -93,7 +93,7 @@ export interface GatewayConfig {
 export type FetchLike = (
   url: string,
   init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }
-) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>;
+) => Promise<{ status: number; ok: boolean; json(): Promise<unknown>; text?: () => Promise<string> }>;
 
 export interface GatewayDeps {
   fetchImpl?: FetchLike;
@@ -154,29 +154,59 @@ function extractContent(body: unknown): string | null {
 
 type AttemptOutcome = { ok: true; content: string } | { ok: false; attempt: GatewayAttempt };
 
+/**
+ * Model parameter policy (F4 finding, F5 fix): some models reject `temperature` outright (HTTP 400, "deprecated for this
+ * model"). A model that is known to (static family rule, or listed in PRECISION_GATEWAY_OMIT_TEMPERATURE, comma-separated)
+ * is called without it; any other model that answers 400 mentioning temperature is retried once without it and remembered
+ * for the life of the process. Nothing about the provider response is kept or surfaced.
+ */
+const OMIT_TEMPERATURE_FAMILY = /^claude-(?:sonnet|opus|haiku|fable)-5/;
+const learnedNoTemperature = new Set<string>();
+export function omitsTemperature(model: string, env: Record<string, string | undefined> = process.env): boolean {
+  if (OMIT_TEMPERATURE_FAMILY.test(model) || learnedNoTemperature.has(model)) return true;
+  return (env.PRECISION_GATEWAY_OMIT_TEMPERATURE ?? "").split(",").map((m) => m.trim()).filter(Boolean).includes(model);
+}
+/** Test seam: forget what was learned at run time. */
+export function resetLearnedModelParams(): void { learnedNoTemperature.clear(); }
+
+async function post(target: ModelTarget, messages: ChatMessage[], options: ChatOptions, timeoutMs: number, fetchImpl: FetchLike, apiKey: string, withTemperature: boolean) {
+  return fetchImpl(target.endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: target.model,
+      messages,
+      ...(withTemperature && options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      max_tokens: options.maxTokens,
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
 async function callOne(
   target: ModelTarget,
   messages: ChatMessage[],
   options: ChatOptions,
   defaultTimeoutMs: number,
   fetchImpl: FetchLike,
-  apiKey: string
+  apiKey: string,
+  env: Record<string, string | undefined> = process.env
 ): Promise<AttemptOutcome> {
   try {
-    const res = await fetchImpl(target.endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: target.model,
-        messages,
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-      }),
-      signal: AbortSignal.timeout(options.timeoutMs ?? defaultTimeoutMs),
-    });
+    const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
+    let res = await post(target, messages, options, timeoutMs, fetchImpl, apiKey, !omitsTemperature(target.model, env));
+    if (res.status === 400 && options.temperature !== undefined && !omitsTemperature(target.model, env)) {
+      const detail = res.text ? await res.text().catch(() => "") : "";
+      if (/temperature/i.test(detail)) {
+        learnedNoTemperature.add(target.model);
+        res = await post(target, messages, options, timeoutMs, fetchImpl, apiKey, false);
+      } else {
+        return { ok: false, attempt: { provider: target.provider, model: target.model, errorCode: "http_error", message: "HTTP 400" } };
+      }
+    }
     if (!res.ok) {
       return {
         ok: false,
@@ -243,7 +273,7 @@ export async function chat(
       });
       continue;
     }
-    const outcome = await callOne(target, messages, options, config.timeoutMs, fetchImpl, apiKey);
+    const outcome = await callOne(target, messages, options, config.timeoutMs, fetchImpl, apiKey, env);
     if (outcome.ok) {
       return { content: outcome.content, provider: target.provider, model: target.model, attempts };
     }

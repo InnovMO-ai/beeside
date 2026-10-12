@@ -86,7 +86,7 @@ for (const locale of ["en", "es"] as const satisfies readonly Loc[]) {
     await expect(h1(page)).toBeVisible();
     await checkScreen(c, "C8-center-sent", targets);
     // ---- status is never colour alone: every status chip carries an icon and a word
-    const chips = await page.locator(".pz-chip").evaluateAll((els) => els.map((e) => ({ text: (e.textContent || "").trim(), icon: !!e.querySelector("svg") })));
+    const chips = await page.locator(".pz-chip, .pz-st").evaluateAll((els) => els.map((e) => ({ text: (e.textContent || "").trim(), icon: !!e.querySelector("svg") })));
     expect(chips.length).toBeGreaterThan(0);
     for (const ch of chips) { expect(ch.text.length, "chip has a word").toBeGreaterThan(1); expect(ch.icon, `chip "${ch.text}" has an icon`).toBe(true); }
     void newKey; void logisticsConfirmed; void composer;

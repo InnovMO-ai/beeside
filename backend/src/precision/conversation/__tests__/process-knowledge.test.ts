@@ -238,6 +238,19 @@ describe("pre-router", () => {
     }
   });
 
+  it("routes 'how does it work / what happens after I send it' to the send topic and 'how does this process work' to Precision Center", () => {
+    for (const q of ["How does this process work after I send it?", "What happens after I send it?", "¿Cómo funciona este proceso después de enviarlo?", "¿Qué pasa después de enviar?"]) {
+      const d = routeProcessQuestion(q, { surface: "category", flags });
+      expect(d.kind).toBe("pack");
+      expect(d.topicKeys).toContain("send_to_operation_hub");
+    }
+    for (const q of ["How does this process work?", "¿Cómo funciona este proceso?"]) {
+      const d = routeProcessQuestion(q, { surface: "category", flags });
+      expect(d.kind).toBe("pack");
+      expect(d.topicKeys).toContain("precision_center");
+    }
+  });
+
   it("treats a country-specific legal question as legal_unverified", () => {
     expect(routeProcessQuestion("What are the tax requirements in Brazil?", { surface: "category", flags }).kind).toBe("legal_unverified");
     expect(routeProcessQuestion("¿Necesito un permiso para importar en Chile?", { surface: "category", flags, extraCountryNames: ["Chile"] }).kind).toBe("legal_unverified");

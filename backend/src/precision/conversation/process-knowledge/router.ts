@@ -124,6 +124,12 @@ const RULES: readonly Rule[] = [
     topic: () => "send_to_operation_hub",
   },
   {
+    // "What happens / how does it work after I send it?" -> the send topic (closure rehearsal finding, 12 Oct 2026).
+    id: "after_send",
+    re: /\b(?:que (?:pasa|pasara|va a pasar|ocurre|sigue|sucede)|what (?:happens|will happen|comes next|follows)|como (?:funciona|sigue|continua)\w*|how (?:does|do|will)\b.{0,30}\b(?:work|continue|proceed))\b.{0,50}\b(?:despues de (?:enviar|mandar)\w*|despues de que (?:lo |la )?(?:envi|mand)\w*|(?:after|once|when) (?:i |you )?(?:send|submit|sent)\w*|(?:enviarlo|enviarla|mandarlo|mandarla|enviado|enviada))\b/,
+    topic: () => "send_to_operation_hub",
+  },
+  {
     id: "confirm_after",
     re: /\b(?:que (?:pasa|pasara|va a pasar|ocurre|sigue|sucede|significa)|what (?:happens|will happen|does|comes|follows)|despues de|after|once i|cuando (?:lo |la )?confirm\w*|si (?:lo |la )?confirm\w*|if i confirm|what next)\b.{0,40}\bconfirm\w*|\bconfirm\w*.{0,30}\b(?:que (?:pasa|ocurre|sigue|significa)|what (?:happens|next|does it mean)|despues|afterwards|then)\b/,
     topic: (ctx, clause) => {
@@ -185,7 +191,7 @@ const RULES: readonly Rule[] = [
   },
   {
     id: "precision_center",
-    re: /\b(?:precision center|centro de precision|que es (?:esto|precision|este (?:lugar|espacio|sitio|centro))|what is (?:this|precision)(?: place| space| tool)?|para que sirve (?:esto|precision|este)|how does (?:this|precision) work|como funciona (?:esto|precision))\b/,
+    re: /\b(?:precision center|centro de precision|que es (?:esto|precision|este (?:lugar|espacio|sitio|centro))|what is (?:this|precision)(?: place| space| tool)?|para que sirve (?:esto|precision|este)|how does (?:this|precision|the process|this process|the platform|this platform) work|como funciona (?:esto|precision|este proceso|el proceso|esta plataforma|la plataforma))\b/,
     topic: () => "precision_center",
   },
   {
