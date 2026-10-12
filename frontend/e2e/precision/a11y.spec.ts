@@ -77,7 +77,7 @@ test("Night Shift toggle switches theme at runtime and is remembered; the system
   const mobile = info.project.name.startsWith("mobile");
   const bg = () => page.evaluate(() => getComputedStyle(document.querySelector(".pz-root")!).getPropertyValue("--pz-bg").trim().toLowerCase());
   const initial = await bg();
-  expect(initial).toBe(info.project.name.endsWith("dark") ? "#0f0d18" : "#f1f1fa");
+  expect(initial).toBe(info.project.name.endsWith("dark") ? "#15161d" : "#f8f8fc");
   if (mobile) await page.getByRole("button", { name: /menu/i }).first().click();
   await page.getByRole("button", { name: /Night Shift|dark|light|theme/i }).first().click();
   await expect.poll(bg).not.toBe(initial);

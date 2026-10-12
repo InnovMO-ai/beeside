@@ -209,6 +209,7 @@ export const es: Record<DictKey, string> = {
   "sm.toUnderstanding": "Continuar Precision Understanding",
   "sm.toCenter": "Ir a Precision Center",
   "sm.viewCategory": "Abrir categoría",
+  "sm.contents": "Contenido",
 
   "crp.eyebrow": "Category Requirement Pack (CRP)",
   "crp.state.draft": "Borrador",
@@ -233,6 +234,7 @@ export const es: Record<DictKey, string> = {
   "crp.newVersion.note": "Este CRP está confirmado y es de solo lectura. Si algo cambia, inicia una versión nueva. El confirmado se mantiene tal cual hasta que confirmes la nueva.",
   "crp.preview": "Vista previa antes de enviar",
   "crp.readOnly": "Puedes revisar este CRP, pero no cambiarlo por ahora.",
+  "crp.readOnlyLabel": "Solo lectura",
   "crp.draftNote": "Este resumen se actualiza a medida que respondes. Podrás confirmarlo cuando estén definidos los datos esenciales.",
   "crp.toCategory": "Volver a la conversación",
   "crp.confirmed.title": "CRP confirmado",

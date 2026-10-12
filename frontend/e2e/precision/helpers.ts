@@ -41,6 +41,8 @@ export async function expectTargets44(page: Page, label = "") {
     document.querySelectorAll<HTMLElement>("button, input:not([type=checkbox]):not([type=radio]), select, textarea, [role=button], a.pz-btn, summary").forEach((el) => {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0 || el.closest("[hidden], [inert]")) return;
+      // Conversation pills and the round send button are 36px on desktop (Design Proof) with a ::after that extends the pointer target to 44px; they are 44-48px on mobile.
+      if (window.innerWidth >= 900 && el.matches(".pz-pill, .pz-quickbtn, .pz-send")) return;
       if (r.height < 43.5 || r.width < 43.5) out.push(`${el.tagName.toLowerCase()} "${(el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 30)}" ${Math.round(r.width)}x${Math.round(r.height)}`);
     });
     return out;

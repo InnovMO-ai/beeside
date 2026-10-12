@@ -7,7 +7,7 @@ import { useThread, waitStage, type Pending } from "../state/thread";
 import { AppShell } from "../ui/Shell";
 import { Icon } from "../ui/icons";
 import { reducedMotion, usePage } from "../ui/hooks";
-import { Button, CategoryStatusChip, Meter, Skeleton, UnderstandingChip } from "../ui/primitives";
+import { CategoryStatusChip, Meter, Skeleton, UnderstandingChip } from "../ui/primitives";
 import { InlineError } from "./SystemPages";
 
 // ---------------------------------------------------------------- pieces
@@ -19,8 +19,8 @@ function ConfirmCard({ turn, active, onAnswer }: { turn: TurnDto; active: boolea
       <p className="pz-confirm-body">{c.body}</p>
       {active ? (
         <div className="pz-confirm-actions">
-          <Button onClick={() => onAnswer("confirm")} icon="check">{c.confirmLabel}</Button>
-          <Button variant="secondary" onClick={() => onAnswer("correct")}>{c.correctLabel}</Button>
+          <button type="button" className="pz-pill pz-pill-ink" onClick={() => onAnswer("confirm")}>{c.confirmLabel}</button>
+          <button type="button" className="pz-pill" onClick={() => onAnswer("correct")}>{c.correctLabel}</button>
         </div>
       ) : null}
     </div>
@@ -33,6 +33,7 @@ function TurnView({ turn, last, active, onConfirm, saved, notSaved }: { turn: Tu
     if (!turn.text.trim()) return null; // never an empty bubble
     return (
       <div className="pz-turn pz-turn-client" data-turn-id={turn.id}>
+        <span className="pz-turn-who" aria-hidden="true">{t("ws.you")}</span>
         <div className="pz-bubble"><span className="pz-sr">{t("ws.you")}: </span>{turn.text}</div>
         {notSaved ? <span className="pz-turn-meta pz-turn-warn"><Icon name="alert" size={14} />{t("ws.notSaved")}</span>
           : saved ? <span className="pz-turn-meta"><Icon name="check" size={14} />{t("shell.saved")}</span> : null}
@@ -42,8 +43,22 @@ function TurnView({ turn, last, active, onConfirm, saved, notSaved }: { turn: Tu
   return (
     <div className="pz-turn pz-turn-assistant" data-turn-id={turn.id} data-kind={turn.kind}>
       <span className="pz-turn-who">{t("ws.assistant")}</span>
-      <p className="pz-turn-text">{turn.text}</p>
+      <p className="pz-turn-text">{turn.kind === "notice" ? <Icon name="info" size={16} className="pz-turn-ico" /> : null}{turn.text}</p>
       {turn.confirmCard ? <ConfirmCard turn={turn} active={active && last} onAnswer={(i) => onConfirm(turn, i)} /> : null}
+    </div>
+  );
+}
+
+function RetryPanel({ onRetry }: { onRetry: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div className="pz-retry" role="alert">
+      <Icon name="alert" size={18} />
+      <div className="pz-retry-body">
+        <strong>{t("ws.ai.title")}</strong>
+        <p>{t("ws.ai.body")}</p>
+        <button type="button" className="pz-retry-btn" onClick={onRetry}>{t("ws.ai.retry")}<Icon name="arrow-right" size={16} /></button>
+      </div>
     </div>
   );
 }
@@ -77,7 +92,7 @@ function Composer({ disabled, busy, processing, note, onSend, taRef }: { disable
         <textarea id="pz-msg" ref={taRef} rows={1} className="pz-msg" value={value} placeholder={t("ws.composer.placeholder")} readOnly={busy}
           aria-describedby="pz-msg-hint" onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} />
-        <Button type="submit" disabled={!value.trim() || busy} aria-label={t("ws.composer.send")} icon="send" className="pz-send">{t("ws.composer.send")}</Button>
+        <button type="submit" className="pz-send" disabled={!value.trim() || busy} aria-label={t("ws.composer.send")}><Icon name="arrow-right" size={18} className="pz-send-ico" /></button>
       </div>
       <p id="pz-msg-hint" className="pz-hint">{processing ? t("ws.composer.processing") : busy ? "\u00a0" : t("ws.composer.hint")}</p>
     </form>
@@ -93,7 +108,14 @@ interface WorkspaceProps<M> {
   submit: (req: Parameters<ReturnType<typeof useSession>["client"]["understandingTurn"]>[0]) => Promise<TurnResultDto>;
   onResult?: (r: TurnResultDto) => void;
   unavailable?: (meta: M) => boolean;
+  /** Category glyph shown before the title (from the DTO's iconKey), when there is one. */
+  icon?: (meta: M | null) => string | null;
+  /** Quiet context right after the title (progress, critical items). */
+  headerLead?: (ctx: { meta: M | null; progress: CategoryProgressDto | null; uState: UnderstandingState | null }) => ReactNode;
+  /** Right side of the header strip (status, link to the document). */
   headerExtra?: (ctx: { meta: M | null; progress: CategoryProgressDto | null; uState: UnderstandingState | null }) => ReactNode;
+  /** The eyebrow is quiet context; some surfaces would only repeat the title, so it stays for screen readers only. */
+  eyebrowVisible?: boolean;
   footerPanels?: (ctx: { meta: M | null; progress: CategoryProgressDto | null; uState: UnderstandingState | null; canWrite: boolean }) => ReactNode;
   closedNote?: (ctx: { meta: M | null; uState: UnderstandingState | null }) => ReactNode;
   unavailableState?: (meta: M) => ReactNode;
@@ -120,7 +142,7 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
   useEffect(() => {
     // Not scrollIntoView: that also moves the Tab starting point, so the first Tab would land in the composer instead of "Skip to main content".
     const el = bottom.current; if (!el) return;
-    const composer = ta.current?.closest("form");
+    const composer = ta.current?.closest("form") ?? el.closest(".pz-ws")?.querySelector(".pz-composer"); // also the closed-composer note, which is pinned too
     const limit = composer ? composer.getBoundingClientRect().top : window.innerHeight;
     const delta = el.getBoundingClientRect().bottom - limit + 16;
     if (delta <= 0) return;
@@ -153,20 +175,8 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
         {th.pending?.status === "processing" ? <WaitRow pending={th.pending} /> : null}
         {th.blocked ? <div className="pz-turn pz-turn-assistant"><span className="pz-turn-who">{t("ws.assistant")}</span><p className="pz-turn-text">{t("ws.blocked")}</p></div> : null}
       </div>
-      {th.pending && (th.pending.status === "ai_unavailable" || th.pending.status === "error") ? (
-        <div className="pz-retry" role="alert">
-          <Icon name="alert" size={20} />
-          <div><strong>{t("ws.ai.title")}</strong><p>{t("ws.ai.body")}</p></div>
-          <Button variant="secondary" icon="refresh" onClick={th.retry}>{t("ws.ai.retry")}</Button>
-        </div>
-      ) : null}
-      {th.orphan && !th.pending ? (
-        <div className="pz-retry" role="alert">
-          <Icon name="alert" size={20} />
-          <div><strong>{t("ws.ai.title")}</strong><p>{t("ws.ai.body")}</p></div>
-          <Button variant="secondary" icon="refresh" onClick={th.resendOrphan}>{t("ws.ai.retry")}</Button>
-        </div>
-      ) : null}
+      {th.pending && (th.pending.status === "ai_unavailable" || th.pending.status === "error") ? <RetryPanel onRetry={th.retry} /> : null}
+      {th.orphan && !th.pending ? <RetryPanel onRetry={th.resendOrphan} /> : null}
       {lastAssistantQuick && lastAssistantQuick.length ? (
         <div className="pz-quick" role="group" aria-label={t("ws.quick")}>
           {lastAssistantQuick.map((q) => (
@@ -182,15 +192,19 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
   const readOnlyAccess = access.mode === "READ_ONLY";
   const closedNote: ReactNode = readOnlyAccess ? t("ws.composer.readOnly") : p.closedNote?.({ meta, uState: th.uState }) ?? t("ws.composer.unavailable");
   const showComposer = !!th.res.data && !(p.unavailableState && p.unavailableState(th.res.data.meta));
+  const iconName = p.icon?.(meta) ?? null;
+  const sideExtra = p.headerExtra?.({ meta, progress: th.progress, uState: th.uState });
   return (
     <AppShell>
       <div className="pz-ws">
         <header className="pz-wshead">
           <div className="pz-wshead-main">
-            <span className="pz-eyebrow">{p.eyebrow}</span>
-            <h1 className="pz-h2" tabIndex={-1} data-autofocus>{title}</h1>
+            {iconName ? <Icon name={iconName} size={22} className="pz-wshead-icon" /> : null}
+            <h1 className="pz-wstitle" tabIndex={-1} data-autofocus>{title}</h1>
+            {p.eyebrow && p.eyebrow !== title ? <span className={p.eyebrowVisible === false ? "pz-sr" : "pz-wsmeta"}>{p.eyebrow}</span> : null}
+            {p.headerLead?.({ meta, progress: th.progress, uState: th.uState })}
           </div>
-          {p.headerExtra?.({ meta, progress: th.progress, uState: th.uState })}
+          {sideExtra ? <div className="pz-wshead-side">{sideExtra}</div> : null}
         </header>
         <div className="pz-wsbody">{body}</div>
         {showComposer ? <Composer disabled={!writable} busy={!!th.pending} processing={busy} note={closedNote} taRef={ta} onSend={(text) => send(text)} /> : null}
@@ -209,45 +223,57 @@ export function UnderstandingScreen() {
       load={async () => ({ thread: await client.understanding(), meta: null })}
       submit={(r) => client.understandingTurn(r)}
       onResult={() => void refreshCenter()}
-      headerExtra={({ uState }) => (uState ? <div className="pz-wshead-side"><UnderstandingChip state={uState} />
-        {uState === "ready_to_confirm" || uState === "confirmed" ? <Link to={{ name: "serviceMap" }} className="pz-textlink">{t("ws.header.viewMap")}<Icon name="arrow-right" size={16} /></Link> : null}</div> : null)}
+      headerExtra={({ uState }) => (uState ? <>
+        <UnderstandingChip state={uState} />
+        {uState === "ready_to_confirm" || uState === "confirmed" ? <Link to={{ name: "serviceMap" }} className="pz-textlink">{t("ws.header.viewMap")}<Icon name="arrow-right" size={16} /></Link> : null}
+      </> : null)}
       closedNote={({ uState }) => (uState === "confirmed" ? t("ws.composer.understandingDone") : t("ws.composer.unavailable"))}
       footerPanels={({ uState }) => (uState === "ready_to_confirm" ? (
         <section className="pz-cta-panel" aria-labelledby="pz-cta-map">
-          <h2 id="pz-cta-map" className="pz-h3">{t("ws.cta.map.title")}</h2><p>{t("ws.cta.map.body")}</p>
-          <Link to={{ name: "serviceMap" }} className="pz-btn pz-btn-primary"><span>{t("ws.cta.map.button")}</span><Icon name="arrow-right" size={18} /></Link>
+          <h2 id="pz-cta-map" className="pz-cta-title">{t("ws.cta.map.title")}</h2><p>{t("ws.cta.map.body")}</p>
+          <Link to={{ name: "serviceMap" }} className="pz-textlink pz-cta-link"><span>{t("ws.cta.map.button")}</span><Icon name="arrow-right" size={16} /></Link>
         </section>) : null)}
     />
   );
 }
 
 export function CategoryWorkspace({ id }: { id: string }) {
-  const { t } = useI18n();
+  const { t, tn } = useI18n();
   const { client, refreshCenter } = useSession();
   return (
     <Workspace<CategoryDto>
-      key={id} scope={`category:${id}`} eyebrow={t("ws.eyebrow.category")} title={(m) => m?.label ?? "…"}
+      key={id} scope={`category:${id}`} eyebrow={t("ws.eyebrow.category")} eyebrowVisible={false} title={(m) => m?.label ?? "…"}
       load={async () => { const c = await client.category(id); return { thread: c.thread, meta: c }; }}
       submit={(r) => client.categoryTurn(id, r)}
       onResult={() => void refreshCenter()}
+      icon={(m) => m?.iconKey ?? null}
+      headerLead={({ meta, progress }) => {
+        const pr = progress ?? meta?.progress ?? null;
+        if (!meta || !pr) return null;
+        return (
+          <div className="pz-wsprog">
+            {pr.progressPct !== null
+              ? <><Meter pct={pr.progressPct} label={t("ws.progress.captured", { pct: pr.progressPct })} /><span className="pz-pct">{t("ws.progress.captured", { pct: pr.progressPct })}</span></>
+              : <span className="pz-wsmeta">{t("ws.progress.none")}</span>}
+            {pr.criticalOpen > 0 ? <span className="pz-crit"><span className="pz-diamond" aria-hidden="true" />{tn("center.cat.critical", pr.criticalOpen)}</span> : null}
+          </div>
+        );
+      }}
       headerExtra={({ meta, progress }) => {
         const pr = progress ?? meta?.progress ?? null;
         if (!meta || !pr) return null;
         return (
-          <div className="pz-wshead-side pz-wshead-cat">
-            <div className="pz-progress">
-              {pr.progressPct !== null ? <><Meter pct={pr.progressPct} label={t("ws.progress.captured", { pct: pr.progressPct })} /><span className="pz-pct">{t("ws.progress.captured", { pct: pr.progressPct })}</span></> : <span className="pz-muted">{t("ws.progress.none")}</span>}
-              <CategoryStatusChip status={pr.status} sendState={meta.sendState} />
-            </div>
+          <>
+            <CategoryStatusChip status={pr.status} sendState={meta.sendState} />
             <Link to={{ name: "crp", id }} className="pz-textlink">{t("ws.header.viewCrp")}<Icon name="arrow-right" size={16} /></Link>
-          </div>
+          </>
         );
       }}
       closedNote={({ meta }) => (meta && (meta.status === "confirmed" || meta.status === "sent") ? <>{t("ws.composer.confirmedCategory")} <Link to={{ name: "crp", id }} className="pz-textlink">{t("ws.cta.crp.button")}</Link></> : t("ws.composer.unavailable"))}
       footerPanels={({ progress, canWrite }) => (canWrite && progress?.status === "ready_for_review" ? (
         <section className="pz-cta-panel" aria-labelledby="pz-cta-crp">
-          <h2 id="pz-cta-crp" className="pz-h3">{t("ws.cta.crp.title")}</h2><p>{t("ws.cta.crp.body")}</p>
-          <Link to={{ name: "crp", id }} className="pz-btn pz-btn-primary"><span>{t("ws.cta.crp.button")}</span><Icon name="arrow-right" size={18} /></Link>
+          <h2 id="pz-cta-crp" className="pz-cta-title">{t("ws.cta.crp.title")}</h2><p>{t("ws.cta.crp.body")}</p>
+          <Link to={{ name: "crp", id }} className="pz-textlink pz-cta-link"><span>{t("ws.cta.crp.button")}</span><Icon name="arrow-right" size={16} /></Link>
         </section>) : null)}
     />
   );
@@ -262,9 +288,9 @@ export function AddServiceScreen() {
       load={async () => { const a = await client.addService(); return { thread: a.thread, meta: { available: a.available } }; }}
       submit={(r) => client.addServiceTurn(r)}
       onResult={(r) => { void refreshCenter(); void r; }}
-      unavailableState={(m) => (m.available ? null : <p className="pz-muted pz-note-line">{t("ws.addService.unavailable")}</p>)}
+      unavailableState={(m) => (m.available ? null : <p className="pz-wsnote">{t("ws.addService.unavailable")}</p>)}
       footerPanels={({ canWrite }) => (canWrite ? (
-        <p className="pz-hint pz-hint-link"><Link to={{ name: "serviceMap" }} className="pz-textlink">{t("ws.header.viewMap")}<Icon name="arrow-right" size={16} /></Link></p>) : null)}
+        <p className="pz-wslink"><Link to={{ name: "serviceMap" }} className="pz-textlink">{t("ws.header.viewMap")}<Icon name="arrow-right" size={16} /></Link></p>) : null)}
     />
   );
 }

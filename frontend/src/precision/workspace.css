@@ -1,65 +1,116 @@
-/* Conversational workspace (Understanding, category conversations, Add a Service). Owned by the workspace track. */
-/* ------------------------------------------------------------ conversational workspace */
-.pz-ws { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100dvh - var(--pz-pad-y)); }
-.pz-main:has(.pz-ws) { padding-bottom: 0; }
-.pz-wshead { display: flex; justify-content: space-between; gap: 16px 28px; align-items: flex-end; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid var(--pz-line); margin-bottom: 28px; }
-.pz-wshead-main { display: grid; gap: 6px; min-width: 0; }
-.pz-wshead-side { display: grid; gap: 10px; justify-items: end; }
-.pz-wshead-cat { min-width: min(100%, 300px); }
-.pz-progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-.pz-wsbody { flex: 1; display: flex; flex-direction: column; gap: 22px; padding-bottom: 28px; }
-.pz-thread { display: flex; flex-direction: column; gap: 26px; }
-.pz-turn { display: grid; gap: 6px; max-width: 100%; }
-.pz-turn-assistant { padding-left: 20px; border-left: 2px solid var(--pz-line-2); max-width: 66ch; }
-.pz-turn-who { font: 600 11px/1 var(--pz-font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--pz-brand-2); }
-.pz-turn-text { font-size: 17.5px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; }
-.pz-turn-client { justify-items: end; }
-.pz-bubble { background: var(--pz-bubble); color: var(--pz-on-bubble); border-radius: 20px 20px 6px 20px; padding: 11px 18px; max-width: min(86%, 520px); white-space: pre-line; overflow-wrap: anywhere; }
+/* Conversational workspace (Understanding, category conversations, Add a Service), Design Proof v3.3. Owned by the workspace track.
+   Grammar: Precision turns are typographic (no bubble, no avatar); the client's turn is a restrained tint block, right; "what we understood" is a tint card;
+   quick choices are inline pills (stacked full-width buttons on mobile); the composer is a rounded field with a round ink send button. */
+
+/* ------------------------------------------------------------ frame */
+.pz-main:has(.pz-ws) { padding: 0; display: flex; flex-direction: column; }
+.pz-ws {
+  --pz-col: 640px;
+  --pz-wsx: max(16px, calc((100% - var(--pz-col)) / 2));
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+}
+
+/* ------------------------------------------------------------ header strip (under the top bar) */
+.pz-wshead { position: sticky; top: var(--pz-mbar-h); z-index: 20; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0 24px; min-height: 56px; padding: 4px clamp(16px, 2.4vw, 32px); background: var(--pz-paper); border-bottom: 1px solid var(--pz-line); }
+.pz-wshead-main { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 14px; min-width: 0; min-height: 44px; }
+.pz-wstitle { font: 600 16px/1.3 var(--pz-font-display); letter-spacing: -.005em; color: var(--pz-ink); overflow-wrap: anywhere; }
+.pz-wsmeta { font-size: 12.5px; line-height: 1.4; color: var(--pz-ink-3); }
+.pz-wshead-icon { color: var(--pz-ink-3); margin-right: -6px; }
+.pz-wsprog { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.pz-wsprog .pz-meter { flex: 0 0 80px; width: 80px; max-width: none; height: 4px; background: var(--pz-track); }
+.pz-wsprog .pz-meter span { background: var(--pz-brand); }
+.pz-wsprog .pz-pct { font-size: 13px; font-weight: 500; color: var(--pz-ink-2); }
+.pz-crit { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; line-height: 1.3; color: var(--pz-amber-ink); }
+.pz-diamond { flex: none; width: 7px; height: 7px; background: var(--pz-amber); transform: rotate(45deg); }
+.pz-wshead-side { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 0 20px; margin-left: auto; min-width: 0; }
+.pz-wshead .pz-textlink { font-size: 13px; font-weight: 600; text-decoration: none; min-height: 44px; color: var(--pz-brand); text-align: right; }
+.pz-wshead .pz-textlink:hover { text-decoration: underline; text-underline-offset: 4px; }
+/* a status in the strip is quiet text with its glyph, not a pill */
+.pz-wshead .pz-chip[data-tone] { --pz-chip-bg: transparent; --pz-chip-line: transparent; --pz-chip-ink: var(--pz-ink-3); --pz-chip-mark: var(--pz-paper); padding: 0; border: 0; font-size: 12.5px; font-weight: 500; }
+
+/* ------------------------------------------------------------ the thread */
+.pz-wsbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 28px; padding: clamp(32px, 9vh, 88px) var(--pz-wsx) 28px; }
+.pz-thread { display: flex; flex-direction: column; gap: 28px; }
+.pz-turn { display: grid; gap: 8px; max-width: 100%; min-width: 0; }
+.pz-turn-who { font: 500 11px/1 var(--pz-font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--pz-ink-3); }
+.pz-turn-text { font-size: 15px; line-height: 1.6; color: var(--pz-ink); white-space: pre-line; overflow-wrap: anywhere; }
+.pz-turn-ico { display: inline-block; vertical-align: -3px; margin-right: 8px; color: var(--pz-ink-3); }
+.pz-turn[data-kind="notice"] .pz-turn-text { color: var(--pz-ink-2); }
+.pz-turn-client { justify-items: end; gap: 6px; }
+.pz-bubble { background: var(--pz-bubble); color: var(--pz-on-bubble); border-radius: 12px; padding: 12px 16px; max-width: 80%; font-size: 15px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
 .pz-turn-meta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--pz-ink-3); }
 .pz-turn-warn { color: var(--pz-rose-ink); font-weight: 600; }
-.pz-confirm { margin-top: 10px; border: 1.5px solid var(--pz-line-2); background: var(--pz-paper); border-radius: 16px; padding: 16px 18px; display: grid; gap: 8px; }
-.pz-confirm-body { font: 600 18px/1.45 var(--pz-font-display); white-space: pre-line; color: var(--pz-ink); }
-.pz-confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-.pz-quick { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 22px; }
-.pz-quickbtn { min-height: 44px; padding: 8px 18px; border-radius: 999px; border: 1.5px solid var(--pz-brand-2); background: var(--pz-paper); color: var(--pz-brand); font: 600 15px/1.3 var(--pz-font-body); cursor: pointer; text-align: left; }
-.pz-quickbtn:hover { background: var(--pz-tint); }
-.pz-quickbtn[data-intent="unknown"], .pz-quickbtn[data-intent="withheld"] { border-style: dashed; border-color: var(--pz-ink-3); color: var(--pz-ink-2); }
-.pz-wait { display: flex; align-items: center; gap: 12px; padding-left: 22px; color: var(--pz-ink-2); font-size: 15px; }
+
+/* what we understood */
+.pz-confirm { margin-top: 8px; background: var(--pz-tint); border-radius: 12px; padding: 14px 18px 16px; display: grid; gap: 6px; }
+.pz-confirm .pz-eyebrow { font: 600 11px/1.3 var(--pz-font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--pz-brand); }
+.pz-confirm-body { font-size: 15px; line-height: 1.55; color: var(--pz-ink); white-space: pre-line; overflow-wrap: anywhere; }
+.pz-confirm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* pills: confirm / correct and quick choices */
+.pz-ws .pz-pill, .pz-ws .pz-quickbtn { --r: 999px; position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 16px; border-radius: var(--r); border: 1px solid var(--pz-line-2); background: var(--pz-paper); color: var(--pz-ink); font: 500 13px/1.3 var(--pz-font-body); text-align: left; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.pz-ws .pz-pill::after, .pz-ws .pz-quickbtn::after { content: ""; position: absolute; inset: -4px 0; } /* 44px pointer target around a 36px pill */
+.pz-ws .pz-pill-ink { border-color: var(--pz-ink); font-weight: 600; }
+.pz-ws .pz-pill:hover, .pz-ws .pz-quickbtn:hover { border-color: var(--pz-brand); color: var(--pz-brand); background: var(--pz-tint); }
+.pz-confirm .pz-pill:hover { background: var(--pz-paper); }
+.pz-ws .pz-quickbtn[data-intent="unknown"], .pz-ws .pz-quickbtn[data-intent="withheld"] { border-style: dashed; }
+.pz-ws .pz-pill:focus-visible, .pz-ws .pz-quickbtn:focus-visible { border-radius: var(--r); }
+.pz-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.pz-thread + .pz-quick { margin-top: -12px; }
+
+/* waiting, errors */
+.pz-wait { display: flex; align-items: center; gap: 10px; color: var(--pz-ink-3); font-size: 14px; }
 .pz-dots { display: inline-flex; gap: 4px; }
-.pz-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--pz-brand-2); animation: pz-pulse 1.2s ease-in-out infinite; }
+.pz-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--pz-ink-3); animation: pz-pulse 1.2s ease-in-out infinite; }
 .pz-dots i:nth-child(2) { animation-delay: .15s; } .pz-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes pz-pulse { 0%, 80%, 100% { opacity: .25; transform: scale(.85); } 40% { opacity: 1; transform: scale(1); } }
-.pz-retry { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; border-radius: 14px; background: var(--pz-note-bg); border: 1px solid var(--pz-note-line); color: var(--pz-note-ink); }
-.pz-retry > div { flex: 1 1 240px; }
-.pz-retry p { font-size: 15px; }
-.pz-cta-panel { display: grid; gap: 10px; justify-items: start; padding: 22px 24px; border-radius: 16px; background: var(--pz-tint); border: 1px solid var(--pz-tint-2); }
-.pz-cta-panel p { color: var(--pz-ink-2); max-width: 54ch; }
-.pz-note-line { padding: 14px 0; }
-.pz-hint-link { padding-left: 22px; }
+.pz-retry { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; border-radius: 12px; background: var(--pz-paper); border: 1px solid var(--pz-line); }
+.pz-retry > svg { margin-top: 3px; color: var(--pz-rose-ink); }
+.pz-retry-body { display: grid; gap: 2px; min-width: 0; }
+.pz-retry strong { font-size: 15px; font-weight: 600; color: var(--pz-rose-ink); }
+.pz-retry p { font-size: 14px; color: var(--pz-ink-2); }
+.pz-ws .pz-retry-btn { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; margin-bottom: -10px; border: 0; background: none; color: var(--pz-ink); font: 600 13px/1.3 var(--pz-font-body); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.pz-ws .pz-retry-btn:hover { color: var(--pz-brand); }
+
+/* output links: the map or the CRP is ready */
+.pz-cta-panel { display: grid; gap: 4px; justify-items: start; padding: 16px 20px; border-radius: 12px; background: var(--pz-paper); border: 1px solid var(--pz-line); }
+.pz-cta-title { font: 600 15px/1.4 var(--pz-font-display); color: var(--pz-ink); }
+.pz-cta-panel p { font-size: 14px; line-height: 1.55; color: var(--pz-ink-2); max-width: 54ch; }
+.pz-cta-link { font-size: 14px; margin-bottom: -10px; }
+.pz-wsnote { padding: 16px 18px; border-radius: 12px; background: var(--pz-paper); border: 1px solid var(--pz-line); color: var(--pz-ink-2); font-size: 15px; line-height: 1.6; }
+.pz-wslink { margin: -12px 0 0; }
+.pz-wslink .pz-textlink { font-size: 14px; }
 .pz-bottom { height: 1px; scroll-margin-bottom: 190px; }
-.pz-composer { position: sticky; bottom: 0; z-index: 10; padding: 14px 0 calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--pz-bg) 82%, transparent); }
-.pz-composer-row { display: flex; gap: 10px; align-items: flex-end; background: var(--pz-paper); border: 1.5px solid var(--pz-line-2); border-radius: 22px; padding: 8px 8px 8px 12px; box-shadow: var(--pz-shadow); }
-.pz-composer-row:focus-within { border-color: var(--pz-brand-2); }
-.pz-msg { border: 0; background: transparent; resize: none; min-height: 44px; max-height: 160px; padding: 10px 6px; border-radius: 12px; box-shadow: none; }
-.pz-msg:focus-visible { outline-offset: 0; }
-.pz-send { min-height: 44px; padding: 0 18px; }
-.pz-composer .pz-hint { padding: 6px 14px 0; }
-.pz-composer-off { padding-block: 18px; }
-.pz-composer-note { padding: 14px 18px; border-radius: 14px; background: var(--pz-paper); border: 1px dashed var(--pz-line-2); color: var(--pz-ink-2); font-size: 15px; }
 
+/* ------------------------------------------------------------ composer, pinned at the bottom of the content area */
+.pz-composer { position: sticky; bottom: 0; z-index: 10; padding: 12px var(--pz-wsx) calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--pz-bg) 86%, transparent); }
+.pz-composer-row { position: relative; background: var(--pz-paper); border: 1px solid var(--pz-line-2); border-radius: 12px; }
+.pz-composer-row:focus-within { border-color: var(--pz-brand); }
+/* the textarea is the whole field (its own focus ring surrounds the field); the send button sits inside it, bottom right */
+.pz-composer .pz-msg { display: block; width: 100%; min-height: 48px; max-height: 160px; padding: 12px 56px 12px 16px; border: 0; border-radius: 12px; background: transparent; box-shadow: none; resize: none; font-size: 15px; line-height: 24px; color: var(--pz-ink); }
+.pz-composer .pz-msg::placeholder { color: var(--pz-ink-3); opacity: 1; }
+.pz-ws .pz-msg:focus-visible { border-radius: 12px; }
+.pz-composer .pz-send { position: absolute; right: 6px; bottom: 5px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--pz-fill); color: var(--pz-on-fill); cursor: pointer; transition: background .15s, opacity .15s; }
+.pz-send::after { content: ""; position: absolute; inset: -4px; }
+.pz-send:hover:not([disabled]) { background: var(--pz-fill-hover); }
+.pz-send[disabled] { opacity: .4; cursor: not-allowed; }
+.pz-ws .pz-send:focus-visible { border-radius: 50%; }
+.pz-send-ico { transform: rotate(-90deg); }
+.pz-composer .pz-hint { padding: 6px 2px 0; font-size: 12px; }
+.pz-composer-off { padding-top: 8px; }
+.pz-composer-note { padding: 14px 16px; border-radius: 12px; background: var(--pz-paper); border: 1px solid var(--pz-line); color: var(--pz-ink-2); font-size: 14px; line-height: 1.55; }
 
+/* ------------------------------------------------------------ mobile: quick choices become stacked full-width buttons */
 @media (max-width: 899px) {
-  .pz-ws { min-height: calc(100dvh - var(--pz-mbar-h) - var(--pz-pad-y)); }
-  .pz-wshead { align-items: flex-start; }
-  .pz-wshead-side { justify-items: start; width: 100%; }
-  .pz-progress { justify-content: flex-start; width: 100%; }
-  .pz-turn-text { font-size: 17px; }
-  .pz-turn-assistant { padding-left: 14px; }
-  .pz-quick { padding-left: 14px; }
-  .pz-wait, .pz-hint-link { padding-left: 14px; }
-  .pz-bubble { max-width: 92%; }
-  .pz-composer { margin-inline: calc(-1 * var(--pz-pad-x)); padding-inline: var(--pz-pad-x); }
-  .pz-send span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .pz-send { padding: 0; width: 48px; min-width: 48px; flex: 0 0 48px; border-radius: 50%; }
+  .pz-wshead { position: static; padding: 2px 16px; }
+  .pz-wshead-side { width: 100%; justify-content: space-between; margin-left: 0; }
+  .pz-wsbody { padding-top: 28px; }
+  .pz-bubble { max-width: 90%; }
+  .pz-ws .pz-pill { min-height: 44px; }
+  .pz-ws .pz-pill::after, .pz-ws .pz-quickbtn::after, .pz-ws .pz-send::after { display: none; }
+  .pz-quick { flex-direction: column; align-items: stretch; gap: 10px; }
+  .pz-ws .pz-quickbtn { --r: 12px; justify-content: flex-start; min-height: 48px; padding: 10px 16px; font-size: 15px; font-weight: 400; }
   .pz-composer .pz-hint { display: none; }
+  .pz-composer .pz-msg { min-height: 52px; padding: 14px 60px 14px 16px; }
+  .pz-composer .pz-send { width: 44px; height: 44px; right: 3px; bottom: 3px; }
 }

@@ -215,6 +215,7 @@ export const en = {
   "sm.toUnderstanding": "Continue Precision Understanding",
   "sm.toCenter": "Go to Precision Center",
   "sm.viewCategory": "Open category",
+  "sm.contents": "Contents",
 
   // ---- crp
   "crp.eyebrow": "Category Requirement Pack (CRP)",
@@ -240,6 +241,7 @@ export const en = {
   "crp.newVersion.note": "This CRP is confirmed and read-only. If something changes, start a new version. The confirmed one stays as it is until you confirm the new one.",
   "crp.preview": "Preview before Send",
   "crp.readOnly": "You can review this CRP, but you can't change it right now.",
+  "crp.readOnlyLabel": "Read-only",
   "crp.draftNote": "This summary updates as you answer. Confirming becomes available once the essential details are defined.",
   "crp.toCategory": "Back to the conversation",
   "crp.confirmed.title": "CRP confirmed",

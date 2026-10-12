@@ -1,26 +1,21 @@
 import { useState } from "react";
 import type { EntryDto } from "../api/dto";
-import { useI18n } from "../i18n";
+import { useI18n, type DictKey } from "../i18n";
 import { useSession } from "../state/app";
 import { useRouter } from "../state/router";
 import { BareShell } from "../ui/Shell";
 import { usePage } from "../ui/hooks";
 import { Button } from "../ui/primitives";
 
-/** Meridians and orbits: a neutral brand composition that implies no place, used whenever there is no approved photograph. */
-function NeutralArt() {
-  const radii = [90, 150, 215, 285, 360, 440, 525];
+/** The four stages of the journey, named as everywhere else in the product. */
+const STEPS: DictKey[] = ["nav.understanding", "nav.serviceMap", "center.cat.title", "center.oh.title"];
+
+/** Calm, neutral wash used whenever there is no approved destination photograph: soft sky tones and a few very light shapes. No place or imagery cues. */
+function NeutralWash() {
   return (
-    <svg className="pz-cover-art" viewBox="0 0 600 760" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-      <rect width="600" height="760" fill="var(--pz-cover-bg)" />
-      <g fill="none" stroke="var(--pz-cover-line)" strokeWidth="1.2">
-        {radii.map((r, i) => <circle key={r} cx="470" cy="560" r={r} opacity={0.18 + i * 0.07} />)}
-        <path d="M470 560L-40 120M470 560L120 -40M470 560L640 -40M470 560L-40 420" opacity=".22" />
-        <path d="M140 560a330 330 0 0 1 330-330" stroke="var(--pz-cover-accent)" strokeWidth="2.4" opacity=".95" />
-      </g>
-      <circle cx="470" cy="230" r="7" fill="var(--pz-cover-dot)" />
-      <circle cx="470" cy="230" r="16" fill="none" stroke="var(--pz-cover-dot)" strokeWidth="1.2" opacity=".6" />
-    </svg>
+    <div className="pz-cover-wash" aria-hidden="true">
+      <span className="pz-wash-a" /><span className="pz-wash-b" /><span className="pz-wash-c" />
+    </div>
   );
 }
 
@@ -41,6 +36,9 @@ export function CoverScreen({ entry }: { entry: EntryDto }) {
   };
   return (
     <BareShell tone="cover">
+      <div className="pz-cover-bg" data-photo={photo ? "true" : "false"}>
+        {photo ? <img src={photo.url} alt={photo.altText} style={{ objectPosition: `${Math.round(photo.focal.x * 100)}% ${Math.round(photo.focal.y * 100)}%` }} /> : <NeutralWash />}
+      </div>
       <section className="pz-cover">
         <div className="pz-cover-copy">
           <span className="pz-eyebrow">{t("cover.eyebrow")}</span>
@@ -52,9 +50,17 @@ export function CoverScreen({ entry }: { entry: EntryDto }) {
           ) : null}
           <Button iconAfter="arrow-right" busy={busy} onClick={go} className="pz-cta-lg">{t("cover.continue")}</Button>
         </div>
-        <div className="pz-cover-visual">
-          {photo ? <img src={photo.url} alt={photo.altText} style={{ objectPosition: `${Math.round(photo.focal.x * 100)}% ${Math.round(photo.focal.y * 100)}%` }} /> : <NeutralArt />}
-        </div>
+        <section className="pz-process" aria-labelledby="pz-process-h">
+          <h2 id="pz-process-h" className="pz-process-title">{t("center.journey")}</h2>
+          <ol className="pz-process-list">
+            {STEPS.map((k, i) => (
+              <li key={k} className="pz-process-step" data-first={i === 0 ? "true" : undefined}>
+                <span className="pz-process-row"><span className="pz-process-n" aria-hidden="true">{i + 1}</span><span className="pz-process-line" aria-hidden="true" /></span>
+                <span className="pz-process-name"><span className="pz-sr">{t("center.step", { n: i + 1 })}. </span>{t(k)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
       </section>
     </BareShell>
   );

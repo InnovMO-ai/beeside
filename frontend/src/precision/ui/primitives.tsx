@@ -30,6 +30,20 @@ export function CategoryStatusChip({ status, sendState }: { status: CategoryStat
   const [icon, tone] = CAT_SHAPES[status];
   return <StatusChip icon={icon} tone={tone}>{t(`status.${status}`)}</StatusChip>;
 }
+/** Plain status line (glyph + text, no pill): used where a list row carries the state, e.g. the Center category table. */
+export function StatusText({ icon, tone, children }: { icon: string; tone: string; children: ReactNode }) {
+  return <span className="pz-st" data-tone={tone}><Icon name={icon} size={14} /><span>{children}</span></span>;
+}
+const CAT_TEXT: Record<CategoryStatus, [string, string]> = {
+  not_started: ["s-empty", "neutral"], in_progress: ["s-half", "neutral"], ready_for_review: ["s-review", "ok"], confirmed: ["s-done", "ok"], sent: ["s-sent", "ok"],
+};
+export function CategoryStatusText({ status, sendState }: { status: CategoryStatus; sendState?: SendStateDto }) {
+  const { t } = useI18n();
+  if (status === "confirmed" && sendState === "sending") return <StatusText icon="s-pending" tone="attention">{t("status.sending")}</StatusText>;
+  if (status === "confirmed" && sendState === "failed") return <StatusText icon="s-pending" tone="attention">{t("status.sendFailed")}</StatusText>;
+  const [icon, tone] = CAT_TEXT[status];
+  return <StatusText icon={icon} tone={tone}>{t(`status.${status}`)}</StatusText>;
+}
 const U_SHAPES: Record<UnderstandingState, [string, string]> = { not_started: ["s-empty", "neutral"], in_progress: ["s-half", "active"], ready_to_confirm: ["s-review", "review"], confirmed: ["s-done", "ok"] };
 export function UnderstandingChip({ state }: { state: UnderstandingState }) {
   const { t } = useI18n();

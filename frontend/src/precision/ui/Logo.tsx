@@ -10,3 +10,15 @@ export function Logo({ height = 28 }: { height?: number }) {
     </span>
   );
 }
+
+/** Logo, thin divider and the product name: the left side of every top bar. */
+export function Brand({ height = 22 }: { height?: number }) {
+  const { t } = useI18n();
+  return (
+    <div className="pz-brand">
+      <Logo height={height} />
+      <span className="pz-brand-div" aria-hidden="true" />
+      <span className="pz-brand-name">{t("nav.center")}</span>
+    </div>
+  );
+}

@@ -6,6 +6,8 @@ const G: Record<string, ReactNode> = {
   "chevron-left": <path d="M15 5l-7 7 7 7" />,
   "chevron-down": <path d="M5 9l7 7 7-7" />,
   "arrow-right": <path d="M4 12h15M13 6l6 6-6 6" />,
+  "arrow-left": <path d="M20 12H5M11 6l-6 6 6 6" />,
+  diamond: <path d="M12 3.5l8.5 8.5-8.5 8.5L3.5 12z" fill="currentColor" stroke="none" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
