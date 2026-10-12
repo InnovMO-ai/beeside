@@ -112,6 +112,10 @@ test.describe("preview and send failures", () => {
     await expect(failed).toContainText("nothing was lost");
     await failed.getByRole("button", { name: "Contact beeside" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
+    // Contact beeside is one e-mail address from configuration: a mailto link, no in-app form, no response promise
+    const mail = page.getByRole("dialog").getByRole("link", { name: "Send an email" });
+    await expect(mail).toHaveAttribute("href", /^mailto:contact@beeside\.you$/);
+    await expect(page.getByRole("dialog").getByRole("textbox")).toHaveCount(0);
     await checkScreen(page, "contact beeside dialog");
   });
 

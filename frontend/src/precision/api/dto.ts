@@ -28,8 +28,8 @@ export interface ApiErrorDto {
   support?: SupportDto;
 }
 
-/** Support contact for the invalid-link page, from configuration (`support_contact_url` / `support_email`). Either field may be null. */
-export interface SupportDto { contactUrl: string | null; email: string | null }
+/** Contact beeside for pages shown before or without a session (link, access ended, errors): the configured address (`contact_beeside_email`). */
+export interface SupportDto { email: string | null }
 
 // ---------------------------------------------------------------- session & entry
 export interface SessionExchangeRequest { code: string }
@@ -252,7 +252,14 @@ export interface SendResultDto {
 }
 
 // ---------------------------------------------------------------- help, add a service
-export interface HelpDto { helpCenterUrl: string | null; contactAvailable: boolean }
+export interface HelpDto {
+  helpCenterUrl: string | null;
+  /** Legal references and the single Contact beeside address, all from configuration. */
+  privacyUrl: string | null;
+  termsUrl: string | null;
+  contactEmail: string | null;
+  contactAvailable: boolean;
+}
 export interface ContactRequest { message: string }
 export interface AddServiceThreadDto { available: boolean; thread: ThreadDto | null }
 

@@ -13,7 +13,7 @@ import { describeError } from "../../security/redact";
 import { accessPermits } from "../ports/entitlement";
 import { createCrpRouter } from "../domain/crp/router";
 import type { Actor } from "../domain/center";
-import { supportContact } from "../domain/config";
+import { contactEmail } from "../domain/config";
 import { requirePrecision, type PrecisionDomainDeps } from "../domain/deps";
 import type { PrecisionDomain } from "../domain";
 import { DEFAULT_SESSION_TTL_MS, authenticateSession, exchangeLinkToken } from "../domain/tokens";
@@ -104,6 +104,15 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
     }),
   );
 
+  // ---- Contact beeside for pages that exist without a session (public, read-only, rate limited like the exchange)
+  api.get(
+    "/support",
+    limit(PRECISION_RATE_LIMITS.exchange, clientAddress),
+    wrap(async (req, res) => {
+      res.json({ email: await contactEmail(deps.db, localeHeader(req) ?? "en") });
+    }),
+  );
+
   // ---- session exchange (public)
   api.post(
     "/session/exchange",
@@ -112,8 +121,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
       const locale = localeHeader(req) ?? "en";
       const code = (req.body as { code?: unknown } | undefined)?.code;
       const invalid = async (): Promise<never> => {
-        const support = await supportContact(deps.db, locale);
-        throw new ApiError("UNAUTHENTICATED", false, support ? { support } : {});
+        throw new ApiError("UNAUTHENTICATED", false, { support: { email: await contactEmail(deps.db, locale) } });
       };
       if (typeof code !== "string" || code.length < 16 || code.length > 200 || !/^[A-Za-z0-9_-]+$/.test(code)) return invalid();
       const issued = await exchangeLinkToken(deps.db, code, deps.now(), DEFAULT_SESSION_TTL_MS);

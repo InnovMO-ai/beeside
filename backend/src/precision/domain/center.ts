@@ -15,7 +15,7 @@ import type { EntitlementState } from "../ports/entitlement";
 import { accessPermits } from "../ports/entitlement";
 import { describeError } from "../../security/redact";
 import { progressOf, projectCountries } from "./categories";
-import { CONFIG_KEYS, configUrl } from "./config";
+import { CONFIG_KEYS, configUrl, contactEmail, customerLink } from "./config";
 import { understandingStateOf } from "./context-reader";
 import type { PrecisionDomainDeps } from "./deps";
 import { destinationsOf, type FaContextService } from "./fa-context";
@@ -130,12 +130,19 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
       categories,
       addService: { available: addServiceAvailability({ paStatus: pa?.status ?? "not_started", snapshotCount: count, projectActive: writable }) },
       operationHub: hub.block,
-      help: { helpCenterUrl: await configUrl(deps.db, CONFIG_KEYS.helpCenterUrl, locale) },
+      help: { helpCenterUrl: await customerLink(deps.db, CONFIG_KEYS.helpCenterUrl, locale) },
     };
   }
 
   async function help(actor: Actor): Promise<HelpDto> {
-    return { helpCenterUrl: await configUrl(deps.db, CONFIG_KEYS.helpCenterUrl, actor.locale), contactAvailable: true };
+    const [helpCenterUrl, privacyUrl, termsUrl, email] = await Promise.all([
+      customerLink(deps.db, CONFIG_KEYS.helpCenterUrl, actor.locale),
+      customerLink(deps.db, CONFIG_KEYS.privacyUrl, actor.locale),
+      customerLink(deps.db, CONFIG_KEYS.termsUrl, actor.locale),
+      contactEmail(deps.db, actor.locale),
+    ]);
+    // Commercial Notices is deliberately not part of this answer: it belongs only to a commercial-communications consent context.
+    return { helpCenterUrl, privacyUrl, termsUrl, contactEmail: email, contactAvailable: true };
   }
 
   async function contact(actor: Actor, message: unknown): Promise<{ ok: true }> {

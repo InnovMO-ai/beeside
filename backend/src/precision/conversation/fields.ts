@@ -24,6 +24,28 @@ export function humanize(key: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
 
+const norm = (v: string): string => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+let NAME_TO_CODE: Map<string, string> | null = null;
+/** Country name (English or Spanish) to ISO 3166-1 alpha-2, from the platform's own region names; null when unknown. */
+export function countryCodeFromName(name: string): string | null {
+  if (!NAME_TO_CODE) {
+    const m = new Map<string, string>();
+    try {
+      const dn = [new Intl.DisplayNames(["en"], { type: "region" }), new Intl.DisplayNames(["es"], { type: "region" })];
+      for (let a = 65; a <= 90; a++) for (let b = 65; b <= 90; b++) {
+        const code = String.fromCharCode(a, b);
+        for (const d of dn) {
+          let n: string | undefined;
+          try { n = d.of(code); } catch { n = undefined; }
+          if (n && n !== code) m.set(norm(n), code);
+        }
+      }
+    } catch { /* Intl.DisplayNames unavailable: names stay unresolved, codes still work */ }
+    NAME_TO_CODE = m;
+  }
+  return NAME_TO_CODE.get(norm(name)) ?? null;
+}
+
 function regionName(code: string, locale: Locale): string {
   try {
     return new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ?? code;
@@ -298,12 +320,17 @@ export function validateValue(def: FieldDefinition, raw: unknown): unknown | nul
       return out.length ? out : null;
     }
     case "country_list": {
-      const arr = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[,;\s]+/) : null;
+      // The prompt asks for ISO 3166-1 alpha-2 codes; a real model sometimes answers with the country name ("Mexico",
+      // "México") instead. A name is resolved to its code deterministically (Intl region names, EN + ES); anything else is refused.
+      const arr = Array.isArray(raw) ? raw : typeof raw === "string" ? (/^[A-Za-z]{2}(?:[,;\s]+[A-Za-z]{2})*$/.test(raw.trim()) ? raw.trim().split(/[,;\s]+/) : raw.split(/\s*(?:[,;]|\by\b|\band\b)\s*/i)) : null;
       if (!arr) return null;
       const out: string[] = [];
       for (const x of arr) {
-        if (typeof x !== "string" || !/^[A-Za-z]{2}$/.test(x.trim())) return null;
-        const c = x.trim().toUpperCase();
+        if (typeof x !== "string") return null;
+        const t = x.trim();
+        if (!t) continue;
+        const c = /^[A-Za-z]{2}$/.test(t) ? t.toUpperCase() : countryCodeFromName(t);
+        if (!c) return null;
         if (!out.includes(c)) out.push(c);
       }
       return out.length ? out : null;

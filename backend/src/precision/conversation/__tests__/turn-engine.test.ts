@@ -430,14 +430,21 @@ describe("reading the client's answer", () => {
     expect(w.lastAssistant().structured).toMatchObject({ state: { fieldKey: "dest_country", clarifyCount: 1 } });
   });
 
-  it("schema validation: an invalid enum value or malformed country code is dropped", async () => {
+  it("schema validation: an invalid enum value or an unrecognizable country is dropped; a country NAME is resolved to its code", async () => {
     const w = new World({ surface: "category", locale: "en", facts: { dest_country: A(["CL"]) }, fixture: { "category:operating_model": { extract: [ext("operating_model", "outsourced", "outsourced")] } } });
     await w.open();
     const r = await w.say("It will be outsourced to somebody");
     expect(r.factsToWrite).toEqual([]);
-    const w2 = new World({ surface: "category", locale: "en", fixture: { "category:dest_country": { extract: [ext("dest_country", ["Chile"], "Chile")] } } });
+    const w2 = new World({ surface: "category", locale: "en", fixture: { "category:dest_country": { extract: [ext("dest_country", ["Atlantis"], "Atlantis")] } } });
     await w2.open();
-    expect((await w2.say("Chile")).factsToWrite).toEqual([]);
+    expect((await w2.say("Atlantis")).factsToWrite).toEqual([]);
+    // a real model sometimes answers with the name instead of the ISO code: resolved deterministically (EN and ES, accents ignored)
+    const w3 = new World({ surface: "category", locale: "en", fixture: { "category:dest_country": { extract: [ext("dest_country", ["Chile"], "Chile")] } } });
+    await w3.open();
+    expect((await w3.say("Chile")).factsToWrite).toMatchObject([{ fieldKey: "dest_country", value: ["CL"] }]);
+    const w4 = new World({ surface: "category", locale: "es", fixture: { "category:dest_country": { extract: [ext("dest_country", "México y Chile", "México y Chile")] } } });
+    await w4.open();
+    expect((await w4.say("México y Chile")).factsToWrite).toMatchObject([{ fieldKey: "dest_country", value: ["MX", "CL"] }]);
   });
 
   it("confidence thresholds: high accepted, medium asks for confirmation (nothing written), low is ignored", async () => {

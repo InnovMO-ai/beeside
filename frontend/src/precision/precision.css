@@ -290,6 +290,13 @@ a.pz-textlink { min-height: 32px; }
 .pz-faq-item p { padding: 0 4px 18px; color: var(--pz-ink-2); font-size: 14px; max-width: 64ch; }
 .pz-help-link { margin-top: 20px; }
 .pz-contact { margin-top: 36px; display: grid; gap: 12px; }
+.pz-mailbox { display: grid; gap: 10px; justify-items: start; max-width: 640px; }
+.pz-lead-sm { color: var(--pz-ink-2); font-size: 14px; }
+.pz-mailaddr { font: 600 15px/1.4 var(--pz-font-body); overflow-wrap: anywhere; }
+.pz-supportline { margin-top: 20px; font-size: 14px; color: var(--pz-ink-2); text-align: center; overflow-wrap: anywhere; }
+.pz-legal { margin-top: 36px; display: grid; gap: 8px; }
+.pz-legal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pz-legal-list a.pz-textlink { min-height: 32px; }
 
 /* ------------------------------------------------------------ mobile (< 900px): recomposed, not shrunken */
 @media (max-width: 899px) {

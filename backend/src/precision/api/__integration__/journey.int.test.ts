@@ -308,16 +308,18 @@ describeWithDb("Precision API — client journey", () => {
       if (value !== null) await h.db.query("INSERT INTO precision_config (key, locale, value) VALUES ($1, '*', $2::jsonb)", [k, JSON.stringify(value)]);
     };
 
-    it("Help: link from configuration (hidden when absent); contact messages are stored without promising a response time", async () => {
+    it("Help: approved links and the single contact address (row > default); contact messages are stored without promising a response time", async () => {
       const { projectId } = await h.newProject();
       const api = h.api(await h.session(projectId));
       await setConfig("help_center_url", null);
-      expect((await api.get("/help")).body).toEqual({ helpCenterUrl: null, contactAvailable: true });
-      expect((await api.get("/center")).body.help.helpCenterUrl).toBeNull();
+      const approved = { helpCenterUrl: "https://beeside.you/HelpCenter", privacyUrl: "https://beeside.you/PolíticaPrivacidad", termsUrl: "https://beeside.you/termsandconditions", contactEmail: "contact@beeside.you", contactAvailable: true };
+      expect((await api.get("/help")).body).toEqual(approved);
+      expect((await api.get("/help")).body).not.toHaveProperty("commercialNoticesUrl"); // only a commercial-consent context may show it
+      expect((await api.get("/center")).body.help.helpCenterUrl).toBe("https://beeside.you/HelpCenter");
       await setConfig("help_center_url", "https://help.example.test/precision");
       expect((await api.get("/help")).body.helpCenterUrl).toBe("https://help.example.test/precision");
       await setConfig("help_center_url", "javascript:alert(1)");
-      expect((await api.get("/help")).body.helpCenterUrl).toBeNull();
+      expect((await api.get("/help")).body.helpCenterUrl).toBe("https://beeside.you/HelpCenter");
       await setConfig("help_center_url", null);
 
       const r = await api.post("/help/contact", { message: "  I cannot find my invoice.  " });

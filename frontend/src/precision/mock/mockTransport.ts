@@ -31,6 +31,14 @@ interface AddThread { turns: StoredTurn[]; stage: "ask" | "confirm"; pendingNeed
 interface Processing { readyAt: number; scope: string; input: StepInput; clientId: string }
 interface TurnResultStored { status: "ok" | "blocked"; turnIds: string[]; mapChanged: boolean; scope: string }
 
+/** What the API answers from configuration (the approved defaults of the backend configuration layer); never read by a screen directly. */
+const MOCK_LINKS = {
+  helpCenterUrl: "https://beeside.you/HelpCenter",
+  privacyUrl: "https://beeside.you/PolíticaPrivacidad",
+  termsUrl: "https://beeside.you/termsandconditions",
+  contactEmail: "contact@beeside.you",
+} as const;
+
 export interface MockConfig {
   latency: number;
   turnLatency: number;
@@ -85,7 +93,7 @@ export interface MockControl {
 function freshState(): MockState {
   return {
     seq: 0, access: { mode: "FULL", readOnlyUntil: null }, coverSeen: false,
-    cfg: { latency: 120, turnLatency: 1800, ohDelay: 2500, helpUrl: null, cover: "neutral", ohMode: "pending_access", contactSherpa: false },
+    cfg: { latency: 120, turnLatency: 1800, ohDelay: 2500, helpUrl: MOCK_LINKS.helpCenterUrl, cover: "neutral", ohMode: "pending_access", contactSherpa: false },
     understanding: newInterview(), summaryConfirmed: false, smConfirmedAt: null, confirmedCategories: [], smRequestKeys: [], needs: [],
     add: { turns: [], stage: "ask", pendingNeed: null, started: false },
     cats: {}, sends: {}, firstDelivered: false, firstAttemptCat: null, processing: {}, results: {}, failedKeys: {}, inject: {}, salt: 0, contacts: [],
@@ -123,7 +131,6 @@ export function createMockServer(opts: MockOptions = {}) {
       else if (k === "oh") st.cfg.ohDelay = Number(v);
       else if (k === "cover" && (v === "photo" || v === "global" || v === "neutral")) st.cfg.cover = v;
       else if (k === "access" && v) st.access = v === "read_only" ? { mode: "READ_ONLY", readOnlyUntil: "2026-12-18T00:00:00.000Z" } : v === "revoked" ? { mode: "REVOKED", readOnlyUntil: null } : st.access;
-      else if (k === "help") st.cfg.helpUrl = "/precision/help";
       else if (k === "ohmode" && (v === "enter" || v === "pending_access")) st.cfg.ohMode = v;
       else if (k === "sherpa") st.cfg.contactSherpa = true;
       else if (k === "fail" && v) st.inject[v] = (st.inject[v] ?? 0) + 1;
@@ -454,12 +461,8 @@ export function createMockServer(opts: MockOptions = {}) {
 
     if (m === "POST /cover/seen") { st.coverSeen = true; save(); return { ok: true }; }
     if (m === "GET /center") return center(l);
-    if (m === "GET /help") return { helpCenterUrl: st.cfg.helpUrl, contactAvailable: true } satisfies HelpDto;
-    if (m === "POST /help/contact") {
-      const msg = (req.body as { message?: string } | undefined)?.message;
-      if (typeof msg !== "string" || !msg.trim() || msg.length > 2000) fail("INVALID_INPUT");
-      st.contacts.push(msg as string); save(); return { ok: true };
-    }
+    if (m === "GET /help") return { helpCenterUrl: st.cfg.helpUrl, privacyUrl: MOCK_LINKS.privacyUrl, termsUrl: MOCK_LINKS.termsUrl, contactEmail: MOCK_LINKS.contactEmail, contactAvailable: true } satisfies HelpDto;
+    if (m === "GET /support") return { email: MOCK_LINKS.contactEmail };
     if (m === "GET /understanding") {
       ensureUnderstandingThread(); save();
       return { surface: "understanding", scopeId: "understanding", title: l === "es" ? "Precision Understanding" : "Precision Understanding", turns: st.understanding.turns.map((t) => ser(t, l)), progress: null, understandingState: uState(), aiDisclosureShown: true, canWrite: canWrite() && uState() !== "confirmed" } satisfies ThreadDto;

@@ -22,6 +22,7 @@ const G: Record<string, ReactNode> = {
   send: <path d="M4 12l16-8-6 16-3-7z" />,
   doc: <><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M10 12h5M10 16h5" /></>,
   lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+  mail: <><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="M4 7l8 6 8-6" /></>,
   external: <path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5" />,
   // status shapes (never colour-only)
   "s-empty": <circle cx="12" cy="12" r="8" />,

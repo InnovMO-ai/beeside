@@ -46,6 +46,19 @@ describe("coerceValue", () => {
     expect(coerceValue("date", "2026-10-03")).toEqual({ ok: true, value: "2026-10-03" });
   });
 
+  it("a JSON array of strings for a list field is joined, not discarded; anything ambiguous still fails", () => {
+    expect(coerceValue("string", ["MX", "CL"])).toEqual({ ok: true, value: "MX, CL" });
+    expect(coerceValue("string", [])).toEqual({ ok: false });
+    expect(coerceValue("string", [{ a: 1 }])).toEqual({ ok: false });
+    expect(coerceValue("string", ["a, b"])).toEqual({ ok: false });
+  });
+
+  it("accepts the partial precisions the prompt allows (YYYY-MM, YYYY) and rejects impossible months", () => {
+    expect(coerceValue("date", "2027-04")).toEqual({ ok: true, value: "2027-04" });
+    expect(coerceValue("date", "2027")).toEqual({ ok: true, value: "2027" });
+    expect(coerceValue("date", "2027-13")).toEqual({ ok: false });
+  });
+
   it("refuses a non-ISO date string rather than guessing the format", () => {
     expect(coerceValue("date", "10/03/2026")).toEqual({ ok: false });
   });

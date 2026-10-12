@@ -10,6 +10,7 @@ import { FA_CONTEXT, setupHarness, TEST_DATABASE_URL, type Harness } from "./har
 
 const describeWithDb = TEST_DATABASE_URL ? describe : describe.skip;
 const ERROR_KEYS = ["error", "message", "retryable"];
+const UNAUTH_KEYS = [...ERROR_KEYS, "support"];
 
 describeWithDb("Precision API — session, access, errors", () => {
   let h: Harness;
@@ -57,7 +58,7 @@ describeWithDb("Precision API — session, access, errors", () => {
       expect((await exchange(link)).status).toBe(200);
       const again = await exchange(link);
       expect(again.status).toBe(401);
-      expect(Object.keys(again.body).sort()).toEqual(ERROR_KEYS.slice().sort());
+      expect(Object.keys(again.body).sort()).toEqual(UNAUTH_KEYS.slice().sort());
       expect(again.body).toMatchObject({ error: "UNAUTHENTICATED", retryable: false });
     });
 
@@ -86,19 +87,23 @@ describeWithDb("Precision API — session, access, errors", () => {
       expect((await h.api(session).get("/entry")).status).toBe(401);
     });
 
-    it("answers every malformed or unknown code the same way, with the support contact only when configured", async () => {
+    it("answers every malformed or unknown code the same way, with the configured Contact beeside address", async () => {
       for (const bad of [undefined, "", "short", 12345, "x".repeat(300), "not a code with spaces!!!!!!", randomUUID() + randomUUID()]) {
         const r = await exchange(bad);
         expect(r.status).toBe(401);
-        expect(r.body).toMatchObject({ error: "UNAUTHENTICATED", retryable: false });
-        expect(r.body).not.toHaveProperty("support");
+        expect(r.body).toMatchObject({ error: "UNAUTHENTICATED", retryable: false, support: { email: "contact@beeside.you" } });
       }
-      await h.db.query("UPDATE precision_config SET is_active = false WHERE key IN ('support_email','support_contact_url') AND is_active");
-      await h.db.query("INSERT INTO precision_config (key, locale, value) VALUES ('support_email', '*', $1::jsonb), ('support_contact_url', '*', $2::jsonb)", [JSON.stringify("help@example.test"), JSON.stringify("https://example.test/contact")]);
-      const r = await exchange(randomUUID() + randomUUID());
-      expect(r.body.support).toEqual({ contactUrl: "https://example.test/contact", email: "help@example.test" });
-      await h.db.query("UPDATE precision_config SET is_active = false WHERE key IN ('support_email','support_contact_url') AND is_active");
-      expect((await exchange(randomUUID() + randomUUID())).body).not.toHaveProperty("support");
+      await h.db.query("UPDATE precision_config SET is_active = false WHERE key = 'contact_beeside_email' AND is_active");
+      await h.db.query("INSERT INTO precision_config (key, locale, value) VALUES ('contact_beeside_email', '*', $1::jsonb)", [JSON.stringify("ops@example.test")]);
+      expect((await exchange(randomUUID() + randomUUID())).body.support).toEqual({ email: "ops@example.test" });
+      await h.db.query("UPDATE precision_config SET is_active = false WHERE key = 'contact_beeside_email' AND is_active");
+      expect((await exchange(randomUUID() + randomUUID())).body.support).toEqual({ email: "contact@beeside.you" });
+    });
+
+    it("GET /support is public and returns only the Contact beeside address", async () => {
+      const r = await request(h.app).get("/api/precision/support");
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ email: "contact@beeside.you" });
     });
 
     it("answers in the requested language", async () => {

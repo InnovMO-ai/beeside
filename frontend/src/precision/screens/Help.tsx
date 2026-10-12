@@ -5,7 +5,7 @@ import { AppShell } from "../ui/Shell";
 import { Icon } from "../ui/icons";
 import { usePage } from "../ui/hooks";
 import { Skeleton } from "../ui/primitives";
-import { ContactForm } from "./Contact";
+import { ContactPanel } from "./Contact";
 import { InlineError } from "./SystemPages";
 
 const FAQ = [1, 2, 3, 4, 5, 6] as const;
@@ -32,13 +32,22 @@ export function HelpScreen() {
           ))}
         </section>
         {help.data?.helpCenterUrl ? (
-          <p className="pz-help-link"><a className="pz-textlink" href={help.data.helpCenterUrl}>{t("help.center.cta")}<Icon name="external" size={16} /></a></p>
+          <p className="pz-help-link"><a className="pz-textlink" href={help.data.helpCenterUrl} target="_blank" rel="noopener noreferrer">{t("help.center.cta")}<Icon name="external" size={16} /><span className="pz-sr">{t("shell.newTab")}</span></a></p>
         ) : null}
         <section className="pz-contact">
           <h2 className="pz-h2">{t("help.contact.title")}</h2>
           {help.loading ? <Skeleton lines={3} /> : help.error && !help.data ? <InlineError onRetry={() => void help.reload()} />
-            : help.data?.contactAvailable === false ? <p className="pz-muted">{t("help.contact.unavailable")}</p> : <ContactForm />}
+            : help.data?.contactAvailable === false ? <p className="pz-muted">{t("help.contact.unavailable")}</p> : <ContactPanel email={help.data?.contactEmail ?? null} />}
         </section>
+        {help.data?.privacyUrl || help.data?.termsUrl ? (
+          <section className="pz-legal" aria-labelledby="pz-legal-h">
+            <h2 id="pz-legal-h" className="pz-h2">{t("help.legal.title")}</h2>
+            <ul className="pz-legal-list">
+              {help.data?.privacyUrl ? <li><a className="pz-textlink" href={help.data.privacyUrl} target="_blank" rel="noopener noreferrer">{t("help.legal.privacy")}<Icon name="external" size={16} /><span className="pz-sr">{t("shell.newTab")}</span></a></li> : null}
+              {help.data?.termsUrl ? <li><a className="pz-textlink" href={help.data.termsUrl} target="_blank" rel="noopener noreferrer">{t("help.legal.terms")}<Icon name="external" size={16} /><span className="pz-sr">{t("shell.newTab")}</span></a></li> : null}
+            </ul>
+          </section>
+        ) : null}
       </article>
     </AppShell>
   );

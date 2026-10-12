@@ -141,7 +141,7 @@ describe("client dictionaries: voice and typography", () => {
     expect(S["status.ready_for_review"]).toBe("Para tu revisión");
     expect(S["nav.addService"]).toBe("Add a Service");
     expect(S["sm.timeWindow"]).toBe("Horizonte de tiempo");
-    expect(S["nav.helpCenter"]).toBe("Centro de ayuda");
+    expect(S["nav.help"]).toBe("Ayuda");
     expect([S["item.confirmed"], S["item.assumed"], S["item.pending"], S["item.not_applicable"]]).toEqual(["Confirmado", "Supuesto", "Pendiente", "No aplica"]);
     expect([E["item.confirmed"], E["item.assumed"], E["item.pending"], E["item.not_applicable"]]).toEqual(["Confirmed", "Assumed", "Pending", "Not applicable"]);
   });

@@ -12,9 +12,26 @@ export const CONFIG_KEYS = {
   privacyUrl: "privacy_url",
   resumeGapMinutes: "analytics.resume_gap_minutes",
   staleAfterDays: "return.stale_after_days",
-  supportContactUrl: "support_contact_url",
-  supportEmail: "support_email",
+  /** Contact beeside: one address for every customer-facing contact / support action. */
+  contactEmail: "contact_beeside_email",
+  /** Commercial Notices: reference document for a commercial-communications consent context. Not a navigation or footer link. */
+  commercialNoticesUrl: "commercial_notices_url",
 } as const;
+
+/**
+ * PO-approved customer-facing values (12 Oct 2026). Resolution order for every one of them:
+ *   1. `precision_config` row (locale-specific, then `*`)  — the Admin-editable layer;
+ *   2. environment variable (deployment-level override);
+ *   3. these shipped defaults.
+ * No UI component or screen carries any of these literally: they reach the client only through the API.
+ */
+export const APPROVED_CUSTOMER_LINKS = {
+  [CONFIG_KEYS.privacyUrl]: { env: "PRECISION_PRIVACY_URL", value: "https://beeside.you/PolíticaPrivacidad" },
+  [CONFIG_KEYS.helpCenterUrl]: { env: "PRECISION_HELP_CENTER_URL", value: "https://beeside.you/HelpCenter" },
+  [CONFIG_KEYS.termsUrl]: { env: "PRECISION_TERMS_URL", value: "https://beeside.you/termsandconditions" },
+  [CONFIG_KEYS.commercialNoticesUrl]: { env: "PRECISION_COMMERCIAL_NOTICES_URL", value: "https://beeside.you/Policiescommercialnotices" },
+} as const;
+export const APPROVED_CONTACT_EMAIL = { env: "PRECISION_CONTACT_EMAIL", value: "contact@beeside.you" } as const;
 
 export const DEFAULT_RESUME_GAP_MINUTES = 30;
 
@@ -57,7 +74,25 @@ export async function configNumber(db: ConfigReader, key: string, locale: Locale
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-export async function supportContact(db: ConfigReader, locale: Locale): Promise<{ contactUrl: string | null; email: string | null } | null> {
-  const [contactUrl, email] = await Promise.all([configUrl(db, CONFIG_KEYS.supportContactUrl, locale), configEmail(db, CONFIG_KEYS.supportEmail, locale)]);
-  return contactUrl || email ? { contactUrl, email } : null;
+const httpsOrPath = (v: unknown): string | null => {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.length > 0 && t.length <= 500 && (/^https:\/\/[^\s]+$/i.test(t) || /^\/[^\s/][^\s]*$/.test(t)) ? t : null;
+};
+const emailOrNull = (v: unknown): string | null => (typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && v.length <= 200 ? v.trim() : null);
+
+/** A customer link: configuration row, then environment, then the approved default. A malformed value at one level falls to the next. */
+export async function customerLink(
+  db: ConfigReader,
+  key: keyof typeof APPROVED_CUSTOMER_LINKS,
+  locale: Locale,
+  env: Record<string, string | undefined> = process.env,
+): Promise<string> {
+  const d = APPROVED_CUSTOMER_LINKS[key];
+  return (await configUrl(db, key, locale)) ?? httpsOrPath(env[d.env]) ?? d.value;
+}
+
+/** The single Contact beeside address. */
+export async function contactEmail(db: ConfigReader, locale: Locale, env: Record<string, string | undefined> = process.env): Promise<string> {
+  return (await configEmail(db, CONFIG_KEYS.contactEmail, locale)) ?? emailOrNull(env[APPROVED_CONTACT_EMAIL.env]) ?? APPROVED_CONTACT_EMAIL.value;
 }

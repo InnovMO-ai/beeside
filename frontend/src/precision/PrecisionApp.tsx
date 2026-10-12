@@ -97,9 +97,9 @@ function Routes() {
 
 function Gate({ transport }: { transport?: TransportFactory }) {
   const { auth, client, retryExchange } = useAuthGate(transport);
-  if (auth.s !== "ready") return <LinkPage state={auth.s} onRetry={retryExchange} />;
+  if (auth.s !== "ready") return <LinkPage state={auth.s} onRetry={retryExchange} client={client} />;
   return (
-    <SessionProvider client={client} fallback={(state, retry) => (state === "loading" ? <Loading /> : state === "invalid" ? <LinkPage state="invalid" onRetry={retry} /> : <LoadErrorPage onRetry={retry} />)}>
+    <SessionProvider client={client} fallback={(state, retry) => (state === "loading" ? <Loading /> : state === "invalid" ? <LinkPage state="invalid" onRetry={retry} client={client} /> : <LoadErrorPage onRetry={retry} />)}>
       {() => <ScreenBoundary><Suspense fallback={<Loading />}><Routes /></Suspense></ScreenBoundary>}
     </SessionProvider>
   );

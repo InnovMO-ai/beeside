@@ -33,7 +33,7 @@ export function ThemeToggle() {
 function HelpLink() {
   const { t } = useI18n();
   const { route } = useRouter();
-  return <Link to={{ name: "help" }} className="pz-toplink" aria-current={route.name === "help" ? "page" : undefined}>{t("nav.helpCenter")}</Link>;
+  return <Link to={{ name: "help" }} className="pz-toplink" aria-current={route.name === "help" ? "page" : undefined}>{t("nav.help")}</Link>;
 }
 
 /** Read-only notice and lost-connection notice, shown above any content. */
@@ -79,7 +79,7 @@ export function BareShell({ children, tone }: { children: ReactNode; tone?: "cov
   );
 }
 
-/** Document view: no sidebar. A slim bar with the way back on the left; Help Center, language and Night Shift on the right. */
+/** Document view: no sidebar. A slim bar with the way back on the left; Help, language and Night Shift on the right. */
 export function DocShell({ children, back, backLabel }: { children: ReactNode; back: Route; backLabel: string }) {
   return (
     <div className="pz-docshell">

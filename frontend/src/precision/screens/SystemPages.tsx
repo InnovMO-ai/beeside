@@ -3,11 +3,14 @@ import { Link } from "../state/router";
 import { BareShell } from "../ui/Shell";
 import { usePage } from "../ui/hooks";
 import { Button, PageState } from "../ui/primitives";
+import { useSession } from "../state/app";
+import { SupportLine } from "./Contact";
 
 export function RevokedPage() {
   const { t } = useI18n();
+  const { client } = useSession();
   usePage(t("revoked.title"), true);
-  return <BareShell><PageState icon="lock" title={t("revoked.title")} body={t("revoked.body")} /></BareShell>;
+  return <BareShell><PageState icon="lock" title={t("revoked.title")} body={t("revoked.body")} /><SupportLine client={client} /></BareShell>;
 }
 export function NotFoundPage() {
   const { t } = useI18n();

@@ -52,7 +52,7 @@ const PROCESS_Q: Record<Loc, string[]> = {
   es: ["¿Mi información es confidencial?", "¿Cómo funciona este proceso después de enviarlo?"],
 };
 
-interface CallRecord { task: string; ms: number; ok: boolean; reason?: string }
+interface CallRecord { task: string; ms: number; ok: boolean; reason?: string; extract?: Array<{ name: string; status: string; value: unknown; confidence: number | null }> }
 class MeasuringProvider implements ModelProvider {
   readonly calls: CallRecord[] = [];
   failNext = 0;
@@ -67,7 +67,9 @@ class MeasuringProvider implements ModelProvider {
     }
     try {
       const r = await this.inner.complete(req);
-      this.calls.push({ task: req.task, ms: Date.now() - t0, ok: true });
+      // Diagnostics for the report (synthetic data only): what the extractor returned per field, never any provider text or credential.
+      const extract = req.task === "extract" ? ((r as unknown as { fields: Array<{ name: string; status: string; value: unknown; confidence: number | null }> }).fields ?? []).map((f) => ({ name: f.name, status: f.status, value: f.value, confidence: f.confidence })) : undefined;
+      this.calls.push({ task: req.task, ms: Date.now() - t0, ok: true, ...(extract ? { extract } : {}) });
       return r;
     } catch (e) {
       this.calls.push({ task: req.task, ms: Date.now() - t0, ok: false, reason: e instanceof ModelUnavailableError ? e.reason : "error" });
@@ -81,8 +83,9 @@ interface TurnRow {
   wallMs: number; engineMs: number; status: string; turnKind: string;
   modelCalls: number; physicalCalls: number; fallbackCopy: boolean;
   factsWritten: number; scanHits: string[]; criticalViolations: string[];
-  routeMatch: boolean | null; notes: string[];
+  routeMatch: boolean | null; notes: string[]; calls: CallRecord[];
 }
+let currentProvider: MeasuringProvider | null = null;
 const rows: TurnRow[] = [];
 const checks: Array<{ id: string; loc: Loc | "-"; pass: boolean; detail: string }> = [];
 const addCheck = (id: string, loc: Loc | "-", pass: boolean, detail = "") => checks.push({ id, loc, pass, detail });
@@ -109,11 +112,13 @@ describeReal(`real-model rehearsal of the demo route A–J (${MODE})`, () => {
     });
     const inner: ModelProvider = MODE === "scripted" ? new ScriptedModelProvider({ fixture: DEMO_SCRIPT_FIXTURE }) : new GatewayModelProvider();
     const provider = new MeasuringProvider(inner);
+    currentProvider = provider;
     const mk = () => createConversationEngine({ store: new DrizzleConversationStore(h.pool), context, facts, evaluate: evaluateCategory, provider, renderer: engineValueRenderer });
     return { engine: mk(), provider, mk };
   }
 
   async function play(flow: string, loc: Loc, engine: ConversationEngine, base: Record<string, unknown>, n: number, say: string, expect: RegExp | null, notes: string[] = []): Promise<ProcessTurnResult> {
+    const c0 = currentProvider?.calls.length ?? 0;
     const t0 = Date.now();
     const r = await engine.processTurn({ ...(base as object), turnKey: `real-${flow}-${loc}-${n}-${Math.random().toString(36).slice(2, 8)}`, text: say } as never);
     const wallMs = Date.now() - t0;
@@ -124,7 +129,7 @@ describeReal(`real-model rehearsal of the demo route A–J (${MODE})`, () => {
       flow, loc, n, say, reply, wallMs, engineMs: r.meta.elapsedMs, status: r.status, turnKind: r.meta.turnKind,
       modelCalls: r.meta.modelCalls, physicalCalls: r.meta.physicalModelCalls, fallbackCopy: r.meta.usedFallbackCopy,
       factsWritten: r.factsToWrite.length, scanHits: scanCustomerBody(reply), criticalViolations: v,
-      routeMatch: expect ? expect.test(reply) : null, notes,
+      routeMatch: expect ? expect.test(reply) : null, notes, calls: currentProvider?.calls.slice(c0) ?? [],
     });
     return r;
   }
@@ -179,7 +184,9 @@ describeReal(`real-model rehearsal of the demo route A–J (${MODE})`, () => {
       addCheck("Process: a question beyond the pack is honest ('cannot confirm') or answered from the pack, never invented", loc, p4.meta.turnKind === "process_question" && p4.status === "ok", text(p4).slice(0, 100));
       addCheck("Process: no fact written by any process question", loc, (await factsCount()) === f0);
       // the pending question is the one that closes every process answer
-      if (pendingQ) addCheck("Process: pending question resumed after the answers", loc, [p1, p2, p3, p4].every((r) => text(r).trim().endsWith(pendingQ.trim())), pendingQ.slice(0, 60));
+      const tails = [p1, p2, p3, p4].map((r) => (text(r).trim().match(/[^.?¿]*\?$/) ?? [""])[0]!.trim());
+      addCheck("Process: every answer ends by resuming the SAME pending question", loc, tails.every((t) => t.length > 8 && t === tails[0]), tails[0]!.slice(0, 80));
+      if (pendingQ) addCheck("Process: resumed question is the pending one", loc, tails.every((t) => pendingQ.includes(t)), pendingQ.slice(0, 60));
 
       let n = 0;
       let last: ProcessTurnResult | null = null;
@@ -195,7 +202,7 @@ describeReal(`real-model rehearsal of the demo route A–J (${MODE})`, () => {
           addCheck("RETRY: unavailable model -> status ai_unavailable with a calm notice (no raw error)", loc, failed.status === "ai_unavailable" && !!failed.notice && scanCustomerBody(failed.notice.text).length === 0, `${failed.status}`);
           const ok = await engine.processTurn({ ...base, turnKey: key, text: nextStep.say } as never);
           addCheck("RETRY: the same turn key then succeeds and records the answer once", loc, ok.status === "ok", ok.status);
-          rows.push({ flow: "logistics", loc, n: ++n, say: nextStep.say, reply: text(ok), wallMs: 0, engineMs: ok.meta.elapsedMs, status: ok.status, turnKind: ok.meta.turnKind, modelCalls: ok.meta.modelCalls, physicalCalls: ok.meta.physicalModelCalls, fallbackCopy: ok.meta.usedFallbackCopy, factsWritten: ok.factsToWrite.length, scanHits: scanCustomerBody(text(ok)), criticalViolations: [], routeMatch: nextStep.expect.test(text(ok)), notes: ["retry-after-failure"] });
+          rows.push({ flow: "logistics", loc, n: ++n, say: nextStep.say, reply: text(ok), wallMs: 0, engineMs: ok.meta.elapsedMs, status: ok.status, turnKind: ok.meta.turnKind, modelCalls: ok.meta.modelCalls, physicalCalls: ok.meta.physicalModelCalls, fallbackCopy: ok.meta.usedFallbackCopy, factsWritten: ok.factsToWrite.length, scanHits: scanCustomerBody(text(ok)), criticalViolations: [], routeMatch: nextStep.expect.test(text(ok)), notes: ["retry-after-failure"], calls: [] });
           last = ok;
           const reopened = await mk().openThread(base);
           addCheck("STATE: category thread and answers survive a new engine instance", loc, reopened.turns.length >= n, `${reopened.turns.length} turns`);
@@ -231,6 +238,11 @@ describeReal(`real-model rehearsal of the demo route A–J (${MODE})`, () => {
       }
     }, 600_000);
   }
+
+  it("every rehearsal check passed (a failed check fails the run, not only the report)", () => {
+    const failed = checks.filter((c) => !c.pass).map((c) => `${c.loc}: ${c.id}`);
+    expect(failed).toEqual([]);
+  });
 
   afterAll(() => {
     mkdirSync(OUT, { recursive: true });

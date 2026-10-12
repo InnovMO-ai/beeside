@@ -15,7 +15,7 @@ export const RULES: Rule[] = [
   { id: "tools", re: /\b(ClickUp|Stripe|Anthropic|OpenAI|Claude|GPT)\b/i, note: "vendor names" },
   { id: "acronyms", re: /\b(PSM|MSM|OH|FA4|FA 4\.0|CCIR|KYC|PbyC)\b/, note: "internal acronyms" },
   { id: "hive", re: /\b(hive)\b/i, note: "The Hive is not named to the client here" },
-  { id: "sherpa", re: /\bsherpa\b/i, allowKeys: ["center.oh.contactSherpa", "help.contact.sherpa"], note: "Sherpa only after it exists (action label only)" },
+  { id: "sherpa", re: /\bsherpa\b/i, allowKeys: ["center.oh.contactSherpa"], note: "Sherpa only after it exists (action label only)" },
   { id: "version-numbers", re: /\b(v\d+(\.\d+)?|versión \d+|version \d+)\b/i, note: "no version numbers shown to the client" },
   { id: "internal-states", re: /\b(ACTIVE|SOURCEABLE|REVIEW|NOT_OFFERED|ACTIVATION_PENDING_RETRY_FIRST|PREVIEW_STALE|TEMPORARILY_UNAVAILABLE)\b/, note: "internal states and error codes" },
   { id: "reopen", re: /\b(reopen|reabrir)\b/i, note: "reopen is forbidden" },

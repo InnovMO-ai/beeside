@@ -30,7 +30,7 @@ describe("Precision API error mapping", () => {
       expect(en.message).not.toBe(es.message);
       expect(en.message).not.toMatch(/\b(PSM|FA|OH|PA|BV\d{3}|JSON|SQL)\b/);
     }
-    expect(errorBody(new ApiError("UNAUTHENTICATED", false, { support: { contactUrl: "https://x.test", email: null } }), "en").support).toEqual({ contactUrl: "https://x.test", email: null });
+    expect(errorBody(new ApiError("UNAUTHENTICATED", false, { support: { email: "contact@beeside.you" } }), "en").support).toEqual({ email: "contact@beeside.you" });
   });
 
   it("status codes follow the client's contract", () => {

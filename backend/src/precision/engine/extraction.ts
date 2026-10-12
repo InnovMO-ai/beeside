@@ -81,6 +81,9 @@ export function coerceValue(type: FieldType, raw: unknown, enumValues?: string[]
       if (typeof raw === "string") return { ok: true, value: raw };
       if (typeof raw === "number" && Number.isFinite(raw)) return { ok: true, value: String(raw) };
       if (typeof raw === "boolean") return { ok: true, value: String(raw) };
+      // List-valued fields are requested as "a comma-separated list"; a model that returns a JSON array of strings instead
+      // (["MX","CL"]) is saying exactly the same thing, so it is joined losslessly rather than discarded.
+      if (Array.isArray(raw) && raw.length > 0 && raw.length <= 50 && raw.every((x) => typeof x === "string" && x.trim().length > 0 && !/[,;]/.test(x))) return { ok: true, value: (raw as string[]).map((x) => x.trim()).join(", ") };
       return { ok: false };
     }
     case "number": {
@@ -98,7 +101,9 @@ export function coerceValue(type: FieldType, raw: unknown, enumValues?: string[]
       return { ok: false };
     }
     case "date": {
-      if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) return { ok: true, value: raw.trim() };
+      // Full ISO date, or the two partial precisions the field prompt allows ("a bare year YYYY or month YYYY-MM"):
+      // a client who says "April 2027" must not be asked again. Months and days are range-checked; nothing is guessed.
+      if (typeof raw === "string" && /^\d{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?)?$/.test(raw.trim())) return { ok: true, value: raw.trim() };
       return { ok: false };
     }
     case "enum": {

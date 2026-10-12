@@ -1,6 +1,6 @@
 import type {
-  AddServiceThreadDto, CategoryDto, CenterDto, ConfirmCrpRequest, ConfirmServiceMapRequest, ConfirmServiceMapResponse, ContactRequest,
-  CrpViewDto, EntryDto, HelpDto, Locale, PreviewDto, SendRequest, SendResultDto, ServiceMapDto, SessionExchangeResponse, ThreadDto, TurnRequest, TurnResultDto,
+  AddServiceThreadDto, CategoryDto, CenterDto, ConfirmCrpRequest, ConfirmServiceMapRequest, ConfirmServiceMapResponse,
+  CrpViewDto, EntryDto, HelpDto, SupportDto, Locale, PreviewDto, SendRequest, SendResultDto, ServiceMapDto, SessionExchangeResponse, ThreadDto, TurnRequest, TurnResultDto,
 } from "./dto";
 import { ApiFailure, LOCALE_HEADER, liveTransport, type Transport } from "./transport";
 import { sessionStore } from "./session";
@@ -45,7 +45,8 @@ export function createClient(deps: ClientDeps) {
     coverSeen: () => call<unknown>("POST", "/cover/seen", {}),
     center: () => call<CenterDto>("GET", "/center"),
     help: () => call<HelpDto>("GET", "/help"),
-    contact: (r: ContactRequest) => call<unknown>("POST", "/help/contact", r),
+    /** Public: the Contact beeside address for pages that exist without a session. */
+    support: () => call<SupportDto>("GET", "/support", undefined, { auth: false }),
     understanding: () => call<ThreadDto>("GET", "/understanding"),
     understandingTurn: (r: TurnRequest) => call<TurnResultDto>("POST", "/understanding/turns", r),
     serviceMap: () => call<ServiceMapDto>("GET", "/service-map"),
