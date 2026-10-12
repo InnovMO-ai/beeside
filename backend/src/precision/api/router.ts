@@ -144,7 +144,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
       const mode = entitlement.accessMode;
       const path = req.path;
       if (mode === "REVOKED" && !(req.method === "GET" && path === "/entry")) throw new ApiError("PRECISION_REVOKED");
-      if (mode === "READ_ONLY" && req.method !== "GET" && !(req.method === "POST" && (path === "/cover/seen" || path === "/help/contact"))) throw new ApiError("PRECISION_READ_ONLY");
+      if (mode === "READ_ONLY" && req.method !== "GET" && !(req.method === "POST" && path === "/cover/seen")) throw new ApiError("PRECISION_READ_ONLY");
     }),
   );
   api.use(limit(PRECISION_RATE_LIMITS.address, clientAddress));
@@ -166,7 +166,6 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
   post("/cover/seen", (a) => domain.center.coverSeen(a));
   get("/center", (a) => domain.center.center(a));
   get("/help", (a) => domain.center.help(a));
-  post("/help/contact", (a, req) => domain.center.contact(a, (req.body as { message?: unknown } | undefined)?.message));
   get("/understanding", (a) => domain.threads.understanding.get(a));
   post("/understanding/turns", (a, req) => domain.threads.understanding.turn(a, req.body));
   get("/service-map", (a) => domain.serviceMap.get(a));

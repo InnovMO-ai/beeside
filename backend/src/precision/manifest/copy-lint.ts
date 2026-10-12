@@ -34,8 +34,6 @@ export const APPROVED_STATE_LABELS: ReadonlySet<string> = new Set(["Datos valida
 export const APPROVED_VERBATIM: ReadonlySet<string> = new Set([
   "Nos ayuda a entender la escala real de tu empresa y dimensionar mejor los servicios que puede requerir tu expansión.",
   "It helps us understand the real scale of your company and better size the services your expansion may require.",
-  "Si más adelante algún servicio requiere evidencia o documentación adicional, tu Sherpa o el proveedor correspondiente te lo indicará.",
-  "If a specific service later requires evidence or additional documentation, your Sherpa or the corresponding provider will let you know.",
   "Now that I understand your expansion project, I'd like to complete a few company details that will help us prepare the next steps and avoid asking for the same information again later.",
   "You previously indicated that your company has between [min] and [max] employees. Approximately how many employees do you currently have?",
 ]);

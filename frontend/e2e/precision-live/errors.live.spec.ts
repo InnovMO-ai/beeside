@@ -397,6 +397,9 @@ test.describe("link and session", () => {
     await expect(p2.getByRole("heading", { level: 1 })).toBeVisible();
     await p2.getByRole("button", { name: T.en.cont }).or(p2.getByRole("link", { name: T.en.cont })).first().click();
     await expect(p2).toHaveURL(/\/precision\/center/);
+    // the Center must be fully loaded (and its requests finished) before the session is revoked, so the next request is the one that meets the revoked session
+    await expect(p2.getByRole("region", { name: "Your project, step by step" })).toBeVisible();
+    await p2.waitForLoadState("networkidle");
     await ctl("POST", "/revoke-sessions", { projectId: s.projectId });
     await navTo(p2, /Precision Understanding/);
     await expect(p2.getByText(/This link can't be used/)).toBeVisible({ timeout: 20_000 });

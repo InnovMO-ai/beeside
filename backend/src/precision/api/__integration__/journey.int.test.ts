@@ -321,13 +321,6 @@ describeWithDb("Precision API — client journey", () => {
       await setConfig("help_center_url", "javascript:alert(1)");
       expect((await api.get("/help")).body.helpCenterUrl).toBe("https://www.beeside.you/helpcenter");
       await setConfig("help_center_url", null);
-
-      const r = await api.post("/help/contact", { message: "  I cannot find my invoice.  " });
-      expect(r.status).toBe(200);
-      expect(JSON.stringify(r.body)).not.toMatch(/hour|day|minute|soon|within|hora|día|pronto/i);
-      const stored = (await h.db.query<{ payload: { message: string; locale: string } }>("SELECT payload FROM outbox_event WHERE project_id = $1 AND event_type = 'precision.contact_message'", [projectId])).rows;
-      expect(stored).toHaveLength(1);
-      expect(stored[0]!.payload).toEqual({ message: "I cannot find my invoice.", locale: "en" });
     });
 
     it("hidden until the first delivery; pending access; enter with the configured link; Sherpa only when assigned", async () => {

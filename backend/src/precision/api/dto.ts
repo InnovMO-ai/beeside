@@ -260,7 +260,6 @@ export interface HelpDto {
   contactEmail: string | null;
   contactAvailable: boolean;
 }
-export interface ContactRequest { message: string }
 export interface AddServiceThreadDto { available: boolean; thread: ThreadDto | null }
 
 // ---------------------------------------------------------------- internal review (NOT part of the client journey)
@@ -277,7 +276,6 @@ export const PRECISION_ROUTES = {
   coverSeen: "POST /api/precision/cover/seen",
   center: "GET /api/precision/center",
   help: "GET /api/precision/help",
-  contact: "POST /api/precision/help/contact",
   understanding: "GET /api/precision/understanding",
   understandingTurn: "POST /api/precision/understanding/turns",
   serviceMap: "GET /api/precision/service-map",

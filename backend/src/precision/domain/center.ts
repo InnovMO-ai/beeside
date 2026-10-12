@@ -34,7 +34,6 @@ export interface CenterService {
   coverSeen(actor: Actor): Promise<{ ok: true }>;
   center(actor: Actor): Promise<CenterDto>;
   help(actor: Actor): Promise<HelpDto>;
-  contact(actor: Actor, message: unknown): Promise<{ ok: true }>;
 }
 
 export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextService): CenterService {
@@ -145,18 +144,5 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
     return { helpCenterUrl, privacyUrl, termsUrl, contactEmail: email, contactAvailable: true };
   }
 
-  async function contact(actor: Actor, message: unknown): Promise<{ ok: true }> {
-    // eslint-disable-next-line no-control-regex -- strips NUL on purpose
-    const text = typeof message === "string" ? message.replace(/\u0000/g, "").trim() : "";
-    if (text.length < 1 || text.length > 2000) throw new ApiError("INVALID_INPUT");
-    // The message is stored for the team; no response time is promised to the client.
-    await deps.db.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, 'precision.contact_message', $2::jsonb, $3)", [
-      actor.projectId,
-      JSON.stringify({ message: text, locale: actor.locale }),
-      deps.now(),
-    ]);
-    return { ok: true };
-  }
-
-  return { entry, coverSeen, center, help, contact };
+  return { entry, coverSeen, center, help };
 }

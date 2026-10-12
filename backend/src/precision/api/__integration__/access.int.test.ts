@@ -159,9 +159,8 @@ describeWithDb("Precision API — session, access, errors", () => {
         expect([r.status, r.body.error]).toEqual([403, "PRECISION_READ_ONLY"]);
         expect(Object.keys(r.body).sort()).toEqual(ERROR_KEYS.slice().sort());
       }
-      // sanctioned writes while read-only: marking the cover seen and writing to support
+      // the one sanctioned write while read-only: marking the cover seen
       expect((await api.post("/cover/seen")).status).toBe(200);
-      expect((await api.post("/help/contact", { message: "Please call me" })).status).toBe(200);
 
       h.entitlement.set({ projectId, premiumActive: false, accessMode: "REVOKED" });
       const entry = await api.get("/entry");
@@ -172,7 +171,6 @@ describeWithDb("Precision API — session, access, errors", () => {
         expect([r.status, r.body.error]).toEqual([403, "PRECISION_REVOKED"]);
       }
       expect((await api.post("/cover/seen")).status).toBe(403);
-      expect((await api.post("/help/contact", { message: "hello" })).status).toBe(403);
 
       // access returns the moment Core says so: nothing is cached in the session
       h.entitlement.set({ projectId, premiumActive: true, accessMode: "FULL" });
@@ -223,8 +221,6 @@ describeWithDb("Precision API — session, access, errors", () => {
         ["bad turn body", api.post("/understanding/turns", { turnKey: "x", text: "" })],
         ["not ready map", api.get("/service-map")],
         ["bad confirm key", api.post("/service-map/confirm", { requestKey: "x" })],
-        ["empty contact", api.post("/help/contact", { message: "   " })],
-        ["long contact", api.post("/help/contact", { message: "x".repeat(2001) })],
       ];
       for (const [label, call] of cases) {
         const r = await call;
@@ -241,10 +237,10 @@ describeWithDb("Precision API — session, access, errors", () => {
     it("caps bodies at 100 kB and rejects broken JSON, in the same shape", async () => {
       const { projectId } = await h.newProject();
       const token = await h.session(projectId);
-      const big = await request(h.app).post("/api/precision/help/contact").set("Authorization", `Bearer ${token}`).send({ message: "x".repeat(200_000) });
+      const big = await request(h.app).post("/api/precision/service-map/confirm").set("Authorization", `Bearer ${token}`).send({ requestKey: "x".repeat(200_000) });
       expect(big.status).toBe(400);
       expect(big.body).toMatchObject({ error: "INVALID_INPUT" });
-      const broken = await request(h.app).post("/api/precision/help/contact").set("Authorization", `Bearer ${token}`).set("Content-Type", "application/json").send("{not json");
+      const broken = await request(h.app).post("/api/precision/service-map/confirm").set("Authorization", `Bearer ${token}`).set("Content-Type", "application/json").send("{not json");
       expect(broken.status).toBe(400);
       expect(Object.keys(broken.body).sort()).toEqual(ERROR_KEYS.slice().sort());
     });

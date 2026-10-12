@@ -100,7 +100,15 @@ test("keyboard only (desktop): skip link, Cover to Understanding to an answer, e
   await expect(h1(page)).toBeVisible();
   await page.waitForLoadState("networkidle");
   const stops: string[] = [];
+  // Focus moves when a screen finishes rendering (the new page takes focus, fonts swap in): let it settle before walking with Tab.
+  const settleFocus = async () => {
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready);
+    let prev = "";
+    await expect.poll(async () => { const cur = await page.evaluate(() => { const a = document.activeElement; return `${a?.tagName}|${a?.id}|${(a?.textContent ?? "").trim().slice(0, 30)}`; }); const same = cur === prev; prev = cur; return same; }, { timeout: 10_000, intervals: [200] }).toBe(true);
+  };
   const press = async (n: number) => { for (let i = 0; i < n; i++) { await page.keyboard.press("Tab"); const r = await ring(page); stops.push(r.what === "body" ? "end of page (focus leaves to the browser and wraps)" : `${r.what}${r.ok ? "" : " (NO RING)"}`); } };
+  await settleFocus();
   await press(1);
   expect(await page.evaluate(() => document.activeElement?.textContent), "the first stop is the skip link").toMatch(/Skip to main content/);
   await press(6);
@@ -109,13 +117,14 @@ test("keyboard only (desktop): skip link, Cover to Understanding to an answer, e
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/precision\/center/);
   await expect(page.getByRole("region", { name: "Your project, step by step" })).toBeVisible();
-  await page.waitForLoadState("networkidle");
+  await settleFocus();
   for (let i = 0; i < 20 && !(await page.evaluate(() => document.activeElement?.tagName === "A" && /^Start$/.test(document.activeElement?.textContent?.trim() ?? "") && !!document.activeElement?.closest("main"))); i++) await press(1);
   expect(await page.evaluate(() => document.activeElement?.textContent?.trim()), `Start reached by keyboard; stops so far: ${stops.join(" | ")}`).toBe("Start");
   const startDesc = await page.evaluate(() => { const a = document.activeElement as HTMLAnchorElement; return `${a.tagName} href=${a.getAttribute("href")} inMain=${!!a.closest("main")} connected=${a.isConnected}`; });
   await page.keyboard.press("Enter");
   await expect(page, `Enter on ${startDesc}`).toHaveURL(/\/precision\/understanding/);
   await expect(page.locator(".pz-confirm")).toBeVisible();
+  await settleFocus();
   for (let i = 0; i < 15 && !(await page.evaluate(() => /Yes, that is correct/.test(document.activeElement?.textContent ?? ""))); i++) await press(1);
   await page.keyboard.press("Enter");
   await expect(page.locator(".pz-confirm")).toHaveCount(2, { timeout: 15_000 });

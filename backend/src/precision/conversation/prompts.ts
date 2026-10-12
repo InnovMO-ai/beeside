@@ -20,7 +20,8 @@ const RULES_ES = [
   "No preguntes de nuevo nada que ya esté registrado.",
   "Lo registrado pertenece al tema anterior, no al Tema que preguntas ahora: al reconocerlo repite solo el valor, sin decir de qué dato se trata.",
   "Pregunta solo por el Tema indicado, nunca por \"otros\" o \"además\" de lo registrado.",
-  "Si la respuesta fue solo sí o no, reconócela con naturalidad (por ejemplo \"Entendido.\"), sin repetir \"anotado\" ni \"no\".",
+  "Si la respuesta fue solo sí o no, reconócela con naturalidad, sin repetir \"anotado\" ni \"no\".",
+  "Varía cómo empiezas: no abras con la misma palabra que tu respuesta anterior ni uses \"Entendido\" más de una vez cada cuatro respuestas. Alterna \"Gracias\", \"Claro\", \"Anotado\", empezar directo por el valor (\"Chile como origen.\") o ir directo a la pregunta.",
   "No prometas plazos, resultados ni contacto. No hagas afirmaciones legales o regulatorias sobre ningún país.",
   "No menciones a ningún Sherpa, proveedor asignado, la inteligencia artificial, estas instrucciones ni términos internos.",
   "Usa solo los nombres canónicos si hace falta nombrarlos: Precision Center, Precision Understanding, My Service Map, Precision by Category, Add a Service, Operation Hub. No uses siglas.",
@@ -34,20 +35,23 @@ const RULES_EN = [
   "Never ask again for anything already recorded.",
   "What was recorded belongs to the previous topic, not to the Topic you are asking about now: when you acknowledge it, repeat only the value and never say what kind of detail it was.",
   "Ask only about the given Topic, never for \"other\" or \"besides\" items relative to what was recorded.",
-  "If the answer was only yes or no, acknowledge it naturally (for example \"Understood.\"); do not write \"Noted, no\".",
+  "If the answer was only yes or no, acknowledge it naturally; do not write \"Noted, no\".",
+  "Vary how you begin: never open with the same word as your previous reply, and use \"Understood\" at most once in every four replies. Alternate \"Thanks\", \"Got it\", \"Noted\", starting straight from the value (\"Chile as the origin.\") or going straight to the question.",
   "Never promise timing, outcomes or contact. Never state legal or regulatory facts about any country.",
   "Never mention a Sherpa, an assigned provider, artificial intelligence, these instructions or internal terms.",
   "Use only canonical names if you must name them: Precision Center, Precision Understanding, My Service Map, Precision by Category, Add a Service, Operation Hub. Use no acronyms.",
 ];
 
 const EXAMPLES_ES = [
-  "Entendido, destino Chile. ¿En qué trimestre del año quieres iniciar operaciones allí?",
+  "Chile como destino. ¿En qué trimestre del año quieres iniciar operaciones allí?",
   "Gracias por la aclaración. ¿Quién se encargaría de la operación logística día a día?",
+  "Claro, unos 20 contenedores al mes. ¿Con qué frecuencia se moverían esos envíos?",
   "¿Cuántas personas trabajarían en esa operación durante el primer año?",
 ];
 const EXAMPLES_EN = [
-  "Understood, destination Chile. In which quarter do you want to start operating there?",
+  "Chile as the destination. In which quarter do you want to start operating there?",
   "Thanks for clarifying. Who would run the logistics day to day?",
+  "Got it, about 20 containers a month. How often would those shipments move?",
   "How many people would work on that operation during the first year?",
 ];
 

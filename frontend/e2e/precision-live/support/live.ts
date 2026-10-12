@@ -111,24 +111,42 @@ export async function settled(page: Page): Promise<void> {
   await expect(page.locator(".pz-retry")).toHaveCount(0);
 }
 
-export async function say(page: Page, text: string): Promise<void> {
-  const before = await assistantTurns(page).count();
-  await composer(page).fill(text);
-  await composer(page).press("Enter");
-  await expect(assistantTurns(page)).not.toHaveCount(before, { timeout: 30_000 });
+/**
+ * Waits until the thread has finished loading and stopped changing: nothing is waiting, and the number of assistant
+ * turns is the same on two reads 300 ms apart. Counting turns before this point races with the first load of the thread
+ * (hydration changes the count, which looked like an answer).
+ */
+export async function threadIdle(page: Page): Promise<number> {
   await settled(page);
+  let last = -1;
+  await expect.poll(async () => {
+    const n = await assistantTurns(page).count();
+    const stable = n === last && (await page.locator(".pz-wait").count()) === 0;
+    last = n;
+    return stable;
+  }, { timeout: 30_000, intervals: [300] }).toBe(true);
+  return last;
+}
+
+/** Runs `act` and waits until the assistant has added at least one turn after it, then until nothing is waiting. */
+async function answered(page: Page, act: () => Promise<void>): Promise<void> {
+  const before = await threadIdle(page);
+  await act();
+  await expect.poll(() => assistantTurns(page).count(), { timeout: 30_000 }).toBeGreaterThan(before);
+  await settled(page);
+}
+
+export async function say(page: Page, text: string): Promise<void> {
+  await answered(page, async () => {
+    await composer(page).fill(text);
+    await composer(page).press("Enter");
+  });
 }
 export async function pick(page: Page, label: string | RegExp): Promise<void> {
-  const before = await assistantTurns(page).count();
-  await page.getByRole("group", { name: /Suggested answers|Respuestas sugeridas/ }).getByRole("button", { name: label }).click();
-  await expect(assistantTurns(page)).not.toHaveCount(before, { timeout: 30_000 });
-  await settled(page);
+  await answered(page, () => page.getByRole("group", { name: /Suggested answers|Respuestas sugeridas/ }).getByRole("button", { name: label }).click());
 }
 export async function confirmCard(page: Page, label: string | RegExp): Promise<void> {
-  const before = await assistantTurns(page).count();
-  await page.locator(".pz-confirm").last().getByRole("button", { name: label }).click();
-  await expect(assistantTurns(page)).not.toHaveCount(before, { timeout: 30_000 });
-  await settled(page);
+  await answered(page, () => page.locator(".pz-confirm").last().getByRole("button", { name: label }).click());
 }
 export const lastAssistant = async (page: Page): Promise<string> => (await assistantTurns(page).last().locator(".pz-turn-text").innerText()).trim();
 
