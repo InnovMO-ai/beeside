@@ -45,6 +45,10 @@ export const APPROVED_VERBATIM: ReadonlySet<string> = new Set([
   "Now that I understand your expansion project, I'd like to complete a few company details that will help us prepare the next steps and avoid asking for the same information again later.",
   "Precision usa inteligencia artificial para ayudarte a estructurar tu proyecto. Si algo de lo que entiende no es correcto, puedes corregirlo en cualquier momento.",
   "Precision uses artificial intelligence to help structure your project. If anything it understands is not correct, you can correct it at any time.",
+  "La información de tu proyecto se utiliza para estructurar tu expansión y se comparte únicamente cuando corresponde avanzar la ejecución. Precision no envía a Operation Hub el historial de conversación, correo, nombres de personas ni documentos; antes de enviar un Category Requirement Pack (CRP), puedes revisar exactamente qué información se compartirá.",
+  "Your project information is used to structure your expansion and is only shared when it is needed to move into execution. Precision does not send conversation history, email, people's names or documents to Operation Hub; before sending a Category Requirement Pack (CRP), you can review exactly what information will be shared.",
+  "La información de tu proyecto se utiliza para estructurar tu expansión y se comparte únicamente cuando corresponde avanzar la ejecución. Precision no envía a Operation Hub el historial de conversación, correo, nombres de personas ni documentos; antes de enviar un CRP, puedes revisar exactamente qué información se compartirá.",
+  "Your project information is used to structure your expansion and is only shared when it is needed to move into execution. Precision does not send conversation history, email, people's names or documents to Operation Hub; before sending a CRP, you can review exactly what information will be shared.",
 ]);
 
 function v(rule: Violation["rule"], code: string, hit: string, message: string, critical = true): Violation {

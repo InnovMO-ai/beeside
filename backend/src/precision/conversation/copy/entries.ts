@@ -285,7 +285,7 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
   { key: "crp_item_state_not_applicable", es: "No aplica", en: "Not applicable", status: "draft", source: `${VP} crp_item_state_labels` },
   { key: "execution_dependency_label", es: "Dependencia para la ejecución", en: "Execution Dependency", status: "draft", source: `${VP} execution_dependency_label` },
   { key: "send_to_oh_next", es: "Enviar a Operation Hub", en: "Send to Operation Hub", status: "draft", source: `${VP} send_to_oh_next` },
-  { key: "send_to_oh_pending", es: "Estamos preparando tu espacio en Operation Hub. Te avisamos en cuanto puedas entrar.", en: "We are preparing your space in Operation Hub. We will let you know as soon as you can enter.", status: "draft", source: `${VP} send_to_oh_pending` },
+  { key: "send_to_oh_pending", es: "Tu información fue enviada a Operation Hub. El acceso estará disponible aquí cuando tu espacio esté habilitado.", en: "Your information has been sent to Operation Hub. Access will be available here once your workspace is enabled.", status: "approved", source: `${VP} send_to_oh_pending` },
   { key: "fa_update_available", es: "Actualizaste tu First Assessment. Puedo incorporar los cambios en una versión nueva de tu My Service Map. ¿Quieres hacerlo?", en: "You updated your First Assessment. I can bring the changes into a new version of your My Service Map. Would you like me to?", status: "draft", source: `${VP} fa_update_available` },
   { key: "pause_note", es: "Guardé todo. Puedes continuar cuando quieras desde donde lo dejaste.", en: "I saved everything. You can continue whenever you like from where you left off.", status: "draft", source: `${VP} pause_note` },
   // ---- help

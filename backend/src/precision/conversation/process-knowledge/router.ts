@@ -86,6 +86,13 @@ const RULES: readonly Rule[] = [
     topic: () => "pending_information",
   },
   {
+    // Approved confidentiality answer (PO closure 12 Oct 2026). Security/"protected/secure" questions stay "unknown": no extra promises.
+    id: "privacy_confidentiality",
+    re: /\b(?:confidencial\w*|confidential\w*|privacidad|privacy|privad[oa]s?|private)\b/,
+    also: /\b(?:informacion|datos|respuestas|detalles|proyecto|information|data|answers|details|project|esto|this|it|conversacion|conversation|correo|email|documentos?|documents?|nombres|names)\b/,
+    topic: () => "privacy_confidentiality",
+  },
+  {
     id: "ai_use",
     re: /\b(?:inteligencia artificial|usan? (?:ia|ai)\b|usas (?:ia|ai)\b|eres (?:un |una )?(?:bot|robot|ia|humano|humana|persona)|hablo con (?:un |una )?(?:bot|robot|humano|persona|ia)|es (?:esto )?(?:una )?(?:ia|persona real|humano)|artificial intelligence|are you (?:a |an )?(?:bot|robot|ai|human|real person)|am i (?:talking|speaking) (?:to|with)|is this (?:an? )?(?:ai|bot|human|person)|do you use (?:ai|artificial))\b/,
     topic: () => "ai_use",
@@ -193,8 +200,8 @@ const PROCESS_ANCHOR = /\b(?:precision|beeside|operation hub|este proceso|el pro
 const PROCESS_PHRASES = /\b(?:como funciona(?:n)?\s+(?:esto|precision|el proceso)|how does (?:it|this|precision) work|que sigue|what s next|what comes next|que viene despues|siguiente paso|next step|quien (?:ve|puede ver)\s+(?:mis|mi|esto)|who (?:sees|can see)\s+(?:my|this)|mis datos|my data)\b/;
 const PROCESS_COST_TIME = /\b(?:cuanto (?:cuesta|cuestan|cobran|tarda|tardan|dura|demora)|how (?:much|long)|precio|price|pricing|tarifa|fee|honorarios|garantia|guarantee|privacidad|privacy|confidencial\w*|seguridad|security|cancelar|cancel)\b/;
 
-/** Privacy and confidentiality: the pack has no approved fact, so the honest answer is "I can't confirm that". */
-const PRIVACY_RE = /\b(?:confidencial\w*|confidential\w*|privacidad|privacy|protegid\w*|protected|secure|secret\w*)\b/;
+/** Privacy words: confidentiality/privacy questions are answered by the approved pack topic (rule "privacy_confidentiality"); security/protection questions have no approved fact, so they get "I can't confirm that". */
+const PRIVACY_RE = /\b(?:confidencial\w*|confidential\w*|privacidad|privacy|privad[oa]s?|private|protegid\w*|protected|secure|secret\w*)\b/;
 const PRIVACY_SUBJECT = /\b(?:informacion|datos|respuestas|detalles|proyecto|information|data|answers|details|project|esto|this)\b/;
 
 function isProcessLike(norm: string): boolean {

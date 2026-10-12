@@ -225,8 +225,16 @@ describe("pre-router", () => {
   });
 
   it("recognises process questions the pack cannot answer as unknown", () => {
-    for (const q of ["¿Cuánto cuesta esto?", "How much does this cost?", "¿Cuánto tarda el proceso?", "Is my data private?", "Is my information confidential?", "¿Mi información es confidencial?", "¿Mis datos están protegidos?", "Is my data secure?"]) {
+    for (const q of ["¿Cuánto cuesta esto?", "How much does this cost?", "¿Cuánto tarda el proceso?", "¿Mis datos están protegidos?", "Is my data secure?"]) {
       expect(routeProcessQuestion(q, { surface: "category", flags }).kind).toBe("unknown");
+    }
+  });
+
+  it("routes confidentiality/privacy questions to the approved privacy_confidentiality topic", () => {
+    for (const q of ["Is my data private?", "Is my information confidential?", "¿Mi información es confidencial?", "¿Es privada mi información?", "Is it confidential?"]) {
+      const d = routeProcessQuestion(q, { surface: "category", flags });
+      expect(d.kind).toBe("pack");
+      expect(d.topicKeys).toContain("privacy_confidentiality");
     }
   });
 
@@ -321,12 +329,25 @@ describe("questions about pace and privacy never write (QA-LIVE regression)", ()
       expect(verifyAssistantText(reply, vctx(locale, surface)).filter((v) => v.critical)).toEqual([]);
     }
   });
-  it("answers the confidentiality question with the honest cannot-confirm copy, not with a recorded pending fact", async () => {
-    const w = new World({ surface: "category", locale: "es" });
+  it("answers the confidentiality question with the approved copy (no extra promises), nothing written", async () => {
+    for (const [locale, q, expected] of [
+      ["es", "¿Mi información es confidencial?", /La información de tu proyecto se utiliza para estructurar tu expansión y se comparte únicamente cuando corresponde avanzar la ejecución\. Precision no envía a Operation Hub el historial de conversación, correo, nombres de personas ni documentos; antes de enviar un Category Requirement Pack \(CRP\), puedes revisar exactamente qué información se compartirá\./],
+      ["en", "Is my information confidential?", /Your project information is used to structure your expansion and is only shared when it is needed to move into execution\. Precision does not send conversation history, email, people's names or documents to Operation Hub; before sending a Category Requirement Pack \(CRP\), you can review exactly what information will be shared\./],
+    ] as const) {
+      const w = new World({ surface: "category", locale });
+      await w.open();
+      const r = await w.say(q);
+      expect(assistantText(r)).toMatch(expected);
+      expect(assistantText(r)).not.toMatch(/cannot confirm|No puedo confirmar|no necesitas compartirlo/);
+      expect(r.factsToWrite).toEqual([]);
+      expect(w.writer.applied.size).toBe(0);
+    }
+  });
+  it("keeps security / protection questions as 'cannot confirm' (no extra promises beyond the contract)", async () => {
+    const w = new World({ surface: "category", locale: "en" });
     await w.open();
-    const r = await w.say("¿Mi información es confidencial?");
-    expect(assistantText(r)).toMatch(/No puedo confirmar ese detalle/);
-    expect(assistantText(r)).not.toMatch(/no necesitas compartirlo/);
+    const r = await w.say("Is my data secure?");
+    expect(assistantText(r)).toMatch(/I can't confirm that detail/);
   });
 });
 

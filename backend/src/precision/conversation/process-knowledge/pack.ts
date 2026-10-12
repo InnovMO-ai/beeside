@@ -14,7 +14,7 @@
  */
 import type { Locale, StateFlags, Surface } from "../types";
 
-export const PACK_VERSION = "pk-2026-10-09.1";
+export const PACK_VERSION = "pk-2026-10-12.1";
 
 export type TopicStatus = "approved" | "draft" | "blocked";
 export type ProcessFlags = StateFlags & { surface: Surface };
@@ -46,7 +46,7 @@ const F = (factId: string, text: string, sourceRef: string): PackFact => ({ fact
 export const PROCESS_TOPICS: readonly PackTopic[] = [
   {
     topicKey: "precision_center",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pc-1", "Precision Center is the client space where what was told in First Assessment becomes a map of services and the requirements for each.", "Voice Pack §2 glossary; intro_once"),
       F("pc-2", "The client decides when to continue and when to pause; there is no paused state.", "Voice Pack intro_once; pause_note"),
@@ -63,7 +63,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "precision_understanding",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pu-1", "Precision Understanding is a conversation to understand the whole project.", "Voice Pack intro_once; Build Readiness A-3"),
       F("pu-2", "Precision Understanding shows no percentage; the client decides when to continue or pause.", "Build Readiness A-3 (V2.0 rule); UND-06"),
@@ -81,7 +81,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "my_service_map",
-    status: "draft",
+    status: "approved",
     facts: [
       F("msm-1", "My Service Map is an executive summary of the services the project needs.", "Voice Pack §2 glossary; Build Readiness A-4"),
       F("msm-2", "While it is being prepared it follows what the client says; once confirmed a dated version is kept and not edited; version numbers are not shown.", "Build Readiness A-4/A-5"),
@@ -98,7 +98,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "my_service_map_confirmation",
-    status: "draft",
+    status: "approved",
     facts: [
       F("msc-1", "Confirming My Service Map creates an immutable dated snapshot.", "Build Readiness A-5; MAP-01"),
       F("msc-2", "Confirming My Service Map does not activate or send anything to Operation Hub.", "Build Readiness E-1; Design handoff §4"),
@@ -116,7 +116,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "precision_by_category",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pbc-1", "Precision by Category is the conversation for each category confirmed in My Service Map.", "Voice Pack §2 glossary"),
       F("pbc-2", "Progress measures how much has been captured, never the quality of the project.", "Voice Pack principle 7; Build Readiness C-1"),
@@ -133,7 +133,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "category_requirement_pack",
-    status: "draft",
+    status: "approved",
     facts: [
       F("crp-1", "A Category Requirement Pack (CRP) is the final summary of a category: what was captured and what is pending.", "Master contract; Build Readiness A-10"),
       F("crp-2", "A CRP includes no documents and is neither a quote nor a promise of a provider.", "Build Readiness D-7; Voice Pack glossary"),
@@ -151,7 +151,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "crp_confirmation",
-    status: "draft",
+    status: "approved",
     facts: [
       F("cc-1", "When the essential information is captured (readiness, not a fixed 100 %), the CRP can be reviewed; the client can request changes or confirm.", "Build Readiness A-9/C-4"),
       F("cc-2", "A confirmed CRP is read-only; confirming does not send it to Operation Hub.", "Build Readiness A-10/E-1"),
@@ -178,7 +178,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "preview_before_send",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pbs-1", "Before sending, the client sees exactly what would be sent (same builder as the send).", "Build Readiness A-11/E-4"),
       F("pbs-2", "If something changed between preview and send, a new preview is generated; nothing leaves Precision until the client sends.", "Build Readiness E-4 (PREVIEW_STALE)"),
@@ -195,7 +195,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "send_to_operation_hub",
-    status: "draft",
+    status: "approved",
     facts: [
       F("sto-1", "Only an explicit send delivers anything to Operation Hub: confirmed My Service Map, confirmed CRP and permitted project context.", "Build Readiness E-3/E-5"),
       F("sto-2", "Conversations, documents, e-mail and names of people are never sent.", "Build Readiness E-3 deny list"),
@@ -222,7 +222,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "confirmed_vs_sent",
-    status: "draft",
+    status: "approved",
     facts: [
       F("cvs-1", "Confirmed is not sent: confirmed means the client reviewed and accepted the content.", "Build Readiness E-1"),
       F("cvs-2", "Sent is shown only when Operation Hub accepted and the read-back matched.", "Build Readiness E-4"),
@@ -264,7 +264,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "add_a_service",
-    status: "draft",
+    status: "approved",
     facts: [
       F("aas-1", "Add a Service is available once My Service Map is confirmed; before that, needs are included in the initial map.", "Voice Pack add_service_not_available_yet; Build Readiness A-14"),
       F("aas-2", "It is a conversation: the client confirms the need, not the taxonomy; a need that is not mapped is not out of scope.", "Voice Guide principle 8; add_service_confirm_need"),
@@ -290,7 +290,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "pending_information",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pi-1", "If the client does not know something it is left as pending; no one needs to invent an answer.", "Voice Pack pending_accept"),
       F("pi-2", "Pending information is always visible in the summary and never hidden in prose.", "Voice Pack crp_pending_section_title"),
@@ -308,7 +308,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "pause_and_resume",
-    status: "draft",
+    status: "approved",
     facts: [
       F("pr-1", "The client decides when to continue and when to pause; there is no paused state.", "Voice Pack intro_once; pause_note"),
       F("pr-2", "What the client answers is saved as part of the project.", "Build Readiness L-7"),
@@ -325,7 +325,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "documents_boundary",
-    status: "draft",
+    status: "approved",
     facts: [
       F("db-1", "Precision neither asks for nor stores documents; there is no upload.", "Track A contract §0; Build Readiness E-3"),
       F("db-2", "If a service later needs evidence, beeside or the provider will say so; documents are handled in Operation Hub.", "Voice Pack ccir_why_later_evidence; welcome_oh_body"),
@@ -342,7 +342,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "operation_hub_boundary",
-    status: "draft",
+    status: "approved",
     facts: [
       F("ohb-1", "Operation Hub is where the project is executed and coordinated; it is not part of Precision.", "Voice Pack glossary; OH contract"),
       F("ohb-2", "It is activated by the first send; the link appears per decision D-8, with a pending-access notice while the client cannot enter yet.", "Build Readiness E-7, D-8"),
@@ -368,7 +368,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "sherpa_role",
-    status: "draft",
+    status: "approved",
     facts: [
       F("sh-1", "A Sherpa is the beeside person who coordinates execution of a project in Operation Hub.", "Voice Guide v1.1 (D-10); Voice Pack glossary"),
       F("sh-2", "The role appears when the project moves to Operation Hub, after the first send; before a real assignment nothing is assigned or implied.", "Build Readiness L-6"),
@@ -395,7 +395,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "general_help",
-    status: "draft",
+    status: "approved",
     facts: [
       F("gh-1", "General help is always visible: Help and frequently asked questions, and Contact beeside.", "Voice Pack help_general; Build Readiness E-7"),
       F("gh-2", "Asking for help does not activate Operation Hub or change the project state; no response time is promised.", "Voice Pack help_general, help_request_sent"),
@@ -412,7 +412,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "changes_reopen_versioning",
-    status: "draft",
+    status: "approved",
     facts: [
       F("crv-1", "Before Confirm the client can request changes freely.", "Build Readiness A-10b (1)"),
       F("crv-2", "After Confirm the version is immutable; a change is a new version started and confirmed by the client; the previous one is kept.", "Build Readiness A-10b (2)(3)"),
@@ -430,7 +430,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "ai_use",
-    status: "draft",
+    status: "approved",
     facts: [
       F("ai-1", "Precision uses artificial intelligence to help structure the project; the client can correct anything at any time.", "Decision D-11 (approved copy)"),
       F("ai-2", "Progress, readiness and what is confirmed are computed by fixed rules, not by the model.", "Track A contract §4"),
@@ -447,7 +447,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "requirement_destiny",
-    status: "draft",
+    status: "approved",
     facts: [
       F("rd-1", "What the client answers is saved as part of the project and feeds the CRP of the category (or My Service Map in Precision Understanding).", "Build Readiness L-7"),
       F("rd-2", "If it stays pending it is always visible; nothing goes to Operation Hub until the client sends explicitly; confirming does not send.", "Build Readiness L-7, E-1"),
@@ -481,7 +481,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
   },
   {
     topicKey: "why_this_question",
-    status: "draft",
+    status: "approved",
     facts: [
       F("wq-1", "Questions exist to define the part of the project being captured; unknowns are accepted as pending.", "Voice Guide principles 2 and 4; pending_accept"),
       F("wq-2", "The reason shown comes from the manifest's help text for the field, when it has one.", "Build Readiness C (manifest help_text)"),
@@ -497,8 +497,32 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
     resumeHint: "Return to the pending question.",
   },
   {
+    topicKey: "privacy_confidentiality",
+    status: "approved",
+    facts: [
+      F("pv-1", "Project information is used to structure the client's expansion and is shared only when it is needed to move into execution.", "PO closure decision 12 Oct 2026 (Confidentiality answer)"),
+      F("pv-2", "Precision does not send conversation history, email, people's names or documents to Operation Hub.", "PO closure decision 12 Oct 2026; Integration contract §payload exclusions"),
+      F("pv-3", "Before sending a Category Requirement Pack (CRP) the client can review exactly what information will be shared.", "PO closure decision 12 Oct 2026; Preview before Send"),
+    ],
+    sentences: {
+      es: [
+        "La información de tu proyecto se utiliza para estructurar tu expansión y se comparte únicamente cuando corresponde avanzar la ejecución.",
+        "Precision no envía a Operation Hub el historial de conversación, correo, nombres de personas ni documentos; antes de enviar un {crp}, puedes revisar exactamente qué información se compartirá.",
+      ],
+      en: [
+        "Your project information is used to structure your expansion and is only shared when it is needed to move into execution.",
+        "Precision does not send conversation history, email, people's names or documents to Operation Hub; before sending a {crp}, you can review exactly what information will be shared.",
+      ],
+    },
+    factIds: ["pv-1", "pv-2", "pv-3"],
+    variants: [],
+    mustNotSay: [NO_PROMISE, "cifrad|encrypt|iso ?27001|soc ?2|gdpr|lgpd|ley federal|nunca se compart|never shared|100%"],
+    terms: ["operation_hub"],
+    resumeHint: "Return to the pending question.",
+  },
+  {
     topicKey: "contact_timing",
-    status: "draft",
+    status: "approved",
     facts: [
       F("ct-1", "No response or contact time is promised anywhere in Precision.", "Voice Pack help_request_sent; Track A contract §0"),
       F("ct-2", "After the first send the work with beeside continues in Operation Hub.", "Build Readiness E-7"),
