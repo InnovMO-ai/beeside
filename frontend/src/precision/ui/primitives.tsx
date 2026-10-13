@@ -116,11 +116,12 @@ export function Dialog({ title, onClose, children, actions }: { title: string; o
   );
 }
 
-export function PageState({ title, body, action, icon = "info" }: { title: string; body?: string; action?: ReactNode; icon?: string }) {
+export function PageState({ title, body, action, icon = "info", level = 1 }: { title: string; body?: string; action?: ReactNode; icon?: string; /** 2 when the page already has its own h1 (a conversation header). */ level?: 1 | 2 }) {
+  const Heading = level === 1 ? "h1" : "h2";
   return (
     <section className="pz-pagestate">
       <span className="pz-pagestate-icon"><Icon name={icon} size={28} /></span>
-      <h1 tabIndex={-1} data-autofocus>{title}</h1>
+      <Heading tabIndex={-1} {...(level === 1 ? { "data-autofocus": true } : {})}>{title}</Heading>
       {body ? <p>{body}</p> : null}
       {action ? <div className="pz-pagestate-action">{action}</div> : null}
     </section>

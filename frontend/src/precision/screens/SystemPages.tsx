@@ -28,7 +28,7 @@ export function LoadErrorPage({ onRetry }: { onRetry: () => void }) {
   return <BareShell><PageState icon="alert" title={t("error.title")} body={t("error.body")} action={<Button icon="refresh" onClick={onRetry}>{t("error.retry")}</Button>} /></BareShell>;
 }
 /** In-layout error for one screen (the shell stays). */
-export function InlineError({ onRetry, title, body }: { onRetry: () => void; title?: string; body?: string }) {
+export function InlineError({ onRetry, title, body, level }: { onRetry: () => void; title?: string; body?: string; level?: 1 | 2 }) {
   const { t } = useI18n();
-  return <PageState icon="alert" title={title ?? t("error.title")} body={body ?? t("error.body")} action={<Button icon="refresh" onClick={onRetry}>{t("error.retry")}</Button>} />;
+  return <PageState icon="alert" level={level} title={title ?? t("error.title")} body={body ?? t("error.body")} action={<Button icon="refresh" onClick={onRetry}>{t("error.retry")}</Button>} />;
 }

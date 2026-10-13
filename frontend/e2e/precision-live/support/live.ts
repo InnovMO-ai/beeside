@@ -15,8 +15,13 @@ export async function openWithCode(page: Page, code: string, locale: Loc, path =
 /** Clicks a navigation entry; on a phone the navigation lives in the menu drawer, which is opened first. */
 export async function navTo(page: Page, name: RegExp): Promise<void> {
   const menu = page.getByRole("button", { name: /^(Open menu|Abrir menú)$/ });
-  if (await menu.isVisible()) await menu.click();
-  await page.getByRole("navigation").getByRole("link", { name }).first().click();
+  const link = page.getByRole("navigation").getByRole("link", { name }).first();
+  // The menu button is only on a phone; re-check it each time so a late layout pass cannot leave the drawer closed.
+  for (let i = 0; i < 4 && !(await link.isVisible()); i++) {
+    if (await menu.isVisible()) await menu.click();
+    await link.waitFor({ state: "visible", timeout: 2_000 }).catch(() => undefined);
+  }
+  await link.click({ timeout: 15_000 });
 }
 
 export const T = {

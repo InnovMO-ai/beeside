@@ -76,9 +76,8 @@ function WaitRow({ pending }: { pending: Pending }) {
   );
 }
 
-function Composer({ disabled, busy, processing, note, onSend, taRef }: { disabled: boolean; busy: boolean; processing: boolean; note: ReactNode; onSend: (text: string) => void; taRef: React.RefObject<HTMLTextAreaElement> }) {
+function Composer({ value, setValue, disabled, busy, processing, note, onSend, taRef }: { value: string; setValue: (v: string) => void; disabled: boolean; busy: boolean; processing: boolean; note: ReactNode; onSend: (text: string) => void; taRef: React.RefObject<HTMLTextAreaElement> }) {
   const { t } = useI18n();
-  const [value, setValue] = useState("");
   const submit = () => { const v = value.trim(); if (!v || busy || disabled) return; setValue(""); onSend(v); };
   useEffect(() => {
     const el = taRef.current; if (!el) return;
@@ -124,6 +123,9 @@ interface WorkspaceProps<M> {
 export function Workspace<M>(p: WorkspaceProps<M>) {
   const { t } = useI18n();
   const { canWrite: accessWrite, access } = useSession();
+  // The typed draft lives here, not in the composer: switching language reloads the thread and must not cost the client their words.
+  const [draft, setDraft] = useState("");
+  useEffect(() => { setDraft(""); }, [p.scope]);
   const th = useThread<M>({ scope: p.scope, load: p.load, submit: p.submit, onResult: p.onResult });
   const meta = th.res.data?.meta ?? null;
   const thread = th.res.data?.thread ?? null;
@@ -159,7 +161,7 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
   };
 
   let body: ReactNode;
-  if (th.res.error && !th.res.data) body = <InlineError onRetry={() => void th.res.reload()} title={t("ws.loadError.title")} body={t("ws.loadError.body")} />;
+  if (th.res.error && !th.res.data) body = <InlineError level={2} onRetry={() => void th.res.reload()} title={t("ws.loadError.title")} body={t("ws.loadError.body")} />;
   else if (!th.res.data) body = <Skeleton lines={6} />;
   else if (p.unavailableState && p.unavailableState(th.res.data.meta)) body = p.unavailableState(th.res.data.meta);
   else body = (
@@ -207,7 +209,7 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
           {sideExtra ? <div className="pz-wshead-side">{sideExtra}</div> : null}
         </header>
         <div className="pz-wsbody">{body}</div>
-        {showComposer ? <Composer disabled={!writable} busy={!!th.pending} processing={busy} note={closedNote} taRef={ta} onSend={(text) => send(text)} /> : null}
+        {showComposer ? <Composer value={draft} setValue={setDraft} disabled={!writable} busy={!!th.pending} processing={busy} note={closedNote} taRef={ta} onSend={(text) => send(text)} /> : null}
       </div>
     </AppShell>
   );

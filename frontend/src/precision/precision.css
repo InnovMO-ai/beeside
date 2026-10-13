@@ -134,7 +134,7 @@ a.pz-textlink { min-height: 32px; }
 @keyframes pz-shimmer { to { background-position: -200% 0; } }
 
 .pz-pagestate { max-width: 520px; margin: clamp(40px, 12vh, 120px) auto; padding: 0 var(--pz-pad-x); text-align: center; display: grid; gap: 12px; justify-items: center; }
-.pz-pagestate h1 { font: 600 clamp(22px, 2.4vw + 8px, 26px)/1.25 var(--pz-font-display); color: var(--pz-ink); }
+.pz-pagestate h1, .pz-pagestate h2 { font: 600 clamp(22px, 2.4vw + 8px, 26px)/1.25 var(--pz-font-display); color: var(--pz-ink); }
 .pz-pagestate p { color: var(--pz-ink-2); font-size: 15px; }
 .pz-pagestate-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--pz-tint); color: var(--pz-brand); }
 .pz-pagestate-action { margin-top: 8px; }

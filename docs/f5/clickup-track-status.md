@@ -213,7 +213,7 @@ Needed from the Product Owner:
 * Run `scripts/clickup-sandbox-verify.ts` and send back the table; then the label can move to SANDBOX / VERIFIED.
 
 
-## 9. Sherpa direct contact channel (Code stage 2, 13 Oct 2026)
+## 9. Sherpa direct contact channel (Code stage 2, 12 Oct 2026)
 
 `OhAccessState` gained an optional `sherpaContactEmail`: a direct channel to the assigned Sherpa, provided by the platform per project.
 `ClickUpAccessSignal.sherpaContactEmail` passes it through (only with an accessible hub and an assigned Sherpa). Nothing is invented:
