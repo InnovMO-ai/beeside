@@ -8,6 +8,7 @@
     "prebuild": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "fa4:gen-email-templates": "node src/fa4/email-templates/generate.js",
     "start:fa4-worker": "node dist/fa4/worker.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "lint": "eslint \"src/**/*.ts\"",

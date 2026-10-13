@@ -54,7 +54,7 @@ if (require.main === module) {
       if (fa4Busy) return;
       fa4Busy = true;
       try {
-        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl } });
+        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
         // eslint-disable-next-line no-console
         if (r.sent + r.failed + r.dead > 0) console.log(`[worker] fa4_email_outbox ${JSON.stringify(r)}`);
       } catch (error) {

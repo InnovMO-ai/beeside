@@ -1,0 +1,19 @@
+SOLICITUD DESDE FIRST ASSESSMENT
+
+{{name}} quiere hablar con beeside sobre su proyecto.
+
+Hola, equipo beeside:
+
+Se recibió una nueva solicitud desde First Assessment.
+
+Tema: {{topic}}
+Mensaje: {{message}}
+Nombre: {{name}}
+Empresa: {{company}}
+Correo: {{email}}
+<!--IF:has_destinations-->Destino(s): {{destinations}}
+<!--ENDIF:has_destinations-->Etapa: {{stage}}
+Idioma de FA: {{fa_language}}
+<!--IF:has_project_id-->Project ID: {{project_id}}
+<!--ENDIF:has_project_id-->
+Responder a este correo debe dirigirse automáticamente a la persona que envió la solicitud (Reply-To).

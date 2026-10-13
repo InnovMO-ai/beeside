@@ -128,6 +128,8 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
       contactAddress: env.FA4_CONTACT_ADDRESS ?? FA4_CONTACT_ADDRESS,
       premiumResourceUrl: { es: env.FA4_PREMIUM_RESOURCE_URL_ES || undefined, en: env.FA4_PREMIUM_RESOURCE_URL_EN || undefined },
+      premiumCommercialContentAllowed: env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true",
+      yevLinkDays: Number(env.FA4_YEV_LINK_DAYS ?? 14),
       emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
       rateLimits: fa4RateLimitOverrides(env),

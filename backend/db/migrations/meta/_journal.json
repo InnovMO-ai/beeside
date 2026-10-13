@@ -148,6 +148,13 @@
       "when": 1791832110419,
       "tag": "0020_fa4_presentation_rc_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791853836233,
+      "tag": "0021_fa4_email_v2",
+      "breakpoints": true
     }
   ]
 }

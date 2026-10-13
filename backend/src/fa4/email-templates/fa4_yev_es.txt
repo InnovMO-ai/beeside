@@ -1,0 +1,38 @@
+YOUR EXPANSION VIEW
+
+Tu expansión ya tiene un punto de partida. Ahora, dale dirección.
+
+<!--IF:has_first_name-->Hola, {{first_name}}:<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hola:<!--ENDIFNOT:has_first_name-->
+
+Has completado tu First Assessment y ya tienes una primera visión de lo que significa llevar tu empresa hacia un nuevo mercado.
+
+Preparamos Your Expansion View a partir de la información que compartiste: reúne los principales elementos de tu proyecto, lo que ya está definido y lo que todavía necesita atención.
+
+<!--IF:show_focus_block-->TU PRÓXIMO MERCADO, EN FOCO
+<!--IF:has_destination-->Destino: {{destination}}
+<!--ENDIF:has_destination--><!--IF:has_objective-->Objetivo declarado: {{declared_objective}}
+<!--ENDIF:has_objective--><!--ENDIF:show_focus_block-->
+Ver mi Your Expansion View:
+{{yev_url}}
+
+Encontrar una oportunidad es sólo el comienzo. Convertirla en una expansión bien coordinada requiere entender qué necesitas, cómo avanzar y qué capacidades activar.
+
+<!--IF:premium_enabled-->Si decides continuar con beeside Premium, podemos ayudarte a pasar de la visión a la ejecución:
+
+- Más precisión: profundizar en las necesidades reales del proyecto y definir servicios y capacidades.
+- Un ecosistema conectado: acceder a especialistas y proveedores seleccionados para tu expansión.
+- Coordinación: centralizar actividades, responsables, entregables y próximos pasos con tu Sherpa y Operation Hub.
+
+Porque expandirse no debería significar resolver todo por tu cuenta.
+
+Explorar beeside Premium:
+{{premium_url}}
+
+<!--ENDIF:premium_enabled-->¿Tienes preguntas sobre tu resultado? Hablar con beeside: {{talk_to_beeside_url}}
+
+Antes de Premium, no compartimos tu proyecto con proveedores.
+
+beeside
+
+Términos y Condiciones: https://beeside.you/termsandconditions
+Política de Privacidad: https://www.beeside.you/privacy

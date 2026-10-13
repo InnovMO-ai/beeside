@@ -1,9 +1,10 @@
-import { L, Locale } from "@beeside/fa-public-engine";
+import { Answers, Locale, countryL10n } from "@beeside/fa-public-engine";
 import { Db } from "../db/database";
 import { EmailMessage, EmailTransport } from "../fa/email/email-adapter";
 import { backoffSeconds, sanitizeDeliveryError } from "../operations/email-outbox";
 import { recordEvent } from "./events";
 import { issueToken } from "./repository";
+import { renderFa4Email, sanitizeSubjectValue } from "./email-render";
 
 /**
  * FA Public transactional email. EmailTransport (log | smtp) -> `fa4_email_delivery` outbox (lease, retry with backoff, dead state, idempotency,
@@ -18,21 +19,6 @@ import { issueToken } from "./repository";
  */
 export type Fa4EmailTemplate = "fa4_resume_link" | "fa4_result_link" | "fa4_contact_request";
 
-const COPY: Record<"fa4_resume_link" | "fa4_result_link", { subject: ReturnType<typeof L>; body: ReturnType<typeof L>; cta: ReturnType<typeof L>; secondary?: ReturnType<typeof L> }> = {
-  fa4_resume_link: {
-    subject: L("Retoma tu First Assessment", "Pick up your First Assessment"),
-    body: L("Usa este enlace para continuar donde lo dejaste.", "Use this link to continue where you left off."),
-    cta: L("Continuar donde lo dejaste", "Pick up where you left off"),
-  },
-  // Design D-147: primary CTA = the private single-use link to the YEV; the YEV content is never in the email body.
-  fa4_result_link: {
-    subject: L("Tu Your Expansion View está listo", "Your Expansion View is ready"),
-    body: L("Ya puedes revisar lo que entendimos de tu proyecto y dónde puede ayudarte beeside.", "You can now review what we understood about your project and where beeside can help."),
-    cta: L("Ver mi Your Expansion View", "See my Your Expansion View"),
-    secondary: L("Conoce cómo puede ayudarte Premium", "See how Premium can help you"),
-  },
-};
-
 export interface Fa4EmailDeps {
   db: Db;
   email: EmailTransport;
@@ -42,6 +28,10 @@ export interface Fa4EmailDeps {
     contactAddress?: string;
     /** Optional secondary CTA of the YEV email (FA4_PREMIUM_RESOURCE_URL_ES|EN). Absent = no secondary link. */
     premiumResourceUrl?: { es?: string; en?: string };
+    /** Third condition of the YEV email's Premium block: the final commercial-content policy allows it (LEGAL-1, external). Fail-closed: absent = false. */
+    premiumCommercialContentAllowed?: boolean;
+    /** Validity of the YEV email's private link (one token serves both "View" and "Talk to beeside"). */
+    yevLinkDays?: number;
   };
 }
 
@@ -95,7 +85,7 @@ export async function enqueueFa4Email(db: Db, projectId: string, template: Exclu
   });
 }
 
-export interface ContactInput { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }
+export interface ContactInput { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string; originStage?: "FA" | "YEV" }
 
 /**
  * Stores a "Hablar con beeside" message and its delivery to the operational mailbox in ONE transaction. The client request id makes a
@@ -105,9 +95,9 @@ export async function enqueueContact(db: Db, projectId: string | null, input: Co
   return db.transaction(async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_contact:${input.clientRequestId}`]);
     const inserted = await tx.query<{ contact_id: string }>(
-      `INSERT INTO fa4_contact_request (project_id, name, company, email, message, share_progress, language, client_request_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (client_request_id) DO NOTHING RETURNING contact_id`,
-      [projectId, input.name, input.company, input.email, input.message, input.shareProgress, language, input.clientRequestId, now],
+      `INSERT INTO fa4_contact_request (project_id, name, company, email, message, share_progress, language, client_request_id, origin_stage, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (client_request_id) DO NOTHING RETURNING contact_id`,
+      [projectId, input.name, input.company, input.email, input.message, input.shareProgress, language, input.clientRequestId, input.originStage ?? "FA", now],
     );
     const created = inserted.rows.length > 0;
     const contactId = inserted.rows[0]?.contact_id
@@ -198,47 +188,73 @@ export async function deliverDueFa4Emails(deps: Fa4EmailDeps, options: { limit?:
   return stats;
 }
 
-const oneLine = (v: string) => v.replace(/[\r\n]+/g, " ").trim();
+const firstName = (full: string) => full.trim().split(/\s+/)[0] ?? "";
+const truncateWords = (t: string, max = 160) => {
+  const clean = t.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max); const i = cut.lastIndexOf(" ");
+  return `${(i > 40 ? cut.slice(0, i) : cut).replace(/[\s,.;:]+$/, "")}…`;
+};
+
+/** Destination names in the email's language (open destination → none). */
+function destinationNames(a: Partial<Answers> | undefined, locale: Locale): string {
+  const list = (a?.destinations?.list ?? []).filter((d) => d.iso && d.iso !== "OPEN" && !a?.destinations?.open);
+  return list.map((d) => countryL10n(d.iso)[locale]).join(", ");
+}
+
+/** "Premium block" gate: ALL THREE — real continuation (D-050/D-096), a URL for the language, and the commercial-content policy. A URL alone never enables it. */
+export function premiumEnabled(projectHasPremiumContinuation: boolean, premiumUrl: string | undefined, commercialAllowed: boolean | undefined): boolean {
+  return projectHasPremiumContinuation === true && !!premiumUrl && /^https:\/\//i.test(premiumUrl) && commercialAllowed === true;
+}
 
 async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<EmailMessage | null> {
-  const p = !d.project_id ? undefined : (await tx.query<{ email: string; locale: Locale; answers: { company?: { sector?: string }; destinations?: { list?: Array<{ iso: string }> }; components?: Array<{ activities?: string[] }> }; step_key: string }>(
+  const p = !d.project_id ? undefined : (await tx.query<{ email: string; locale: Locale; answers: Partial<Answers>; step_key: string }>(
     "SELECT email, locale, answers, step_key FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [d.project_id])).rows[0];
+  const base = deps.config.appBaseUrl.replace(/\/$/, "");
+
   if (d.template === "fa4_contact_request") {
-    const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale }>(
-      "SELECT name, company, email, message, share_progress, language FROM fa4_contact_request WHERE contact_id = $1", [d.contact_request_id])).rows[0];
+    const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale; origin_stage: "FA" | "YEV" }>(
+      "SELECT name, company, email, message, share_progress, language, origin_stage FROM fa4_contact_request WHERE contact_id = $1", [d.contact_request_id])).rows[0];
     if (!c) return null;
-    const lines = [c.message, "", `— ${[c.name, c.company, c.email].filter(Boolean).join(" · ")}`, `Idioma / Language: ${c.language}`];
-    if (c.share_progress && p) {
-      const dests = (p.answers.destinations?.list ?? []).map((x) => x.iso).join(", ") || "—";
-      const acts = [...new Set((p.answers.components ?? []).flatMap((x) => x.activities ?? []))].join(", ") || "—";
-      lines.push("", "Avance compartido / Shared progress (la persona lo autorizó solo para este mensaje):", `Sector: ${p.answers.company?.sector ?? "—"}`, `Destinos / Destinations: ${dests}`, `Actividades / Activities: ${acts}`, `Paso / Step: ${p.step_key}`);
-    }
+    const dests = c.share_progress && p ? destinationNames(p.answers, c.language) : "";
+    const r = renderFa4Email("talk", c.language, {
+      topic: c.language === "es" ? "Hablar con beeside" : "Talk to beeside",
+      message: c.message, name: c.name, company: c.company, email: c.email, destinations: dests,
+      stage: c.origin_stage === "YEV" ? "YEV" : "First Assessment",
+      fa_language: c.language === "es" ? "Español" : "English",   // the language the person used in FA (internal context), shown in the email's own language
+      project_id: d.project_id ?? "",
+    }, { has_destinations: !!dests, has_project_id: !!d.project_id });
     return {
-      template: d.template,
-      to: deps.config.contactAddress ?? "contact@beeside.you",
-      locale: c.language,
-      subject: oneLine(`Hablar con beeside · ${c.name}${c.company ? ` (${c.company})` : ""}`),
-      body: lines.join("\n"),
-      ctaLabel: "", ctaUrl: "",
-      replyTo: c.email,
-      projectId: d.project_id,
+      template: d.template, to: deps.config.contactAddress ?? "contact@beeside.you", locale: c.language,
+      subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: "",
+      replyTo: c.email, projectId: d.project_id,
     };
   }
+
   if (!p || !d.project_id) return null;
-  const token = await issueToken(tx, d.project_id, "RESUME", new Date(now.getTime() + deps.config.resumeLinkDays * 86_400_000));
-  const base = deps.config.appBaseUrl.replace(/\/$/, "");
-  const view = d.template === "fa4_result_link" ? "&view=result" : "";
-  const c = COPY[d.template];
-  const premium = d.template === "fa4_result_link" ? deps.config.premiumResourceUrl?.[p.locale] : undefined;
-  return {
-    template: d.template,
-    to: p.email,
-    locale: p.locale,
-    subject: c.subject[p.locale],
-    body: c.body[p.locale],
-    ctaLabel: c.cta[p.locale],
-    ctaUrl: `${base}/fa4#r=${token}${view}`,
-    ...(premium && c.secondary ? { secondaryCtaLabel: c.secondary[p.locale], secondaryCtaUrl: premium } : {}),
-    projectId: d.project_id,
-  };
+  const locale = p.locale;
+  const name = firstName(p.answers.identity?.name ?? "");
+  if (d.template === "fa4_resume_link") {
+    const token = await issueToken(tx, d.project_id, "RESUME", new Date(now.getTime() + deps.config.resumeLinkDays * 86_400_000));
+    const url = `${base}/fa4#r=${token}`;
+    const r = renderFa4Email("resume", locale, { first_name: name, resume_url: url }, { has_first_name: !!name });
+    return { template: d.template, to: p.email, locale, subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: url, projectId: d.project_id };
+  }
+
+  // YEV email: ONE private access token serves both actions (View / Talk to beeside): opening one never invalidates the other while it is valid.
+  const token = await issueToken(tx, d.project_id, "YEV_LINK", new Date(now.getTime() + (deps.config.yevLinkDays ?? 14) * 86_400_000));
+  const yevUrl = `${base}/fa4#r=${token}&view=result`;
+  const talkUrl = `${yevUrl}&contact=open&origin=yev_email`;
+  const premiumUrl = deps.config.premiumResourceUrl?.[locale];
+  const hasPremium = ((await tx.query<{ shown: boolean }>("SELECT (model->'premium'->>'shown')::boolean AS shown FROM fa4_result WHERE project_id = $1 ORDER BY result_seq DESC LIMIT 1", [d.project_id])).rows[0]?.shown) === true;
+  const destination = destinationNames(p.answers, locale);
+  const objective = truncateWords(p.answers.context?.success ?? "");
+  const enabled = premiumEnabled(hasPremium, premiumUrl, deps.config.premiumCommercialContentAllowed);
+  const r = renderFa4Email("yev", locale, {
+    first_name: name, yev_url: yevUrl, talk_to_beeside_url: talkUrl, premium_url: enabled ? premiumUrl : "https://beeside.you/",
+    destination, declared_objective: objective,
+  }, { has_first_name: !!name, has_destination: !!destination, has_objective: !!objective, show_focus_block: !!destination || !!objective, premium_enabled: enabled });
+  return { template: d.template, to: p.email, locale, subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: yevUrl, projectId: d.project_id };
 }
+
+export { sanitizeSubjectValue };

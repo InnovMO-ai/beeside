@@ -16,7 +16,7 @@ import {
 } from "./email";
 import { parseClientEvent, recordEvent } from "./events";
 import {
-  Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeResumeToken, latestResult, loadPublishedCatalog, normalizeEmail,
+  Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeLinkToken, latestResult, loadPublishedCatalog, normalizeEmail,
   projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
 } from "./repository";
 import { deliverResult } from "./service";
@@ -34,6 +34,10 @@ export interface Fa4Deps {
     contactAddress?: string;
     /** Optional secondary CTA of the YEV email (FA4_PREMIUM_RESOURCE_URL_ES|EN). */
     premiumResourceUrl?: { es?: string; en?: string };
+    /** Commercial-content policy gate of the YEV email's Premium block (LEGAL-1, external; fail-closed). */
+    premiumCommercialContentAllowed?: boolean;
+    /** Validity (days) of the YEV email's private link. */
+    yevLinkDays?: number;
     /** How long an interactive request waits for the provider's answer before it reports `pending` (the UI then polls). */
     emailConfirmWaitMs?: number;
     /** Approved Terms / Privacy identifiers recorded as immutable acceptance evidence (LEGAL-1 / CHK-1 pending). */
@@ -83,7 +87,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   const emailDeps: Fa4EmailDeps = {
     db: deps.db, email: deps.email,
-    config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl },
+    config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
   };
   const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };
@@ -228,14 +232,16 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   const contact = (withSession: boolean): Handler => async (req, res) => {
     const p = withSession ? await session(req) : null;
     const b = bodyOf(req);
-    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-    const name = str(b.name, 120), company = str(b.company, 160), email = str(b.email, 254), message = str(b.message, 4000);
+    // control characters (NUL included) never enter storage or an email; newlines survive in the message only
+    const str = (v: unknown, max: number, keepNewlines = false) => (typeof v === "string"
+      ? v.replace(keepNewlines ? /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u2028\u2029]/g : /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ").trim().slice(0, max) : "");
+    const name = str(b.name, 120), company = str(b.company, 160), email = str(b.email, 254), message = str(b.message, 4000, true);
     if (!name || !isValidEmail(email) || message.length < 3 || (withSession && !company)) throw new FaError("INVALID_INPUT", "the message is incomplete");
     const clientRequestId = /^[A-Za-z0-9_-]{8,64}$/.test(str(b.clientRequestId, 64)) ? str(b.clientRequestId, 64) : randomUUID();
     const share = withSession && b.shareProgress === true;
     const locale = p?.answers.locale ?? (b.locale === "en" ? "en" : "es");
-    const c = await enqueueContact(deps.db, p?.projectId ?? null, { name, company, email, message, shareProgress: share, clientRequestId }, locale, deps.config.now());
-    if (c.created) await recordEvent(deps.db, { name: "contact_submitted", source: "server", projectId: p?.projectId ?? null, locale, props: { shareProgress: share, anonymous: !p } });
+    const c = await enqueueContact(deps.db, p?.projectId ?? null, { name, company, email, message, shareProgress: share, clientRequestId, originStage: withSession && b.stage === "YEV" ? "YEV" : "FA" }, locale, deps.config.now());
+    if (c.created) await recordEvent(deps.db, { name: "contact_submitted", source: "server", projectId: p?.projectId ?? null, locale, props: { shareProgress: share, anonymous: !p, stage: withSession && b.stage === "YEV" ? "YEV" : "FA" } });
     await settle(res, c.deliveryId, { email: maskEmail(email) });
   };
   router.post("/session/contact", rateLimit(limiter, lim('contact'), bearer), handle(contact(true)));
@@ -270,10 +276,10 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   router.post("/links/continue", handle(async (req, res) => {
     const raw = bodyOf(req).token;
     const now = deps.config.now();
-    const exchanged = looksLikeAccessToken(raw) ? await exchangeResumeToken(deps.db, raw, now, new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000)) : null;
+    const exchanged = looksLikeAccessToken(raw) ? await exchangeLinkToken(deps.db, raw, now, new Date(now.getTime() + deps.config.sessionTtlHours * 3_600_000)) : null;
     if (!exchanged) throw new FaError("NOT_FOUND", "this link is not valid or has expired");
     await recordEvent(deps.db, { name: "resume_link_used", source: "server", projectId: exchanged.projectId });
-    res.json({ sessionToken: exchanged.sessionToken });
+    res.json({ sessionToken: exchanged.sessionToken, kind: exchanged.kind });
   }));
 
   // Resume by email. The answer is always the same ({ok:true}) whether or not the address has projects (no account enumeration).

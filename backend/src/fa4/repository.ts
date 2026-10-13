@@ -15,7 +15,7 @@ import { generateAccessToken, hashAccessToken } from "../fa/services/tokens";
  * FA Public v1.0 persistence (PostgreSQL, raw SQL over the shared `Db` abstraction, like the rest of the backend).
  * Tables: see db/schema/fa4.ts. Integrity (append-only results, immutable catalog versions) is enforced by triggers (0016).
  */
-export type TokenKind = "SESSION" | "RESUME";
+export type TokenKind = "SESSION" | "RESUME" | "YEV_LINK";
 export type ProjectStatus = "IN_PROGRESS" | "DELIVERED" | "INELIGIBLE" | "ANONYMIZED";
 
 export interface Fa4ProjectRow {
@@ -160,6 +160,7 @@ export async function publishCapability(
  */
 export async function issueToken(tx: Db, projectId: string, kind: TokenKind, expiresAt: Date): Promise<string> {
   if (kind === "RESUME") await tx.query("UPDATE fa4_access_token SET revoked_at = now() WHERE project_id = $1 AND kind = 'RESUME' AND used_at IS NULL AND revoked_at IS NULL", [projectId]);
+  if (kind === "YEV_LINK") await tx.query("UPDATE fa4_access_token SET revoked_at = now() WHERE project_id = $1 AND kind = 'YEV_LINK' AND revoked_at IS NULL", [projectId]);
   const token = generateAccessToken();
   await tx.query("INSERT INTO fa4_access_token (project_id, kind, token_hash, expires_at) VALUES ($1, $2, $3, $4)", [projectId, kind, hashAccessToken(token), expiresAt]);
   return token;
@@ -240,6 +241,31 @@ export async function exchangeResumeToken(db: Db, rawToken: string, now: Date, s
     if (!projectId) return null;
     return { projectId, sessionToken: await issueToken(tx, projectId, "SESSION", sessionExpiresAt) };
   });
+}
+
+/**
+ * Exchanges an emailed private link for a working session.
+ *  - YEV_LINK (the YEV email: "View" and "Talk to beeside" share ONE token): multi-use until it expires or is revoked; an exchange never spends it,
+ *    so opening one action never invalidates the other, and a scanner / prefetch cannot break it.
+ *  - RESUME: single-use, atomically spent (replays fail).
+ * Returns null for unknown, expired, revoked, used or anonymized links (one generic outcome).
+ */
+export async function exchangeLinkToken(db: Db, rawToken: string, now: Date, sessionExpiresAt: Date): Promise<{ projectId: string; sessionToken: string; kind: "YEV_LINK" | "RESUME" } | null> {
+  const hash = hashAccessToken(rawToken);
+  const yev = await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ token_id: string; project_id: string }>(
+      `SELECT t.token_id, t.project_id FROM fa4_access_token t JOIN fa4_project p ON p.project_id = t.project_id
+        WHERE t.token_hash = $1 AND t.kind = 'YEV_LINK' AND t.revoked_at IS NULL AND t.expires_at > $2 AND p.status <> 'ANONYMIZED'`,
+      [hash, now],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    await tx.query("UPDATE fa4_access_token SET last_used_at = $2 WHERE token_id = $1", [r.token_id, now]);
+    return { projectId: r.project_id, sessionToken: await issueToken(tx, r.project_id, "SESSION", sessionExpiresAt), kind: "YEV_LINK" as const };
+  });
+  if (yev) return yev;
+  const resumed = await exchangeResumeToken(db, rawToken, now, sessionExpiresAt);
+  return resumed ? { ...resumed, kind: "RESUME" as const } : null;
 }
 
 /**

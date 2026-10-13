@@ -95,7 +95,7 @@ export const fa4AccessToken = pgTable(
   (t) => [
     uniqueIndex("fa4_access_token_hash_unique").on(t.tokenHash),
     index("fa4_access_token_project_idx").on(t.projectId, t.kind),
-    check("fa4_access_token_kind", sql`${t.kind} IN ('SESSION','RESUME')`),
+    check("fa4_access_token_kind", sql`${t.kind} IN ('SESSION','RESUME','YEV_LINK')`),
   ],
 );
 
@@ -263,12 +263,15 @@ export const fa4ContactRequest = pgTable(
     language: text("language").notNull(),
     /** Client-generated idempotency key: a double click / retry of the same form never creates a second message. */
     clientRequestId: text("client_request_id").notNull(),
+    /** Where the person wrote from: 'FA' (First Assessment) or 'YEV' (the result, including the YEV email's "Talk to beeside" link). */
+    originStage: text("origin_stage").notNull().default("FA"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("fa4_contact_request_project_idx").on(t.projectId, t.createdAt),
     uniqueIndex("fa4_contact_request_idem_unique").on(t.clientRequestId),
     check("fa4_contact_request_language", sql`${t.language} IN ('es','en')`),
+    check("fa4_contact_request_stage", sql`${t.originStage} IN ('FA','YEV')`),
   ],
 );
 

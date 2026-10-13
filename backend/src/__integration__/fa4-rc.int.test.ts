@@ -112,21 +112,82 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       expect((await client.query("SELECT status FROM fa4_email_delivery WHERE status='DEAD'")).rowCount).toBe(1);
     });
 
-    it("YEV email: result link is the primary CTA, Premium resource is the secondary one only when configured", async () => {
+    it("YEV email (v2): two private actions from ONE token, no mailto, no PDF, footer legal links, Premium only with ALL THREE conditions", async () => {
       const t = await start();
       await api().post("/api/fa4/session/result").set(auth(t));
-      const r = await api().post("/api/fa4/session/result/email").set(auth(t));
-      expect(r.status).toBe(200); expect(r.body.state).toBe("sent");
-      const m = email.messages.at(-1)!;
-      expect(m.ctaLabel).toBe("Ver mi Your Expansion View"); expect(m.ctaUrl).toMatch(/#r=[A-Za-z0-9_-]{43}&view=result$/);
-      expect(m.secondaryCtaUrl).toBe("https://fa.test/premium-es"); expect(m.secondaryCtaLabel).toBe("Conoce cómo puede ayudarte Premium");
-      expect(m.body).not.toMatch(/Nórtica|Presencia|México/);               // the YEV content is never in the body
-      delete deps.config.premiumResourceUrl;
-      const t2 = await start(journeyA());
-      await api().post("/api/fa4/session/result").set(auth(t2));
-      await api().post("/api/fa4/session/result/email").set(auth(t2));
-      expect(email.messages.at(-1)!.secondaryCtaUrl).toBeUndefined();        // absent URL = no secondary link, no failure
-      deps.config.premiumResourceUrl = { es: "https://fa.test/premium-es" };
+      const send = async (premiumUrl: string | undefined, allowed: boolean | undefined) => {
+        email.messages.length = 0;
+        deps.config.premiumResourceUrl = premiumUrl ? { es: premiumUrl } : {}; deps.config.premiumCommercialContentAllowed = allowed;
+        await client.query("DELETE FROM fa4_email_delivery WHERE template = 'fa4_result_link'");
+        const r = await api().post("/api/fa4/session/result/email").set(auth(t));
+        expect(r.status).toBe(200);
+        return email.messages.at(-1)!;
+      };
+      const m = await send("https://fa.test/premium-es", true);
+      expect(m.subject).toBe("Your Expansion View está listo. Descubre lo que sigue. | beeside");
+      expect(m.html!).toContain("Ver mi Your Expansion View"); expect(m.html!).toContain("Explorar beeside Premium"); expect(m.html!).toContain("https://fa.test/premium-es");
+      const yev = /href="(https:\/\/fa\.test\/fa4#r=[A-Za-z0-9_-]{43}&amp;view=result)"/.exec(m.html!)![1]!.replace(/&amp;/g, "&");
+      const talk = /href="(https:\/\/fa\.test\/fa4#r=[^"]+contact=open[^"]*)"/.exec(m.html!)![1]!.replace(/&amp;/g, "&");
+      expect(talk).toContain("origin=yev_email"); expect(yev.split("&")[0]).toBe(talk.split("&")[0]);          // SAME token, two actions
+      expect(m.html!).not.toMatch(/mailto:|\.pdf|Policiescommercialnotices|noreply@|\{\{|<!--IF/i); expect(m.text!).not.toMatch(/\{\{|<!--IF|mailto:/);
+      expect(m.html!).toContain("https://beeside.you/termsandconditions"); expect(m.html!).toContain("https://www.beeside.you/privacy");
+      expect(m.text!).toContain("Hablar con beeside: https://fa.test/fa4#r=");
+      expect(m.html!).not.toMatch(/Nórtica|Presencia/);                              // result content is never in the body
+      expect(m.html!).toContain("Destino:"); expect(m.html!).toContain("México");        // declared destination (focus block)
+      expect(m.replyTo).toBeUndefined();                                             // transport default → contact@beeside.you
+      // Premium gate: every missing condition hides the whole block, CTA included
+      for (const [url, allowed] of [[undefined, true], ["https://fa.test/premium-es", false], ["https://fa.test/premium-es", undefined], [undefined, false]] as const) {
+        const x = await send(url, allowed);
+        expect(x.html!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/); expect(x.text!).not.toMatch(/Explorar beeside Premium|Si decides continuar|Porque expandirse/);
+        expect(x.html!).toContain("Hablar con beeside"); expect(x.html!).toContain("Antes de Premium, no compartimos tu proyecto con proveedores.");   // always present
+      }
+      deps.config.premiumResourceUrl = { es: "https://fa.test/premium-es" }; deps.config.premiumCommercialContentAllowed = true;
+    });
+
+    it("Premium needs a REAL continuation too: URL + policy alone never enable it", async () => {
+      const a = journeyA(); a.destinations = { list: [{ iso: "JP" }], open: false, sameInAll: true }; a.components = [{ ...a.components[0]!, destinations: ["JP"] }];   // a result without real value (D-050)
+      const t = await start(a);
+      deps.config.premiumResourceUrl = { es: "https://fa.test/premium-es" }; deps.config.premiumCommercialContentAllowed = true;
+      const res = await api().post("/api/fa4/session/result").set(auth(t));
+      expect(res.body.model.premium.shown).toBe(false);
+      await api().post("/api/fa4/session/result/email").set(auth(t));
+      expect(email.messages.at(-1)!.html!).not.toMatch(/Explorar beeside Premium/);
+    });
+
+    it("both private YEV links work in any order, repeatedly, while valid; revoked / expired access fails safely", async () => {
+      const t = await start();
+      await api().post("/api/fa4/session/result").set(auth(t));
+      await api().post("/api/fa4/session/result/email").set(auth(t));
+      const html = email.messages.at(-1)!.html!;
+      const tok = /fa4#r=([A-Za-z0-9_-]{43})/.exec(html)![1]!;
+      const exch = () => api().post("/api/fa4/links/continue").send({ token: tok });
+      const a1 = await exch(); expect(a1.status).toBe(200); expect(a1.body.kind).toBe("YEV_LINK");        // open YEV
+      const a2 = await exch(); expect(a2.status).toBe(200);                                                   // then Talk to beeside still works
+      expect((await api().get("/api/fa4/session/result").set(auth(a2.body.sessionToken))).status).toBe(200);
+      expect((await api().post("/api/fa4/session/contact").set(auth(a2.body.sessionToken)).send({ name: "Lucía", company: "Nórtica", email: "lucia@nortica.example", message: "Hola desde el correo", stage: "YEV", clientRequestId: "req-yev-0001" })).status).toBe(200);
+      expect((await client.query("SELECT origin_stage FROM fa4_contact_request WHERE client_request_id = 'req-yev-0001'")).rows[0].origin_stage).toBe("YEV");
+      // a newer YEV email supersedes the older private link (fails safely) while the new one works
+      clock.now = new Date(clock.now.getTime() + 6 * 60_000);
+      await api().post("/api/fa4/session/result/email").set(auth(t));
+      expect((await exch()).status).toBe(404);
+      const tok2 = /fa4#r=([A-Za-z0-9_-]{43})/.exec(email.messages.at(-1)!.html!)![1]!;
+      expect((await api().post("/api/fa4/links/continue").send({ token: tok2 })).status).toBe(200);
+      // expiry
+      clock.now = new Date(clock.now.getTime() + 15 * 86_400_000);
+      expect((await api().post("/api/fa4/links/continue").send({ token: tok2 })).status).toBe(404);
+    });
+
+    it("scanner-safe resume: GET/HEAD of the link never consumes it; the real continuation does, once", async () => {
+      const t = await start();
+      await api().post("/api/fa4/session/finish-later").set(auth(t));
+      const tok = /fa4#r=([A-Za-z0-9_-]{43})/.exec(email.messages.at(-1)!.html!)![1]!;
+      for (const verb of ["get", "head"] as const) {
+        expect([404, 405]).toContain((await api()[verb]("/api/fa4/links/continue")).status);              // passive visits are no-ops
+        await api()[verb](`/api/fa4/links/continue?token=${tok}`);
+      }
+      const real = await api().post("/api/fa4/links/continue").send({ token: tok });
+      expect(real.status).toBe(200); expect(real.body.kind).toBe("RESUME");
+      expect((await api().post("/api/fa4/links/continue").send({ token: tok })).status).toBe(404);          // single-use semantics kept
     });
 
     it("the YEV email is not marketing consent", async () => {
@@ -152,11 +213,19 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       expect(m.ctaUrl).toBe("");
     });
 
-    it("share-progress adds a plain summary (no internal states) to this message only", async () => {
+    it("internal email v2: FA locale (ES→ES, EN→EN) + «Idioma de FA», stage, destinations only when progress is shared, Reply-To = the person", async () => {
       const t = await start();
-      await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, shareProgress: true });
-      const m = email.messages.at(-1)!;
-      expect(m.body).toContain("Avance compartido"); expect(m.body).toMatch(/MX/); expect(m.body).not.toMatch(/SOURCEABLE|REVIEW|DEPENDENT|capabilit/i);
+      await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, shareProgress: true, clientRequestId: "req-loc-0001" });
+      let m = email.messages.at(-1)!;
+      expect(m.html!).toContain("Idioma de FA"); expect(m.html!).toContain("Español"); expect(m.html!).toContain("Etapa"); expect(m.html!).toContain("First Assessment"); expect(m.html!).toContain("México");
+      expect(m.subject).toBe("Hablar con beeside — Nórtica Envases — Lucía"); expect(m.replyTo).toBe("lucia@nortica.example"); expect(m.to).toBe("contact@beeside.you");
+      expect(m.html!).not.toMatch(/SOURCEABLE|REVIEW|DEPENDENT|termsandconditions/);               // no internal states, no public legal footer
+      await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, clientRequestId: "req-loc-0002" });
+      expect(email.messages.at(-1)!.html!).not.toContain("Destino(s)");                              // not shared → not included
+      const en = await start(journeyNortica("en"));
+      await api().post("/api/fa4/session/contact").set(auth(en)).send({ ...body, stage: "YEV", clientRequestId: "req-loc-0003" });
+      m = email.messages.at(-1)!;
+      expect(m.subject).toBe("Talk to beeside — Nórtica Envases — Lucía"); expect(m.html!).toContain("FA language"); expect(m.html!).toContain("English"); expect(m.html!).toContain("YEV"); expect(m.text!).toContain("Stage: YEV");
     });
 
     it("failure is reported as failure (502) and the same form can be sent again once; a double click never creates two messages", async () => {
@@ -206,11 +275,19 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       expect((await client.query("SELECT count(*)::int n FROM fa4_marketing_consent")).rows[0].n).toBe(1);   // never marketing
     });
 
-    it("header injection in the name cannot add headers or recipients", async () => {
+    it("Subject header injection: CR/LF, controls, U+2028/9 and encoded-words in name/company never reach a header", async () => {
       const t = await start();
-      await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, name: "Eve\r\nBcc: attacker@evil.example", clientRequestId: "req-0003-abcd" });
-      const m = email.messages.at(-1)!;
-      expect(m.subject).not.toMatch(/[\r\n]/); expect(m.to).toBe("contact@beeside.you");
+      const evil = [
+        "Eve\r\nBcc: attacker@evil.example", "Eve\u2028Bcc: x@y.z", "=?utf-8?B?QmNjOiB4QHkuego=?=", "Eve\u0085Cc: a@b.c", "Eve\u0000\u0007\u202Ebidi", "A".repeat(500),
+      ];
+      let i = 0;
+      for (const n of evil) {
+        await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, name: n, company: n, clientRequestId: `req-inj-000${i++}` });
+        const m = email.messages.at(-1)!;
+        // eslint-disable-next-line no-control-regex
+        expect(m.subject).not.toMatch(/[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E]|=\?|\?=/);
+        expect(m.subject.length).toBeLessThan(160); expect(m.to).toBe("contact@beeside.you");
+      }
     });
   });
 

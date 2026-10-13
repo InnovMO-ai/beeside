@@ -40,7 +40,7 @@ export class SmtpEmailTransport implements EmailTransport {
   }
 
   async send(message: EmailMessage, options?: EmailSendOptions): Promise<{ providerReference: string | null }> {
-    const { text, html } = renderBodies(message);
+    const { text, html } = message.html && message.text ? { text: message.text, html: message.html } : renderBodies(message);
     const info = await this.transporter.sendMail({
       from: { name: this.config.fromName, address: this.config.from },
       replyTo: message.replyTo ?? this.config.replyTo,

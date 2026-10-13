@@ -1,0 +1,32 @@
+{
+  "resume": {
+    "es": {
+      "subject": "Tu expansión puede continuar cuando estés listo | beeside",
+      "preheader": "Retoma tu First Assessment justo donde lo dejaste."
+    },
+    "en": {
+      "subject": "Your expansion journey is ready when you are | beeside",
+      "preheader": "Continue your First Assessment right where you left off."
+    }
+  },
+  "yev": {
+    "es": {
+      "subject": "Your Expansion View está listo. Descubre lo que sigue. | beeside",
+      "preheader": "Revisa lo que entendimos de tu proyecto y dónde puede ayudarte beeside."
+    },
+    "en": {
+      "subject": "Your Expansion View is ready. Discover what comes next. | beeside",
+      "preheader": "Review what we understood about your project and where beeside can help."
+    }
+  },
+  "talk": {
+    "es": {
+      "subject": "Hablar con beeside — {{company}} — {{name}}",
+      "preheader": null
+    },
+    "en": {
+      "subject": "Talk to beeside — {{company}} — {{name}}",
+      "preheader": null
+    }
+  }
+}
