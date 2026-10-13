@@ -13,6 +13,7 @@ export interface RenderedEmail { subject: string; html: string; text: string }
 
 const htmlEscape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 // C0 / DEL / C1 controls except \n; line and paragraph separators; bidi override/isolate controls
+// eslint-disable-next-line no-control-regex
 const CONTROLS = new RegExp("[\\u0000-\\u0009\\u000B-\\u001F\\u007F-\\u009F\\u2028\\u2029\\u202A-\\u202E\\u2066-\\u2069]", "g");
 const stripControls = (v: string) => v.replace(/\r\n?/g, "\n").replace(CONTROLS, "");
 
@@ -66,4 +67,12 @@ export function renderFa4Email(kind: EmailKind, locale: EmailLocale, vars: Recor
     subject = subject.replace(" — {{company}}", company ? " — {{company}}" : "").replace("{{company}}", company).replace("{{name}}", name || "—");
   }
   return { subject: subject.replace(/\s+/g, " ").trim(), html, text };
+}
+
+/** Free-text input from a form: control characters (NUL included) are replaced by spaces; newlines survive only when asked; trimmed and capped. */
+export function cleanInput(v: unknown, max: number, keepNewlines = false): string {
+  if (typeof v !== "string") return "";
+  const t = v.replace(/\r\n?/g, "\n");
+  const out = keepNewlines ? t.replace(CONTROLS, " ") : t.replace(CONTROLS, " ").replace(/\n/g, " ");
+  return Array.from(keepNewlines ? out.replace(/ ?\n ?/g, "\n") : out).slice(0, max).join("").trim();
 }

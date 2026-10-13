@@ -15,6 +15,7 @@ import {
   DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, latestDelivery, retryFa4Delivery, stateOfStatus,
 } from "./email";
 import { parseClientEvent, recordEvent } from "./events";
+import { cleanInput } from "./email-render";
 import {
   Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeLinkToken, latestResult, loadPublishedCatalog, normalizeEmail,
   projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
@@ -232,9 +233,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   const contact = (withSession: boolean): Handler => async (req, res) => {
     const p = withSession ? await session(req) : null;
     const b = bodyOf(req);
-    // control characters (NUL included) never enter storage or an email; newlines survive in the message only
-    const str = (v: unknown, max: number, keepNewlines = false) => (typeof v === "string"
-      ? v.replace(keepNewlines ? /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u2028\u2029]/g : /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ").trim().slice(0, max) : "");
+    const str = cleanInput;   // control characters (NUL included) never enter storage or an email; newlines survive in the message only
     const name = str(b.name, 120), company = str(b.company, 160), email = str(b.email, 254), message = str(b.message, 4000, true);
     if (!name || !isValidEmail(email) || message.length < 3 || (withSession && !company)) throw new FaError("INVALID_INPUT", "the message is incomplete");
     const clientRequestId = /^[A-Za-z0-9_-]{8,64}$/.test(str(b.clientRequestId, 64)) ? str(b.clientRequestId, 64) : randomUUID();
