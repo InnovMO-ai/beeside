@@ -3,10 +3,10 @@ import type { Answers, ProjectComponent } from '@beeside/fa-public-engine';
 import { frontKey, OPEN_DEST, proxyFor } from '@beeside/fa-public-engine';
 import type { Activity, ClientResolution, FrontKey, Locale, PublicCatalog } from '@beeside/fa-public-engine';
 import { BRAND } from '../brand';
-import { activatorFields, isValidEmail } from '@beeside/fa-public-engine';
+import { activatorFields, isValidEmail, lastProjectStep } from '@beeside/fa-public-engine';
 import { plansFor } from '@beeside/fa-public-engine';
 import { mapTextWithIndex } from '@beeside/fa-public-engine';
-import { buildNotApplicable, formatKeyDate, reflectionParagraphs, type Seg } from '@beeside/fa-public-engine';
+import { buildNotApplicable, formatKeyDate } from '@beeside/fa-public-engine';
 import { countryName, STATE_MESSAGES, visibleStateKey } from '@beeside/fa-public-engine';
 import { UI, becauseText, fill } from '../copy/ui';
 import { CheckGroup, ChipGroup, ChipMulti, CountryPicker, Label, RadioGroup, Segmented, TextField } from './controls';
@@ -29,13 +29,17 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
   return (
     <div className="narrow">
       <Head title={UI.idTitle[locale]} lead={UI.idLead[locale]} />
-      <TextField label={UI.name[locale]} value={id.name} onChange={(v) => setId({ name: v })} autoComplete="name" />
-      <TextField label={UI.company[locale]} value={id.company} onChange={(v) => setId({ company: v })} autoComplete="organization" />
-      <div onBlur={() => setTouched(true)}>
-        <TextField label={UI.email[locale]} type="email" value={id.email} onChange={(v) => setId({ email: v })} autoComplete="email" help={UI.emailHelp[locale]} invalid={touched && id.email && !isValidEmail(id.email) ? UI.emailInvalid[locale] : undefined} />
+      <div className="fgrid">
+        <TextField label={UI.name[locale]} value={id.name} onChange={(v) => setId({ name: v })} autoComplete="name" />
+        <TextField label={UI.company[locale]} value={id.company} onChange={(v) => setId({ company: v })} autoComplete="organization" />
       </div>
-      <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
-      <RadioGroup legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
+      <div className="fgrid">
+        <div onBlur={() => setTouched(true)}>
+          <TextField label={UI.email[locale]} type="email" value={id.email} onChange={(v) => setId({ email: v })} autoComplete="email" help={UI.emailHelp[locale]} invalid={touched && id.email && !isValidEmail(id.email) ? UI.emailInvalid[locale] : undefined} />
+        </div>
+        <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
+      </div>
+      <RadioGroup three legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
       {/* Closing section of Identity: separated from "who decides" by space + a divider; required acceptances only; these two alone enable «Aceptar y continuar». */}
       <section className="id-legal" aria-labelledby="id-legal-title">
         <h2 id="id-legal-title">{UI.idBeforeTitle[locale]}</h2>
@@ -47,7 +51,7 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
       </section>
       {/* OPTIONAL and independent (D-144): own block, unchecked by default, never implied, does not gate "Accept and continue". */}
       <section className="id-optional" aria-labelledby="id-opt-title">
-        <h2 id="id-opt-title">{UI.idOptionalTitle[locale]} <span className="opt-tag">{UI.optionalTag[locale]}</span></h2>
+        <h2 id="id-opt-title">{UI.idOptionalTitle[locale]}</h2>
         <label className={`choice optional ${id.marketingConsent ? 'on' : ''}`}><input type="checkbox" checked={id.marketingConsent === true} onChange={(e) => setId({ marketingConsent: e.target.checked })} /><span>{UI.marketingConsent[locale]}</span></label>
       </section>
       <p className="trust">
@@ -74,7 +78,7 @@ export function CompanyStep({ a, set, locale }: StepCtx) {
       <RadioGroup value={c.hasExistingBusiness === null ? null : c.hasExistingBusiness ? 'yes' : 'no'} onChange={(v) => setC({ hasExistingBusiness: v === 'yes' })} options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} />
       {c.hasExistingBusiness && (<>
         <TextField label={UI.sector[locale]} value={c.sector} onChange={(v) => setC({ sector: v })} placeholder={UI.sectorPh[locale]} />
-        <RadioGroup legend={UI.size[locale]} value={c.size} onChange={(v) => setC({ size: v })} options={(Object.keys(UI.sizes) as Array<keyof typeof UI.sizes>).map((v) => ({ value: v, label: T(UI.sizes[v], locale) }))} two />
+        <RadioGroup legend={UI.size[locale]} value={c.size} onChange={(v) => setC({ size: v })} options={(Object.keys(UI.sizes) as Array<keyof typeof UI.sizes>).map((v) => ({ value: v, label: T(UI.sizes[v], locale) }))} three />
         <Label>{UI.operatesIn[locale]}</Label>
         <CountryPicker locale={locale} selected={c.operatesIn} onChange={(iso) => setC({ operatesIn: iso })} />
       </>)}
@@ -93,26 +97,29 @@ export function DestinationsStep({ a, set, locale }: StepCtx) {
       <Label>{UI.destLabel[locale]}</Label>
       <CountryPicker locale={locale} selected={d.list.map((x) => x.iso)} disabledOpen={d.open}
         onChange={(iso) => setD((x) => ({ ...x, open: false, list: iso.map((i) => x.list.find((y) => y.iso === i) ?? { iso: i }) }))} />
-      {d.list.map((x) => (
-        <TextField key={x.iso} label={`${UI.region[locale]} — ${countryName(x.iso, locale)}`} value={x.region ?? ''} onChange={(v) => setD((y) => ({ ...y, list: y.list.map((z) => (z.iso === x.iso ? { ...z, region: v || undefined } : z)) }))} />
-      ))}
-      <div className="choices" style={{ marginTop: 16 }}>
+      {d.list.length > 0 && (
+        <div className="fgrid country-rows">
+          {d.list.map((x) => (
+            <TextField key={x.iso} label={`${UI.region[locale]} — ${countryName(x.iso, locale)}`} value={x.region ?? ''} onChange={(v) => setD((y) => ({ ...y, list: y.list.map((z) => (z.iso === x.iso ? { ...z, region: v || undefined } : z)) }))} />
+          ))}
+        </div>
+      )}
+      <div className="choices" style={{ marginTop: 12 }}>
         <label className={`choice ${d.open ? 'on' : ''}`}><input type="checkbox" checked={d.open} onChange={(e) => setD((x) => ({ ...x, open: e.target.checked, list: e.target.checked ? [] : x.list, sameInAll: null }))} /><span>{UI.destOpen[locale]}</span></label>
       </div>
+      {/* Final Design Delta (A): «same project in all these countries?» is part of the destinations block; only with 2+ destinations. */}
+      {!d.open && d.list.length >= 2 && (
+        <section className="blk" aria-labelledby="same-title">
+          <h2 id="same-title" className="qtitle">{UI.sameTitle[locale]}</h2>
+          <p className="help">{`${joinNames(d.list.map((x) => countryName(x.iso, locale)), locale)}. ${UI.sameLead[locale]}.`}</p>
+          <RadioGroup value={d.sameInAll === null ? null : d.sameInAll ? 'yes' : 'no'} onChange={(v) => setD((x) => ({ ...x, sameInAll: v === 'yes' }))}
+            options={[{ value: 'yes', label: (d.list.length === 2 ? UI.sameYes : UI.sameYesMany)[locale] }, { value: 'no', label: UI.sameNo[locale] }]} />
+        </section>
+      )}
     </div>
   );
 }
-export function SameInAllStep({ a, set, locale }: StepCtx) {
-  const names = a.destinations.list.map((x) => countryName(x.iso, locale));
-  const joined = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${UI.and[locale]} ${names[names.length - 1]}` : names.join('');
-  return (
-    <div className="narrow">
-      <Head eyebrow={UI.stages[1]![locale]} title={UI.sameTitle[locale]} lead={`${joined}. ${UI.sameLead[locale]}.`} />
-      <RadioGroup value={a.destinations.sameInAll === null ? null : a.destinations.sameInAll ? 'yes' : 'no'} onChange={(v) => set((x) => ({ ...x, destinations: { ...x.destinations, sameInAll: v === 'yes' } }))}
-        options={[{ value: 'yes', label: (a.destinations.list.length === 2 ? UI.sameYes : UI.sameYesMany)[locale] }, { value: 'no', label: UI.sameNo[locale] }]} />
-    </div>
-  );
-}
+const joinNames = (names: string[], loc: Locale) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} ${UI.and[loc]} ${names[names.length - 1]}` : names.join(''));
 /** "Only invest, without operating" is exclusive: choosing it clears the rest; choosing anything else drops it. */
 export function nextActivities(next: Activity[], prev: Activity[]): Activity[] {
   if (next.includes('invest_only') && !prev.includes('invest_only')) return ['invest_only'];
@@ -131,52 +138,41 @@ export function ActivityStep(s: StepCtx & { compId: string }) {
         options={acts.map((v) => ({ value: v, label: T(UI.acts[v], locale) }))} />
       {needsWith && <CheckGroup legend={CT(UI.withTitle, locale, c)} values={c.withWhat} onChange={(v) => upd(s, compId, (x) => ({ ...x, withWhat: v }))} options={(['goods', 'services', 'digital'] as const).map((v) => ({ value: v, label: T(UI.withs[v], locale) }))} />}
       <TextField label={UI.descPh[locale]} value={c.description ?? ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, description: v || undefined }))} />
+      {isLastProjectScreen(a, 'activity', compId) && <ClarityQuestion a={a} set={s.set} locale={locale} />}
     </div>
   );
 }
+/**
+ * The canonical clarity question (QB 15, D-079) — asked at the end of the LAST project screen (the old «this is what we understand» checkpoint is gone).
+ * YES → the «mark the topics» shortcut; NO → the diagnostic path. Unanswered behaves as NO (as confirming the old checkpoint did).
+ */
+function ClarityQuestion({ a, set, locale }: Pick<StepCtx, 'a' | 'set' | 'locale'>) {
+  return (
+    <section className="blk" data-testid="clarity-question">
+      <RadioGroup legend={UI.r1Know[locale]} value={a.knowsNeeds === null ? null : a.knowsNeeds ? 'yes' : 'no'} onChange={(v) => set((x) => ({ ...x, knowsNeeds: v === 'yes' }))}
+        options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} three />
+      <p className="help">{UI.r1KnowHelp[locale]}</p>
+    </section>
+  );
+}
+const isLastProjectScreen = (a: Answers, id: string, comp: string) => { const l = lastProjectStep(a); return l.id === id && l.comp === comp; };
+
+/** Presence + permanence + what you have there today — one screen per country/component (Final Design Delta B). Every question names its country. */
 export function PresenceStep(s: StepCtx & { compId: string }) {
   const { locale, compId } = s; const c = s.a.components.find((x) => x.id === compId); if (!c) return null;
   return (
     <div className="narrow">
       <Head eyebrow={eyebrowFor(s.a, c, locale)} title={CT(UI.presTitle, locale, c)} />
-      <RadioGroup value={c.presence} onChange={(v) => upd(s, compId, (x) => ({ ...x, presence: v }))} options={(Object.keys(UI.pres) as Array<keyof typeof UI.pres>).map((v) => ({ value: v, label: T(UI.pres[v], locale) }))} />
-      <RadioGroup legend={CT(UI.perm, locale, c)} value={c.permanence} onChange={(v) => upd(s, compId, (x) => ({ ...x, permanence: v, durationMonths: v === 'temporary' ? x.durationMonths : undefined }))} options={(['permanent', 'temporary', 'open'] as const).map((v) => ({ value: v, label: T(UI.permOpts[v], locale) }))} />
-      {c.permanence === 'temporary' && <TextField label={UI.months[locale]} type="number" value={c.durationMonths ? String(c.durationMonths) : ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, durationMonths: v ? Math.max(1, Math.min(600, Math.round(+v))) : undefined }))} />}
-    </div>
-  );
-}
-export function ExistingStep(s: StepCtx & { compId: string }) {
-  const { locale, compId } = s; const c = s.a.components.find((x) => x.id === compId); if (!c) return null;
-  return (
-    <div className="narrow">
-      <Head eyebrow={eyebrowFor(s.a, c, locale)} title={CT(UI.existTitle, locale, c)} />
-      <RadioGroup value={c.existing} onChange={(v) => upd(s, compId, (x) => ({ ...x, existing: v }))} options={(['nothing', 'via_third', 'own'] as const).map((v) => ({ value: v, label: T(UI.exist[v], locale) }))} />
-      {(c.existing === 'via_third' || c.existing === 'own') && <TextField label={UI.existNote[locale]} value={c.existingNote ?? ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, existingNote: v || undefined }))} />}
-    </div>
-  );
-}
-export function ReflectionStep({ a, set, locale, goTo }: StepCtx) {
-  // Frozen R1: lavender band, the company sentence as headline, one white card per destination, every fragment editable in place.
-  const [lead, ...cards] = reflectionParagraphs(a);
-  const frags = (segs: Seg[]) => segs.map((g, i) => {
-    const text = g.text[locale];
-    const br = g.br ? <br /> : null;
-    if (!g.edit) return <span key={i}>{br}{text}</span>;
-    const [, pre = '', core = '', post = ''] = /^(\s*)([\s\S]*?)(\s*)$/.exec(text) ?? [];   // boundary spaces stay outside the button so the sentence reads naturally
-    return <span key={i}>{br}{pre}<button type="button" className="frag" onClick={() => goTo(g.edit!)}>{core}</button>{post}</span>;
-  });
-  return (
-    <div className="r1">
-      <div className="r1-main">
-        <p className="eyebrow">{a.identity.name.trim() ? `${a.identity.name.trim().split(/\s+/)[0]}, ${UI.r1EyebrowNamed[locale]}` : UI.r1Eyebrow[locale]}</p>
-        <p className="r1-lead">{lead && lead.length ? frags(lead) : null}</p>
-        <div className="r1-cards">{cards.map((c, i) => <div className="r1-card" key={i}><p>{frags(c)}</p></div>)}</div>
-        <p className="hint r1-fix">{UI.r1Fix[locale]}</p>
-      </div>
-      <aside className="r1-aside">
-        <b>{UI.r1Know[locale]}</b><p className="hint">{UI.r1KnowHelp[locale]}</p>
-        <button type="button" className="btn outline" style={{ flex: 'none' }} onClick={() => { set((x) => ({ ...x, projectConfirmed: true, knowsNeeds: true })); goTo('reason'); }}>{UI.r1Direct[locale]}</button>
-      </aside>
+      <RadioGroup two value={c.presence} onChange={(v) => upd(s, compId, (x) => ({ ...x, presence: v }))} options={(Object.keys(UI.pres) as Array<keyof typeof UI.pres>).map((v) => ({ value: v, label: T(UI.pres[v], locale) }))} />
+      <section className="blk">
+        <RadioGroup three legend={CT(UI.perm, locale, c)} value={c.permanence} onChange={(v) => upd(s, compId, (x) => ({ ...x, permanence: v, durationMonths: v === 'temporary' ? x.durationMonths : undefined }))} options={(['permanent', 'temporary', 'open'] as const).map((v) => ({ value: v, label: T(UI.permOpts[v], locale) }))} />
+        {c.permanence === 'temporary' && <TextField label={UI.months[locale]} type="number" value={c.durationMonths ? String(c.durationMonths) : ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, durationMonths: v ? Math.max(1, Math.min(600, Math.round(+v))) : undefined }))} />}
+      </section>
+      <section className="blk">
+        <RadioGroup legend={CT(UI.existTitle, locale, c)} value={c.existing} onChange={(v) => upd(s, compId, (x) => ({ ...x, existing: v }))} options={(['nothing', 'via_third', 'own'] as const).map((v) => ({ value: v, label: T(UI.exist[v], locale) }))} />
+        {(c.existing === 'via_third' || c.existing === 'own') && <TextField label={UI.existNote[locale]} value={c.existingNote ?? ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, existingNote: v || undefined }))} />}
+      </section>
+      {isLastProjectScreen(s.a, 'presence', compId) && <ClarityQuestion a={s.a} set={s.set} locale={locale} />}
     </div>
   );
 }
@@ -192,8 +188,8 @@ export function ReasonStep({ a, set, locale }: StepCtx) {
     </div>
   );
 }
-export function DecisionStep({ a, set, locale }: StepCtx) {
-  const dec = a.decision;
+export function DecisionStep(s: StepCtx) {
+  const { a, set, locale } = s; const dec = a.decision;
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[2]![locale]} title={UI.decTitle[locale]} />
@@ -208,6 +204,13 @@ export function DecisionStep({ a, set, locale }: StepCtx) {
         <DatePick locale={locale} value={a.externalDate.date ?? ''} onChange={(v) => set((x) => ({ ...x, externalDate: { ...x.externalDate, date: v } }))} />
         <TextField label={UI.dateWhat[locale]} value={a.externalDate.what ?? ''} onChange={(v) => set((x) => ({ ...x, externalDate: { ...x.externalDate, what: v } }))} />
       </>)}
+      {/* Final Design Delta: the project size (D-149) is the last block of this screen; the shortcut path (D-079) skips it, as before. */}
+      {a.knowsNeeds !== true && (
+        <section className="blk">
+          <h2 className="qtitle">{UI.scaleTitle[locale]}</h2><p className="help">{UI.scaleWhy[locale]}</p>
+          {a.components.filter((c) => !c.activities.includes('invest_only')).map((c) => <ScaleField key={c.id} s={s} c={c} />)}
+        </section>
+      )}
     </div>
   );
 }
@@ -254,16 +257,6 @@ function ScaleField({ s, c }: { s: StepCtx; c: ProjectComponent }) {
     </div>
   );
 }
-export function ScaleStep(s: StepCtx) {
-  const { a, locale } = s;
-  return (
-    <div className="narrow">
-      <Head eyebrow={UI.stages[2]![locale]} title={UI.scaleTitle[locale]} lead={UI.scaleWhy[locale]} />
-      {a.components.filter((c) => !c.activities.includes('invest_only')).map((c) => <ScaleField key={c.id} s={s} c={c} />)}
-    </div>
-  );
-}
-
 // ---------------- 4. what the project needs ----------------
 export function ActivatorsStep(s: StepCtx & { mode: 'all' | 'sell' | 'site' }) {
   const { a, set, locale, mode } = s;
@@ -381,6 +374,7 @@ export function FrontsTableStep(s: StepCtx) {
   return (
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
+      <CargoBlock {...s} />
       <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
       {plans.map((p) => (
         <section key={p.destination} aria-label={countryName(p.destination, loc)}>
@@ -422,6 +416,7 @@ export function FrontsSupportStep(s: StepCtx) {
   return (
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.supportTitle[loc]} lead={UI.supportLead[loc]} />
+      <CargoBlock {...s} />
       {plans.map((p) => {
         const rows = p.applies.filter((t) => a.fronts[frontKey(p.destination, t.front)]?.status !== 'resolved');
         if (!rows.length) return null;
@@ -451,6 +446,7 @@ export function FrontsMarkStep(s: StepCtx) {
   return (
     <div>
       <Head eyebrow={`${UI.stages[3]![loc]} · 1 ${UI.of[loc]} 2`} title={UI.markTitle[loc]} lead={UI.markLead[loc]} />
+      <CargoBlock {...s} />
       <p className="hint" role="status">{UI.markedCount[loc]} {marked} · {UI.notIndicated[loc]} {total - marked}</p>
       {plans.map((p) => (
         <section key={p.destination}>
@@ -502,18 +498,20 @@ export function FrontsCriticalStep(s: StepCtx) {
   );
 }
 
-export function CargoRouteStep(s: StepCtx) {
+/** The cargo-route question (I-26, D-119) as a block at the start of the topics screen; shown only where the server-side resolution says it is relevant. */
+export function CargoBlock(s: StepCtx) {
   const { a, locale: loc } = s; const dests = s.res.cargoRouteDestinations.filter((d) => a.cargoRoute[d] === undefined);
   const all = [...new Set([...dests, ...Object.keys(a.cargoRoute)])];
+  if (!all.length) return null;
   return (
-    <div className="narrow">
-      <Head eyebrow={UI.stages[3]![loc]} title={UI.cargoTitle[loc]} />
+    <section className="blk cargo" data-testid="topics-cargo" aria-labelledby="cargo-title">
+      <h2 id="cargo-title" className="qtitle">{UI.cargoTitle[loc]}</h2>
       {all.map((d) => {
         const opts = UI.cargo(countryName(d, loc));
-        return <RadioGroup key={d} legend={all.length > 1 ? countryName(d, loc) : undefined} value={a.cargoRoute[d] ?? null} onChange={(v) => s.set((x) => ({ ...x, cargoRoute: { ...x.cargoRoute, [d]: v } }))}
+        return <RadioGroup key={d} two legend={all.length > 1 ? countryName(d, loc) : undefined} value={a.cargoRoute[d] ?? null} onChange={(v) => s.set((x) => ({ ...x, cargoRoute: { ...x.cargoRoute, [d]: v } }))}
           options={(['within', 'into_from_abroad', 'both', 'unknown'] as const).map((v) => ({ value: v, label: T(opts[v], loc) }))} />;
       })}
-    </div>
+    </section>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildFlow, emptyAnswers, isStepComplete, nextStep, prevStep, STAGE_OF, stepKey, syncComponents,
+  buildFlow, emptyAnswers, isStepComplete, lastProjectStep, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
 } from '@beeside/fa-public-engine';
 import { api, ApiError, confirmSend, sessionStore, track } from './api';
@@ -10,17 +10,25 @@ import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
-import { TopActions } from './components/HelpContact';
+import { ContactDialog, HelpTalkLinks, TopActions } from './components/HelpContact';
 import { RecoveryScreen } from './components/Recovery';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
 
 /** Resume links carry their token in the URL fragment (/fa4#r=<token>[&view=result]): never sent to a server, so never in access logs. */
-function linkFromLocation(): { token: string; view: string | null } | null {
+function linkFromLocation(): { token: string; view: string | null; contact: string | null } | null {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const token = params.get('r');
-  return token && TOKEN.test(token) ? { token, view: params.get('view') } : null;
+  return token && TOKEN.test(token) ? { token, view: params.get('view'), contact: params.get('contact') } : null;
+}
+
+/** A saved step of a screen that was merged/removed resolves to the surviving screen; on desktop the combined topics table stands in for support / critical date. */
+function resolveSavedStep(saved: string, a: Answers): string {
+  const base = saved === 'cover' || saved === 'identity' ? 'company' : normalizeStepKey(saved, a);
+  const wide = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1024px)').matches;
+  const id = base.split(':')[0];
+  return wide && (id === 'fronts_support' || id === 'fronts_critical') && a.knowsNeeds !== true ? 'fronts_status' : base;
 }
 
 /** FA Public v1.0 application controller. Pure view over the deterministic engine; every conclusion comes from the server-stored answers + PUBLISHED catalog. */
@@ -41,6 +49,10 @@ export function Fa4App() {
   const [resolveFailed, setResolveFailed] = useState(false);
   const online = useOnline();
   const [resolveTick, setResolveTick] = useState(0);
+  const [contactOpen, setContactOpen] = useState(false);   // the contact dialog opened from the result footer / the YEV email's «Talk to beeside» link
+  const [pendingResume, setPendingResume] = useState(false);   // an emailed single-use resume link is waiting for an explicit «continue» (scanner-safe)
+  const resumeConfirmed = useRef(false);
+  const openContactAfterBoot = useRef(false);
   const desktop = useDesktop();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locale = a.locale;
@@ -59,6 +71,9 @@ export function Fa4App() {
       if (!alive) return;
       setCatalogError(false); setCatalog(cat);
       const link = linkFromLocation();
+      // A passive visit (mail scanner, prefetch) must never spend the single-use resume link: it is redeemed only after an explicit user action.
+      if (link && !link.view && !resumeConfirmed.current) { setPendingResume(true); setBooting(false); return; }
+      if (link?.contact === 'open') openContactAfterBoot.current = true;
       try {
         if (link) {
           let exchanged: { sessionToken: string };
@@ -75,10 +90,10 @@ export function Fa4App() {
           const s = await api.session();
           if (!alive) return;
           setA(s.answers); setHasSession(true);
-          if (link) setToast(UI.resumed[s.answers.locale]);
+          if (link && !link.view) setToast(UI.resumed[s.answers.locale]);
           if (link?.view === 'result' || s.step === 'result') {
-            try { const r = await api.latestResult(); setModel(r.model); setStep({ id: 'result' }); } catch { setStep({ id: 'extra' }); }
-          } else setStep(parseKey(s.step === 'cover' || s.step === 'identity' ? 'company' : s.step));
+            try { const r = await api.latestResult(); setModel(r.model); setStep({ id: 'result' }); if (openContactAfterBoot.current) { openContactAfterBoot.current = false; setContactOpen(true); } } catch { setStep({ id: 'extra' }); }
+          } else setStep(parseKey(resolveSavedStep(s.step, s.answers)));
         }
       } catch (e) {
         if (e instanceof ApiError && (e.status === 401 || e.status === 404)) { sessionStore.clear(); if (!link) setRecovery('stale'); }
@@ -133,7 +148,9 @@ export function Fa4App() {
   async function onNext() {
     if (!catalog) return;
     if (step.id === 'identity' && !(await ensureSession())) return;
-    const base = step.id === 'reflection' && a.knowsNeeds === null ? { ...a, projectConfirmed: true, knowsNeeds: false } : a;
+    // leaving the LAST project screen confirms the project; an unanswered clarity question behaves as NO (what confirming the old checkpoint did)
+    const lp = lastProjectStep(a);
+    const base = stepKey(step) === stepKey(lp) && !a.projectConfirmed ? { ...a, projectConfirmed: true, knowsNeeds: a.knowsNeeds ?? false } : a;
     if (base !== a) setA(base);
     // The next step depends on the server-side resolution of THESE answers (e.g. the cargo-route question): never navigate on a stale one.
     let ctxFlow = flow;
@@ -164,9 +181,22 @@ export function Fa4App() {
   const sendResultEmail = safely(() => confirmSend(api.emailResult(), 'result'));
   // contact: pending after the server's wait is reported as "not confirmed" (the same form can be sent again: it is idempotent)
   const sendContact = async (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }) => {
-    try { await confirmSend(api.contact(p), null); return true; } catch { return false; }
+    try { await confirmSend(api.contact({ ...p, stage: step.id === 'result' ? 'YEV' : 'FA' }), null); return true; } catch { return false; }
   };
+  const contactPrefill = { name: a.identity.name, company: a.identity.company, email: a.identity.email };
 
+  if (pendingResume) {
+    const loc: Locale = typeof navigator !== 'undefined' && /^en/i.test(navigator.language) ? 'en' : 'es';
+    return (
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={loc} />}<div className="shell" lang={loc}>
+        <div className="topbar"><Logo /></div>
+        <main className="main narrow" id="main">
+          <h1 className="h1">{UI.resumed[loc]}</h1>
+          <button type="button" className="btn primary" style={{ flex: 'none', marginTop: 8 }} onClick={() => { resumeConfirmed.current = true; setPendingResume(false); setBooting(true); setAttempt((n) => n + 1); }}>{UI.resumeContinue[loc]}</button>
+        </main>
+      </div></div>
+    );
+  }
   if (recovery) {
     return (
       <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
@@ -193,10 +223,11 @@ export function Fa4App() {
               {busy ? <p>{UI.generating[locale]}</p> : <><h1 className="h1">{UI.resolveErrorTitle[locale]}</h1><p className="lead">{UI.resolveErrorBody[locale]}</p>
                 <div className="sheet-actions"><button className="btn" onClick={() => setStep({ id: 'extra' })}>{UI.back[locale]}</button><button className="btn primary" onClick={generate}>{UI.tryAgain[locale]}</button></div></>}
             </main>
-          : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'reflection' })}
+          : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'destinations' })}
               onContinue={safely(api.continueWithBeeside)} onEmail={sendResultEmail} email={a.identity.email}
-              actions={<TopActions locale={locale} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} saveSlot={false} />}
+              footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
+        {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}
         {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
     );
@@ -212,11 +243,11 @@ export function Fa4App() {
   const stage = STAGE_OF[step.id];
   const complete = isStepComplete(step, a);
   const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
-  const label = step.id === 'identity' ? UI.acceptContinue[locale] : step.id === 'reflection' ? UI.r1Confirm[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
-  const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical', 'reflection'].includes(step.id);
+  const label = step.id === 'identity' ? UI.acceptContinue[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
+  const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical'].includes(step.id);
 
   return (
-    <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className={`shell ${step.id === 'reflection' ? 'tinted' : ''} ${wide ? '' : 'has-deco'} ${step.id === 'identity' ? 'static-nav' : ''}`} lang={locale}>
+    <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className={`shell ${wide ? 'wide-shell' : 'has-deco'}`} lang={locale}>
       <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} /></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
@@ -232,6 +263,7 @@ export function Fa4App() {
         <StepBody step={step} ctx={ctx}  desktop={desktop} />
       </main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
+        <button type="button" className="linkbtn nav-save" onClick={saveLater}>{UI.saveLater[locale]}</button>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
         {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
       </div></div>
@@ -249,14 +281,10 @@ function StepBody({ step, ctx, desktop }: { step: StepRef; ctx: S.StepCtx; deskt
     case 'company': return <S.CompanyStep {...ctx} />;
     case 'exit': return <S.ExitStep {...ctx} />;
     case 'destinations': return <S.DestinationsStep {...ctx} />;
-    case 'same_in_all': return <S.SameInAllStep {...ctx} />;
     case 'activity': return <S.ActivityStep {...ctx} compId={c} />;
     case 'presence': return <S.PresenceStep {...ctx} compId={c} />;
-    case 'existing': return <S.ExistingStep {...ctx} compId={c} />;
-    case 'reflection': return <S.ReflectionStep {...ctx} />;
     case 'reason': return <S.ReasonStep {...ctx} />;
     case 'decision': return <S.DecisionStep {...ctx} />;
-    case 'scale': return <S.ScaleStep {...ctx} />;
     case 'activators': return <S.ActivatorsStep {...ctx} mode="all" />;
     case 'activators_sell': return <S.ActivatorsStep {...ctx} mode="sell" />;
     case 'activators_site': return <S.ActivatorsStep {...ctx} mode="site" />;
@@ -264,7 +292,6 @@ function StepBody({ step, ctx, desktop }: { step: StepRef; ctx: S.StepCtx; deskt
     case 'fronts_support': return <S.FrontsSupportStep {...ctx} />;
     case 'fronts_mark': return <S.FrontsMarkStep {...ctx} />;
     case 'fronts_critical': return <S.FrontsCriticalStep {...ctx} />;
-    case 'cargo_route': return <S.CargoRouteStep {...ctx} />;
     case 'support_values': return <S.SupportValuesStep {...ctx} />;
     case 'extra': return <S.ExtraStep {...ctx} />;
     default: return null;

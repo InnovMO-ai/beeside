@@ -27,9 +27,7 @@ for (const loc of ["es", "en"] as const) {
     await page.getByRole("button", { name: t(UI.next), exact: true }).click();
 
     // topics: "Vender y llegar a tus clientes" en marcha, the rest pending; support yes everywhere
-    await answerTopics(page, loc, (n) => (/clientes|customers/i.test(n) && /Vender|Selling/i.test(n) ? "in_progress" : "pending"), "yes");
-    await page.getByRole("radio", { name: loc === "es" ? "Ambos" : "Both", exact: true }).check();
-    await page.getByRole("button", { name: t(UI.next), exact: true }).click();
+    await answerTopics(page, loc, (n) => (/clientes|customers/i.test(n) && /Vender|Selling/i.test(n) ? "in_progress" : "pending"), "yes", loc === "es" ? /^Ambos$/ : /^Both$/);
     await page.getByRole("button", { name: t(UI.values.single_contact), exact: true }).click();
     await page.getByRole("button", { name: t(UI.values.speed), exact: true }).click();
     await page.getByLabel(t(UI.keepQ)).fill(loc === "es" ? "La relación comercial con nuestros clientes" : "The commercial relationship with our customers");

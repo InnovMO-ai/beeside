@@ -53,7 +53,7 @@ describe('copy gate', () => {
     expect(`${UI.coverTitleLead.en} ${UI.coverTitleAccent.en}`).toBe('Your expansion starts with a clearer view.');   // cover (PO design mock)
     expect(UI.coverNoteStrong.en).toBe('Spending 10–15 minutes today can give you more clarity for what comes next.');   // final PO decision 2026-10-12: no "weeks of freedom" claim
     expect(UI.coverNote.en).toBe('You can save and continue later.');                                                     // typo "Yo" fixed
-    expect(UI.sizes['251-1000'].es).toBe('251–1.000'); expect(UI.sizes['1000+'].es).toBe('Más de 1.000');
+    expect(UI.sizes['251-1000'].es).toBe('251–1,000'); expect(UI.sizes['1000+'].es).toBe('Más de 1,000');   // PO decision: comma for thousands in both languages
     expect(UI.noPremiumTitle.en).toBe('Your project, with more clarity');
     expect(UI.catalogErrorBody.en).not.toMatch(/lost/i);
     expect(UI.exitBody.es).not.toMatch(/anónim/i);

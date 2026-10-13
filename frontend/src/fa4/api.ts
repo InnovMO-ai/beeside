@@ -40,7 +40,7 @@ export const api = {
   emailResult: () => request<SendResult>('POST', '/session/result/email', {}),
   continueWithBeeside: () => request<{ ok: true }>('POST', '/session/continue', {}),
   /** "Hablar con beeside": a message to contact@beeside.you. `clientRequestId` makes a retry / double click idempotent. */
-  contact: (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }) => request<SendResult>('POST', sessionStore.get() ? '/session/contact' : '/contact', { ...p, locale: document.documentElement.lang === 'en' ? 'en' : 'es' }, true),
+  contact: (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string; stage?: 'FA' | 'YEV' }) => request<SendResult>('POST', sessionStore.get() ? '/session/contact' : '/contact', { ...p, locale: document.documentElement.lang === 'en' ? 'en' : 'es' }, true),
   emailStatus: (kind: 'resume' | 'result') => request<{ state: SendState | 'failed' | 'none' }>('GET', `/session/email-status?kind=${kind}`),
   exchangeLink: (token: string) => request<{ sessionToken: string }>('POST', '/links/continue', { token }, false),
   requestLink: (email: string) => request<{ ok: true }>('POST', '/links/request', { email }, false),

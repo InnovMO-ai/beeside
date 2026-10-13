@@ -17,9 +17,19 @@ export const HELP_URL: Record<Locale, string> = {
 export interface ContactPrefill { name: string; company: string; email: string }
 export type ContactSend = (p: ContactPrefill & { message: string; shareProgress: boolean; clientRequestId: string }) => Promise<boolean>;
 
-const HelpIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" /><path d="M12 17h.01" /></svg>;
-const TalkIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 5h16v11H9l-5 4z" /></svg>;
+const HelpIcon = () => <svg className="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" /><path d="M12 17h.01" /></svg>;
+const TalkIcon = () => <svg className="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 5h16v11H9l-5 4z" /></svg>;
 const Ext = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5" /></svg>;
+
+/** Result footer: Help (external, new tab) and «Hablar con beeside» as quiet text links — the YEV carries no form chrome (Final Design Delta). */
+export function HelpTalkLinks({ locale, onHelp, onTalk }: { locale: Locale; onHelp?: () => void; onTalk: () => void }) {
+  return (
+    <div className="help-talk">
+      <a className="linkbtn" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={onHelp}>{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
+      <button type="button" className="linkbtn" onClick={onTalk}>{UI.talk[locale]}</button>
+    </div>
+  );
+}
 
 /** Top-bar actions. Desktop: three text actions. Phone: Save stays visible; Help + Talk sit behind one compact "?" button. */
 export function TopActions({ locale, onSave, prefill, onSend, saveSlot = true, onHelp, onOpenContact }: { locale: Locale; onSave?: () => void; prefill: ContactPrefill; onSend?: ContactSend; saveSlot?: boolean; onHelp?: () => void; onOpenContact?: () => void }) {

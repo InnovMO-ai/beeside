@@ -10,7 +10,7 @@ export const UI = {
   saveError: L('No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),
 
   // Cover (PO design): English from the approved mock; PO-approved copy (final decisions 2026-10-12).
-  coverEyebrow: L('Un camino más claro. Un mañana más brillante.', 'A clearer path. A brighter tomorrow.'),
+  coverEyebrow: L('Un camino más estructurado, mejores resultados.', 'A more structured path, better results.'),
   coverTitleLead: L('Tu expansión empieza con una', 'Your expansion starts with a'),
   coverTitleAccent: L('visión más clara.', 'clearer view.'),
   coverLead: L('Cuéntanos sobre tu proyecto. Te ayudaremos a identificar lo que ya está definido, lo que necesita atención y lo que sigue.', "Tell us about your project. We'll help you identify what's already defined, what needs attention, and what comes next."),
@@ -24,7 +24,7 @@ export const UI = {
   coverSideBottom: [L('EXPANDE', 'EXPAND'), L('CON', 'WITH'), L('CONFIANZA', 'CONFIDENCE')],
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
-  idTitle: L('¿Quién eres en este proyecto?', 'Who are you in this project?'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
+  idTitle: L('Déjame conocerte.', 'Let me get to know you.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
   name: L('Nombre', 'Name'), company: L('Empresa', 'Company'), email: L('Correo de trabajo', 'Work email'),
   emailHelp: L('Lo usaremos para guardar tu avance y enviarte tu resultado.', "We'll use it to save your progress and send you your result."),
   emailInvalid: L('Revisa el email', 'Check the email address'),
@@ -35,10 +35,10 @@ export const UI = {
   openInNewTab: L('(se abre en una pestaña nueva)', '(opens in a new tab)'),
 
   coTitle: L('¿Quiénes son?', 'Who are you?'),
-  hasBiz: L('¿Tu empresa ya está operando?', 'Is your company already operating?'), yes: L('Sí', 'Yes'), no: L('No', 'No'), unknown: L('No lo sé', 'Not sure'),
+  hasBiz: L('¿Tu empresa se encuentra operando actualmente?', 'Is your company currently operating?'), yes: L('Sí', 'Yes'), no: L('No', 'No'), unknown: L('No lo sé', 'Not sure'),
   sector: L('¿A qué se dedica tu empresa?', 'What does your company do?'), sectorPh: L('p. ej., desarrollo de software', 'e.g. software development'),
   size: L('Aproximadamente, ¿cuántas personas trabajan hoy en tu empresa?', 'Roughly how many people work at your company today?'),
-  sizes: { '1-10': L('1–10', '1–10'), '11-50': L('11–50', '11–50'), '51-250': L('51–250', '51–250'), '251-1000': L('251–1.000', '251–1,000'), '1000+': L('Más de 1.000', 'More than 1,000') },
+  sizes: { '1-10': L('1–10', '1–10'), '11-50': L('11–50', '11–50'), '51-250': L('51–250', '51–250'), '251-1000': L('251–1,000', '251–1,000'), '1000+': L('Más de 1,000', 'More than 1,000') },
   operatesIn: L('¿En qué países tiene hoy actividad tu empresa?', 'In which countries is your company active today?'), operatesInHelp: L('Donde tienes oficinas, plantas o equipo. Si ya vendes en el país al que quieres ir, lo indicarás más adelante.', 'Where you have offices, plants or staff. If you already sell in the country you want to expand to, you will tell us later.'), searchCountry: L('Busca un país', 'Search for a country'), none: L('Sin resultados', 'No results'),
   exitTitle: L('Por ahora, First Assessment es para negocios en marcha', 'For now, First Assessment is for operating businesses'),
   exitBody: L('First Assessment está pensado para empresas o negocios que ya operan y quieren expandirse.', 'First Assessment is designed for businesses that already operate and want to expand.'),
@@ -59,10 +59,7 @@ export const UI = {
   exist: { nothing: L('Nada todavía', 'Nothing yet'), via_third: L('Vendo o trabajo allí a través de terceros (distribuidor, socio, clientes)', 'I sell or work there through third parties (distributor, partner, customers)'), own: L('Tengo presencia propia', 'I have my own presence') },
   existNote: L('¿Con quién o cómo? (opcional)', 'With whom or how? (optional)'),
 
-  r1Eyebrow: L('Esto es lo que entendemos', "This is what we understand"), r1Fix: L('Toca cualquier parte para corregirla.', 'Tap any part to correct it.'),
-  r1Know: L('¿Ya tienes claro qué necesitas para avanzar?', 'Do you already know what you need to move forward?'), r1KnowHelp: L('Puedes ir directo a marcarlo; antes te haremos tres preguntas cortas.', "You can go straight to marking it; first we'll ask three short questions."),
-  r1Direct: L('Sí, ir a marcarlo', 'Yes, take me to mark it'), r1Confirm: L('Sí, es así', "Yes, that's right"),
-  r1EyebrowNamed: L('esto es lo que entendemos', 'this is what we understand'),
+    r1Know: L('¿Ya tienes claro qué necesitas para avanzar?', 'Do you already know what you need to move forward?'), r1KnowHelp: L('Puedes ir directo a marcarlo; antes te haremos tres preguntas cortas.', "You can go straight to marking it; first we'll ask three short questions."),
   colTopic: L('Aplican a tu proyecto', 'Apply to your project'), colStatus: L('¿En qué punto está?', 'Where does it stand?'),
   colSupport: L('¿Quieres apoyo aquí?', 'Do you want support here?'), readyBefore: L('¿Listo antes de', 'Ready before'),
   catalogErrorTitle: L('No pudimos cargar First Assessment', "We couldn't load First Assessment"),
@@ -81,7 +78,6 @@ export const UI = {
   headApplies1: L('{applies} tema aplica a tu proyecto', '{applies} topic applies to your project'), headAppliesN: L('{applies} temas aplican a tu proyecto', '{applies} topics apply to your project'),
   headIn: L(' en {n} países', ' across {n} countries'),
   headDepends1: L(' Uno más depende de una decisión.', ' One more depends on a decision.'), headDependsN: L(' {n} más dependen de una decisión.', ' {n} more depend on a decision.'),
-  r1Company: L('Tu empresa', 'Your company'),
 
   reasonEyebrow: L('Lo que te mueve', "What's driving you"), reasonTitle: L('¿Por qué quieres hacerlo y por qué ahora?', 'Why do you want to do it, and why now?'),
   reasons: {
@@ -204,6 +200,7 @@ export const UI = {
   offlineBody: L('Tu avance está guardado en este dispositivo. Cuando vuelva la conexión, seguimos.', "Your progress is kept on this device. We'll continue when you're back online."),
   staleTitle: L('Tu sesión se cerró por inactividad', 'Your session closed after inactivity'),
   staleBody: L('Lo que respondiste está guardado. Pide un enlace para continuar donde lo dejaste.', 'Your answers are saved. Ask for a link to continue where you left off.'),
+  resumeContinue: L('Continuar donde lo dejaste', 'Pick up where you left off'),
   linkRequested: L('Si ese correo tiene un proyecto, te enviaremos un enlace nuevo en unos minutos.', "If that email has a project, we'll send you a new link in a few minutes."),
   topicsErrorTitle: L('No pudimos preparar esta parte', "We couldn't prepare this section"),
   startNew: L('Empezar de nuevo', 'Start over'),

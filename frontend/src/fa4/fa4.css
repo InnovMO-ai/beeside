@@ -371,10 +371,7 @@ dialog.sheet::backdrop { background: rgba(23, 24, 27, .45); }
 
 /* Result */
 .result { position: relative; }
-.res-actions { position: absolute; z-index: 5; right: var(--gutter); top: 12px; }
-.res-actions .ta-link { color: #fff; } .res-actions .ta-link svg { color: #cfc5f1; } .res-actions .ta-link:hover { background: rgba(255,255,255,.1); }
-.res-actions .ta-icon { background: transparent; border-color: rgba(255,255,255,.4); color: #fff; }
-@media (min-width: 1200px) { .res-actions { right: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter))); top: 22px; } }
+@media (min-width: 1200px) { .res-hero h1 { letter-spacing: -.015em; text-wrap: balance; } }
 .res-hero h1 { letter-spacing: -.015em; text-wrap: balance; }
 .sec h2.big { letter-spacing: -.01em; }
 details.conditions { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -442,3 +439,79 @@ details.conditions summary:hover { color: var(--purple); }
 .fa4 .offline-banner { position: sticky; top: 0; z-index: 60; background: #fff7e0; color: #5a4100; border-bottom: 1px solid #e8c766; padding: 10px 16px; font-size: 14px; text-align: center; }
 .fa4 .recovery-form { max-width: 440px; margin-top: 16px; }
 .fa4 .state.err { border: 1px solid #b3261e; background: #fdecea; color: #7a1712; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+
+
+/* =====================================================================================
+   FINAL DESIGN DELTA (PO visual review, 2026-10-13) — density system, sticky action bar, header, progress.
+   Tokens: content column 640 · H1 28/24 · controls 44 · gaps 8 / 16 / 24 · no decorative circles.
+   ===================================================================================== */
+:root { --col: 640px; }
+.narrow { max-width: var(--col); }
+.main { padding: 14px var(--gutter) 24px; }
+.eyebrow { margin-bottom: 6px; font-size: 13px; }
+.h1 { font-size: 24px; line-height: 1.2; margin-bottom: 6px; }
+.lead { margin-bottom: 14px; font-size: 15px; line-height: 1.5; }
+.label { margin: 14px 0 6px; font-size: 14px; }
+.help { margin: -2px 0 10px; font-size: 13px; }
+legend.label, .qtitle { font-size: 16px; line-height: 1.35; margin: 0 0 8px; }
+fieldset:has(> legend.label) { padding-top: 16px !important; }
+fieldset:first-of-type:has(> legend.label) { padding-top: 12px !important; }
+.field { min-height: 44px; padding: 9px 12px; }
+textarea.field { min-height: 88px; }
+.choices { gap: 8px; }
+.choice { min-height: 44px; padding: 9px 14px; font-size: 16px; }
+.choices.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px) { .choices.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .choices.two { grid-template-columns: 1fr 1fr; } }
+.blk { margin-top: 16px; padding-top: 4px; }
+.blk + .blk, fieldset + .blk { border-top: 1px solid var(--line); padding-top: 12px; }
+.blk > fieldset:first-child, .blk > .qtitle:first-child { margin-top: 0; }
+.fgrid { display: grid; grid-template-columns: 1fr; column-gap: 16px; }
+@media (min-width: 640px) { .fgrid { grid-template-columns: 1fr 1fr; } }
+.chip { min-height: 44px; }
+
+/* Identity: legal + optional blocks are tighter; no «Opcional» badge (the block title already says it) */
+.id-legal { margin-top: 20px; padding-top: 16px; }
+.id-legal .choices { gap: 8px; }
+.id-optional { margin-top: 16px; padding: 12px 14px 12px; }
+.id-optional h2 { margin-bottom: 8px; }
+.opt-tag { display: none; }
+.id-legal .hint { margin: 0 0 10px; }
+.trust { margin: 14px 0 0; }
+
+/* Header: logo + Help + Talk on one quiet line; Save moves to the action bar on desktop */
+.topbar { padding: 10px var(--gutter) 6px; }
+.logo { height: 36px; }
+@media (min-width: 1024px) { .logo { height: 44px; } }
+.ta-link { font-weight: 500; }
+@media (min-width: 900px) and (max-width: 1023px) { .ta-wide { display: none; } .ta-narrow { display: block; } }
+@media (min-width: 1024px) { .ta-wide { display: inline-flex; } .ta-narrow { display: none; } .top-actions .ta-save { display: none; } .ta-wide .ico { display: none; } }
+.nav-save { display: none; margin-right: auto; font-size: 14px; }
+@media (min-width: 1024px) { .nav-save { display: inline-flex; align-items: center; } }
+
+/* Progress: names never touch the bar or each other (reserved 2 lines, balanced, safe wrapping) */
+.progress .labels, .progress .stage-names { padding-top: 8px; line-height: 1.25; }
+.progress .stage-names { align-items: start; min-height: calc(2.5em + 8px); }
+.progress .stage-names span { text-wrap: balance; overflow-wrap: anywhere; hyphens: auto; padding-right: 6px; }
+.progress .labels span { text-wrap: balance; }
+
+/* ONE sticky action bar at every width (replaces the static desktop bar and the Identity variant) */
+.navbar, .shell.static-nav .navbar { position: sticky; bottom: 0; z-index: 20; background: var(--white); border-top: 1px solid var(--line); padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom)); }
+.shell.tinted .navbar { background: var(--lav); }
+.navbar .inner { align-items: center; }
+@media (min-width: 900px) {
+  .navbar { position: sticky; border-top: 1px solid var(--line); background: var(--white); padding-top: 10px; }
+  .navbar .inner { max-width: var(--col); margin: 0; justify-content: flex-end; }
+  .navbar .inner.wide { max-width: var(--maxw); margin: 0 auto; }
+  .main { padding-bottom: 24px; }
+}
+@media (min-width: 1100px) { .shell.has-deco .navbar .inner { max-width: 776px; } .shell.has-deco .navbar { padding-left: var(--gutter); } }
+.btn { min-height: 44px; }
+
+/* Side panel: clean, no decorative circles */
+.deco::before, .deco::after { display: none !important; }
+
+/* YEV: no form chrome; Help / Talk are quiet links at the foot of the result */
+.res-footer { padding-top: 0; padding-bottom: 8px; }
+.help-talk { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; }
+.help-talk .linkbtn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }

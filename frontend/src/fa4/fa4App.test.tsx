@@ -56,7 +56,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
     await user.click(screen.getByRole("button", { name: "Accept and continue" }));
-    await screen.findByRole("heading", { name: "Is your company already operating?" });
+    await screen.findByRole("heading", { name: "Is your company currently operating?" });
     const create = calls.find((c) => c.url === "/api/fa4/sessions")!;
     expect(create.method).toBe("POST");
     expect((create.body as { answers: { identity: { email: string }; locale: string } }).answers.identity.email).toBe("ana@acme.example");
@@ -75,6 +75,10 @@ describe("Fa4App (Vite/React) against the API contract", () => {
       return null;
     });
     render(<Fa4App />);
+    // scanner-safe: nothing is redeemed until the person explicitly continues
+    await screen.findByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ });
+    expect(calls.find((c) => c.url === "/api/fa4/links/continue")).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ }));
     await screen.findByRole("heading", { name: "¿En qué punto está la decisión sobre este proyecto?" });
     expect(calls.find((c) => c.url === "/api/fa4/links/continue")!.body).toEqual({ token: linkToken });
     expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe("T".repeat(43));   // X-Fa4-Session (not Authorization, which gateways like IAP consume)
@@ -85,6 +89,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
     const calls = mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : c.url === "/api/fa4/links/request" ? json({ ok: true }) : null));
     render(<Fa4App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ }));
     await screen.findByRole("heading", { name: "Este enlace ya no es válido" });
     expect(window.location.hash).toBe("");
     expect(document.body.textContent).not.toMatch(/NOT_FOUND|404|undefined/);
@@ -107,7 +112,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     });
     render(<Fa4App />);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Guardar y seguir después" }));
+    await user.click((await screen.findAllByRole("button", { name: "Guardar y seguir después" }))[0]!);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("no pudimos enviarte el enlace"); expect(document.body.textContent).not.toMatch(/Te enviamos a/);
     await user.click(screen.getByRole("button", { name: "Intentar de nuevo" }));
@@ -124,7 +129,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
       return null;
     });
     render(<Fa4App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Guardar y seguir después" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Guardar y seguir después" }))[0]!);
     await screen.findByText(/l\*\*\*@nubia\.example/);
     fireEvent.click(screen.getByRole("button", { name: "Ver mi resultado" }));
     await screen.findByTestId("result-screen");
