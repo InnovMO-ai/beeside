@@ -7,7 +7,7 @@ test('English: language is chosen on the cover only; the whole first steps rende
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Your expansion starts with a clearer view.');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('heading', { name: 'Who are you in this project?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Let me get to know you.' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Switch language|Cambiar idioma/ })).toHaveCount(0);                 // no language switcher after the cover
   await expect(page.getByRole('button', { name: 'Español' })).toHaveCount(0);
   await page.getByLabel('Name', { exact: true }).fill('Ana');
@@ -25,15 +25,7 @@ test('English: language is chosen on the cover only; the whole first steps rende
   await noHorizontalOverflow(page);
   expect(await axeViolations(page)).toEqual([]);
   await page.getByRole('button', { name: 'Accept and continue', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Is your company already operating?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Is your company currently operating?' })).toBeVisible();
   await expect(page.getByText('Your company').filter({ visible: true }).first()).toBeVisible();   // progress shows the stage name in EN
 });
 
-test('Project reflection: tapping a fragment returns to the source answer (correct from any reflection)', async ({ page, request }) => {
-  const { journeyA } = await import('@beeside/fa-public-engine/testing');
-  const { seed, open } = await import('./helpers');
-  const token = await seed(request, journeyA(), 'reflection');
-  await open(page, token);
-  await page.getByRole('button', { name: 'contratar personas' }).click();
-  await expect(page.getByRole('heading', { name: /¿Qué planeas hacer en México\?/ })).toBeVisible();
-});

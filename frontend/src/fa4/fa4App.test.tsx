@@ -85,6 +85,29 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(window.location.hash).toBe("");
   });
 
+  it("YEV email links: «View» and «Talk to beeside» need no confirmation click; Talk opens the existing contact form on the private YEV and sends origin stage YEV (never mailto)", async () => {
+    HTMLDialogElement.prototype.showModal ||= function () { this.setAttribute("open", ""); };   // jsdom
+    const a = journeyA("es"); const model = modelFor(a);
+    window.history.replaceState({}, "", `/fa4#r=${"Y".repeat(43)}&view=result&contact=open&origin=yev_email`);
+    const calls = mockApi((c) => {
+      if (c.url === "/api/fa4/links/continue") return json({ sessionToken: "T".repeat(43), kind: "YEV_LINK" });
+      if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "result", status: "DELIVERED" });
+      if (c.url === "/api/fa4/session/result" && c.method === "GET") return json({ resultId: "r1", model });
+      if (c.url === "/api/fa4/session/contact") return json({ state: "sent", email: "l***@nubia.example" });
+      return null;
+    });
+    render(<Fa4App />);
+    const dialog = await screen.findByRole("dialog");                                       // opened by contact=open on the private YEV
+    expect(calls.find((c) => c.url === "/api/fa4/links/continue")).toBeDefined();
+    expect(screen.getByTestId("result-screen")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(dialog.querySelector("textarea")!, "Hola desde el correo del YEV");
+    await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    await screen.findByText(/Recibimos tu mensaje/);
+    expect(calls.find((c) => c.url === "/api/fa4/session/contact")!.body).toMatchObject({ stage: "YEV", shareProgress: false });
+    expect(document.body.innerHTML).not.toMatch(/mailto:/);
+  });
+
   it("an invalid or expired link shows the calm recovery screen (no raw error), drops the token, and offers a new link / a fresh start", async () => {
     window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
     const calls = mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : c.url === "/api/fa4/links/request" ? json({ ok: true }) : null));

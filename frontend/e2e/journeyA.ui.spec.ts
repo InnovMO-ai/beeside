@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { UI } from '../src/fa4/copy/ui';
 import { axeViolations, noHorizontalOverflow } from './helpers';
-import { answerTopics, expectNoRawOrInternal, startNortica } from './walk';
+import { answerPresence, answerTopics, expectNoRawOrInternal, startNortica } from './walk';
 
 /** Journey A through the real UI (ES): hire only, presence "not sure". VT-03: the only question left (regulation) is ONE neutral screen, nothing else. */
 test('Journey A — hire only: one neutral regulation screen, topics, YEV with the planned team', async ({ page }) => {
@@ -9,20 +9,15 @@ test('Journey A — hire only: one neutral regulation screen, topics, YEV with t
   await page.getByRole('checkbox', { name: UI.acts.hire.es, exact: true }).check();
   await expect(page.getByText(UI.withTitle.es.replace('{country}', 'México'))).toHaveCount(0);   // hire only → no "with what"
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await page.getByRole('radio', { name: UI.pres.open.es, exact: true }).first().check();
-  await page.getByRole('radio', { name: UI.permOpts.open.es, exact: true }).last().check();
-  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await page.getByRole('radio', { name: UI.exist.nothing.es }).check();
-  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await expect(page.getByText(/En México quieres contratar personas/)).toBeVisible();
-  await page.getByRole('button', { name: UI.r1Confirm.es }).click();
+  await expect(page.getByText(UI.r1Know.es)).toBeVisible();                                   // the clarity question lives on the last project screen (D-079)
+  await answerPresence(page, 'es', { presence: 'open', permanence: 'open', existing: 'nothing', clarity: 'no' });
+  await expect(page.locator('body')).not.toContainText('esto es lo que entendemos');          // the standalone checkpoint is gone
   await page.getByRole('checkbox', { name: UI.reasons.talent.es }).check();
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await page.getByRole('radio', { name: UI.dec.decided.es }).check();
   await page.getByRole('radio', { name: UI.starts['6m'].es }).check();
   await page.getByRole('radio', { name: 'No', exact: true }).check();
-  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await expect(page.getByText(UI.scaleWhy.es)).toBeVisible();
+  await expect(page.getByText(UI.scaleWhy.es)).toBeVisible();                                 // project size is a block of the decision screen
   await page.getByLabel(/¿Cuántas personas contratarías en México/).fill('3 a 5 personas');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   // VT-03: only regulation applies (nothing to sell, no premises) → a single screen titled by the question itself

@@ -33,6 +33,7 @@ add('LEGAL-1 / blocked copy', n === 0, `${n} NEEDS_CANONICAL_COPY entr${n === 1 
 const smtpOk = env.FA4_EMAIL_TRANSPORT === 'smtp' && !!env.SMTP_HOST && !!env.SMTP_PASSWORD;
 add('Email transport (SMTP)', smtpOk, smtpOk ? `smtp · from ${env.MAIL_FROM ?? 'contact@beeside.you'} · reply-to ${env.MAIL_REPLY_TO ?? 'contact@beeside.you'}` : 'FA4_EMAIL_TRANSPORT=smtp, SMTP_HOST and SMTP_PASSWORD (Secret Manager) not all set — production refuses log-only email');
 add('Email worker', !!env.FA4_WORKER_CONFIRMED, env.FA4_WORKER_CONFIRMED ? 'FA4 outbox worker deployed (npm run start:fa4-worker)' : 'deploy the FA4 outbox worker (node dist/fa4/worker.js) — set FA4_WORKER_CONFIRMED=true once running');
+add('Premium block gate (3 conditions)', env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === 'true' ? true : 'partial', env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === 'true' ? 'commercial-content policy allows the YEV email Premium block (LEGAL-1 confirmed)' : 'FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED not true → the YEV email omits the Premium block (fail-closed; LEGAL-1 is an external dependency)');
 add('Premium resource URL (optional)', true, env.FA4_PREMIUM_RESOURCE_URL_ES || env.FA4_PREMIUM_RESOURCE_URL_EN ? 'configured' : 'not configured — the YEV email omits the secondary link (not a blocker)');
 
 const w = Math.max(...rows.map((r) => r.id.length));

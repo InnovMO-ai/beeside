@@ -122,20 +122,20 @@ test('Hablar con beeside: real submission (success) and honest failure with retr
 test('Help opens the Help Center in a new tab and the assessment stays intact', async ({ page, context, request }) => {
   const token = await seed(request, journeyA(), 'company');
   await open(page, token);
-  await expect(page.getByRole('heading', { name: '¿Tu empresa ya está operando?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
   const visibleHelp = page.locator('a[href*="helpcenter"]').filter({ visible: true });
   if (!(await visibleHelp.count())) await page.getByRole('button', { name: 'Ayuda y contacto' }).click();
   const link = visibleHelp.first();
   await expect(link).toHaveAttribute('href', 'https://www.beeside.you/helpcenter');
   await expect(link).toHaveAttribute('target', '_blank');
-  await expect(page.getByRole('heading', { name: '¿Tu empresa ya está operando?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
 });
 
 test('Ineligible (no existing business) exits early and respectfully', async ({ page, request }) => {
   const a = journeyA(); a.company = { ...a.company, hasExistingBusiness: false };
   const token = await seed(request, a, 'company');
   await open(page, token);
-  await expect(page.getByRole('heading', { name: '¿Tu empresa ya está operando?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
   await page.getByLabel('Sí', { exact: true }).check(); await page.getByLabel('No', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.getByRole('heading', { name: /First Assessment es para negocios en marcha/ })).toBeVisible();

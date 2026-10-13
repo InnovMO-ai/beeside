@@ -38,7 +38,8 @@ function fill(src: string, vars: Record<string, string>, mode: "html" | "text"):
   return src.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, name: string) => {
     const raw = vars[name] ?? "";
     if (/_url$/.test(name)) {
-      if (!/^https:\/\//i.test(raw)) throw new Error(`email variable ${name} must be an https URL`);
+      // https only (no javascript:, no plain http); http is tolerated solely for a local development host (APP_BASE_URL on localhost)
+      if (!/^https:\/\//i.test(raw) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(raw)) throw new Error(`email variable ${name} must be an https URL`);
       return mode === "html" ? htmlEscape(raw) : raw;
     }
     const clean = stripControls(raw);

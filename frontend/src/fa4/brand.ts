@@ -3,7 +3,9 @@
  *  BRAND-1 official logo · BRAND-2 official typography · BRAND-3 final Night Shift treatment
  *  CHK-1   Terms / Privacy / Help Center canonical URLs (closed 2026-10-12, see CANONICAL_URLS).
  */
-// Official assets (supplied by beeside marketing; files unmodified): lockup = wordmark + bee. "dark" = for light backgrounds, "light" = for dark ones.
+// Official assets (supplied by beeside marketing). The bee in these SVGs is an embedded raster: the blur reported by the PO came from the browser
+// down-scaling a 1920×1080 PNG ~16:1. Final Design Delta: the embedded rasters were pre-resampled once (bicubic, same artwork, no redraw, no recolour) to
+// ≈3× the display size so they render crisply at DPR 1–3. A native vector from Brand (BRAND-1) would replace these four files. lockup = wordmark + bee. "dark" = for light backgrounds, "light" = for dark ones.
 import lockupDark from './assets/brand/lockup-dark.svg';
 import lockupLight from './assets/brand/lockup-light.svg';
 import beeMarkPurple from './assets/brand/bee-mark-purple.svg';

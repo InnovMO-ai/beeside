@@ -12,8 +12,11 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   const token = await seed(request, a, 'reflection');
   await open(page, token);
 
-  await expect(page.getByText('esto es lo que entendemos')).toBeVisible();
-  await page.getByRole('button', { name: 'Sí, ir a marcarlo' }).click();                           // shortcut offered after R1
+  // the saved step_key 'reflection' belongs to a screen that no longer exists → the user lands on the LAST project screen (compat map)
+  await expect(page.getByTestId('clarity-question')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('esto es lo que entendemos');
+  await page.getByTestId('clarity-question').getByRole('radio', { name: 'Sí', exact: true }).check();   // YES → the «mark the topics» shortcut (D-079)
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
   await page.getByLabel('Ejecutar un contrato ganado').check();
   await page.getByLabel(/Escríbelo con tus palabras/).fill('ganamos un contrato');
@@ -45,6 +48,11 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await expect(page.getByText('Lo relacionamos con')).toBeVisible();
   await expect(page.getByText('Encontrar y validar proveedores').first()).toBeVisible();
   await add('transporte especializado (sobredimensionado, rutas, permisos)');
+  // I-26 cargo route: a BLOCK at the start of this screen — it appears once oversized cargo is relevant (the need just added) and no route was declared
+  const cargo = page.getByTestId('topics-cargo');
+  await expect(cargo.getByRole('heading', { name: '¿Dónde necesitas mover la carga?' })).toBeVisible();
+  await expect(cargo.getByLabel('Dentro de México')).toBeVisible(); await expect(cargo.getByLabel('Hacia México desde otro país')).toBeVisible();
+  await cargo.getByLabel('Aún no lo sé', { exact: true }).check();
   await add('alojamiento');
   for (const t of ['Estructura legal, impuestos y contabilidad', 'Encontrar a las personas', 'Contratar legalmente y pagar nómina', 'Tu equipo que viaja o se traslada', 'Seguros'])
     await page.locator('label.choice', { hasText: t }).first().locator('input').check();
@@ -57,12 +65,6 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
     await page.locator('label.choice', { hasText: t }).first().locator('input').check();
   await page.getByRole('button', { name: 'Continuar' }).click();
 
-  // I-26 cargo route — asked because oversized cargo is relevant and no route was declared
-  await expect(page.getByRole('heading', { name: '¿Dónde necesitas mover la carga?' })).toBeVisible();
-  await expect(page.getByLabel('Dentro de México')).toBeVisible();
-  await expect(page.getByLabel('Hacia México desde otro país')).toBeVisible();
-  await page.getByLabel('Aún no lo sé', { exact: true }).check();
-  await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();                              // support values (skippable)
   await page.getByRole('button', { name: 'Ver mi resultado' }).click();
 
