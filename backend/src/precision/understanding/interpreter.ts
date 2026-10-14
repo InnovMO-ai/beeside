@@ -63,7 +63,7 @@ export const emptyInterpretation = (source: Interpretation["source"] = "rules"):
 
 // ------------------------------------------------------------------ concepts
 const CONCEPT_MATCHERS: { def: ConceptDef; terms: string[] }[] = CONCEPTS.map((def) => ({ def, terms: [] }));
-function termsOf(def: ConceptDef, loc: Loc): string[] {
+function termsOf(def: ConceptDef): string[] {
   // Both languages are always read: clients mix them ("el EOR", "Warehouse"), and the displayed language stays the client's.
   return [...def.terms.es, ...def.terms.en];
 }
@@ -75,7 +75,7 @@ export function detectConcepts(text: string, f: string): { hits: ConceptHit[]; c
   const hits: ConceptHit[] = [];
   const covered = new Set<string>();
   for (const def of CONCEPTS) {
-    for (const term of termsOf(def, "es")) {
+    for (const term of termsOf(def)) {
       const m = termRegex(term).exec(f);
       if (!m) continue;
       const before = f.slice(Math.max(0, m.index - 55), m.index);
@@ -96,8 +96,6 @@ const SEQUENCERS = /(?:luego|despues|posteriormente|mas adelante|en una segunda 
 const HQ = /(?:casa matriz|empresa matriz|matriz|sede|oficinas centrales|headquarter\w*|head office|parent(?: company)?|corporate office)\s*(?:esta\s+)?(?:en|in|:)?\s*$/;
 const FROM = /(?:desde|de parte de|procedente de|proveniente de|originarios? de|from|out of)\s*$/;
 const SALES = /(?:vender(?:\s+\w+){0,3}\s+(?:en|a)|ventas?\s+(?:en|a)|clientes?\s+(?:en|de)|distribuir(?:\s+\w+){0,3}\s+(?:en|a)|sell(?:ing)?(?:\s+\w+){0,3}\s+(?:in|to)|customers?\s+in)\s*$/;
-const TRANSIT = /(?:a traves de|via|por|escala en|transit(?:ing)? (?:through|via)|passing through|through)\s*$/;
-const COMPANY_NOUN = /(?:empresa|compania|firma|grupo|constructora|ingenieria|consultora|fabrica|somos|soy|we are|we're|our company|a)\s+(?:una\s+|un\s+|una\s+)?(?:empresa|compania|firma|company)?\s*$/;
 const STAFF_NOUN = /(?:personal|tecnicos|ingenieros|equipo|empleados|trabajadores|staff|engineers|technicians|team)\s*$/;
 
 function roleFor(f: string, idx: number, len: number, demonym: boolean, seenOperation: boolean, nextGap: string | null): CountryRole {

@@ -219,7 +219,7 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
     const card = (structuredOf(pendingRow) as { confirmCard?: ConfirmCardDto }).confirmCard;
     if (input.confirmAction && (!card || card.token !== input.confirmAction.token)) throw new ConversationInputError("INVALID_INPUT", "confirm token does not match the pending card");
 
-    const text = input.text !== undefined ? input.text.replace(/\u0000/g, "").trim() : null;
+    const text = input.text !== undefined ? input.text.replaceAll("\u0000", "").trim() : null;
     const chips = (structuredOf(pendingRow) as { quickReplies?: QuickReplyDto[] }).quickReplies ?? [];
     const chip = input.quickReply ? chips.find((c) => c.value === input.quickReply!.value) ?? null : null;
     const quick: QuickValue | null = input.confirmAction ? (input.confirmAction.intent === "confirm" ? "ok" : "change") : input.quickReply && QUICK.has(input.quickReply.value) ? (input.quickReply.value as QuickValue) : null;
@@ -303,7 +303,7 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
       }
 
       // after the substance is covered, offer the optional orientation once (it never blocks readiness)
-      let action = r.action;
+      const action = r.action;
       let promptText = r.prompt;
       let p: ReturnType<typeof promptFor> = { text: r.prompt, quick: r.quickReplies, ...(r.card ? { card: r.card } : {}) };
       let composed = answerLead ? `${answerLead} ${r.prompt}` : r.text;
@@ -399,7 +399,7 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
       const provided = [input.text !== undefined, input.quickReply !== undefined, input.confirmAction !== undefined].filter(Boolean).length;
       if (provided !== 1) throw new ConversationInputError("INVALID_INPUT", "exactly one of text, quickReply or confirmAction is required");
       if (input.text !== undefined) {
-        const t = input.text.replace(/\u0000/g, "").trim();
+        const t = input.text.replaceAll("\u0000", "").trim();
         if (t.length < 1 || t.length > 8000) throw new ConversationInputError("INVALID_INPUT", "text must be 1..8000 characters");
       }
       return deps.store.withProjectLock(input.projectId, () => processUnderstanding(input));

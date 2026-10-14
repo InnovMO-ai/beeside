@@ -2,7 +2,7 @@
  * Test harness: drives the Understanding pipeline (interpret -> step) with a scripted or persona-driven simulated client and
  * verifies EVERY assistant text with the same deterministic verifiers the production engine uses.
  */
-import { verifyAssistantText, hasCriticalViolation, type Violation } from "../../conversation/verifiers";
+import { verifyAssistantText, type Violation } from "../../conversation/verifiers";
 import { evaluateDepth, type Depth } from "../depth";
 import { computeFindings } from "../findings";
 import { interpretByRules } from "../interpreter";

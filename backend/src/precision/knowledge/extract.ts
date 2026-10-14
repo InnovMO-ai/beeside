@@ -66,7 +66,7 @@ export function extractHtml(src: string): Section[] {
 
 export function parseCsv(src: string): string[][] {
   const rows: string[][] = []; let row: string[] = []; let cur = ""; let q = false;
-  const s = src.replace(/^﻿/, "");
+  const s = src.replace(/^\uFEFF/, "");
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (q) { if (c === '"') { if (s[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }

@@ -10,7 +10,7 @@
  */
 import { countryName } from "./countries";
 import { LOCATION_CRITERIA } from "./criteria";
-import { answerKind, describeMoney, money, negated, ranges } from "./signals";
+import { answerKind, describeMoney, money, ranges } from "./signals";
 import type { Range } from "./signals";
 import { fold, hasTerm, parseDuration, describeMonths, parseQuantity, quantities, quantityNear, spanAround, termRegex, NUMBER_SOURCE } from "./text";
 import type { Frame, FrameItem, ItemStatus, Interpretive, L10n, Loc } from "./types";
@@ -139,7 +139,6 @@ const WORKFORCE_CONCEPTS = ["hiring", "workforce_presence", "payroll", "social_s
 const FINANCE_SCOPE = ["entity_setup", "accounting", "tax_compliance", "tax_services", "audit", "transfer_pricing"] as const;
 const MOVES_GOODS = ["customs_trade", "logistics_transport", "warehousing", "temperature_control"] as const;
 
-const resolvedIn = (it: FrameItem | undefined): boolean => Boolean(it) && ["known", "undecided", "unknown", "withheld"].includes(it!.status);
 
 export const PROBES: readonly ProbeDef[] = [
   // ---------------------------------------------------------------- project
