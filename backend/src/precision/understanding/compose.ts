@@ -220,6 +220,11 @@ export function conflictQuestion(frame: Frame, key: string, loc: Loc): string {
   const prev = frame.items[key];
   const inc = frame.pendingConflicts.find((c) => c.key === key);
   const label = lc(probeByKey(key)?.label[loc] ?? key);
+  if (inc?.source === "discovery") {
+    return loc === "es"
+      ? `En Discovery actualizaste ${label}: ${stripEnd(inc.display)}. Aquí me habías dicho ${stripEnd(prev?.display ?? "")}. ¿Cuál aplica?`
+      : `In Discovery you updated ${label}: ${stripEnd(inc.display)}. Here you had told me ${stripEnd(prev?.display ?? "")}. Which one applies?`;
+  }
   return loc === "es"
     ? `En Discovery quedó registrado ${label}: ${stripEnd(prev?.display ?? "")}. Ahora mencionas ${stripEnd(inc?.display ?? "")}. ¿Cuál aplica?`
     : `Discovery recorded ${label}: ${stripEnd(prev?.display ?? "")}. Now you mention ${stripEnd(inc?.display ?? "")}. Which one applies?`;

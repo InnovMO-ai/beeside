@@ -28,6 +28,7 @@ import type { ConfirmCardDto, QuickReplyDto } from "../api/dto";
 import { createHash } from "node:crypto";
 import { evaluateDepth } from "./depth";
 import { interpretByRules, type Interpretation } from "./interpreter";
+import { refreshFromDiscovery } from "./freshness";
 import { seedFromDiscovery, type DiscoverySeedInput } from "./seed";
 import { plan, promptFor, step, type Action, type QuickValue, type StepResult } from "./step";
 import { FrameConflictError, type FrameStore, type StoredFrame } from "./store";
@@ -89,12 +90,28 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
 
   async function loadFrame(projectId: string, locale: Locale): Promise<{ stored: StoredFrame; seeded: boolean }> {
     const found = await deps.frames.load(projectId);
-    if (found) return { stored: found, seeded: false };
+    if (found) return { stored: await freshen(projectId, locale, found), seeded: false };
     const seed = await deps.seed(projectId, locale);
     const frame = seed ? seedFromDiscovery(seed, nowIso()).frame : emptyFrame(locale);
     const stored = await deps.frames.create(projectId, frame);
     if (stored.version === 1) await deps.frames.appendEvent(projectId, `seed.${projectId.slice(0, 8)}`, "seed", 1, { discovery: Boolean(seed), needs: frame.needs.length });
     return { stored, seeded: Boolean(seed) };
+  }
+
+  /**
+   * Fact freshness: when Discovery moved to a new source pin after this frame was seeded, the frame follows (see freshness.ts).
+   * Never breaks a turn: any failure leaves the frame as it was and the next turn tries again.
+   */
+  async function freshen(projectId: string, locale: Locale, found: StoredFrame): Promise<StoredFrame> {
+    if (found.closedAt) return found;
+    try {
+      const seed = await deps.seed(projectId, locale);
+      if (!seed?.pinId || seed.pinId === found.frame.discoveryPinId) return found;
+      const r = refreshFromDiscovery(found.frame, seed, nowIso());
+      return await deps.frames.commit(projectId, r.frame, found.version, { turnKey: `fresh.${seed.pinId}`.slice(0, 120), kind: "freshness", payload: { changed: r.changed.slice(0, 40), asks: r.asks } });
+    } catch {
+      return (await deps.frames.load(projectId)) ?? found;
+    }
   }
 
   function vctx(ctx: ConversationContext, locale: Locale, introduced: Set<string>, questions: VerifyContext["questions"]): VerifyContext {
@@ -146,7 +163,8 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
     const started = clock.monotonicMs();
     const ctx = await deps.context.load({ projectId: input.projectId, surface: "understanding", scopeInstanceId: input.scopeInstanceId, locale: input.locale });
     const thread = await deps.store.loadThread(input.projectId, input.scopeInstanceId, 60);
-    const frameRead = await deps.frames.load(input.projectId);
+    const loaded = await deps.frames.load(input.projectId);
+    const frameRead = loaded && ctx.canWrite ? await freshen(input.projectId, input.locale, loaded) : loaded;
     const ready = Boolean(frameRead?.frame.checkpoint.accepted);
     if (thread.length > 0 || !ctx.canWrite) return resultOf({ ctx, status: "ok", turns: thread, ready, replayed: true, started });
 

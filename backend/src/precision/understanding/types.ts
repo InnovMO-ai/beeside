@@ -103,7 +103,7 @@ export interface Finding {
 }
 
 /** A value the client gave that contradicts what Discovery established (or an earlier statement) and has not been settled yet. */
-export interface ConflictRecord { key: string; value: unknown; display: string; quote: string; interpretive: Interpretive; at: string }
+export interface ConflictRecord { key: string; value: unknown; display: string; quote: string; interpretive: Interpretive; at: string; /** The newer value comes from Discovery (it changed after the client spoke here). */ source?: "discovery" }
 
 export interface Frame {
   version: number;

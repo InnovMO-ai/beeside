@@ -4,7 +4,9 @@
  * a confirmed My Service Map, what Discovery already knew is used (never re-asked), the map carries the client's priority and
  * reasons, the client corrects it, and "Add a service" reads the NEED first.
  */
-import { FA_CONTEXT, setupHarness, TEST_DATABASE_URL, type Harness } from "./harness";
+import { randomUUID } from "node:crypto";
+import { createPgFrameStore } from "../../understanding/pg-store";
+import { setupHarness, TEST_DATABASE_URL, type Harness } from "./harness";
 import { confirmMap, internalTermsIn, key } from "./drive";
 import type { FaClientSafeContext } from "../../ports/fa-context";
 import { briefingHygiene } from "../../understanding/briefing";
@@ -173,6 +175,24 @@ d("Understanding Core — through the API", () => {
     expect((await api.post("/service-map/corrections", { requestKey: key("bad"), op: "move", itemId: toMove.id, toGroupId: "g_nope" })).status).toBe(400);
     expect((await api.post("/service-map/corrections", { requestKey: "x", op: "remove", itemId: toMove.id })).status).toBe(400);
   }, 120000);
+
+  it("fact freshness: when Discovery changes after Precision started, the frame follows and says so", async () => {
+    const { projectId } = await h.newProject({ context: PT_CONTEXT });
+    const api = h.api(await h.session(projectId), "es");
+    await api.get("/understanding");
+    const before = (await createPgFrameStore(h.db).load(projectId))!;
+    expect(before.frame.items["project.timeframe"]?.value).toBe("2027-01");
+    h.fa.add({ projectId, resultId: randomUUID(), context: { ...PT_CONTEXT, project: { ...PT_CONTEXT.project, timeframe: "2027-09" } } });
+    h.runtime.domain.fa.invalidate(projectId);
+    expect((await api.get("/understanding")).status).toBe(200);
+    const after = (await createPgFrameStore(h.db).load(projectId))!;
+    expect(after.frame.items["project.timeframe"]?.value).toBe("2027-09");
+    expect(after.frame.changedSinceDiscovery.some((c) => c.key === "project.timeframe")).toBe(true);
+    expect(after.frame.discoveryPinId).not.toBe(before.frame.discoveryPinId);
+    // the same pin read again changes nothing
+    await api.get("/understanding");
+    expect((await createPgFrameStore(h.db).load(projectId))!.version).toBe(after.version);
+  });
 
   it("Add a service reads the NEED first: marketing is a known need, a warehouse is asked once, noise is not a service", async () => {
     const { projectId } = await h.newProject({ context: PT_CONTEXT });
