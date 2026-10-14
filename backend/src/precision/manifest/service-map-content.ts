@@ -44,7 +44,15 @@ export interface PsmVersions {
   contract: string | null;
   manifests: Record<string, string>;
 }
+/** What Precision understood about the project, in client language (built from the Understanding frame; optional). */
+export interface PsmUnderstanding {
+  context: string[];
+  facts: { label: string; value: string }[];
+  pending: string[];
+  findings: { title: string; detail: string; specialty: string | null }[];
+}
 export interface ServiceMapBuildInput {
+  understanding?: PsmUnderstanding | null;
   project: ServiceMapProjectInput;
   categories: ServiceMapCategoryInput[];
   locale: Locale;
@@ -61,6 +69,8 @@ export interface PsmV1Content {
   openItems: string[];
   contextPinId: string | null;
   versions: PsmVersions;
+  /** Present only when the project was understood by the Understanding engine. */
+  understanding?: PsmUnderstanding;
 }
 
 const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -112,6 +122,8 @@ export function buildServiceMapContent(input: ServiceMapBuildInput): PsmV1Conten
     const t = cleanText(o);
     if (t && !open.includes(t)) open.push(t);
   }
+  const u = input.understanding;
+  const hasU = Boolean(u && (u.context.length || u.facts.length || u.pending.length || u.findings.length));
   return {
     schema: "psm.v1",
     project: {
@@ -130,6 +142,7 @@ export function buildServiceMapContent(input: ServiceMapBuildInput): PsmV1Conten
       contract: input.versions?.contract ?? null,
       manifests: Object.fromEntries(Object.entries(input.versions?.manifests ?? {}).sort(([a], [b]) => a.localeCompare(b))),
     },
+    ...(hasU && u ? { understanding: u } : {}),
   };
 }
 

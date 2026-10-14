@@ -7,20 +7,23 @@
  *  - The first confirmation uses `precision_assessment_confirm`; every later one (changes after confirmation, a service added)
  *    uses `precision_psm_new_version`. Version numbers are stored, never returned.
  */
-import { createHash } from "node:crypto";
 import type { Db } from "../../db/database";
-import type { ConfirmServiceMapResponse, ItemState, Locale, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto } from "../api/dto";
+import type { ConfirmServiceMapResponse, ItemState, ServiceMapCorrectionResponse, Locale, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto } from "../api/dto";
 import { ApiError } from "../api/errors";
 import { formatDate } from "../manifest/value-render";
 import { categoryInfo, buildServiceMapContent, openItemsFromEvaluations, type PsmV1Content } from "../manifest";
 import type { FaContextRead } from "../ports/fa-context";
 import { confirmPrecisionAssessment } from "../repository";
 import { listCategoryRefs, type CategoryRef } from "./category-ref";
-import { loadCategoryState, loadMapNeeds, projectCountries, syncProposals, type CategoryState } from "./categories";
+import { loadCategoryState, loadMapNeeds, projectCountries, settleProposedCategories, syncProposals, type CategoryState } from "./categories";
 import type { PrecisionDomainDeps } from "./deps";
 import { emitEvent } from "./events";
 import { loadFactMap, loadFactMaps, lockProjectMap, recordSystemFact } from "./facts";
 import { destinationsOf, type FaContextService } from "./fa-context";
+import { opaqueId } from "./opaque";
+import { buildBriefing, sanitizeBriefing } from "../understanding/briefing";
+import { createPgFrameStore } from "../understanding/pg-store";
+import { applyCorrection, moveTargets, type CorrectionRequest } from "./service-map-corrections";
 import { latestSnapshot, loadPaState, type PaState, type SnapshotRow } from "./project-state";
 
 type Q = Pick<Db, "query">;
@@ -50,8 +53,6 @@ const CHANGE_COPY = {
   itemRemoved: { en: "removed", es: "eliminado" },
 } as const;
 
-/** Item ids are stored with their origin (capability or hash); the client only ever sees an opaque stable id. */
-const opaqueId = (id: string): string => `i_${createHash("sha256").update(id).digest("hex").slice(0, 14)}`;
 
 const plain = (v: unknown): string | null => {
   if (typeof v === "string") return v.trim() || null;
@@ -100,7 +101,12 @@ export async function buildLiveMap(deps: MapDeps, q: Q, projectId: string, local
     "SELECT id, catalog_version, crosswalk_version, contract_version FROM context_pin WHERE project_id = $1 AND status = 'current'", [projectId],
   )).rows[0];
 
+  // what Precision understood (the frame), as a clean briefing; absent for projects on the generic engine
+  const frame = (await createPgFrameStore(q as Db).load(projectId))?.frame ?? null;
+  const understanding = frame ? sanitizeBriefing(buildBriefing(frame, new Date().toISOString())) : null;
+
   const content = buildServiceMapContent({
+    understanding,
     project: {
       objective: plain(answered("pa_project_objective")),
       destinations: destinationCodes,
@@ -108,10 +114,11 @@ export async function buildLiveMap(deps: MapDeps, q: Q, projectId: string, local
       productOrService: plain(answered("pa_expansion_product_or_service")),
       operatingEntity: plain(answered("pa_operating_entity")),
     },
-    categories: states.map((s) => ({
+    // a proposed category the client emptied (removed or moved every need) is not part of the map
+    categories: states.filter((s) => !(s.ref.lifecycle === "proposed" && s.needs.length === 0)).map((s) => ({
       categoryKey: s.ref.categoryKey,
       label: s.label,
-      needs: s.needs.map((n) => ({ id: n.id, label: n.label, priority: n.priority, state: (s.ref.lifecycle === "completed" ? "confirmed" : "pending") as ItemState })),
+      needs: s.needs.map((n) => ({ id: n.id, label: n.label, priority: n.priority, ...(n.why ? { why: n.why } : {}), ...(n.timing ? { timing: n.timing } : {}), state: (s.ref.lifecycle === "completed" ? "confirmed" : "pending") as ItemState })),
     })),
     locale,
     openItems: open,
@@ -203,6 +210,8 @@ export async function hasUnconfirmedChanges(deps: MapDeps, q: Q, projectId: stri
 export interface ServiceMapService {
   get(caller: Caller): Promise<ServiceMapDto>;
   confirm(caller: Caller, requestKey: string): Promise<ConfirmServiceMapResponse>;
+  /** The client corrects their map (remove / reword / priority / move / reason); returns the map as it now stands. */
+  correct(caller: Caller, req: CorrectionRequest): Promise<ServiceMapCorrectionResponse>;
 }
 
 export function createServiceMapService(deps: PrecisionDomainDeps, fa: FaContextService): ServiceMapService {
@@ -221,7 +230,10 @@ export function createServiceMapService(deps: PrecisionDomainDeps, fa: FaContext
     const confirmed = snap && stored ? { ...viewOf(stored, codesOf(stored, live.destinationCodes), locale, snap.confirmedAt.toISOString(), live.visibleIdByKey), confirmedAt: snap.confirmedAt.toISOString() } : null;
     const unconfirmed = confirmed !== null && changes.length > 0;
     const canConfirm = caller.canWrite && ((live.pa.status === "ready_for_confirmation" && live.content.groups.length > 0) || (live.pa.status === "confirmed" && unconfirmed));
-    return { live: liveView, confirmed, canConfirm, hasUnconfirmedChanges: unconfirmed, canWrite: caller.canWrite };
+    return {
+      live: liveView, confirmed, canConfirm, hasUnconfirmedChanges: unconfirmed, canWrite: caller.canWrite,
+      ...(caller.canWrite ? { moveTargets: moveTargets(locale, (k) => categoryInfo(k).label[locale]) } : {}),
+    };
   }
 
   async function confirm(caller: Caller, requestKey: string): Promise<ConfirmServiceMapResponse> {
@@ -242,7 +254,7 @@ export function createServiceMapService(deps: PrecisionDomainDeps, fa: FaContext
         const current = await buildLiveMap(deps, tx, projectId, locale, read);
         if (!(await hasUnconfirmedChanges(deps, tx, projectId, locale, read, current))) return (await latestSnapshot(tx, pa.instanceId))!.confirmedAt;
       }
-      await tx.query("UPDATE category_assessment SET lifecycle_status = 'confirmed' WHERE project_id = $1 AND lifecycle_status = 'proposed'", [projectId]);
+      await settleProposedCategories(tx, projectId);
       const live = await buildLiveMap(deps, tx, projectId, locale, read);
       if (live.content.groups.length === 0) throw new ApiError("NOT_READY");
 
@@ -262,5 +274,11 @@ export function createServiceMapService(deps: PrecisionDomainDeps, fa: FaContext
     return { confirmedAt: confirmedAt.toISOString(), serviceMap: await get(caller) };
   }
 
-  return { get, confirm };
+  async function correct(caller: Caller, req: CorrectionRequest): Promise<ServiceMapCorrectionResponse> {
+    if (!caller.canWrite) throw new ApiError("PRECISION_READ_ONLY");
+    await applyCorrection(deps, caller.projectId, caller.locale, req);
+    return { serviceMap: await get(caller) };
+  }
+
+  return { get, confirm, correct };
 }

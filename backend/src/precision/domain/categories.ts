@@ -19,6 +19,8 @@ import type { PrecisionDomainDeps } from "./deps";
 import { factKey, loadFactMap, lockProjectMap, recordSystemFact } from "./facts";
 import { parseCountryCodes } from "./fa-context";
 import { loadPaState } from "./project-state";
+import { frameOwnedFaNeedIds, syncFrameMapForProject } from "./frame-map";
+
 
 export const MAP_NEEDS_KEY = "map_needs";
 
@@ -28,39 +30,74 @@ export interface MapNeed {
   label: string;
   priority: "high" | "medium" | "low" | null;
   source: "fa" | "client";
+  /** Why the client needs it, in their words (from the conversation), when known. */
+  why?: string | null;
+  /** When the client needs it ("antes de marzo"), when known. */
+  timing?: string | null;
+  /** The client removed it. Kept as a tombstone so the First Assessment proposal never re-adds it; never shown. */
+  removed?: boolean;
 }
 
-export function parseMapNeeds(value: unknown): MapNeed[] {
+/** `keepRemoved`: tombstones stay in the list (writers); readers get the active needs only. */
+export function parseMapNeeds(value: unknown, keepRemoved = false): MapNeed[] {
   if (!Array.isArray(value)) return [];
   const out: MapNeed[] = [];
   for (const v of value) {
     const o = v as Partial<MapNeed> | null;
     if (!o || typeof o.id !== "string" || typeof o.label !== "string") continue;
-    out.push({ id: o.id, label: o.label, priority: o.priority === "high" || o.priority === "medium" || o.priority === "low" ? o.priority : null, source: o.source === "client" ? "client" : "fa" });
+    if (o.removed === true && !keepRemoved) continue;
+    const need: MapNeed = { id: o.id, label: o.label, priority: o.priority === "high" || o.priority === "medium" || o.priority === "low" ? o.priority : null, source: o.source === "client" ? "client" : "fa" };
+    if (typeof o.why === "string" && o.why.trim()) need.why = o.why;
+    if (typeof o.timing === "string" && o.timing.trim()) need.timing = o.timing;
+    if (o.removed === true) need.removed = true;
+    out.push(need);
   }
   return out;
 }
 
-export async function loadMapNeeds(db: Pick<Db, "query">, instanceIds: readonly string[]): Promise<Map<string, MapNeed[]>> {
+export async function loadMapNeeds(db: Pick<Db, "query">, instanceIds: readonly string[], keepRemoved = false): Promise<Map<string, MapNeed[]>> {
   const out = new Map<string, MapNeed[]>();
   if (instanceIds.length === 0) return out;
   const { rows } = await db.query<{ scope_instance_id: string; value: unknown }>(
     "SELECT scope_instance_id, value FROM fact WHERE scope_instance_id = ANY($1::uuid[]) AND field_key = $2 AND superseded_by IS NULL",
     [instanceIds, factKey(MAP_NEEDS_KEY)],
   );
-  for (const r of rows) out.set(r.scope_instance_id, parseMapNeeds(r.value));
+  for (const r of rows) out.set(r.scope_instance_id, parseMapNeeds(r.value, keepRemoved));
   return out;
 }
 
 /** Appends (by id) needs to a category's `map_needs`; returns true when something was written. */
 export async function appendMapNeeds(tx: Db, projectId: string, instanceId: string, add: readonly MapNeed[]): Promise<boolean> {
   const current = await loadFactMap(tx, instanceId);
-  const have = parseMapNeeds(current[MAP_NEEDS_KEY]?.value);
+  const have = parseMapNeeds(current[MAP_NEEDS_KEY]?.value, true);
   const known = new Set(have.map((n) => n.id));
   const fresh = add.filter((n) => !known.has(n.id));
   if (fresh.length === 0) return false;
   const id = await recordSystemFact(tx, { projectId, scopeInstanceId: instanceId, source: "category", fieldKey: MAP_NEEDS_KEY, value: [...have, ...fresh], valueType: "json" }, current);
   return id !== null;
+}
+
+/** Replaces a category's `map_needs` (tombstones included). Returns true when something was written. */
+export async function replaceMapNeeds(tx: Db, projectId: string, instanceId: string, next: readonly MapNeed[]): Promise<boolean> {
+  const current = await loadFactMap(tx, instanceId);
+  const have = parseMapNeeds(current[MAP_NEEDS_KEY]?.value, true);
+  if (JSON.stringify(have) === JSON.stringify(next)) return false;
+  const id = await recordSystemFact(tx, { projectId, scopeInstanceId: instanceId, source: "category", fieldKey: MAP_NEEDS_KEY, value: [...next], valueType: "json" }, current);
+  return id !== null;
+}
+
+/**
+ * Settles the proposals when the Service Map is confirmed: categories left without any active need (the client removed or moved
+ * them) are NOT selected; the rest become confirmed. Caller holds the map lock.
+ */
+export async function settleProposedCategories(tx: Db, projectId: string): Promise<void> {
+  const refs = (await listCategoryRefs(tx, projectId)).filter((r) => r.lifecycle === "proposed");
+  if (refs.length === 0) return;
+  const needsBy = await loadMapNeeds(tx, refs.map((r) => r.instanceId));
+  for (const r of refs) {
+    const empty = (needsBy.get(r.instanceId) ?? []).length === 0;
+    await tx.query("UPDATE category_assessment SET lifecycle_status = $2 WHERE instance_id = $1 AND lifecycle_status = 'proposed'", [r.instanceId, empty ? "not_selected" : "confirmed"]);
+  }
 }
 
 /**
@@ -92,6 +129,8 @@ export async function ensureCategoryInstance(
  * already-present categories and needs are left alone, so it can run on every load. Never throws for a missing context.
  */
 export async function syncProposals(deps: Pick<PrecisionDomainDeps, "db" | "registry">, projectId: string, read: FaContextRead | null): Promise<void> {
+  // the Understanding frame (when the project has one) places its needs first; the First Assessment proposal covers the rest
+  await syncFrameMapForProject(deps, projectId);
   if (!read) return;
   const pa = await loadPaState(deps.db, projectId);
   if (!pa || pa.status === "confirmed") return;
@@ -100,16 +139,18 @@ export async function syncProposals(deps: Pick<PrecisionDomainDeps, "db" | "regi
   const proposal = proposeCategories(read.context.needs, pm.manifest);
   if (proposal.categories.length === 0) return;
 
+  // what the Understanding conversation already placed or the client removed is not proposed again
+  const dropped = await frameOwnedFaNeedIds(deps.db, projectId);
   const wanted = proposal.categories.map((c) => ({
     categoryKey: c.categoryKey,
     needs: read.context.needs
-      .filter((n) => c.capabilityIds.includes(n.capabilityId))
+      .filter((n) => c.capabilityIds.includes(n.capabilityId) && !dropped.has(`fa:${n.capabilityId}`))
       .map((n): MapNeed => ({ id: `fa:${n.capabilityId}`, label: cleanText(n.label || n.capabilityId), priority: n.priority, source: "fa" })),
   }));
 
   // cheap pre-check outside the transaction: nothing to do when everything is already there
   const refs = await listCategoryRefs(deps.db, projectId);
-  const needsBy = await loadMapNeeds(deps.db, refs.map((r) => r.instanceId));
+  const needsBy = await loadMapNeeds(deps.db, refs.map((r) => r.instanceId), true);
   const missing = wanted.some((w) => {
     const ref = refs.find((r) => r.categoryKey === w.categoryKey);
     if (!ref) return true;

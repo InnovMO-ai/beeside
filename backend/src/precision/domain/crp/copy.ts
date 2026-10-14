@@ -53,6 +53,8 @@ export const PREVIEW_COPY = {
   operatingCountries: p("Operating countries", "Países de operación"),
   requiredLater: p("Information required later", "Información requerida más adelante"),
   openItems: p("Open items", "Puntos abiertos"),
+  pendingDetail: p("Still to define", "Por definir"),
+  attentionPoint: p("Point to review with a specialist", "Punto a revisar con un especialista"),
   mapTitle: p("My Service Map", "My Service Map"),
 } as const;
 

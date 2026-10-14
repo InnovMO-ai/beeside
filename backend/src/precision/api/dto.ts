@@ -186,7 +186,17 @@ export interface ServiceMapDto {
   canConfirm: boolean;
   hasUnconfirmedChanges: boolean;
   canWrite: boolean;
+  /** Groups a need can be moved to (opaque ids, client labels). Absent when the client cannot write. */
+  moveTargets?: { id: string; label: string }[];
 }
+/** A client correction of My Service Map: the client's decision, applied as stated. Item and group ids are the opaque ones the map returned. */
+export type ServiceMapCorrectionRequest =
+  | { requestKey: string; op: "remove"; itemId: string }
+  | { requestKey: string; op: "rename"; itemId: string; text: string }
+  | { requestKey: string; op: "set_priority"; itemId: string; priority: "high" | "medium" | "low" | null }
+  | { requestKey: string; op: "move"; itemId: string; toGroupId: string }
+  | { requestKey: string; op: "set_why"; itemId: string; text: string };
+export interface ServiceMapCorrectionResponse { serviceMap: ServiceMapDto }
 export interface ConfirmServiceMapRequest { requestKey: string }
 export interface ConfirmServiceMapResponse { confirmedAt: string; serviceMap: ServiceMapDto }
 

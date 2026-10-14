@@ -79,6 +79,7 @@ import {
 import { produceVerifiedText, verifyAssistantText, type VerifyContext } from "./verifiers";
 import type { FactMap, FactView } from "../manifest/types";
 import { introducedFromTexts } from "./process-knowledge/term-registry";
+import { classifyPhrase } from "../understanding/need-explorer";
 
 // ------------------------------------------------------------------ configuration
 /** Progressive-waiting stages (keys only; the UI owns the copy and the exact wording). */
@@ -637,12 +638,24 @@ class Run {
     if (sig.signal && sig.pure) return rephrase();
     if (input.quickReply?.intent === "unknown") return rephrase();
 
+    // NEED FIRST (deterministic, before any model): meta-commands, objects and conditions are not services; an ambiguous word is
+    // asked once; a known or legitimately unknown need goes on to be confirmed in the client's own words.
+    const phrase = classifyPhrase(raw);
+    const reply = phrase.kind === "meta" ? "add_service_meta" : phrase.kind === "goods_item" ? "add_service_goods" : phrase.kind === "attribute" ? "add_service_attribute" : phrase.kind === "ambiguous" ? "add_service_warehouse" : null;
+    if (reply) {
+      const t = this.copy(reply);
+      return this.simpleReply(t, needState("need", t));
+    }
+    const canFallback = phrase.kind === "known" || phrase.kind === "unknown_legit";
+
     const spec = { name: "service_need", type: "string" as const, description: "The service or support the client says they need, as one short phrase (max 25 words), in the client's own language", isTarget: true };
     const res = await this.callModel({ task: "extract", surface: this.surface, step: "service_need", locale: this.locale, turnKey: this.turnKey, clientText: raw, question: state?.pendingQuestion ?? null, specs: [spec], timeoutMs: this.opt.extractTimeoutMs } satisfies ExtractRequest);
     const got = res.fields.find((f) => f.name === "service_need");
     const conf = got?.confidence ?? 0;
-    if (!got || got.status !== "ok" || typeof got.value !== "string" || conf < 0.6 || !this.sourceOk(got.source, raw)) return rephrase();
-    const need = clip(got.value, 160).replace(/[.!?¿¡]+$/g, "");
+    const modelOk = Boolean(got && got.status === "ok" && typeof got.value === "string" && conf >= 0.6 && this.sourceOk(got.source, raw));
+    if (!modelOk && !canFallback) return rephrase();
+    // the model failed but the rules recognise a need: keep the client's own words (never lose a legitimate need)
+    const need = clip(modelOk ? (got!.value as string) : raw.trim(), 160).replace(/[.!?¿¡]+$/g, "");
     if (need.length < 3) return rephrase();
     const t = this.copy("add_service_confirm_need", { need });
     const vs = verifyAssistantText(t, this.vctx({ questions: "one" }));

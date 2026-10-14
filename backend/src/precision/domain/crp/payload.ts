@@ -44,6 +44,13 @@ export interface PayloadPsm {
   operating_entity: string | null;
   categories: PayloadPsmCategory[];
   open_items: string[];
+  /** What Precision understood (additive; absent for projects understood by the generic engine). */
+  understanding?: {
+    context: string[];
+    facts: { label: string; value: string }[];
+    pending: string[];
+    findings: { title: string; detail: string; specialty: string | null }[];
+  };
 }
 
 export interface Handoff {
@@ -92,6 +99,18 @@ export function toPayloadPsm(snapshot: SnapshotRow): PayloadPsm {
     return out;
   });
   const objective = sanitizeOrNull(project.objective, 1000);
+  const u = obj(c.understanding);
+  const SPECIALTIES = new Set(["legal", "tax", "labor", "customs", "regulatory", "corporate", "finance"]);
+  const understanding = {
+    context: strs(u.context, 400).slice(0, 8),
+    facts: arr(u.facts).map((f) => ({ label: sanitizeText(obj(f).label, 120), value: sanitizeText(obj(f).value, 240) })).filter((f) => f.label && f.value).slice(0, 30),
+    pending: strs(u.pending, 200).slice(0, 20),
+    findings: arr(u.findings)
+      .map((f) => ({ title: sanitizeText(obj(f).title, 200), detail: sanitizeText(obj(f).detail, 600), specialty: typeof obj(f).specialty === "string" && SPECIALTIES.has(obj(f).specialty as string) ? (obj(f).specialty as string) : null }))
+      .filter((f) => f.title && f.detail)
+      .slice(0, 12),
+  };
+  const hasU = understanding.context.length + understanding.facts.length + understanding.pending.length + understanding.findings.length > 0;
   return {
     psm_version: snapshot.version,
     objectives: objective ? [objective] : [],
@@ -101,6 +120,7 @@ export function toPayloadPsm(snapshot: SnapshotRow): PayloadPsm {
     operating_entity: sanitizeOrNull(project.operatingEntity, 300),
     categories,
     open_items: strs(c.openItems, 300),
+    ...(hasU ? { understanding } : {}),
   };
 }
 

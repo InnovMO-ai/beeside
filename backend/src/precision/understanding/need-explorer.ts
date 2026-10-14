@@ -11,7 +11,7 @@
  */
 import { CONCEPTS, conceptById } from "./concepts";
 import { detectConcepts } from "./interpreter";
-import { fold, hasTerm, quantities } from "./text";
+import { fold, hasTerm, quantities, termRegex } from "./text";
 import type { Loc } from "./types";
 
 export type PhraseKind = "known" | "attribute" | "ambiguous" | "unknown_legit" | "goods_item" | "meta" | "unclear";
@@ -90,3 +90,16 @@ export function replyForPhrase(r: PhraseResult, loc: Loc): string | null {
 }
 
 export const KNOWN_CONCEPT_IDS = new Set(CONCEPTS.map((c) => c.id));
+
+const FILLER = new Set(["servicio", "servicios", "service", "services", "de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas", "para", "con", "en", "y", "e", "o", "a", "al", "por", "mi", "mis", "nuestro", "nuestra", "necesito", "necesitamos", "quiero", "queremos", "busco", "buscamos", "apoyo", "ayuda", "asesoria", "need", "want", "help", "support", "with", "for", "and", "the", "of", "our", "my", "some", "an"]);
+
+/** Content words of the phrase NOT explained by the given concepts' terms. Few leftovers = the phrase IS that need. */
+export function residualWords(text: string, conceptIds: readonly string[]): string[] {
+  let f = ` ${fold(text)} `;
+  for (const id of conceptIds) {
+    const def = conceptById(id);
+    if (!def) continue;
+    for (const term of [...def.terms.es, ...def.terms.en]) f = f.replace(new RegExp(termRegex(term).source, "gu"), " ");
+  }
+  return f.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !FILLER.has(w));
+}

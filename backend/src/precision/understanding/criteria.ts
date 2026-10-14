@@ -10,6 +10,6 @@ export const LOCATION_CRITERIA: LocationCriterion[] = [
   { id: "market_access", label: { es: "cercanía a clientes", en: "proximity to customers" }, terms: ["cerca de los clientes", "cercania a clientes", "cercania al cliente", "cerca de mis clientes", "proximity to customers", "near customers", "cerca del proyecto", "cerca del sitio"], topics: ["economy_innovation", "exports_trade"] },
   { id: "investment_climate", label: { es: "clima de inversión", en: "investment climate" }, terms: ["inversion", "incentivos", "clima de negocios", "investment climate", "incentives", "ecosistema empresarial"], topics: ["foreign_investment", "economy_innovation"] },
   { id: "regulatory", label: { es: "facilidad regulatoria", en: "regulatory ease" }, terms: ["permisos", "tramites", "regulacion", "facilidad regulatoria", "licencias", "permits", "regulatory"], topics: ["regulatory_environment", "government"] },
-  { id: "security", label: { es: "seguridad", en: "security" }, terms: ["seguridad", "estado de derecho", "inseguridad", "security", "safety", "rule of law"], topics: ["rule_of_law"] },
+  { id: "security", label: { es: "seguridad", en: "security" }, terms: ["seguridad(?! social)", "estado de derecho", "inseguridad", "security", "safety", "rule of law"], topics: ["rule_of_law"] },
   { id: "energy_supply", label: { es: "suministro de energía", en: "energy supply" }, terms: ["energia electrica", "suministro electrico", "suministro de energia", "power supply", "electricity"], topics: ["infrastructure", "energy"] },
 ];

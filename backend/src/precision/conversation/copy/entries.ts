@@ -196,6 +196,10 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
     status: "draft",
     source: `${VP} add_service_confirm_need`,
   },
+  { key: "add_service_meta", es: "Claro. ¿Qué otra necesidad tiene tu proyecto?", en: "Of course. What other need does your project have?", status: "draft", source: NEW },
+  { key: "add_service_goods", es: "Eso parece un artículo y no un servicio. ¿Qué necesitas resolver con eso?", en: "That sounds like an item rather than a service. What do you need to solve with it?", status: "draft", source: NEW },
+  { key: "add_service_attribute", es: "Entendido, es una condición del producto. ¿Qué parte necesitas apoyar: el transporte, el almacenamiento o ambos?", en: "Understood, that is a condition of the product. Which part do you need help with: transport, storage or both?", status: "draft", source: NEW },
+  { key: "add_service_warehouse", es: "Mencionaste almacén. ¿Buscas un espacio para rentar o un servicio que almacene y opere tu mercancía?", en: "You mentioned a warehouse. Are you looking for a space to rent or a service that stores and handles your goods?", status: "draft", source: NEW },
   { key: "add_service_rephrase", es: "De acuerdo. Cuéntame con otras palabras qué necesitas.", en: "Tell me in other words what you need.", status: "draft", source: NEW },
   {
     key: "add_service_confirmed_ack",

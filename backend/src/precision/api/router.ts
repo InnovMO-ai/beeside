@@ -170,6 +170,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
   post("/understanding/turns", (a, req) => domain.threads.understanding.turn(a, req.body));
   get("/service-map", (a) => domain.serviceMap.get(a));
   post("/service-map/confirm", (a, req) => domain.serviceMap.confirm(a, (req.body as { requestKey?: unknown } | undefined)?.requestKey as string));
+  post("/service-map/corrections", (a, req) => domain.serviceMap.correct(a, req.body as never));
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));
   get("/categories/:id", (a, req) => domain.threads.category.get(a, idOf(req)));

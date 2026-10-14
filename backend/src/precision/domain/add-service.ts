@@ -16,6 +16,8 @@
 import { createHash } from "node:crypto";
 import type { Db } from "../../db/database";
 import { ApiError } from "../api/errors";
+import { classifyPhrase, residualWords } from "../understanding/need-explorer";
+import { conceptById } from "../understanding/concepts";
 import { bundledCatalog, bundledServicesProjection, cleanText, classifyNeed, containsTerm, normalizeSlug } from "../manifest";
 import type { EngineClassification, FactMap } from "../manifest/types";
 import type { Locale } from "../manifest/value-render";
@@ -44,6 +46,24 @@ const needId = (need: string): string => `add:${createHash("sha256").update(need
 /** Signals the classifier needs, found by plain matching on the catalog (the model suggests nothing here). */
 function suggestSignals(need: string, pm: Parameters<typeof classifyNeed>[1]): { service_key?: string; category_key?: string } {
   const rows = bundledServicesProjection();
+  const fromCatalog = suggestFromCatalog(need, rows, pm);
+  if (fromCatalog.service_key || fromCatalog.category_key) return fromCatalog;
+  // NEED FIRST: the concept lexicon understands the client's words ("marketing", "nómina", "bodega para rentar") even when the
+  // catalog has no service of that name; the catalog only decides where the need is grouped.
+  const phrase = classifyPhrase(need);
+  if (phrase.kind !== "known") return {};
+  // only when the phrase IS the need ("marketing", "servicios de marketing", "nómina"); a longer, more specific request keeps the
+  // frozen path (the catalog decides, otherwise it is held for review in the client's own words)
+  if (residualWords(need, phrase.conceptIds).length > 0) return {};
+  const defs = phrase.conceptIds.map((id) => conceptById(id)).filter((d): d is NonNullable<typeof d> => Boolean(d?.category));
+  const categories = [...new Set(defs.map((d) => d.category as string))];
+  if (categories.length !== 1) return {};
+  const category = categories[0] as string;
+  const serviceKeys = [...new Set(defs.flatMap((d) => d.services ?? []))].filter((k) => rows.some((r) => r[1] === category && r[2] === k));
+  return serviceKeys.length === 1 ? { service_key: serviceKeys[0] as string } : { category_key: category };
+}
+
+function suggestFromCatalog(need: string, rows: ReturnType<typeof bundledServicesProjection>, pm: Parameters<typeof classifyNeed>[1]): { service_key?: string; category_key?: string } {
   const hits = rows.filter(([, , key, name]) => containsTerm(need, name) || containsTerm(need, key.replace(/_/g, " ")));
   const services = [...new Set(hits.map((h) => h[2]))];
   if (services.length === 1) return { service_key: services[0] as string };

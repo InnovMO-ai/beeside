@@ -73,7 +73,17 @@ export function previewBlocks(h: Handoff, locale: Locale): PreviewBlockDto[] {
     canRequestChanges: false,
     canStartNewVersion: false,
   });
-  const contextLines = [...h.structured.required_later.map((l) => `${T("requiredLater", locale)}: ${l}`), ...psm.open_items.map((l) => `${T("openItems", locale)}: ${l}`)];
+  const u = psm.understanding;
+  const understoodLines = u
+    ? [
+        ...u.context,
+        ...u.facts.map((f) => `${f.label}: ${f.value}`),
+        ...u.pending.map((l) => `${T("pendingDetail", locale)}: ${l}`),
+        ...u.findings.map((f) => `${T("attentionPoint", locale)}: ${f.title}`),
+      ]
+    : [];
+  const contextLines = [
+    ...understoodLines,...h.structured.required_later.map((l) => `${T("requiredLater", locale)}: ${l}`), ...psm.open_items.map((l) => `${T("openItems", locale)}: ${l}`)];
   return [
     { id: "project", title: T("project", locale), lines: projectLines },
     { id: "service_map", title: T("serviceMap", locale), lines: mapLines, view: mapView },
