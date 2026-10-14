@@ -3,6 +3,7 @@ import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
 import { DELIVERY_STATUSES, listPrecisionDeliveries } from "./precision-deliveries";
 import { MANAGED_LOCALES, configOverview, resetConfig, setConfig } from "./precision-config-admin";
+import { createCountryResource, listCountryResources, listKnowledgeSources, setCountryResourceActive, updateCountryResource } from "./precision-knowledge-admin";
 import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
@@ -720,6 +721,50 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     mutation("precision_config.reset", (req) => ({ targetType: "precision_config", targetId: `${req.params.key}:${String(req.query.locale ?? "")}` }), async (req) => {
       const out = await resetConfig(db, { key: req.params.key ?? "", locale: req.query.locale });
       return { status: 200, body: out, details: { result: out.reset ? "reset" : "nothing_to_reset" } };
+    }),
+  );
+
+  // ------------------------------------------------------------------ Country Resource Library + Source Registry (Admin-managed)
+  router.get(
+    "/precision/country-resources",
+    allow("config.read", "country_resources.viewed"),
+    handle(async (req, res) => {
+      const out = await listCountryResources(db, typeof req.query.countryCode === "string" ? req.query.countryCode : undefined);
+      await audit(req, "country_resources.viewed", "ALLOWED", { details: { count: out.resources.length } });
+      res.json(out);
+    }),
+  );
+  router.post(
+    "/precision/country-resources",
+    allow("config.write", "country_resource.created"),
+    mutation("country_resource.created", () => ({ targetType: "country_resource", targetId: "new" }), async (req) => {
+      const r = await createCountryResource(db, body(req), now());
+      return { status: 201, body: r, details: { id: r.id, countryCode: r.countryCode, version: r.version } };
+    }),
+  );
+  router.put(
+    "/precision/country-resources/:id",
+    allow("config.write", "country_resource.updated"),
+    mutation("country_resource.updated", (req) => ({ targetType: "country_resource", targetId: String(req.params.id) }), async (req) => {
+      const r = await updateCountryResource(db, String(req.params.id), body(req), now());
+      return { status: 200, body: r, details: { version: r.version } };
+    }),
+  );
+  router.post(
+    "/precision/country-resources/:id/:state(activate|deactivate)",
+    allow("config.write", "country_resource.state_changed"),
+    mutation("country_resource.state_changed", (req) => ({ targetType: "country_resource", targetId: String(req.params.id) }), async (req) => {
+      const r = await setCountryResourceActive(db, String(req.params.id), req.params.state === "activate", now());
+      return { status: 200, body: r, details: { active: r.active } };
+    }),
+  );
+  router.get(
+    "/precision/knowledge/sources",
+    allow("config.read", "knowledge_sources.viewed"),
+    handle(async (req, res) => {
+      const out = await listKnowledgeSources(db);
+      await audit(req, "knowledge_sources.viewed", "ALLOWED", { details: { count: out.sources.length } });
+      res.json(out);
     }),
   );
 

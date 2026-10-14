@@ -41,6 +41,8 @@ export interface AssistantStructured {
   state?: PendingState;
   quickReplies?: QuickReplyDto[];
   confirmCard?: ConfirmCardDto;
+  /** A country guide offered in this turn (opened through the resource resolver; the link itself is Admin configuration). */
+  resourceOffer?: { id: string; title: string };
   topicKeys?: string[];
   packVersion?: string;
   factIds?: string[];
@@ -81,5 +83,6 @@ export function toTurnDto(row: StoredTurn): TurnDto {
     createdAt: row.createdAt.toISOString(),
     ...(st.quickReplies && st.quickReplies.length > 0 ? { quickReplies: st.quickReplies } : {}),
     ...(st.confirmCard ? { confirmCard: st.confirmCard } : {}),
+    ...(st.resourceOffer ? { resourceOffer: st.resourceOffer } : {}),
   };
 }

@@ -19,8 +19,10 @@ import type { PrecisionDomain } from "../domain";
 import { DEFAULT_SESSION_TTL_MS, authenticateSession, exchangeLinkToken } from "../domain/tokens";
 import type { ModelProvider } from "../conversation";
 import { integrationStatus } from "../ports/registry";
-import type { InternalStatusDto, Locale } from "./dto";
+import type { InternalStatusDto, Locale, ResourceLinkDto } from "./dto";
 import { ApiError, classifyError, errorBody } from "./errors";
+import { createPgCountryResources } from "../knowledge/pg-repo";
+import { createPgFrameStore } from "../understanding/pg-store";
 
 const policy = (name: string, limit: number, windowSeconds: number): RateLimitPolicy => ({ name, limit, windowSeconds });
 export const PRECISION_RATE_LIMITS = {
@@ -171,6 +173,14 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
   get("/service-map", (a) => domain.serviceMap.get(a));
   post("/service-map/confirm", (a, req) => domain.serviceMap.confirm(a, (req.body as { requestKey?: unknown } | undefined)?.requestKey as string));
   post("/service-map/corrections", (a, req) => domain.serviceMap.correct(a, req.body as never));
+  get("/resources/:id", async (a, req) => {
+    // only a guide that was offered to THIS project in its conversation, and only while it is active
+    const id = idOf(req);
+    const stored = await createPgFrameStore(deps.db).load(a.projectId);
+    const res = stored?.frame.asked[`res:${id}`] ? await createPgCountryResources(deps.db).get(id) : null;
+    if (!res || !res.active) throw new ApiError("NOT_FOUND");
+    return { id: res.id, title: res.title, kind: res.destination.kind, ref: res.destination.ref } satisfies ResourceLinkDto;
+  });
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));
   get("/categories/:id", (a, req) => domain.threads.category.get(a, idOf(req)));

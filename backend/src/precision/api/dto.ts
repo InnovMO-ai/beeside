@@ -104,7 +104,12 @@ export interface TurnDto {
   createdAt: string;
   quickReplies?: QuickReplyDto[];
   confirmCard?: ConfirmCardDto;
+  /** A country guide offered in this turn; opening it goes through GET /resources/:id (destination is Admin configuration). */
+  resourceOffer?: { id: string; title: string };
 }
+
+/** A country guide the client was offered, resolved on demand. `ref` is Admin configuration (an https URL or a document reference). */
+export interface ResourceLinkDto { id: string; title: string; kind: "url" | "document"; ref: string }
 
 export type ThreadSurface = "understanding" | "category" | "add_service";
 

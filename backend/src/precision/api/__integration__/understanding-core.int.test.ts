@@ -136,6 +136,50 @@ d("Understanding Core — through the API", () => {
     expect(again.body.serviceMap.hasUnconfirmedChanges).toBe(false);
   }, 120000);
 
+  it("offers an Admin-managed country guide once, in context, and only that project can open it", async () => {
+    const guideId = randomUUID();
+    await h.db.query(
+      "INSERT INTO country_resource (id, country_code, title, language, version, destination_kind, destination_ref, active, updated_at, topic) VALUES ($1,'MX','Hacer negocios en México','es','2026.1','url','https://guides.example.test/mx','true'::boolean, now(), 'entity_setup')",
+      [guideId],
+    );
+    try {
+      const { projectId } = await h.newProject({ context: PT_CONTEXT });
+      const api = h.api(await h.session(projectId), "es");
+      await api.get("/understanding");
+      const first = await api.post("/understanding/turns", { turnKey: key("open"), text: NARRATIVE });
+      const offers = (r: any) => r.body.turns.filter((t: any) => t.resourceOffer);
+      let seen = offers(first);
+      let r = first;
+      for (let i = 0; i < 4 && r.body.understandingState !== "ready_to_confirm"; i++) {
+        const a = await pending(projectId);
+        if (a?.kind !== "ask_probe") break;
+        r = await api.post("/understanding/turns", { turnKey: key("u"), text: ANSWERS[a.probeKey as string] ?? "Todavía no lo sé." });
+        seen = seen.concat(offers(r));
+      }
+      expect(seen).toHaveLength(1); // once
+      expect(seen[0].resourceOffer).toEqual({ id: guideId, title: "Hacer negocios en México" });
+      expect(seen[0].text).toContain("Hacer negocios en México");
+      expect(seen[0].text).not.toContain("guides.example.test");
+      expect(seen[0].text).toMatch(/no es necesario|no necesitas/i);
+      expect(internalTermsIn(h.seen)).toEqual([]);
+
+      const opened = await api.get(`/resources/${guideId}`);
+      expect(opened.status).toBe(200);
+      expect(opened.body).toMatchObject({ id: guideId, kind: "url", ref: "https://guides.example.test/mx" });
+
+      // another project that was never offered the guide cannot resolve it
+      const other = await h.newProject({ context: PT_CONTEXT });
+      const apiOther = h.api(await h.session(other.projectId), "es");
+      expect((await apiOther.get(`/resources/${guideId}`)).status).toBe(404);
+
+      // deactivated in Admin -> no longer opens
+      await h.db.query("UPDATE country_resource SET active = false WHERE id = $1", [guideId]);
+      expect((await api.get(`/resources/${guideId}`)).status).toBe(404);
+    } finally {
+      await h.db.query("DELETE FROM country_resource WHERE id = $1", [guideId]);
+    }
+  }, 120000);
+
   it("the client corrects the map: remove, priority, reword and move are applied as stated and survive every later load", async () => {
     const { projectId } = await h.newProject({ context: PT_CONTEXT });
     const api = h.api(await h.session(projectId), "es");

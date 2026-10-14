@@ -33,6 +33,7 @@ import { seedFromDiscovery, type DiscoverySeedInput } from "./seed";
 import { plan, promptFor, step, type Action, type QuickValue, type StepResult } from "./step";
 import { FrameConflictError, type FrameStore, type StoredFrame } from "./store";
 import { emptyFrame, type Frame } from "./types";
+import type { ResourcesPort } from "../knowledge/resources-port";
 import { projectFacts } from "./facts-projection";
 
 // ------------------------------------------------------------------ ports
@@ -64,6 +65,8 @@ export interface UnderstandingEngineDeps {
   facts?: FactWriter;
   interpreter?: UnderstandingInterpreter;
   orientation?: OrientationPort;
+  /** Optional Country Resource Library: offers a guide once, in context, never required. */
+  resources?: ResourcesPort;
   clock?: Clock;
   now?: () => Date;
 }
@@ -316,8 +319,19 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
           composed = [r.text.slice(0, r.text.length - r.prompt.length).trim(), promptText].filter(Boolean).join(" ");
         }
       }
+      // a country guide (Admin-managed) offered once when its topic is on the table; never when another offer or an answer already leads
+      let resourceOffer: { id: string; title: string } | null = null;
+      if (deps.resources && nextAction.kind !== "offer_orientation" && action.kind !== "ready" && !answerLead) {
+        const stage = action.kind === "ask_priority" || action.kind === "checkpoint" ? "priority" : "topic";
+        const ro = await deps.resources.offer(frame, frame.locale, nowIso(), stage);
+        if (ro && composed.length + ro.text.length < 1100) {
+          frame.asked[ro.key] = 1;
+          resourceOffer = { id: ro.id, title: ro.title };
+          composed = [r.text.slice(0, r.text.length - r.prompt.length).trim(), ro.text, promptText].filter(Boolean).join(" ");
+        }
+      }
       if (sherpaNote) frame.notes.push({ text: sherpaNote.slice(0, 220), at: nowIso() });
-      return finishTurn({ ctx, input, frame, stored, clientTurn, introduced, action: nextAction, p, composed, bare: promptText, changes: r.changes, started, extraStructured: refs.length ? { sourceRefs: refs } : {}, ready: r.ready, rawAction: action });
+      return finishTurn({ ctx, input, frame, stored, clientTurn, introduced, action: nextAction, p, composed, bare: promptText, changes: r.changes, started, extraStructured: { ...(refs.length ? { sourceRefs: refs } : {}), ...(resourceOffer ? { resourceOffer } : {}) }, ready: r.ready, rawAction: action });
     } catch (err) {
       if (err instanceof FrameConflictError) {
         // Another request moved the frame (a retry racing the first attempt): the client's turn is saved, the retry reprocesses safely.
