@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
+import { MANAGED_LOCALES, configOverview, resetConfig, setConfig } from "./precision-config-admin";
 import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
@@ -662,6 +663,35 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
           : { result: (result as ErasurePlan).reason ?? "refused" },
         projectId: id,
       };
+    }),
+  );
+
+  // ------------------------------------------------------------------ Precision links and routes (Admin-managed)
+  // Effective value + source per audience, versioned writes, reset to the layer below. Audit keeps key/locale/version, never the value or reason text.
+  router.get(
+    "/precision/config",
+    allow("config.read", "precision_config.viewed"),
+    handle(async (req, res) => {
+      const entries = await configOverview(db, process.env);
+      await audit(req, "precision_config.viewed", "ALLOWED", { details: { count: entries.length } });
+      res.json({ entries, locales: MANAGED_LOCALES });
+    }),
+  );
+  router.put(
+    "/precision/config/:key",
+    allow("config.write", "precision_config.set"),
+    mutation("precision_config.set", (req) => ({ targetType: "precision_config", targetId: `${req.params.key}:${String(body(req).locale ?? "")}` }), async (req) => {
+      const b = body(req);
+      const out = await setConfig(db, { key: req.params.key ?? "", locale: b.locale, value: b.value, reason: b.reason, now: now() });
+      return { status: 200, body: out, details: { version: out.version, result: "set" } };
+    }),
+  );
+  router.delete(
+    "/precision/config/:key",
+    allow("config.write", "precision_config.reset"),
+    mutation("precision_config.reset", (req) => ({ targetType: "precision_config", targetId: `${req.params.key}:${String(req.query.locale ?? "")}` }), async (req) => {
+      const out = await resetConfig(db, { key: req.params.key ?? "", locale: req.query.locale });
+      return { status: 200, body: out, details: { result: out.reset ? "reset" : "nothing_to_reset" } };
     }),
   );
 

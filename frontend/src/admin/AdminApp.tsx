@@ -1,9 +1,14 @@
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import logo from "../assets/beeside-logo.png";
 import { ExpansionSnapshot } from "../fa/components/ExpansionSnapshot";
 import type { SnapshotView } from "../fa/types";
 import { AnalyticsView } from "./AnalyticsView";
+import { EntitlementTab } from "./EntitlementTab";
+import { PrecisionView } from "./PrecisionView";
 import { AdminApiError, AdminRole, Me, Permission, REGISTRIES, RegistrySlug, adminApi } from "./api";
+import { Json, KeyValues, Status, Table, errorMessage, formatWhen, text, useLoad } from "./ui";
+
+export { formatWhen };
 
 /**
  * beeside Control Center (Build Plan v1.1 Phase 10) — an internal operations surface, not a CRM and
@@ -11,14 +16,14 @@ import { AdminApiError, AdminRole, Me, Permission, REGISTRIES, RegistrySlug, adm
  * permission is enforced again by the API; historical records and client answers are read-only.
  */
 
-type Json = Record<string, unknown>;
-type ProjectTab = "overview" | "answers" | "snapshot" | "internal" | "premium" | "lifecycle";
+type ProjectTab = "overview" | "answers" | "snapshot" | "internal" | "premium" | "access" | "lifecycle";
 type Route =
   | { name: "projects" }
   | { name: "project"; id: string; tab: ProjectTab }
   | { name: "config" }
   | { name: "communications" }
   | { name: "analytics" }
+  | { name: "precision" }
   | { name: "operations" }
   | { name: "audit" }
   | { name: "people" };
@@ -29,6 +34,7 @@ const TABS: Array<{ id: ProjectTab; label: string }> = [
   { id: "snapshot", label: "Snapshot" },
   { id: "internal", label: "Internal Assessment" },
   { id: "premium", label: "Premium" },
+  { id: "access", label: "Access" },
   { id: "lifecycle", label: "Lifecycle & email" },
 ];
 
@@ -38,83 +44,13 @@ export function parseAdminRoute(pathname: string): Route {
     const tab = TABS.find((t) => t.id === parts[2])?.id ?? "overview";
     return { name: "project", id: parts[1], tab };
   }
-  if (parts[0] === "config" || parts[0] === "communications" || parts[0] === "analytics" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
+  if (parts[0] === "config" || parts[0] === "communications" || parts[0] === "analytics" || parts[0] === "precision" || parts[0] === "operations" || parts[0] === "audit" || parts[0] === "people") return { name: parts[0] };
   return { name: "projects" };
 }
 
 function pathOf(route: Route): string {
   if (route.name === "project") return `/admin/projects/${route.id}/${route.tab}`;
   return `/admin/${route.name}`;
-}
-
-const text = (value: unknown): string => (value === null || value === undefined || value === "" ? "—" : typeof value === "object" ? JSON.stringify(value) : String(value));
-
-export function formatWhen(value: unknown): string {
-  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) return "—";
-  return `${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(value))} UTC`;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof AdminApiError) {
-    if (error.code === "FORBIDDEN") return "Your role does not allow this action.";
-    return error.detail ? `${error.code}: ${error.detail}` : error.code;
-  }
-  return "Something went wrong.";
-}
-
-function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    let active = true;
-    setError(null);
-    load()
-      .then((result) => active && setData(result))
-      .catch((e: unknown) => active && setError(errorMessage(e)));
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, version]);
-  return { data, error, reload: () => setVersion((v) => v + 1) };
-}
-
-function Status({ data, error }: { data: unknown; error: string | null }) {
-  if (error) return <p className="admin-error" role="alert">{error}</p>;
-  if (!data) return <p role="status">Loading…</p>;
-  return null;
-}
-
-function Table({ columns, rows, empty = "Nothing to show." }: { columns: Array<{ label: string; render: (row: Json) => ReactNode }>; rows: Json[]; empty?: string }) {
-  if (rows.length === 0) return <p className="helper">{empty}</p>;
-  return (
-    <div className="admin-table-wrap">
-      <table className="admin-table">
-        <thead>
-          <tr>{columns.map((c) => <th key={c.label} scope="col">{c.label}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>{columns.map((c) => <td key={c.label}>{c.render(row)}</td>)}</tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function KeyValues({ items }: { items: Array<[string, ReactNode]> }) {
-  return (
-    <dl className="admin-kv">
-      {items.map(([k, v]) => (
-        <div key={k}>
-          <dt>{k}</dt>
-          <dd>{v}</dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 
 // ------------------------------------------------------------------------------------------ app
@@ -151,6 +87,7 @@ export function AdminApp() {
     { route: { name: "config" }, label: "Configuration", show: can("config.read") },
     { route: { name: "communications" }, label: "Communications", show: can("operations.read") },
     { route: { name: "analytics" }, label: "Analytics", show: can("analytics.read") },
+    { route: { name: "precision" }, label: "Precision", show: can("analytics.read") },
     { route: { name: "operations" }, label: "Operations", show: can("operations.read") },
     { route: { name: "audit" }, label: "Audit", show: can("audit.read") },
     { route: { name: "people" }, label: "People", show: can("admin_users.manage") },
@@ -198,6 +135,7 @@ export function AdminApp() {
         {route.name === "config" && <ConfigView can={can} />}
         {route.name === "communications" && can("operations.read") && <CommunicationsView can={can} />}
         {route.name === "analytics" && can("analytics.read") && <AnalyticsView />}
+        {route.name === "precision" && can("analytics.read") && <PrecisionView can={can} />}
         {route.name === "operations" && <OperationsView can={can} />}
         {route.name === "audit" && can("audit.read") && <AuditView />}
         {route.name === "people" && can("admin_users.manage") && <PeopleView />}
@@ -287,6 +225,7 @@ function ProjectView({ id, tab, can, onTab, onBack }: { id: string; tab: Project
         {tab === "snapshot" && <SnapshotTab id={id} />}
         {tab === "internal" && <InternalTab id={id} />}
         {tab === "premium" && <PremiumTab id={id} canManage={can("premium.manage")} />}
+        {tab === "access" && <EntitlementTab id={id} can={can} />}
         {tab === "lifecycle" && <LifecycleTab id={id} canExecute={can("operations.execute")} />}
       </div>
     </section>

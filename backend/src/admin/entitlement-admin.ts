@@ -9,6 +9,8 @@ import { FaError } from "../fa/services/errors";
 
 export interface ProjectEntitlementView {
   projectId: string;
+  /** Opaque id, needed to scope a company-level grant explicitly (never a name). */
+  companyId: string;
   entitlement: {
     premium_access_active: boolean;
     precision_access_mode: string;
@@ -51,6 +53,7 @@ export async function projectEntitlement(db: Db, projectId: string, now: Date): 
   const covered = await db.query<{ t: Date }>("SELECT entitlement_covered_until($1, $2) AS t", [projectId, now]);
   return {
     projectId,
+    companyId: project.rows[0].company_id,
     entitlement: (entitlement.rows[0] as ProjectEntitlementView["entitlement"]) ?? null,
     sources: sources.rows as ProjectEntitlementView["sources"],
     grants: grants.rows,

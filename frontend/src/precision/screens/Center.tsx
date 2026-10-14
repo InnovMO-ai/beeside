@@ -6,7 +6,7 @@ import { Link, type Route } from "../state/router";
 import { AppShell } from "../ui/Shell";
 import { Icon } from "../ui/icons";
 import { usePage } from "../ui/hooks";
-import { Button, CategoryStatusText, Meter, Skeleton, StatusText } from "../ui/primitives";
+import { CategoryStatusText, Meter, Skeleton, StatusText } from "../ui/primitives";
 import { OhContactButton, OhContactDialog } from "./Contact";
 import { InlineError } from "./SystemPages";
 

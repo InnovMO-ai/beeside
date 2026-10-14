@@ -303,4 +303,57 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
     const audit = await h.client.query("SELECT details::text AS d FROM admin_audit_event WHERE action = 'analytics.viewed' AND details::text LIKE '%precision_%'");
     expect(audit.rows.length).toBeGreaterThanOrEqual(5);
   });
+  it("Precision links and routes: effective value + source per audience, validated versioned writes, reset, role limits; the audit never carries the value", async () => {
+    const { admin, supervisor } = await people();
+    const put = (cookie: string, key: string, b: unknown) => app().put(`/api/admin/precision/config/${key}`).set("Cookie", cookie).set("X-Beeside-Admin", "1").send(b as object);
+    const del = (cookie: string, key: string, locale: string) => app().delete(`/api/admin/precision/config/${key}?locale=${locale}`).set("Cookie", cookie).set("X-Beeside-Admin", "1");
+    const entry = (body: { entries: Array<{ key: string; effective: Array<{ locale: string; value: string | null; source: string }> }> }, key: string, locale: string) =>
+      body.entries.find((e) => e.key === key)?.effective.find((x) => x.locale === locale);
+
+    const initial = await get(supervisor, "/precision/config");
+    expect(initial.status).toBe(200);
+    expect(entry(initial.body, "privacy_url", "es")?.source).toBe("default");
+    expect(entry(initial.body, "operation_hub_url", "en")).toEqual({ locale: "en", value: null, source: "unset", });
+
+    // read-only role cannot write
+    expect((await put(supervisor, "operation_hub_url", { locale: "*", value: "https://hub.example.test/p", reason: "x" })).status).toBe(403);
+
+    // validation: https or site-relative only, a reason is required, keys are a closed list
+    expect((await put(admin, "operation_hub_url", { locale: "*", value: "http://insecure.example.test", reason: "x" })).status).toBe(400);
+    expect((await put(admin, "operation_hub_url", { locale: "*", value: "javascript:alert(1)", reason: "x" })).status).toBe(400);
+    expect((await put(admin, "operation_hub_url", { locale: "*", value: "https://hub.example.test/p" })).status).toBe(400);
+    expect((await put(admin, "operation_hub_url", { locale: "fr", value: "https://hub.example.test/p", reason: "x" })).status).toBe(400);
+    expect((await put(admin, "analytics.resume_gap_minutes", { locale: "*", value: "https://x.example.test", reason: "x" })).status).toBe(404);
+    expect((await put(admin, "contact_beeside_email", { locale: "*", value: "not-an-email", reason: "x" })).status).toBe(400);
+
+    // set -> effective in both audiences with source admin; a locale override wins over '*'
+    expect((await put(admin, "operation_hub_url", { locale: "*", value: "https://hub.example.test/p", reason: "go live" })).body.version).toBe(1);
+    expect((await put(admin, "operation_hub_url", { locale: "*", value: "https://hub.example.test/p2", reason: "new path" })).body.version).toBe(2);
+    expect((await put(admin, "operation_hub_url", { locale: "es", value: "https://hub.example.test/es", reason: "spanish hub" })).status).toBe(200);
+    const after = await get(admin, "/precision/config");
+    expect(entry(after.body, "operation_hub_url", "en")).toEqual({ locale: "en", value: "https://hub.example.test/p2", source: "admin", adminLocale: "*" });
+    expect(entry(after.body, "operation_hub_url", "es")).toMatchObject({ value: "https://hub.example.test/es", source: "admin", adminLocale: "es" });
+
+    // the runtime resolver reads exactly what Admin wrote (same rows, no second path)
+    const { configUrl } = await import("../precision/domain/config");
+    expect(await configUrl(h.deps.db, "operation_hub_url", "en")).toBe("https://hub.example.test/p2");
+
+    // history is kept: one active row per (key, locale), older versions inactive
+    const rows = await h.client.query("SELECT version, is_active FROM precision_config WHERE key = 'operation_hub_url' AND locale = '*' ORDER BY version");
+    expect(rows.rows).toEqual([{ version: 1, is_active: false }, { version: 2, is_active: true }]);
+
+    // reset falls back to the layer below
+    expect((await del(admin, "operation_hub_url", "es")).body.reset).toBe(true);
+    expect((await del(admin, "operation_hub_url", "es")).body.reset).toBe(false);
+    expect(entry((await get(admin, "/precision/config")).body, "operation_hub_url", "es")?.value).toBe("https://hub.example.test/p2");
+    expect((await put(admin, "privacy_url", { locale: "en", value: "/legal/privacy", reason: "site-relative" })).status).toBe(200);
+    expect(entry((await get(admin, "/precision/config")).body, "privacy_url", "en")?.value).toBe("/legal/privacy");
+
+    const audit = await h.client.query("SELECT action, outcome, target_id, details::text AS d FROM admin_audit_event WHERE action LIKE 'precision_config.%'");
+    expect(audit.rows.length).toBeGreaterThan(5);
+    const text = JSON.stringify(audit.rows);
+    expect(text).not.toContain("hub.example.test");
+    expect(text).not.toContain("go live");
+    expect(audit.rows.some((r) => r.action === "precision_config.set" && r.outcome === "DENIED")).toBe(true);
+  });
 });
