@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import axe from "axe-core";
-import { journeyA, journeyB, journeyC } from "@beeside/fa-public-engine/testing";
+import { journeyA, journeyB, journeyC, journeyNortica } from "@beeside/fa-public-engine/testing";
 import { ResultScreen } from "./components/ResultScreen";
 import { modelFor } from "./fa4.test-helpers";
 
@@ -175,10 +175,45 @@ describe("Start Your Expansion — configurable Premium purchase destination", (
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument()); expect(assign).not.toHaveBeenCalled();
     Object.defineProperty(window, "location", { configurable: true, value: orig });
   });
+  it("open / undefined destination: when Premium is offered the title is the generic one (ES and EN)", () => {
+    const a = journeyNortica("es"); a.destinations = { list: [], open: true, sameInAll: true }; a.components = a.components.map((c) => ({ ...c, destinations: [] }));
+    const m = modelFor(a);
+    for (const [loc, title] of [["es", "Concretar tu expansión"], ["en", "Define your expansion"]] as const) {
+      const r = render(<ResultScreen model={m} locale={loc} onContinue={vi.fn()} />);
+      if (m.premium.shown) expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument(); else expect(screen.queryByRole("button", { name: "Start Your Expansion" })).toBeNull();
+      r.unmount();
+    }
+  });
   it("destination-aware next step: one country / several / open", () => {
     const t = (a: Parameters<typeof modelFor>[0], loc: "es" | "en" = "es") => { const r = render(<ResultScreen model={modelFor(a)} locale={loc} onContinue={vi.fn()} />); const h = screen.getByRole("heading", { level: 2, name: /Concretar|Define/ }).textContent; r.unmount(); return h; };
     expect(t(journeyA("es"))).toMatch(/^Concretar tu expansión en .+/);
     expect(t(journeyB("es", "unknown"))).toBe("Concretar tu expansión en tus mercados objetivo");
     expect(t(journeyB("en", "unknown"), "en")).toBe("Define your expansion across your target markets");
+  });
+});
+
+describe("release audit — purchase destination is fail-closed in a public build", () => {
+  it("no destination and no staging opt-in → the CTA is not rendered (no silent no-payment fallback)", async () => {
+    const { PremiumContinuation } = await import("./components/PremiumContinuation");
+    const m = modelFor(journeyA("es"));
+    const { container } = render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" purchaseUrl={null} fallbackAllowed={false} onContinue={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Start Your Expansion" })).toBeNull();
+    expect(container.textContent).not.toMatch(/Todavía no hay ningún pago|Sherpa/);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toMatch(/Concretar tu expansión/);
+  });
+  it("a configured destination renders the CTA even when the fallback is not allowed", async () => {
+    const { PremiumContinuation } = await import("./components/PremiumContinuation");
+    const m = modelFor(journeyA("es"));
+    render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" purchaseUrl="https://pay.example/x" fallbackAllowed={false} onContinue={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Start Your Expansion" })).toBeInTheDocument();
+  });
+  it.each([["https://pay.example/checkout", "https://pay.example/checkout"], ["http://pay.example/x", null], ["javascript:alert(1)", null], ["", null], ["//pay.example", null]])("VITE_FA4_PREMIUM_PURCHASE_URL=%j → %j (https only)", async (v, expected) => {
+    vi.resetModules(); vi.stubEnv("VITE_FA4_PREMIUM_PURCHASE_URL", v);
+    const b = await import("./brand"); expect(b.PREMIUM_PURCHASE_URL).toBe(expected); vi.unstubAllEnvs(); vi.resetModules();
+  });
+  it("no purchase URL is hardcoded in the source", async () => {
+    const fs = await import("node:fs"); const path = await import("node:path");
+    const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+    for (const f of walk(path.resolve(__dirname)).filter((x) => /\.(ts|tsx)$/.test(x) && !/\.test\./.test(x))) expect(fs.readFileSync(f, "utf8"), f).not.toMatch(/stripe\.com|checkout\.stripe|buy\.stripe|pay\.beeside/i);
   });
 });

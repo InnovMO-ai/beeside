@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { UI, fill } from '../copy/ui';
-import { PREMIUM_PURCHASE_URL } from '../brand';
+import { PREMIUM_PURCHASE_URL, PURCHASE_FALLBACK_ALLOWED } from '../brand';
 import { OPEN_DEST } from '@beeside/fa-public-engine';
 import type { YourExpansionViewModel } from '@beeside/fa-public-engine';
 
@@ -16,8 +16,8 @@ function nextStepTitle(destinations: YourExpansionViewModel['destinations'] | un
   return UI.nextOpen[locale];
 }
 
-export function PremiumContinuation({ premium, destinations, locale, onContinue, onEmail, email, delivered, purchaseUrl = PREMIUM_PURCHASE_URL }: {
-  purchaseUrl?: string | null;
+export function PremiumContinuation({ premium, destinations, locale, onContinue, onEmail, email, delivered, purchaseUrl = PREMIUM_PURCHASE_URL, fallbackAllowed = PURCHASE_FALLBACK_ALLOWED }: {
+  purchaseUrl?: string | null; fallbackAllowed?: boolean;
   premium: YourExpansionViewModel['premium']; destinations?: YourExpansionViewModel['destinations']; locale: Locale; email?: string; delivered?: boolean;
   onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean>;
 }) {
@@ -32,7 +32,7 @@ export function PremiumContinuation({ premium, destinations, locale, onContinue,
             <h2 id="pc-title" className="pc-title">{nextStepTitle(destinations, locale)}</h2>
             <p className="pc-body">{UI.premiumBody[locale]}</p>
           </div>
-          {cont === 'done'
+          {!purchaseUrl && !fallbackAllowed ? null : cont === 'done'
             ? <p role="status">{purchaseUrl ? UI.continuedPay[locale] : UI.continued[locale]}</p>
             : cont === 'confirm' || cont === 'busy'
               ? <div role="group" aria-labelledby="pc-confirm-title" data-testid="start-confirm">

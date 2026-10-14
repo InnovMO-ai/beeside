@@ -34,6 +34,12 @@ export const CONTACT_EMAIL = 'contact@beeside.you';
  */
 const purchase = env('VITE_FA4_PREMIUM_PURCHASE_URL', '');
 export const PREMIUM_PURCHASE_URL: string | null = /^https:\/\//i.test(purchase) ? purchase : null;
+/**
+ * Release audit: a PUBLIC production build must never silently fall back to the Sherpa / «no payment yet» confirmation when the purchase destination
+ * is missing: the CTA is then not rendered at all (fail-closed). The fallback exists only for internal staging, local runs and tests, and only when
+ * the build opts in explicitly with VITE_FA4_ALLOW_PURCHASE_FALLBACK=true (or outside a production build, e.g. unit tests / dev server).
+ */
+export const PURCHASE_FALLBACK_ALLOWED: boolean = !import.meta.env.PROD || env('VITE_FA4_ALLOW_PURCHASE_FALLBACK', '') === 'true';
 
 export const BRAND = {
   /** BRAND-1: official logo. The lockup is never redrawn or recoloured; the accessible name is the wordmark itself ("beeside"). */

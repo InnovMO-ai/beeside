@@ -82,3 +82,18 @@ describe("Premium block gate", () => {
     });
   });
 });
+
+describe("release audit — customer emails", () => {
+  const logo = "https://fa.test/brand/beeside-lockup.png";
+  const vars = { first_name: "L", resume_url: "https://fa.test/fa4#r=T", yev_url: "https://fa.test/fa4#r=T&view=result", talk_to_beeside_url: "https://fa.test/fa4#r=T&contact=open", premium_url: "https://beeside.you/", logo_url: logo, destination: "México", declared_objective: "x" };
+  it.each([["resume", "es"], ["resume", "en"], ["yev", "es"], ["yev", "en"]] as const)("%s/%s: Discovery naming, one logo image, only https links, no leftovers, no First Assessment / FA", (kind, l) => {
+    const r = renderFa4Email(kind, l, vars, { has_logo: true, has_first_name: true, premium_enabled: false, has_destination: true, show_focus_block: true });
+    const all = r.html + r.text;
+    expect(all).not.toMatch(/First Assessment|FIRST ASSESSMENT|\bFA4?\b/); expect(all).toContain("Discovery");
+    expect((r.html.match(/<img\b/g) ?? []).length).toBe(1); expect(r.html).toContain(`src="${logo}"`);
+    for (const m of r.html.matchAll(/(?:href|src)="([^"{]+)"/g)) expect(m[1]).toMatch(/^(https:\/\/|mailto:contact@beeside\.you$|#)/);
+    expect(all).not.toMatch(/\{\{|<!--(IF|ENDIF)/);
+    if (kind === "yev") { expect(all).toContain(l === "es" ? "La información que nos compartiste no se comparte con proveedores en esta etapa." : "The information you shared with us is not shared with providers at this stage."); expect(r.html).not.toMatch(/>beeside<\/p>/); }
+    expect(r.html).not.toMatch(/Start Your Expansion/);                                      // the CTA button is not part of the email design
+  });
+});

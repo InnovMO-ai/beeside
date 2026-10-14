@@ -33,7 +33,7 @@ export default defineConfig({
     },
     {
       // Same layout as the production image: static-server.mjs next to ./dist.
-      command: `npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
+      command: `VITE_FA4_ALLOW_PURCHASE_FALLBACK=true npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
       url: `http://localhost:${WEB}/health`,
       timeout: 120_000,
       reuseExistingServer: !!process.env.E2E_REUSE,

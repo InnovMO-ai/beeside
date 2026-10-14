@@ -18,7 +18,10 @@ COPY frontend frontend
 ARG VITE_FA4_ENV_LABEL=""
 ARG VITE_FA4_PRIVACY_URL=""
 ARG VITE_FA4_LAUNCH=""
-ENV VITE_FA4_ENV_LABEL=$VITE_FA4_ENV_LABEL VITE_FA4_PRIVACY_URL=$VITE_FA4_PRIVACY_URL VITE_FA4_LAUNCH=$VITE_FA4_LAUNCH
+# «Start Your Expansion» destination (https; supplied by Product, never defaulted) and the staging-only opt-in to the no-payment confirmation fallback.
+ARG VITE_FA4_PREMIUM_PURCHASE_URL=""
+ARG VITE_FA4_ALLOW_PURCHASE_FALLBACK=""
+ENV VITE_FA4_ENV_LABEL=$VITE_FA4_ENV_LABEL VITE_FA4_PRIVACY_URL=$VITE_FA4_PRIVACY_URL VITE_FA4_LAUNCH=$VITE_FA4_LAUNCH VITE_FA4_PREMIUM_PURCHASE_URL=$VITE_FA4_PREMIUM_PURCHASE_URL VITE_FA4_ALLOW_PURCHASE_FALLBACK=$VITE_FA4_ALLOW_PURCHASE_FALLBACK
 RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=frontend
 
 FROM node:20-slim AS runtime

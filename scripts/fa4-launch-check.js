@@ -38,7 +38,7 @@ add('Premium resource URL (optional)', true, env.FA4_PREMIUM_RESOURCE_URL_ES || 
 
 // «Start Your Expansion» → Premium purchase/payment destination (PO 2026-10-14). Not supplied: never invented, never hardcoded. https only.
 const pp = env.VITE_FA4_PREMIUM_PURCHASE_URL;
-add('Premium purchase destination (EXTERNAL)', !!pp && /^https:\/\//i.test(pp), pp && /^https:\/\//i.test(pp) ? 'configured (https)' : 'VITE_FA4_PREMIUM_PURCHASE_URL not set — the CTA falls back to the recorded-continuation confirmation (no payment); the approved Stripe/embedded destination is still to be supplied');
+add('Premium purchase destination (EXTERNAL)', !!pp && /^https:\/\//i.test(pp), pp && /^https:\/\//i.test(pp) ? 'configured (https)' : 'VITE_FA4_PREMIUM_PURCHASE_URL not set — a PUBLIC build without it renders NO «Start Your Expansion» CTA (fail-closed; the no-payment fallback exists only with VITE_FA4_ALLOW_PURCHASE_FALLBACK=true: staging/tests); the approved Stripe/embedded destination is still to be supplied');
 
 const w = Math.max(...rows.map((r) => r.id.length));
 for (const r of rows) console.log(`${r.ok === true ? 'READY  ' : r.ok === 'partial' ? 'PARTIAL' : 'PENDING'}  ${r.id.padEnd(w)}  ${r.detail}`);
