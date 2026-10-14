@@ -288,4 +288,19 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
     expect(executed?.details).toMatch(/deleted_rows/);
     expect(audit.rows.map((r) => r.details).join()).not.toMatch(/Ana|Rivera|Northwind|@/);
   });
+
+  it("Precision statistics: every role can read the canonical metrics (aggregates only); the audit records the view, not the data", async () => {
+    const { supervisor } = await people();
+    const catalog = await get(supervisor, "/analytics/precision/catalog");
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.metrics.length).toBeGreaterThan(20);
+    for (const [path, key] of [["funnel", "stages"], ["quality", "addService"], ["ai", "bySurface"], ["commercial", "period"]] as const) {
+      const res = await get(supervisor, `/analytics/precision/${path}?from=2026-01-01&to=2026-12-31`);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty(key);
+    }
+    expect((await get(supervisor, "/analytics/precision/funnel?from=2026-12-31&to=2026-01-01")).status).toBe(400);
+    const audit = await h.client.query("SELECT details::text AS d FROM admin_audit_event WHERE action = 'analytics.viewed' AND details::text LIKE '%precision_%'");
+    expect(audit.rows.length).toBeGreaterThanOrEqual(5);
+  });
 });

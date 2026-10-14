@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
+import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
 import { createConfigVersioningRouter } from "../config-versioning/router";
@@ -809,6 +810,13 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
   router.get("/analytics/feedback", allow("analytics.read", "analytics.viewed"), analyticsView("feedback", (req) => feedbackMetrics(db, rangeOf(req), segmentOf(req))));
   router.get("/analytics/segments", allow("analytics.read", "analytics.viewed"), analyticsView("segments", (req) => segmentBreakdown(db, rangeOf(req))));
   router.get("/analytics/operations", allow("analytics.read", "analytics.viewed"), analyticsView("operations", (req) => operationalMetrics(db, rangeOf(req), now())));
+
+  // Precision V1.0 metrics: the canonical catalog and the four families, computed from the same analytics_v1_* views Tableau reads.
+  router.get("/analytics/precision/catalog", allow("analytics.read", "analytics.viewed"), analyticsView("precision_catalog", async () => ({ metrics: METRIC_CATALOG })));
+  router.get("/analytics/precision/funnel", allow("analytics.read", "analytics.viewed"), analyticsView("precision_funnel", (req) => precisionFunnel(db, rangeOf(req))));
+  router.get("/analytics/precision/quality", allow("analytics.read", "analytics.viewed"), analyticsView("precision_quality", (req) => precisionQuality(db, rangeOf(req))));
+  router.get("/analytics/precision/ai", allow("analytics.read", "analytics.viewed"), analyticsView("precision_ai", (req) => precisionAi(db, rangeOf(req))));
+  router.get("/analytics/precision/commercial", allow("analytics.read", "analytics.viewed"), analyticsView("precision_commercial", (req) => precisionCommercial(db, rangeOf(req))));
 
   // The optional comments are client content, not analytics: reading them is audited on its own.
   router.get("/analytics/feedback/comments", allow("analytics.read", "analytics.feedback_comments_viewed"), handle(async (req, res) => {

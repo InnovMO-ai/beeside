@@ -20,7 +20,7 @@ export interface AuditInput {
 }
 
 const FORBIDDEN_KEY = /token|secret|password|cookie|verifier|nonce|code|email|name|phone|answer|value|content/i;
-const ALLOWED_KEYS = new Set(["job_run_id", "deleted_rows", "person_anonymized", "company_anonymized", "previous_state", "section", "reason", "permission", "role", "from_role", "to_role", "template", "status", "registry", "version", "decision", "diff_reviewed", "event_type", "request_id", "subscription_status", "result", "query_length", "results", "active", "login_enabled", "job", "trigger", "stats", "delivery_id", "count", "kind", "method", "path", "source", "days", "grant_days", "company_scope", "max_projects", "grant_id", "extends_grant_id", "program_id", "sponsor_id", "reason_code", "event"]);
+const ALLOWED_KEYS = new Set(["job_run_id", "deleted_rows", "person_anonymized", "company_anonymized", "previous_state", "section", "reason", "permission", "role", "from_role", "to_role", "template", "status", "registry", "version", "decision", "diff_reviewed", "event_type", "request_id", "subscription_status", "result", "query_length", "results", "active", "login_enabled", "job", "trigger", "stats", "delivery_id", "count", "kind", "method", "path", "source", "days", "grant_days", "company_scope", "max_projects", "grant_id", "extends_grant_id", "program_id", "sponsor_id", "reason_code", "event", "view"]);
 
 function sanitize(value: unknown, depth: number): unknown {
   if (value === null || typeof value === "boolean" || typeof value === "number") return value;
