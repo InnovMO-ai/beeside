@@ -14,3 +14,4 @@ export * from "./fa4";
 export * from "./precision";
 export * from "./billing";
 export * from "./entitlement";
+export * from "./privacy";

@@ -180,7 +180,11 @@ describeWithDb("Premium entitlement sources -> Core -> Precision (PostgreSQL, ro
     await expect(issueGrant(h.deps.db, { scope: { projectId: a.id }, source: "manual", startsAt: t0, endsAt: new Date(t0.getTime() + 5 * DAY), reason: "r", approvedBy: adm, actor: "admin", now: t0 })).rejects.toMatchObject({ code: "NOT_APPLICABLE" });
     await recordPrivacyEvent(h.deps.db, { projectId: a.id, event: "access_restored", reasonCode: "other", actor: `admin:${adm}` });
     expect((await provider().get(a.id)).accessMode).toBe("FULL");
-    await recordPrivacyEvent(h.deps.db, { projectId: a.id, event: "anonymized", reasonCode: "erasure_request", actor: `admin:${adm}` });
+    await expect(recordPrivacyEvent(h.deps.db, { projectId: a.id, event: "anonymized" as never, reasonCode: "erasure_request", actor: `admin:${adm}` })).rejects.toMatchObject({ code: "NOT_APPLICABLE" }); // only the erasure itself may write it
+    // the terminal state, as the executor leaves it (the full erasure is covered by privacy-erasure.int.test.ts)
+    await h.client.query("SELECT set_config('app.privacy_erasure_project', $1, true)", [a.id]);
+    await h.client.query("INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES ($1, 'anonymized', 'erasure_request', $2)", [a.id, `admin:${adm}`]);
+    await h.client.query("SELECT set_config('app.privacy_erasure_project', '', true)");
     expect((await provider().get(a.id)).accessMode).toBe("REVOKED");
     await expect(recordPrivacyEvent(h.deps.db, { projectId: a.id, event: "access_restored", reasonCode: "other", actor: "x" })).rejects.toMatchObject({ code: "NOT_APPLICABLE" });
   });

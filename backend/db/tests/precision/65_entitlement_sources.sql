@@ -254,7 +254,10 @@ BEGIN
   INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES (p, 'access_restored', 'other', 'admin:' || adm);
   PERFORM pg_temp.assert_that('E64', (SELECT state FROM project_privacy_state WHERE project_id = p) = 'open', 'a block can be lifted (request withdrawn)');
   PERFORM pg_temp.expect_error('E65', format($q$INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES (%L, 'access_restored', 'other', 'x')$q$, p), 'BV409', 'no access block');
+  PERFORM pg_temp.expect_error('E65b', format($q$INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES (%L, 'anonymized', 'erasure_request', 'x')$q$, p), 'BV409', 'only by privacy_erase_project');
+  PERFORM set_config('app.privacy_erasure_project', p::text, true);  -- what privacy_erase_project() does as its last step
   INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES (p, 'anonymized', 'erasure_request', 'admin:' || adm);
+  PERFORM set_config('app.privacy_erasure_project', '', true);
   PERFORM pg_temp.assert_that('E66', (SELECT state FROM project_privacy_state WHERE project_id = p) = 'anonymized', 'anonymized is recorded');
   PERFORM pg_temp.expect_error('E67a', format($q$INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES (%L, 'access_restored', 'other', 'x')$q$, p), 'BV409', 'anonymized');
   PERFORM pg_temp.expect_error('E67b', format($q$UPDATE project_privacy_event SET reason_code = 'other' WHERE project_id = %L$q$, p), 'BV409', 'append-only');

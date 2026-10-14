@@ -22,7 +22,8 @@ export type GrantSource = "complimentary" | "promotion" | "trial" | "manual" | "
 export type ProgramKind = "promotion" | "trial" | "partner" | "sponsored";
 export type CompanyScope = "current_projects" | "projects_created_in_period";
 export type SponsorKind = "government" | "agency" | "chamber" | "accelerator" | "corporate" | "other";
-export type PrivacyEventName = "access_blocked" | "access_restored" | "anonymized";
+/** `anonymized` is not here on purpose: the ledger records it only as the last step of an executed erasure (`privacy_erase_project`, src/privacy). */
+export type PrivacyEventName = "access_blocked" | "access_restored";
 export type PrivacyReason = "erasure_request" | "legal_order" | "contract_closure" | "security_action" | "other";
 
 export interface GrantRow {
@@ -362,14 +363,14 @@ export async function syncEntitlementSources(db: Db, input: { now: Date }): Prom
 
 /**
  * Privacy / data-lifecycle boundary. A valid privacy or legal requirement overrides any commercial term: once a project is
- * `blocked` or `anonymized`, Precision answers REVOKED whatever the entitlement says (see `deriveAccess`). This module only
- * records the decision; the legal rules and the anonymization itself belong to Privacy/Admin. No free text is stored.
+ * `blocked` or `anonymized`, Precision answers REVOKED whatever the entitlement says (see `deriveAccess`). This module records the
+ * block / restore decisions; the erasure itself (and the `anonymized` ledger entry it ends with) belongs to `src/privacy`. No free text is stored.
  */
 export async function recordPrivacyEvent(db: Db, input: { projectId: string; event: PrivacyEventName; reasonCode: PrivacyReason; actor: string }): Promise<void> {
   await guarded(() =>
     db.query("INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES ($1, $2, $3, $4)", [input.projectId, input.event, input.reasonCode, input.actor]),
   );
-  if (input.event !== "access_restored") {
+  if (input.event === "access_blocked") {
     await emitV1Event(db, "privacy_block_applied", { projectId: input.projectId, properties: { privacy_event: input.event, reason_code: input.reasonCode } });
   }
 }

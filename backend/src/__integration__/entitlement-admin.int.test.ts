@@ -229,4 +229,63 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
     for (const row of audit.rows) expect(row.details).toMatch(/reason_code/);
     expect(audit.rows.map((r) => r.details).join()).toMatch(/erasure_request/);
   });
+
+  it("privacy erasure: SUPER_ADMIN only; policy first, dry run, typed confirmation, then executed once; `anonymized` cannot be recorded by hand; the audit keeps counts, never content", async () => {
+    const { admin, superAdmin, supervisor } = await people();
+    const p = await project();
+    await h.client.query("UPDATE privacy_policy SET status = 'retired', retired_at = now() WHERE status = 'approved'");
+
+    // roles: nobody below SUPER_ADMIN can read, approve, plan or execute
+    for (const cookie of [admin, supervisor]) {
+      expect((await get(cookie, "/privacy/policy")).status).toBe(403);
+      expect((await post(cookie, "/privacy/policy", { minDaysAfterBlock: 0, retainLegalAcceptance: false })).status).toBe(403);
+      expect((await get(cookie, `/projects/${p.id}/privacy/erasure`)).status).toBe(403);
+      expect((await post(cookie, `/projects/${p.id}/privacy/erasure`, { confirmProjectId: p.id })).status).toBe(403);
+    }
+    // no policy: the dry run says so, the execution is refused (and recorded as refused)
+    expect((await get(superAdmin, "/privacy/policy")).body.policy).toBeNull();
+    expect((await get(superAdmin, `/projects/${p.id}/privacy/erasure`)).body.plan).toMatchObject({ eligible: false, reason: "no_approved_policy" });
+    const refused = await post(superAdmin, `/projects/${p.id}/privacy/erasure`, { confirmProjectId: p.id });
+    expect(refused.status).toBe(409);
+    expect(refused.body.result).toMatchObject({ eligible: false, reason: "no_approved_policy" });
+
+    // the policy is a decision with explicit terms
+    expect((await post(superAdmin, "/privacy/policy", { minDaysAfterBlock: -1, retainLegalAcceptance: false })).status).toBe(400);
+    expect((await post(superAdmin, "/privacy/policy", { minDaysAfterBlock: 0 })).status).toBe(400);
+    const approved = await post(superAdmin, "/privacy/policy", { minDaysAfterBlock: 0, retainLegalAcceptance: false });
+    expect(approved.status).toBe(201);
+    expect((await get(superAdmin, "/privacy/policy")).body.policy).toMatchObject({ min_days_after_block: 0, retain_legal_acceptance: false, version: approved.body.policy.version });
+
+    // not blocked yet; `anonymized` is never recorded by hand
+    expect((await get(superAdmin, `/projects/${p.id}/privacy/erasure`)).body.plan).toMatchObject({ eligible: false, reason: "not_blocked" });
+    expect((await post(superAdmin, `/projects/${p.id}/privacy`, { event: "anonymized", reasonCode: "erasure_request" })).status).toBe(400);
+    expect((await post(superAdmin, `/projects/${p.id}/privacy`, { event: "access_blocked", reasonCode: "erasure_request" })).status).toBe(201);
+    h.advanceMinutes(2);
+
+    const dry = (await get(superAdmin, `/projects/${p.id}/privacy/erasure`)).body;
+    expect(dry.plan).toMatchObject({ eligible: true });
+    expect(dry.plan.would_delete.answer).toBeGreaterThan(0);
+    // an irreversible action needs the project id typed back
+    expect((await post(superAdmin, `/projects/${p.id}/privacy/erasure`, {})).status).toBe(400);
+    expect((await post(superAdmin, `/projects/${p.id}/privacy/erasure`, { confirmProjectId: randomUUID() })).status).toBe(400);
+    expect(await h.client.query("SELECT 1 FROM answer WHERE project_id = $1", [p.id]).then((r) => r.rows.length)).toBeGreaterThan(0);
+
+    const done = await post(superAdmin, `/projects/${p.id}/privacy/erasure`, { confirmProjectId: p.id });
+    expect(done.status).toBe(200);
+    expect(done.body.result).toMatchObject({ eligible: true, executed: true, deleted_rows: dry.plan.would_delete });
+    expect(await h.client.query("SELECT 1 FROM answer WHERE project_id = $1", [p.id]).then((r) => r.rows.length)).toBe(0);
+    expect((await post(superAdmin, `/projects/${p.id}/privacy/erasure`, { confirmProjectId: p.id })).body.result).toMatchObject({ eligible: false, reason: "already_erased" });
+    const state = (await get(admin, `/projects/${p.id}/entitlement`)).body;
+    expect(state.privacy.state).toBe("anonymized");
+    expect(state.entitlement?.precision_access_mode ?? "REVOKED").not.toBe("FULL");
+
+    // the Admin read models still answer for an erased project (no 500s on missing content)
+    for (const path of ["", "/answers", "/snapshot", "/internal-assessment", "/premium"]) expect((await get(admin, `/projects/${p.id}${path}`)).status).toBeLessThan(500);
+
+    const audit = await h.client.query("SELECT action, outcome, details::text AS details FROM admin_audit_event WHERE action LIKE 'privacy.erasure%' OR action = 'privacy.policy_approved' ORDER BY occurred_at, audit_id");
+    expect(audit.rows.map((r) => `${r.action}:${r.outcome}`)).toEqual(expect.arrayContaining(["privacy.policy_approved:ALLOWED", "privacy.erasure_executed:ALLOWED", "privacy.erasure_planned:ALLOWED"]));
+    const executed = audit.rows.find((r) => r.action === "privacy.erasure_executed" && /executed/.test(r.details));
+    expect(executed?.details).toMatch(/deleted_rows/);
+    expect(audit.rows.map((r) => r.details).join()).not.toMatch(/Ana|Rivera|Northwind|@/);
+  });
 });

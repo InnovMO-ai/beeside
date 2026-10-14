@@ -225,6 +225,20 @@
       "when": 1791998959135,
       "tag": "0031_subscription_checkout_link_outcome",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792000430322,
+      "tag": "0032_privacy_erasure_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792000439395,
+      "tag": "0033_privacy_erasure_executor",
+      "breakpoints": true
     }
   ]
 }

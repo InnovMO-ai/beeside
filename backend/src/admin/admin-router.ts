@@ -28,6 +28,7 @@ import {
   redeemProgram,
   terminateGrant,
 } from "../premium/entitlement-grants";
+import { ErasurePlan, ErasureResult, approvePolicy, currentPolicy, erasureRuns, executeErasure, planErasure } from "../privacy/erasure";
 import { isSubscriptionEventType, processSubscriptionEvent } from "../premium/subscription-events";
 import {
   ADMIN_LOGIN_COOKIE,
@@ -598,10 +599,68 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     mutation("privacy.event_recorded", (req) => ({ targetType: "project", targetId: projectId(req), projectId: projectId(req) }), async (req) => {
       const id = projectId(req);
       const b = body(req);
-      const event = oneOf(b.event, ["access_blocked", "access_restored", "anonymized"] as const satisfies readonly PrivacyEventName[], "event");
+      if (b.event === "anonymized") throw new FaError("INVALID_INPUT", "anonymization is executed through /privacy/erasure, never recorded by hand", { fields: ["event"] });
+      const event = oneOf(b.event, ["access_blocked", "access_restored"] as const satisfies readonly PrivacyEventName[], "event");
       const reasonCode = oneOf(b.reasonCode, ["erasure_request", "legal_order", "contract_closure", "security_action", "other"] as const satisfies readonly PrivacyReason[], "reasonCode");
       await recordPrivacyEvent(db, { projectId: id, event, reasonCode, actor: actorOf(req) });
       return { status: 201, body: { projectId: id, event, reasonCode }, details: { event, reason_code: reasonCode } };
+    }),
+  );
+
+  // ---- privacy erasure: SUPER_ADMIN only. The policy gate, the window and the registry are enforced by the database; these routes
+  // only ask, show the dry run and record who confirmed. Nothing here is scheduled.
+  router.get(
+    "/privacy/policy",
+    allow("privacy.manage", "privacy.policy_viewed"),
+    handle(async (req, res) => {
+      const policy = await currentPolicy(db);
+      await audit(req, "privacy.policy_viewed", "ALLOWED", { targetType: "privacy_policy", targetId: policy?.policy_id ?? "none" });
+      res.json({ policy });
+    }),
+  );
+  router.post(
+    "/privacy/policy",
+    allow("privacy.manage", "privacy.policy_approved"),
+    mutation("privacy.policy_approved", () => ({ targetType: "privacy_policy", targetId: "new" }), async (req) => {
+      const b = body(req);
+      if (typeof b.retainLegalAcceptance !== "boolean") throw new FaError("INVALID_INPUT", "retainLegalAcceptance must be true or false", { fields: ["retainLegalAcceptance"] });
+      const policy = await approvePolicy(db, {
+        minDaysAfterBlock: asInt(b.minDaysAfterBlock, "minDaysAfterBlock", 0, 3650),
+        retainLegalAcceptance: b.retainLegalAcceptance,
+        approvedBy: adminId(req),
+        now: now(),
+      });
+      return { status: 201, body: { policy }, details: { days: policy.min_days_after_block, result: policy.retain_legal_acceptance ? "legal_acceptance_kept" : "legal_acceptance_erased" } };
+    }),
+  );
+  router.get(
+    "/projects/:projectId/privacy/erasure",
+    allow("privacy.manage", "privacy.erasure_planned"),
+    handle(async (req, res) => {
+      const id = projectId(req);
+      const plan = await planErasure(db, id, actorOf(req as AdminRequest), now());
+      const runs = await erasureRuns(db, id);
+      await audit(req as AdminRequest, "privacy.erasure_planned", "ALLOWED", { targetType: "project", targetId: id, projectId: id, details: { result: plan.eligible ? "eligible" : (plan.reason ?? "refused") } });
+      res.json({ plan, runs });
+    }),
+  );
+  router.post(
+    "/projects/:projectId/privacy/erasure",
+    allow("privacy.manage", "privacy.erasure_executed"),
+    mutation("privacy.erasure_executed", (req) => ({ targetType: "project", targetId: projectId(req), projectId: projectId(req) }), async (req) => {
+      const id = projectId(req);
+      // The operator types the project id back: an irreversible action is never one click or one stray request.
+      if (body(req).confirmProjectId !== id) throw new FaError("INVALID_INPUT", "confirmProjectId must repeat the project id", { fields: ["confirmProjectId"] });
+      const result = await executeErasure(db, id, actorOf(req), now());
+      const executed = "executed" in result && result.executed;
+      return {
+        status: executed ? 200 : 409,
+        body: { result },
+        details: executed
+          ? { result: "executed", deleted_rows: (result as ErasureResult).deleted_rows, person_anonymized: (result as ErasureResult).person_anonymized, company_anonymized: (result as ErasureResult).company_anonymized }
+          : { result: (result as ErasurePlan).reason ?? "refused" },
+        projectId: id,
+      };
     }),
   );
 
