@@ -23,6 +23,8 @@ export interface AccessRow {
   /** Latest subscription (null when none): lets the derivation close access at the period end even if the sweep is late. */
   subscription_status: "PREMIUM_ACTIVE" | "CANCELLATION_SCHEDULED" | "PREMIUM_INACTIVE" | null;
   subscription_period_end: Date | null;
+  /** Recurring subscription: the provider renews it, so the clock waits `renewalSafetyDays` past the paid-through date (same margin as the sweep). */
+  subscription_auto_renews?: boolean | null;
   /**
    * Dated end of FULL access when the entitlement is not open-ended (a grant, or a paid period already scheduled to end).
    * NULL = open-ended. Optional so callers that only know paid rows keep working. This is what lets any non-paid source
@@ -45,7 +47,7 @@ export interface DerivedAccess {
  * What a project can do at `now`. Pure. It never grants more than the stored state and never less than the clock
  * implies: a period that ran out is READ_ONLY even if the sweep has not run yet, and an elapsed window is REVOKED.
  */
-export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<PremiumPolicy, "readonlyGraceDays">): DerivedAccess {
+export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<PremiumPolicy, "readonlyGraceDays"> & Partial<Pick<PremiumPolicy, "renewalSafetyDays">>): DerivedAccess {
   if (!row) return { mode: "REVOKED", readonlyUntil: null };
   if (row.privacy_state === "blocked" || row.privacy_state === "anonymized") return { mode: "REVOKED", readonlyUntil: null };
   let mode = row.precision_access_mode;
@@ -53,11 +55,15 @@ export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<Prem
   let readonlyUntil = row.readonly_until;
   if (mode === "FULL") {
     const open = row.subscription_status === "PREMIUM_ACTIVE" || row.subscription_status === "CANCELLATION_SCHEDULED";
-    if (open && row.subscription_period_end && row.subscription_period_end.getTime() <= now.getTime()) {
+    // A recurring subscription that has not been cancelled keeps FULL for the safety margin past the paid-through date (late renewal /
+    // collection retries); the sweep ends it after the same margin. A scheduled cancellation ends exactly at the period end.
+    const margin = row.subscription_auto_renews === true && row.subscription_status === "PREMIUM_ACTIVE" ? (policy.renewalSafetyDays ?? 0) * 86_400_000 : 0;
+    const paidEnd = row.subscription_period_end ? row.subscription_period_end.getTime() + margin : null;
+    if (open && paidEnd !== null && paidEnd <= now.getTime()) {
       mode = "READ_ONLY";
       endedAt = row.subscription_period_end;
       readonlyUntil = null;
-    } else if (row.effective_until && row.effective_until.getTime() <= now.getTime() && !(open && row.subscription_period_end && row.subscription_period_end.getTime() > now.getTime())) {
+    } else if (row.effective_until && row.effective_until.getTime() <= now.getTime() && !(open && paidEnd !== null && paidEnd > now.getTime())) {
       // A dated source (grant) ran out and no paid period is still running.
       mode = "READ_ONLY";
       endedAt = row.effective_until;
@@ -77,10 +83,10 @@ export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<Prem
 export async function loadAccessRow(db: Db, projectId: string): Promise<AccessRow | null> {
   const { rows } = await db.query<AccessRow>(
     `SELECT e.premium_access_active, e.precision_access_mode, e.premium_ended_at, e.readonly_until, e.effective_until,
-            s.status AS subscription_status, s.current_period_end AS subscription_period_end, ps.state AS privacy_state
+            s.status AS subscription_status, s.current_period_end AS subscription_period_end, s.auto_renews AS subscription_auto_renews, ps.state AS privacy_state
        FROM entitlement e
        LEFT JOIN project_privacy_state ps ON ps.project_id = e.project_id
-       LEFT JOIN LATERAL (SELECT status, current_period_end FROM subscription WHERE project_id = e.project_id
+       LEFT JOIN LATERAL (SELECT status, current_period_end, auto_renews FROM subscription WHERE project_id = e.project_id
                            ORDER BY created_at DESC, current_period_start DESC LIMIT 1) s ON true
       WHERE e.project_id = $1`,
     [projectId],
@@ -108,9 +114,12 @@ export async function sweepPrecisionAccess(db: Db, bundles: BundleStore, input: 
 
   const due = await db.query<{ subscription_id: string; project_id: string; current_period_end: Date }>(
     `SELECT subscription_id, project_id, current_period_end FROM subscription
-      WHERE status IN ('PREMIUM_ACTIVE', 'CANCELLATION_SCHEDULED') AND current_period_end <= $1
+      WHERE status IN ('PREMIUM_ACTIVE', 'CANCELLATION_SCHEDULED')
+        -- A recurring subscription is renewed (or ended) by its provider: wait a safety margin past the paid-through date so a late
+        -- renewal never flickers access. A scheduled cancellation ends exactly at the period end, as before.
+        AND current_period_end + CASE WHEN auto_renews AND status = 'PREMIUM_ACTIVE' THEN make_interval(days => $3) ELSE interval '0' END <= $1
       ORDER BY current_period_end LIMIT $2`,
-    [now, BATCH],
+    [now, BATCH, policy.renewalSafetyDays ?? 14],
   );
   for (const sub of due.rows) {
     try {

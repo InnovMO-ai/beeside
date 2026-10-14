@@ -322,7 +322,10 @@ describeWithDb("Stripe adapter -> Core payment/entitlement (PostgreSQL, rolled b
     const id = project.project_id as string;
     const unknown = await send("customer.subscription.updated", { object: "subscription", id: "sub_x" });
     expect(unknown.res.status).toBe(200);
-    expect(await outcomeOf(unknown.id)).toBe("STORED_UNHANDLED_TYPE");
+    // Subscription events are handled now (recurring billing); one that carries no mapping of ours is simply not ours.
+    expect(await outcomeOf(unknown.id)).toBe("IGNORED_NOT_OURS");
+    const stored = await send("customer.created", { object: "customer", id: "cus_x" });
+    expect(await outcomeOf(stored.id)).toBe("STORED_UNHANDLED_TYPE");
 
     // A paid session of ours-looking metadata but not created by this adapter: no row -> no activation.
     const foreign = await client().createCheckoutSession({ projectId: id, locale: "en", idempotencyKey: "test:foreign" });

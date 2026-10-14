@@ -6,7 +6,8 @@ import { BundleStore } from "../../fa/services/bundle-store";
 import { Logger, describeError, jsonLogger } from "../../security/redact";
 import { PremiumPolicy } from "../premium-policy";
 import { ApplyContext, applyPaidCheckoutSession, mappedProjectId, markCheckoutTerminal, recordAlert } from "./apply";
-import { StripeCheckoutSession } from "./client";
+import { applyInvoicePaid, applyPaymentFailed, applySubscriptionState, linkSubscriptionCheckout } from "./apply-subscription";
+import { StripeCheckoutSession, StripeInvoice, StripeSubscription } from "./client";
 import { STRIPE_SIGNATURE_HEADER, verifyStripeSignature } from "./signature";
 
 /**
@@ -90,6 +91,11 @@ async function dispatch(tx: Db, event: StripeEvent, ctx: ApplyContext): Promise<
     case "checkout.session.async_payment_succeeded": {
       const session = object as unknown as StripeCheckoutSession;
       if (session.object !== "checkout.session" || typeof session.id !== "string") return { outcome: "IGNORED_MALFORMED", projectId: null, sessionId: null };
+      if (session.mode === "subscription") {
+        // Recurring: the session only proves the subscription EXISTS. Nothing is collected (trial) or confirmed here; access follows invoice.paid.
+        const linked = await linkSubscriptionCheckout(tx, session, ctx);
+        return { outcome: linked.outcome, projectId: linked.projectId, sessionId: session.id };
+      }
       if (session.mode !== undefined && session.mode !== "payment") return { outcome: "IGNORED_NOT_PREMIUM_PAYMENT", projectId: null, sessionId: session.id };
       if (session.payment_status !== "paid") {
         // Delayed payment method: the money is not confirmed yet. async_payment_succeeded / _failed will follow.
@@ -107,6 +113,25 @@ async function dispatch(tx: Db, event: StripeEvent, ctx: ApplyContext): Promise<
       if (!projectId) return { outcome: "IGNORED_UNKNOWN_SESSION", projectId: null, sessionId };
       if (to === "failed" && changed) await recordAlert(tx, ctx.log, { kind: "payment_async_failed", projectId, stripeRef: sessionId });
       return { outcome: changed ? (to === "expired" ? "CHECKOUT_EXPIRED" : "CHECKOUT_FAILED") : "NO_CHANGE", projectId, sessionId };
+    }
+    case "invoice.paid": {
+      const invoice = object as unknown as StripeInvoice;
+      if (invoice.object !== "invoice" || typeof invoice.id !== "string") return { outcome: "IGNORED_MALFORMED", projectId: null, sessionId: null };
+      const result = await applyInvoicePaid(tx, invoice, ctx);
+      return { outcome: result.outcome, projectId: result.projectId, sessionId: null };
+    }
+    case "invoice.payment_failed": {
+      const invoice = object as unknown as StripeInvoice;
+      if (invoice.object !== "invoice" || typeof invoice.id !== "string") return { outcome: "IGNORED_MALFORMED", projectId: null, sessionId: null };
+      const result = await applyPaymentFailed(tx, invoice, ctx);
+      return { outcome: result.outcome, projectId: result.projectId, sessionId: null };
+    }
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      const sub = object as unknown as StripeSubscription;
+      if (sub.object !== "subscription" || typeof sub.id !== "string") return { outcome: "IGNORED_MALFORMED", projectId: null, sessionId: null };
+      const result = await applySubscriptionState(tx, sub, ctx, { forceEnded: event.type === "customer.subscription.deleted" });
+      return { outcome: result.outcome, projectId: result.projectId, sessionId: null };
     }
     default: {
       if (!REFUND_DISPUTE_TYPES.has(event.type)) return { outcome: "STORED_UNHANDLED_TYPE", projectId: null, sessionId: null };

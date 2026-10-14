@@ -23,6 +23,9 @@ export const subscriptionEventTypeEnum = pgEnum("subscription_event_type", [
   "cancellation_requested",
   "subscription_period_ended",
   "premium_reactivated",
+  // Recurring billing (provider-agnostic): a paid renewal extends the paid-through date; a withdrawn cancellation restores renewal.
+  "subscription_renewed",
+  "cancellation_withdrawn",
 ]);
 
 export const findingStatusEnum = pgEnum("finding_status", [

@@ -26,6 +26,10 @@ export const premiumCheckout = pgTable(
     currency: text("currency"),
     paidAmountTotal: bigint("paid_amount_total", { mode: "number" }),
     stripePaymentIntentId: text("stripe_payment_intent_id"),
+    // payment = one-time Checkout (legacy path); subscription = recurring. For a subscription checkout the Stripe subscription id is
+    // linked when the session completes and is how later invoices/updates are mapped back to the project (never by e-mail).
+    billingMode: text("billing_mode").notNull().default("payment"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
     // Result of applying a confirmed payment: ACTIVATED | NOT_APPLICABLE_DUPLICATE_PAYMENT | NOT_APPLICABLE_NOT_ELIGIBLE.
     outcome: text("outcome"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
@@ -39,7 +43,9 @@ export const premiumCheckout = pgTable(
     uniqueIndex("premium_checkout_one_open_per_project").on(t.projectId).where(sql`${t.status} = 'open'`),
     index("premium_checkout_project_idx").on(t.projectId, t.createdAt),
     index("premium_checkout_payment_intent_idx").on(t.stripePaymentIntentId),
+    index("premium_checkout_subscription_idx").on(t.stripeSubscriptionId),
     check("premium_checkout_status", sql`${t.status} IN ('open', 'completed', 'expired', 'failed')`),
+    check("premium_checkout_billing_mode", sql`${t.billingMode} IN ('payment', 'subscription')`),
     check("premium_checkout_language", sql`${t.interfaceLanguage} IN ('es', 'en')`),
     check("premium_checkout_currency", sql`${t.currency} IS NULL OR ${t.currency} ~ '^[a-z]{3}$'`),
     check("premium_checkout_amounts", sql`(${t.amountTotal} IS NULL OR ${t.amountTotal} >= 0) AND (${t.paidAmountTotal} IS NULL OR ${t.paidAmountTotal} >= 0)`),

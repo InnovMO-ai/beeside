@@ -6,12 +6,20 @@ import { enqueueEmail } from "../operations/email-outbox";
 
 /**
  * Provider-agnostic subscription lifecycle (Technical Change Note v1.1 §G, Technical Architecture
- * v1.1 §4.2/§10). Any future payment provider is translated into these four events by a thin
- * adapter; no provider is selected here. None of the handlers writes assessment_state, answers,
+ * v1.1 §4.2/§10). Any payment provider is translated into these events by a thin adapter; no provider is selected here.
+ * Two events serve recurring billing: `subscription_renewed` (a collected renewal moves the paid-through date forward) and
+ * `cancellation_withdrawn` (a scheduled cancellation is taken back, so renewal continues). None of the handlers writes assessment_state, answers,
  * findings, the Snapshot or the Internal Assessment — Premium can never reopen First Assessment.
  */
 
-export const SUBSCRIPTION_EVENT_TYPES = ["premium_activated", "cancellation_requested", "subscription_period_ended", "premium_reactivated"] as const;
+export const SUBSCRIPTION_EVENT_TYPES = [
+  "premium_activated",
+  "cancellation_requested",
+  "subscription_period_ended",
+  "premium_reactivated",
+  "subscription_renewed",
+  "cancellation_withdrawn",
+] as const;
 export type SubscriptionEventType = (typeof SUBSCRIPTION_EVENT_TYPES)[number];
 
 export interface SubscriptionEventInput {
@@ -25,7 +33,10 @@ export interface SubscriptionEventInput {
   idempotencyKey?: string | null;
   /** Required when a subscription row is created (activation / reactivation). */
   periodStart?: Date | null;
+  /** Activation / reactivation: the paid term's end. Renewal: the NEW paid-through date. */
   periodEnd?: Date | null;
+  /** Activation / reactivation: the provider renews (and ends) this subscription (recurring billing). */
+  autoRenews?: boolean;
 }
 
 export interface SubscriptionEventResult {
@@ -42,6 +53,7 @@ export interface SubscriptionEventResult {
 interface SubscriptionRow {
   subscription_id: string;
   status: "PREMIUM_ACTIVE" | "CANCELLATION_SCHEDULED" | "PREMIUM_INACTIVE";
+  current_period_end: Date;
 }
 
 export function isSubscriptionEventType(value: unknown): value is SubscriptionEventType {
@@ -100,7 +112,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
 
   const latest = (
     await tx.query<SubscriptionRow>(
-      "SELECT subscription_id, status FROM subscription WHERE project_id = $1 ORDER BY created_at DESC, current_period_start DESC LIMIT 1 FOR UPDATE",
+      "SELECT subscription_id, status, current_period_end FROM subscription WHERE project_id = $1 ORDER BY created_at DESC, current_period_start DESC LIMIT 1 FOR UPDATE",
       [input.projectId],
     )
   ).rows[0];
@@ -122,15 +134,16 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
     // THE STACKING RULE: a paid term starts when the access the project already holds (free, sponsored, trial, ...) ends, so the
     // client keeps every free day and is never charged for a day already covered. With no other access this is a no-op.
     const held = (await tx.query<{ t: Date }>("SELECT entitlement_covered_until($1, $2) AS t", [input.projectId, at])).rows[0]?.t;
-    if (held && held.getTime() > start.getTime()) {
+    // Only access that is really still ahead counts: a provider term that began before this event was processed (late webhook) keeps its own dates.
+    if (held && held.getTime() > Math.max(start.getTime(), at.getTime())) {
       const length = end.getTime() - start.getTime();
       start = held;
       end = new Date(held.getTime() + length);
     }
     const { rows } = await tx.query<{ subscription_id: string }>(
-      `INSERT INTO subscription (project_id, status, current_period_start, current_period_end, created_at, updated_at)
-       VALUES ($1, 'PREMIUM_ACTIVE', $2, $3, $4, $4) RETURNING subscription_id`,
-      [input.projectId, start, end, at],
+      `INSERT INTO subscription (project_id, status, current_period_start, current_period_end, auto_renews, created_at, updated_at)
+       VALUES ($1, 'PREMIUM_ACTIVE', $2, $3, $4, $5, $5) RETURNING subscription_id`,
+      [input.projectId, start, end, input.autoRenews === true, at],
     );
     return rows[0]?.subscription_id as string;
   };
@@ -167,6 +180,27 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       if (!latest || latest.status !== "PREMIUM_ACTIVE") throw new FaError("NOT_APPLICABLE", "there is no active Premium subscription to cancel");
       await tx.query(
         `UPDATE subscription SET status = 'CANCELLATION_SCHEDULED', cancel_at_period_end = true, cancellation_requested_at = $2, updated_at = $2
+          WHERE subscription_id = $1`,
+        [latest.subscription_id, at],
+      );
+      eventId = await insertEvent(latest.subscription_id);
+      break;
+    }
+    case "subscription_renewed": {
+      if (!latest || latest.status === "PREMIUM_INACTIVE") throw new FaError("NOT_APPLICABLE", "there is no running subscription to renew");
+      if (!input.periodEnd || Number.isNaN(input.periodEnd.getTime())) throw new FaError("INVALID_INPUT", "current_period_end is required", { fields: ["current_period_end"] });
+      // Forward only: a renewal that does not move the paid-through date (a replay with a different key, a late duplicate) is
+      // recorded but changes nothing, so the date can never go backwards.
+      if (input.periodEnd.getTime() > latest.current_period_end.getTime()) {
+        await tx.query("UPDATE subscription SET current_period_end = $2, updated_at = $3 WHERE subscription_id = $1", [latest.subscription_id, input.periodEnd, at]);
+      }
+      eventId = await insertEvent(latest.subscription_id);
+      break;
+    }
+    case "cancellation_withdrawn": {
+      if (!latest || latest.status !== "CANCELLATION_SCHEDULED") throw new FaError("NOT_APPLICABLE", "there is no scheduled cancellation to withdraw");
+      await tx.query(
+        `UPDATE subscription SET status = 'PREMIUM_ACTIVE', cancel_at_period_end = false, cancellation_requested_at = NULL, updated_at = $2
           WHERE subscription_id = $1`,
         [latest.subscription_id, at],
       );

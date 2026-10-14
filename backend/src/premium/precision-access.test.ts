@@ -69,3 +69,23 @@ describe("deriveAccess with a dated source (grant): the clock closes it even if 
     expect(deriveAccess(row, T0, grace).mode).toBe("FULL");
   });
 });
+
+describe("deriveAccess with a recurring subscription: the provider renews, the clock waits the safety margin", () => {
+  const recurring = (periodEnd: Date, status: AccessRow["subscription_status"] = "PREMIUM_ACTIVE"): AccessRow => ({
+    ...full(periodEnd, status), subscription_auto_renews: true, effective_until: periodEnd,
+  });
+  const policy = { readonlyGraceDays: 90, renewalSafetyDays: 14 };
+  it("stays FULL past the paid-through date inside the margin, then closes at the paid-through date with the window counted from it", () => {
+    const end = new Date(T0.getTime() - 5 * D);
+    expect(deriveAccess(recurring(end), T0, policy).mode).toBe("FULL");
+    const late = new Date(T0.getTime() - 15 * D);
+    const r = deriveAccess(recurring(late), T0, policy);
+    expect(r.mode).toBe("READ_ONLY");
+    expect(r.readonlyUntil?.getTime()).toBe(late.getTime() + 90 * D);
+  });
+  it("a scheduled cancellation ends exactly at the period end (no margin), and a one-time term is unaffected", () => {
+    const end = new Date(T0.getTime() - D);
+    expect(deriveAccess(recurring(end, "CANCELLATION_SCHEDULED"), T0, policy).mode).toBe("READ_ONLY");
+    expect(deriveAccess({ ...full(end), subscription_auto_renews: false }, T0, policy).mode).toBe("READ_ONLY");
+  });
+});

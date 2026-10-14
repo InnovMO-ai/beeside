@@ -204,6 +204,27 @@
       "when": 1791996686895,
       "tag": "0028_entitlement_foundation_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791998245706,
+      "tag": "0029_subscription_recurring",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791998246902,
+      "tag": "0030_subscription_recurring_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791998959135,
+      "tag": "0031_subscription_checkout_link_outcome",
+      "breakpoints": true
     }
   ]
 }

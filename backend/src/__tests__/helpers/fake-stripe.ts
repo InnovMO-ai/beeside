@@ -23,6 +23,24 @@ export interface FakeSession {
   created: number;
   livemode: boolean;
   locale: string | null;
+  /** Subscription mode only. */
+  subscription: string | null;
+  trial_end: number | null;
+}
+
+export interface FakeSubscription {
+  id: string;
+  object: "subscription";
+  status: string;
+  current_period_start: number;
+  current_period_end: number;
+  cancel_at_period_end: boolean;
+  canceled_at: number | null;
+  ended_at: number | null;
+  trial_end: number | null;
+  metadata: Record<string, string>;
+  created: number;
+  livemode: boolean;
 }
 
 export interface RecordedRequest {
@@ -35,6 +53,9 @@ export interface RecordedRequest {
 
 export class FakeStripe {
   readonly sessions = new Map<string, FakeSession>();
+  readonly subscriptions = new Map<string, FakeSubscription>();
+  /** Length of one billing cycle in the fake (days). */
+  cycleDays = 30;
   readonly requests: RecordedRequest[] = [];
   /** Responses to inject for the next N create calls: e.g. { status: 500 }. */
   readonly failures: Array<{ status: number; body?: unknown }> = [];
@@ -52,6 +73,7 @@ export class FakeStripe {
   /** Forget every session, request and injected failure (between tests). */
   reset(): void {
     this.sessions.clear();
+    this.subscriptions.clear();
     this.idempotent.clear();
     this.requests.length = 0;
     this.failures.length = 0;
@@ -74,6 +96,79 @@ export class FakeStripe {
     s.payment_status = "paid";
     s.payment_intent = `pi_test_${sessionId.slice(-8)}`;
     s.url = null;
+    return s;
+  }
+
+  private nowSeconds(): number {
+    return Math.floor(this.clock() / 1000);
+  }
+
+  /**
+   * Subscription mode: the customer completes the hosted page. With a trial_end the subscription is `trialing` (nothing collected);
+   * otherwise it is `active` for one cycle (first invoice paid). Webhooks are NOT sent: tests send events themselves.
+   */
+  completeSubscriptionSession(sessionId: string): { session: FakeSession; subscription: FakeSubscription } {
+    const session = this.must(sessionId);
+    const now = this.nowSeconds();
+    const id = `sub_test_${String(++this.counter).padStart(6, "0")}${Math.random().toString(36).slice(2, 8)}`;
+    const trialing = session.trial_end !== null && session.trial_end > now;
+    const subscription: FakeSubscription = {
+      id,
+      object: "subscription",
+      status: trialing ? "trialing" : "active",
+      current_period_start: now,
+      current_period_end: trialing ? (session.trial_end as number) : now + this.cycleDays * 86_400,
+      cancel_at_period_end: false,
+      canceled_at: null,
+      ended_at: null,
+      trial_end: session.trial_end,
+      metadata: { ...(session.metadata ?? {}) },
+      created: now,
+      livemode: false,
+    };
+    this.subscriptions.set(id, subscription);
+    session.status = "complete";
+    session.payment_status = trialing ? "no_payment_required" : "paid";
+    session.subscription = id;
+    session.url = null;
+    return { session, subscription };
+  }
+
+  /** The trial ends and the first cycle is collected. */
+  collectFirstCycle(subId: string): FakeSubscription {
+    const sub = this.mustSub(subId);
+    sub.status = "active";
+    sub.current_period_start = sub.current_period_end;
+    sub.current_period_end = sub.current_period_start + this.cycleDays * 86_400;
+    return sub;
+  }
+
+  /** A renewal cycle is collected: the paid-through date moves one cycle forward. */
+  renew(subId: string): FakeSubscription {
+    const sub = this.mustSub(subId);
+    sub.status = "active";
+    sub.current_period_start = sub.current_period_end;
+    sub.current_period_end = sub.current_period_start + this.cycleDays * 86_400;
+    return sub;
+  }
+
+  setCancelAtPeriodEnd(subId: string, on: boolean): FakeSubscription {
+    const sub = this.mustSub(subId);
+    sub.cancel_at_period_end = on;
+    sub.canceled_at = on ? this.nowSeconds() : null;
+    return sub;
+  }
+
+  setSubscriptionStatus(subId: string, status: string): FakeSubscription {
+    const sub = this.mustSub(subId);
+    sub.status = status;
+    if (status === "canceled") sub.ended_at = this.nowSeconds();
+    return sub;
+  }
+
+  mustSub(subId: string): FakeSubscription {
+    const s = this.subscriptions.get(subId);
+    if (!s) throw new Error(`fake stripe: unknown subscription ${subId}`);
     return s;
   }
 
@@ -145,10 +240,25 @@ export class FakeStripe {
         created,
         livemode: false,
         locale: form.locale ?? null,
+        subscription: null,
+        trial_end: form["subscription_data[trial_end]"] ? Number(form["subscription_data[trial_end]"]) : null,
       };
       this.sessions.set(id, session);
       if (key) this.idempotent.set(key, id);
       this.json(res, 200, session);
+      return;
+    }
+    const oneSub = /^\/v1\/subscriptions\/(sub_[A-Za-z0-9_]+)$/.exec(url.pathname);
+    if (req.method === "GET" && oneSub?.[1]) {
+      const sub = this.subscriptions.get(oneSub[1]);
+      if (sub) this.json(res, 200, sub);
+      else this.json(res, 404, { error: { type: "invalid_request_error", code: "resource_missing" } });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/v1/subscriptions") {
+      const gte = Number(query["created[gte]"] ?? 0);
+      const all = [...this.subscriptions.values()].filter((x) => x.created >= gte);
+      this.json(res, 200, { object: "list", data: all, has_more: false });
       return;
     }
     const one = /^\/v1\/checkout\/sessions\/(cs_[A-Za-z0-9_]+)$/.exec(url.pathname);
@@ -187,4 +297,32 @@ export function sessionObject(s: FakeSession, extra: Record<string, unknown> = {
 
 export function signedHeaders(secret: string, raw: string, timestampSeconds: number = Math.floor(Date.now() / 1000)): { "Stripe-Signature": string; "Content-Type": string } {
   return { "Stripe-Signature": signStripePayload(secret, timestampSeconds, raw), "Content-Type": "application/json" };
+}
+
+/** The webhook-facing view of a fake subscription. */
+export function subscriptionObject(s: FakeSubscription, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...s, customer: "cus_test_private", ...extra };
+}
+
+let invoiceCounter = 0;
+
+/** A Stripe invoice for one billing cycle of a fake subscription (`period` defaults to the subscription's current cycle). */
+export function invoiceObject(
+  s: FakeSubscription,
+  options: { id?: string; amountPaid?: number; billingReason?: string; period?: { start: number; end: number }; subscriptionMetadata?: Record<string, string> } = {},
+): Record<string, unknown> {
+  const period = options.period ?? { start: s.current_period_start, end: s.current_period_end };
+  return {
+    id: options.id ?? `in_test_${String(++invoiceCounter).padStart(6, "0")}`,
+    object: "invoice",
+    subscription: s.id,
+    subscription_details: { metadata: options.subscriptionMetadata ?? s.metadata },
+    billing_reason: options.billingReason ?? "subscription_cycle",
+    status: "paid",
+    amount_paid: options.amountPaid ?? 49_900,
+    currency: "mxn",
+    lines: { data: [{ period }] },
+    customer_email: "private.customer@example.invalid",
+    livemode: false,
+  };
 }

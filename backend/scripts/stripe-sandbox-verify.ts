@@ -4,18 +4,25 @@
  * the Stripe track stays "IN BUILD — adapter complete, contract-tested against a fake; SANDBOX not verified".
  *
  * What it verifies, end to end against the real Stripe test environment:
- *   1. the key is a TEST key and the configured price is an active one-time price;
+ *   1. the key is a TEST key and the configured price is active (one-time in STRIPE_BILLING_MODE=payment; RECURRING in =subscription);
  *   2. a Hosted Checkout Session is created through the real adapter for an existing eligible project;
  *   3. (you pay with a Stripe test card) the signed webhook forwarded by the Stripe CLI activates Premium exactly once;
  *   4. the same payment seen again through reconciliation (second channel) creates no second activation;
  *   5. optional --duplicate-payment: a second paid session for the same project -> NOT_APPLICABLE_DUPLICATE_PAYMENT, one subscription;
  *   6. optional --refund-check: a refund you issue in the Dashboard/CLI is recorded + alerted and access is unchanged.
+ *   7. RECURRING only (STRIPE_BILLING_MODE=subscription) and optional --cancel-check: you set "cancel at period end" on the subscription in the
+ *      Dashboard -> CANCELLATION_SCHEDULED with access intact; you resume it -> back to PREMIUM_ACTIVE.
+ *   Recurring renewals are verified with a Stripe TEST CLOCK (Dashboard > Billing > Test clocks): advance the clock one billing period and
+ *   re-run `reconcile` (or let the forwarded invoice.paid arrive); the paid-through date must move forward exactly once. Also confirm in the
+ *   sandbox (these were ASSUMED, not verified, when the adapter was written): (a) Checkout accepts subscription_data[trial_end] only >= 48 h
+ *   ahead (the adapter uses 49 h), (b) invoice events carry subscription_details.metadata.project_id.
  *
  * Usage (backend/):
  *   export DATABASE_URL=postgres://...            # a SANDBOX database that already has all migrations applied
  *   export APP_BASE_URL=http://localhost:5173     # any http(s) URL; used for return links
  *   export STRIPE_SECRET_KEY=sk_test_...          # TEST key only: sk_live_ / rk_live_ are refused
- *   export STRIPE_PRICE_ID=price_...              # a one-time price
+ *   export STRIPE_PRICE_ID=price_...              # a one-time price (payment mode) or a RECURRING price (subscription mode)
+ *   export STRIPE_BILLING_MODE=payment|subscription   # default payment
  *   export STRIPE_WEBHOOK_SECRET=whsec_...        # from `stripe listen --print-secret`
  *   export STRIPE_SUCCESS_URL=$APP_BASE_URL/premium/return STRIPE_CANCEL_URL=$APP_BASE_URL/premium
  *   export VERIFY_PROJECT_ID=<uuid of a COMPLETED_LOCKED project that never entered Premium, in that database>
@@ -71,15 +78,17 @@ async function main(): Promise<void> {
   const waitMs = Number(env.VERIFY_WAIT_SECONDS ?? 600) * 1000;
   const duplicate = process.argv.includes("--duplicate-payment");
   const refund = process.argv.includes("--refund-check");
+  const cancelCheck = process.argv.includes("--cancel-check");
 
   const config = stripeConfigFromEnv({ ...env, STRIPE_API_BASE_URL: undefined });
   if (stripeLivemodeExpected(config)) throw new Error("refusing to run: configuration resolved to live mode");
   const policy = premiumPolicyFromEnv(env);
   const client = new StripeClient(config);
+  const recurring = config.billingMode === "subscription";
 
   // 1. Preflight against the real Stripe test API.
   const price = await client.retrievePrice(config.priceId);
-  check("price is active, one-time, test mode", price.active === true && price.type === "one_time" && price.livemode === false, `${price.currency ?? "?"} ${price.unit_amount ?? "?"}`);
+  check(`price is active, ${recurring ? "recurring" : "one-time"}, test mode`, price.active === true && price.type === (recurring ? "recurring" : "one_time") && price.livemode === false, `${price.currency ?? "?"} ${price.unit_amount ?? "?"}`);
   if (config.productId) check("price belongs to STRIPE_PRODUCT_ID", (typeof price.product === "string" ? price.product : price.product?.id) === config.productId);
 
   const pool = new Pool({ connectionString: env.DATABASE_URL });
@@ -111,6 +120,7 @@ async function main(): Promise<void> {
     const activated = await waitFor("the webhook to activate Premium", async () => ((await count("SELECT count(*) AS n FROM subscription WHERE project_id = $1 AND status = 'PREMIUM_ACTIVE'", [projectId])) > 0 ? true : null), waitMs);
     check("webhook activated Premium", activated === true);
     if (activated) {
+      if (recurring) check("the Core subscription is recurring (auto_renews) and mapped to the Stripe subscription", (await count("SELECT count(*) AS n FROM subscription s JOIN premium_checkout c ON c.project_id = s.project_id WHERE s.project_id = $1 AND s.auto_renews AND c.stripe_subscription_id IS NOT NULL", [projectId])) === 1);
       check("exactly one subscription and one activation event", (await count("SELECT count(*) AS n FROM subscription WHERE project_id = $1", [projectId])) === 1 && (await count("SELECT count(*) AS n FROM subscription_event WHERE project_id = $1", [projectId])) === 1);
       const inbound = (await db.query<{ type: string; outcome: string }>("SELECT type, outcome FROM billing_inbound_event WHERE stripe_session_id = $1 ORDER BY received_at", [session?.stripe_session_id])).rows;
       check("signed events stored with outcomes", inbound.some((e) => e.outcome === "ACTIVATED"), inbound.map((e) => `${e.type}:${e.outcome}`).join(", "));
@@ -125,13 +135,23 @@ async function main(): Promise<void> {
       if (duplicate) {
         const second = await client.createCheckoutSession({ projectId, locale: "en", idempotencyKey: `sandbox-verify:${Date.now()}` });
         await db.query(
-          `INSERT INTO premium_checkout (project_id, stripe_session_id, status, idempotency_key, checkout_url, interface_language, expires_at) VALUES ($1, $2, 'open', $3, $4, 'en', $5)`,
-          [projectId, second.id, `sandbox-verify:${second.id}`, second.url, second.expires_at ? new Date(second.expires_at * 1000) : null],
+          `INSERT INTO premium_checkout (project_id, stripe_session_id, status, idempotency_key, checkout_url, interface_language, expires_at, billing_mode) VALUES ($1, $2, 'open', $3, $4, 'en', $5, $6)`,
+          [projectId, second.id, `sandbox-verify:${second.id}`, second.url, second.expires_at ? new Date(second.expires_at * 1000) : null, recurring ? "subscription" : "payment"],
         );
         console.log(`\nDuplicate-payment check: pay this SECOND session with the test card too:\n\n  ${second.url}\n`);
         const outcome = await waitFor("the duplicate payment to be processed", async () => (await db.query<{ outcome: string }>("SELECT outcome FROM premium_checkout WHERE stripe_session_id = $1 AND status = 'completed'", [second.id])).rows[0]?.outcome ?? null, waitMs);
         check("duplicate payment -> NOT_APPLICABLE_DUPLICATE_PAYMENT", outcome === "NOT_APPLICABLE_DUPLICATE_PAYMENT", String(outcome));
         check("still exactly one subscription; an operational alert exists", (await count("SELECT count(*) AS n FROM subscription WHERE project_id = $1", [projectId])) === 1 && (await count("SELECT count(*) AS n FROM billing_alert WHERE project_id = $1 AND kind = 'duplicate_payment'", [projectId])) === 1);
+      }
+
+      // 5b. Cancellation at period end and its withdrawal (recurring, optional).
+      if (recurring && cancelCheck) {
+        console.log("\nCancel check: in the Stripe Dashboard (test mode) open the subscription > Actions > Cancel subscription > 'at end of billing period'.");
+        const scheduled = await waitFor("CANCELLATION_SCHEDULED", async () => ((await count("SELECT count(*) AS n FROM subscription WHERE project_id = $1 AND status = 'CANCELLATION_SCHEDULED'", [projectId])) > 0 ? true : null), waitMs);
+        check("cancellation at period end recorded; access still FULL", scheduled === true && (await count("SELECT count(*) AS n FROM entitlement WHERE project_id = $1 AND precision_access_mode = 'FULL'", [projectId])) === 1);
+        console.log("Now WITHDRAW it in the Dashboard (Actions > Don't cancel subscription).");
+        const resumed = await waitFor("PREMIUM_ACTIVE again", async () => ((await count("SELECT count(*) AS n FROM subscription WHERE project_id = $1 AND status = 'PREMIUM_ACTIVE'", [projectId])) > 0 ? true : null), waitMs);
+        check("withdrawn cancellation restores renewal", resumed === true);
       }
 
       // 6. Refund (optional): record + alert, access unchanged.

@@ -90,6 +90,14 @@ BEGIN
   INSERT INTO premium_checkout (project_id, stripe_session_id, idempotency_key, interface_language) VALUES (p, 'cs_test_s15', 'k15', 'en') RETURNING checkout_id INTO c;
   UPDATE premium_checkout SET status = 'failed' WHERE checkout_id = c;
   PERFORM pg_temp.expect_error('S15', format($q$UPDATE premium_checkout SET status = 'completed', completed_at = now() WHERE checkout_id = %L$q$, c), 'BV409', 'cannot move');
+
+  -- recurring (0031): a LINKED subscription may receive its final outcome exactly once; any other completed outcome stays write-once
+  INSERT INTO premium_checkout (project_id, stripe_session_id, idempotency_key, interface_language, billing_mode) VALUES (q, 'cs_test_s15b', 'k15b', 'en', 'subscription') RETURNING checkout_id INTO c;
+  UPDATE premium_checkout SET status = 'completed', completed_at = now(), outcome = 'SUBSCRIPTION_LINKED', stripe_subscription_id = 'sub_s15b' WHERE checkout_id = c;
+  UPDATE premium_checkout SET outcome = 'ACTIVATED', paid_amount_total = 49900 WHERE checkout_id = c;
+  PERFORM pg_temp.assert_that('S15b', (SELECT outcome FROM premium_checkout WHERE checkout_id = c) = 'ACTIVATED', 'a linked subscription gets its final outcome');
+  PERFORM pg_temp.expect_error('S15c', format($q$UPDATE premium_checkout SET outcome = 'OTHER' WHERE checkout_id = %L$q$, c), 'BV409', 'write-once');
+  PERFORM pg_temp.expect_error('S15d', format($q$UPDATE premium_checkout SET completed_at = now() + interval '1 day' WHERE checkout_id = %L$q$, c), 'BV409', 'write-once');
 END $t$;
 
 \echo '--- S16-S19: billing_inbound_event / billing_alert ---'

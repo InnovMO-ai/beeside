@@ -17,6 +17,12 @@ describe("Stripe configuration", () => {
     expect(c.priceId).toBe("price_123ABC");
   });
 
+  it("billing mode defaults to the one-time payment and accepts only payment or subscription", () => {
+    expect(stripeConfigFromEnv(base as NodeJS.ProcessEnv).billingMode).toBe("payment");
+    expect(stripeConfigFromEnv({ ...base, STRIPE_BILLING_MODE: "subscription" } as NodeJS.ProcessEnv).billingMode).toBe("subscription");
+    expect(() => stripeConfigFromEnv({ ...base, STRIPE_BILLING_MODE: "monthly" } as NodeJS.ProcessEnv)).toThrow(/STRIPE_BILLING_MODE/);
+  });
+
   it("refuses missing or malformed values without echoing them", () => {
     expect(() => stripeConfigFromEnv({ ...base, STRIPE_SECRET_KEY: undefined } as unknown as NodeJS.ProcessEnv)).toThrow(/STRIPE_SECRET_KEY is required/);
     expect(() => stripeConfigFromEnv({ ...base, STRIPE_SECRET_KEY: "pk_test_nope" } as NodeJS.ProcessEnv)).toThrow(/not a Stripe secret/);
@@ -42,7 +48,9 @@ describe("Stripe configuration", () => {
 describe("Core Premium policy (Stripe does not own the duration)", () => {
   it("defaults, overrides and rejects out-of-range values", () => {
     expect(premiumPolicyFromEnv({} as NodeJS.ProcessEnv)).toEqual(DEFAULT_PREMIUM_POLICY);
-    expect(premiumPolicyFromEnv({ PREMIUM_ACCESS_PERIOD_DAYS: "180", PRECISION_READONLY_GRACE_DAYS: "30" } as unknown as NodeJS.ProcessEnv)).toEqual({ accessPeriodDays: 180, readonlyGraceDays: 30 });
+    expect(premiumPolicyFromEnv({ PREMIUM_ACCESS_PERIOD_DAYS: "180", PRECISION_READONLY_GRACE_DAYS: "30" } as unknown as NodeJS.ProcessEnv)).toEqual({ accessPeriodDays: 180, readonlyGraceDays: 30, renewalSafetyDays: 14 });
+    expect(premiumPolicyFromEnv({ PREMIUM_RENEWAL_SAFETY_DAYS: "7" } as unknown as NodeJS.ProcessEnv).renewalSafetyDays).toBe(7);
+    expect(() => premiumPolicyFromEnv({ PREMIUM_RENEWAL_SAFETY_DAYS: "91" } as unknown as NodeJS.ProcessEnv)).toThrow();
     expect(premiumPolicyFromEnv({ PRECISION_READONLY_GRACE_DAYS: "0" } as unknown as NodeJS.ProcessEnv).readonlyGraceDays).toBe(0);
     expect(() => premiumPolicyFromEnv({ PREMIUM_ACCESS_PERIOD_DAYS: "0" } as unknown as NodeJS.ProcessEnv)).toThrow();
     expect(() => premiumPolicyFromEnv({ PREMIUM_ACCESS_PERIOD_DAYS: "abc" } as unknown as NodeJS.ProcessEnv)).toThrow();

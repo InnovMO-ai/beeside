@@ -13,7 +13,7 @@ import { IntegrationDescriptor } from "../ports/integration-descriptor";
 export class CoreEntitlementProvider implements EntitlementProvider {
   constructor(
     private readonly db: Pick<Db, "query">,
-    private readonly options: { policy: Pick<PremiumPolicy, "readonlyGraceDays">; now?: () => Date },
+    private readonly options: { policy: Pick<PremiumPolicy, "readonlyGraceDays"> & Partial<Pick<PremiumPolicy, "renewalSafetyDays">>; now?: () => Date },
   ) {}
 
   describe(): IntegrationDescriptor {

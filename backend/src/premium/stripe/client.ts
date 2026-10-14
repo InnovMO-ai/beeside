@@ -38,6 +38,8 @@ export interface StripeCheckoutSession {
   amount_total?: number | null;
   currency?: string | null;
   payment_intent?: string | { id?: string } | null;
+  /** Subscription mode: the id of the subscription the session created (set once the session completes). */
+  subscription?: string | { id?: string } | null;
   expires_at?: number | null;
   created?: number;
   livemode?: boolean;
@@ -51,6 +53,38 @@ export interface StripePrice {
   currency?: string;
   unit_amount?: number | null;
   product?: string | { id?: string };
+  livemode?: boolean;
+}
+
+/** A Stripe subscription, reduced to the fields Core reads. `current_period_*` are unix seconds. */
+export interface StripeSubscription {
+  id: string;
+  object: "subscription";
+  /** trialing | active | past_due | unpaid | canceled | incomplete | incomplete_expired | paused */
+  status: string;
+  current_period_start?: number;
+  current_period_end?: number;
+  cancel_at_period_end?: boolean;
+  canceled_at?: number | null;
+  ended_at?: number | null;
+  trial_end?: number | null;
+  metadata?: Record<string, string> | null;
+  created?: number;
+  livemode?: boolean;
+}
+
+/** A Stripe invoice, reduced to the fields Core reads. */
+export interface StripeInvoice {
+  id: string;
+  object: "invoice";
+  subscription?: string | { id?: string } | null;
+  subscription_details?: { metadata?: Record<string, string> | null } | null;
+  /** subscription_create | subscription_cycle | subscription_update | manual | ... */
+  billing_reason?: string | null;
+  status?: string | null;
+  amount_paid?: number | null;
+  currency?: string | null;
+  lines?: { data?: Array<{ period?: { start?: number; end?: number } | null }> } | null;
   livemode?: boolean;
 }
 
@@ -79,6 +113,8 @@ export function formEncode(params: Record<string, unknown>): string {
 
 export interface CreateCheckoutInput {
   projectId: string;
+  /** Subscription mode only: unix seconds. The first charge happens then, so access already held is never paid for twice. */
+  trialEnd?: number;
   /** es | en: Stripe's hosted page language. */
   locale: "es" | "en";
   idempotencyKey: string;
@@ -134,8 +170,32 @@ export class StripeClient {
     throw last ?? new StripeApiError(0, "network_error", null, true);
   }
 
-  /** Hosted Checkout, one-time payment (mode=payment). client_reference_id and metadata.project_id carry the explicit project mapping. */
+  get billingMode(): "payment" | "subscription" {
+    return this.config.billingMode ?? "payment";
+  }
+
+  /**
+   * Hosted Checkout. client_reference_id and metadata.project_id carry the explicit project mapping (never an e-mail address).
+   * mode=payment: one-time payment. mode=subscription: recurring; the mapping is repeated on the subscription itself so that
+   * invoices and subscription events can be mapped back without trusting any other field.
+   */
   createCheckoutSession(input: CreateCheckoutInput): Promise<StripeCheckoutSession> {
+    if (this.billingMode === "subscription") {
+      return this.request<StripeCheckoutSession>("POST", "/v1/checkout/sessions", {
+        idempotencyKey: input.idempotencyKey,
+        retry: true,
+        body: {
+          mode: "subscription",
+          line_items: [{ price: this.config.priceId, quantity: 1 }],
+          success_url: this.config.successUrl,
+          cancel_url: this.config.cancelUrl,
+          client_reference_id: input.projectId,
+          locale: input.locale,
+          metadata: { project_id: input.projectId },
+          subscription_data: { metadata: { project_id: input.projectId }, ...(input.trialEnd ? { trial_end: input.trialEnd } : {}) },
+        },
+      });
+    }
     return this.request<StripeCheckoutSession>("POST", "/v1/checkout/sessions", {
       idempotencyKey: input.idempotencyKey,
       retry: true,
@@ -164,6 +224,19 @@ export class StripeClient {
     return this.request<StripePrice>("GET", `/v1/prices/${priceId}`, { retry: true });
   }
 
+  retrieveSubscription(subscriptionId: string): Promise<StripeSubscription> {
+    if (!/^sub_[A-Za-z0-9_]+$/.test(subscriptionId)) return Promise.reject(new StripeApiError(0, "invalid_request_error", "invalid_subscription_id", false));
+    return this.request<StripeSubscription>("GET", `/v1/subscriptions/${subscriptionId}`, { retry: true });
+  }
+
+  /** One page of subscriptions of any status (newest first). */
+  listSubscriptions(input: { createdGte: number; limit?: number; startingAfter?: string }): Promise<StripeList<StripeSubscription>> {
+    return this.request<StripeList<StripeSubscription>>("GET", "/v1/subscriptions", {
+      retry: true,
+      query: { status: "all", limit: input.limit ?? 100, "created[gte]": input.createdGte, ...(input.startingAfter ? { starting_after: input.startingAfter } : {}) },
+    });
+  }
+
   /** One page of recent sessions (newest first). `createdGte` is a unix timestamp in seconds. */
   listCheckoutSessions(input: { createdGte: number; limit?: number; startingAfter?: string }): Promise<StripeList<StripeCheckoutSession>> {
     return this.request<StripeList<StripeCheckoutSession>>("GET", "/v1/checkout/sessions", {
@@ -171,6 +244,13 @@ export class StripeClient {
       query: { limit: input.limit ?? 100, "created[gte]": input.createdGte, ...(input.startingAfter ? { starting_after: input.startingAfter } : {}) },
     });
   }
+}
+
+export function subscriptionId(value: { subscription?: string | { id?: string } | null }): string | null {
+  const sub = value.subscription;
+  if (typeof sub === "string") return sub;
+  if (sub && typeof sub === "object" && typeof sub.id === "string") return sub.id;
+  return null;
 }
 
 export function paymentIntentId(session: Pick<StripeCheckoutSession, "payment_intent">): string | null {

@@ -13,6 +13,9 @@ export const subscription = pgTable(
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    // Recurring billing: the provider renews (and ends) this subscription. The Core sweep then waits a safety margin past the
+    // paid-through date instead of ending it at that instant, so a renewal that is a few minutes late never flickers access.
+    autoRenews: boolean("auto_renews").notNull().default(false),
     cancellationRequestedAt: timestamp("cancellation_requested_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

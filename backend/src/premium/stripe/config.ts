@@ -8,8 +8,13 @@ export interface StripeConfig {
   secretKey: string;
   /** Webhook signing secret(s) (whsec_...). More than one is accepted so a secret can be rotated without downtime. */
   webhookSecrets: string[];
-  /** The price of Premium (price_...): a one-time price. */
+  /** The price of Premium (price_...): a one-time price in `payment` mode, a recurring price in `subscription` mode. */
   priceId: string;
+  /**
+   * payment (default): one-time Checkout, Core grants the configured access period. subscription: recurring billing; Core's paid-through date
+   * follows the collected invoices. Both converge on the same provider-agnostic subscription events.
+   */
+  billingMode?: "payment" | "subscription";
   /** Optional: the product the price belongs to (used by the sandbox verification script only). */
   productId?: string;
   successUrl: string;
@@ -47,6 +52,13 @@ function httpUrl(value: string, name: string): string {
   return value;
 }
 
+function billingMode(env: NodeJS.ProcessEnv): "payment" | "subscription" {
+  const raw = env.STRIPE_BILLING_MODE?.trim();
+  if (raw === undefined || raw === "") return "payment";
+  if (raw !== "payment" && raw !== "subscription") throw new Error("STRIPE_BILLING_MODE must be payment or subscription");
+  return raw;
+}
+
 /** Reads and validates the configuration. Throws (without echoing any value) when something is missing or malformed. */
 export function stripeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): StripeConfig {
   const secretKey = required(env, "STRIPE_SECRET_KEY");
@@ -62,6 +74,7 @@ export function stripeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Strip
     secretKey,
     webhookSecrets,
     priceId,
+    billingMode: billingMode(env),
     ...(env.STRIPE_PRODUCT_ID ? { productId: env.STRIPE_PRODUCT_ID.trim() } : {}),
     successUrl: httpUrl(required(env, "STRIPE_SUCCESS_URL"), "STRIPE_SUCCESS_URL"),
     cancelUrl: httpUrl(required(env, "STRIPE_CANCEL_URL"), "STRIPE_CANCEL_URL"),
