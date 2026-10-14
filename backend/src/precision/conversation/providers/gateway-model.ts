@@ -12,6 +12,8 @@ import {
   type ExtractRequest,
   type ExtractResponse,
   type ExtractedValue,
+  type InterpretRequest,
+  type InterpretResponse,
   type ModelProvider,
   type ModelProviderDescriptor,
   type ModelRequest,
@@ -74,6 +76,8 @@ export class GatewayModelProvider implements ModelProvider {
         return (await this.write(req)) as ModelResponseFor<R>;
       case "route":
         return (await this.route(req)) as ModelResponseFor<R>;
+      case "interpret":
+        return (await this.interpret(req)) as ModelResponseFor<R>;
     }
     throw new Error("unknown task");
   }
@@ -125,6 +129,29 @@ export class GatewayModelProvider implements ModelProvider {
       );
       return { task: "write", text: cleanModelText(out.content), physicalCalls: 1 };
     } catch (err) {
+      throw toUnavailable(err);
+    }
+  }
+
+  private async interpret(req: InterpretRequest): Promise<InterpretResponse> {
+    const system = [
+      "You read what a client says about their international expansion project and return ONLY a JSON object (no prose).",
+      "Never invent. Every observation, need, country, rationale and priority must carry a `quote`: words copied EXACTLY from the client's message.",
+      "Allowed observation keys: " + req.probeKeys.join(", ") + ". Allowed concept ids: " + req.conceptIds.join(", ") + ".",
+      'Shape: {"intent":"answer|unknown|withheld|undecided|done|question|add_service|unclear|affirm|deny","correction":boolean,',
+      '"observations":[{"key":string,"value":any,"display":string,"quote":string,"interpretive":"observed|understood|implicit"}],',
+      '"concepts":[{"id":string,"quote":string}],"needs":[{"text":string,"conceptIds":string[],"quote":string,"resolution":"resolved|ambiguous|unresolved|outcome|compound"}],',
+      '"countries":[{"code":"ISO-3166-1 alpha-2","role":"origin|process|sales|operation|transit|support|headquarters|unspecified","quote":string}],',
+      '"rationale":[{"subject":"project","text":string,"quote":string}],"priorities":[{"subjects":string[],"rank":"top|important|can_wait","reason":string,"quote":string}],"question":string|null}.',
+      'Use interpretive "implicit" for anything the client did not say but you infer; use "unknown" intent when the client says they do not know. Reply in JSON only.',
+    ].join("\n");
+    const user = `${req.question ? `Question the client is answering: ${req.question}\n` : ""}Client message: ${req.clientText}`;
+    try {
+      const out = await chat([{ role: "system", content: system }, { role: "user", content: user }], this.cfg(req.timeoutMs), { temperature: 0, maxTokens: 1500 }, this.deps);
+      const m = out.content.match(/\{[\s\S]*\}/);
+      return { task: "interpret", json: m ? JSON.parse(m[0]) : null, physicalCalls: 1 };
+    } catch (err) {
+      if (err instanceof SyntaxError) return { task: "interpret", json: null, physicalCalls: 1 };
       throw toUnavailable(err);
     }
   }

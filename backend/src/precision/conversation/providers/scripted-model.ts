@@ -11,6 +11,8 @@ import {
   type ExtractRequest,
   type ExtractResponse,
   type ExtractedValue,
+  type InterpretRequest,
+  type InterpretResponse,
   type FieldBrief,
   type ModelProvider,
   type ModelProviderDescriptor,
@@ -29,6 +31,8 @@ export interface ScriptedStep {
   /** One text, `[attempt1, attempt2]`, or a function. */
   write?: string | string[] | ((req: WriteRequest) => string);
   route?: string[];
+  /** The model's JSON reading of the client's words for the Understanding surface (null/absent = no opinion). */
+  interpret?: unknown | ((req: InterpretRequest) => unknown);
   /** Simulates an unavailable model for this step. */
   fail?: "timeout" | "exhausted" | "not_configured";
 }
@@ -350,6 +354,11 @@ export class ScriptedModelProvider implements ModelProvider {
         return this.write(req, script) as ModelResponseFor<R>;
       case "route":
         return this.route(req, script) as ModelResponseFor<R>;
+      case "interpret": {
+        const i = script?.interpret;
+        const json = typeof i === "function" ? (i as (r: InterpretRequest) => unknown)(req) : i ?? null;
+        return { task: "interpret", json, physicalCalls: 1 } satisfies InterpretResponse as ModelResponseFor<R>;
+      }
     }
     throw new Error("unknown task");
   }

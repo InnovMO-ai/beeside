@@ -145,12 +145,35 @@ export interface RouteRequest {
 }
 export interface RouteResponse { task: "route"; topicKeys: string[]; physicalCalls: number }
 
-export type ModelRequest = ExtractRequest | WriteRequest | RouteRequest;
+/**
+ * Understanding: the model READS the client's words into a structured proposal (observations with the client's own quote, concepts,
+ * needs, countries, rationale, priorities). It never decides: the governor validates every quote and value, and the frame reducer
+ * decides what becomes knowledge. `json` is untrusted data; null = the model has no reading (the rule baseline answers alone).
+ */
+export interface InterpretRequest {
+  task: "interpret";
+  surface: Surface;
+  step: string;
+  locale: Locale;
+  turnKey: string;
+  clientText: string;
+  /** The question the client is answering (so a bare "unas 60" binds to the right aspect). */
+  question: string | null;
+  /** The vocabulary the answer must stay inside: aspect keys and concept ids. */
+  probeKeys: string[];
+  conceptIds: string[];
+  timeoutMs: number;
+}
+export interface InterpretResponse { task: "interpret"; json: unknown; physicalCalls: number }
+
+export type ModelRequest = ExtractRequest | WriteRequest | RouteRequest | InterpretRequest;
 export type ModelResponseFor<R extends ModelRequest> = R extends ExtractRequest
   ? ExtractResponse
   : R extends WriteRequest
     ? WriteResponse
-    : RouteResponse;
+    : R extends InterpretRequest
+      ? InterpretResponse
+      : RouteResponse;
 
 export interface ModelProvider {
   describe(): ModelProviderDescriptor;

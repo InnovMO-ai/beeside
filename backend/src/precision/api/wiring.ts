@@ -9,6 +9,7 @@
  *   PRECISION_FA_CONTEXT_PROVIDER         fixture (default) | reader (no adapter yet: refuses to start)
  *   PRECISION_INTERNAL_KEY                enables GET /api/precision/internal/status (absent -> 404)
  *   PRECISION_UNDERSTANDING_ENGINE        core (default) | legacy — the Understanding surface runs on the Understanding Core, or on the generic manifest-driven engine (rollback lever)
+ *   PRECISION_UNDERSTANDING_INTERPRETER   rules (default) | model — the model reads the client's words (governed, with the rule baseline as fallback); stays off until the real-model privacy approval (zero data retention) is in place
  *   PRECISION_KNOWLEDGE_SEED_ON_BOOT      true|false (default true) -> idempotent registration of the initial Knowledge Source Registry entries
  *   PRECISION_PUBLISH_MANIFESTS_ON_BOOT   true|false (default: true outside production) -> idempotent publish of the bundled manifests
  *   PRECISION_FIXTURE_PROJECT=true        register the synthetic seeded project with the fixture providers (no effect with real providers)
@@ -41,6 +42,7 @@ import { createFaContextService } from "../domain/fa-context";
 import { createPrecisionDomain, type PrecisionDomain } from "../domain";
 import { createPrecisionRouter } from "./router";
 import { createUnderstandingEngine } from "../understanding/engine";
+import { createModelInterpreter } from "../understanding/model-interpreter";
 import { createPgFrameStore } from "../understanding/pg-store";
 import { seedFromFaContext } from "../understanding/seed-source";
 import { createPgKnowledgeRepository } from "../knowledge/pg-repo";
@@ -103,7 +105,7 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   if ((env.PRECISION_KNOWLEDGE_SEED_ON_BOOT ?? "true") === "true") await seedInitialSources(knowledgeRepo);
   const conversation = (env.PRECISION_UNDERSTANDING_ENGINE ?? "core") === "legacy"
     ? genericEngine
-    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, orientation: createOrientationPort(knowledgeRepo), clock: systemClock, now });
+    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledgeRepo), clock: systemClock, now });
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 

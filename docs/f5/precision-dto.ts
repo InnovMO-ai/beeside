@@ -28,8 +28,8 @@ export interface ApiErrorDto {
   support?: SupportDto;
 }
 
-/** Support contact for the invalid-link page, from configuration (`support_contact_url` / `support_email`). Either field may be null. */
-export interface SupportDto { contactUrl: string | null; email: string | null }
+/** Contact beeside for pages shown before or without a session (link, access ended, errors): the configured address (`contact_beeside_email`). */
+export interface SupportDto { email: string | null }
 
 // ---------------------------------------------------------------- session & entry
 export interface SessionExchangeRequest { code: string }
@@ -186,7 +186,17 @@ export interface ServiceMapDto {
   canConfirm: boolean;
   hasUnconfirmedChanges: boolean;
   canWrite: boolean;
+  /** Groups a need can be moved to (opaque ids, client labels). Absent when the client cannot write. */
+  moveTargets?: { id: string; label: string }[];
 }
+/** A client correction of My Service Map: the client's decision, applied as stated. Item and group ids are the opaque ones the map returned. */
+export type ServiceMapCorrectionRequest =
+  | { requestKey: string; op: "remove"; itemId: string }
+  | { requestKey: string; op: "rename"; itemId: string; text: string }
+  | { requestKey: string; op: "set_priority"; itemId: string; priority: "high" | "medium" | "low" | null }
+  | { requestKey: string; op: "move"; itemId: string; toGroupId: string }
+  | { requestKey: string; op: "set_why"; itemId: string; text: string };
+export interface ServiceMapCorrectionResponse { serviceMap: ServiceMapDto }
 export interface ConfirmServiceMapRequest { requestKey: string }
 export interface ConfirmServiceMapResponse { confirmedAt: string; serviceMap: ServiceMapDto }
 
@@ -255,7 +265,14 @@ export interface SendResultDto {
 }
 
 // ---------------------------------------------------------------- help, add a service
-export interface HelpDto { helpCenterUrl: string | null; contactAvailable: boolean }
+export interface HelpDto {
+  helpCenterUrl: string | null;
+  /** Legal references and the single Contact beeside address, all from configuration. */
+  privacyUrl: string | null;
+  termsUrl: string | null;
+  contactEmail: string | null;
+  contactAvailable: boolean;
+}
 export interface AddServiceThreadDto { available: boolean; thread: ThreadDto | null }
 
 // ---------------------------------------------------------------- internal review (NOT part of the client journey)
