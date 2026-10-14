@@ -139,7 +139,7 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       for (const [url, allowed] of [[undefined, true], ["https://fa.test/premium-es", false], ["https://fa.test/premium-es", undefined], [undefined, false]] as const) {
         const x = await send(url, allowed);
         expect(x.html!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/); expect(x.text!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/);
-        expect(x.html!).toContain("Hablar con beeside"); expect(x.html!).toContain("Antes de Premium, no compartimos tu proyecto con proveedores.");   // always present
+        expect(x.html!).toContain("Hablar con beeside"); expect(x.html!).toContain("La información que nos compartiste no se comparte con proveedores en esta etapa.");   // always present
       }
       deps.config.premiumResourceUrl = { es: "https://fa.test/premium-es" }; deps.config.premiumCommercialContentAllowed = true;
     });
