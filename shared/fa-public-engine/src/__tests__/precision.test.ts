@@ -3,7 +3,9 @@ import { answersSchema } from '../domain/schema';
 import { resolveAll } from '../engine/resolve';
 import { buildYourExpansionView } from '../engine/yev';
 import { journeyA, journeyB, journeyC, journeyNortica, journeyUnknown } from '../testing/journeys';
-import { ANSWERS_COVERAGE, schemaPaths } from '../precision/coverage';
+import fs from 'node:fs';
+import path from 'node:path';
+import { ANSWERS_COVERAGE, renderCoverageMarkdown, schemaPaths } from '../precision/coverage';
 import { buildResolutionSnapshot, buildSourceSnapshot } from '../precision/snapshots';
 import { SealedResultError, canonicalJson, mapSealedResultToPrecisionContext, type SealedResultV1 } from '../precision/context';
 import { CONTRACT_VERSION, MAPPER_VERSION, RESOLUTION_SCHEMA_VERSION, RULES_VERSION, SOURCE_SCHEMA_VERSION } from '../precision/versions';
@@ -30,6 +32,13 @@ describe('field coverage matrix (acceptance 17)', () => {
     for (const [p, e] of Object.entries(ANSWERS_COVERAGE)) {
       if (e.cls === 'INCLUDED' ? !e.contract : !e.reason) throw new Error(`coverage entry without ${e.cls === 'INCLUDED' ? 'contract place' : 'reason'}: ${p}`);
     }
+  });
+});
+
+describe('coverage matrix document', () => {
+  it('docs/fa4/FIELD_COVERAGE_MATRIX.md is the generated matrix (run node scripts/fa4-coverage-doc.js)', () => {
+    const doc = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'docs', 'fa4', 'FIELD_COVERAGE_MATRIX.md'), 'utf8');
+    expect(doc).toBe(renderCoverageMarkdown());
   });
 });
 

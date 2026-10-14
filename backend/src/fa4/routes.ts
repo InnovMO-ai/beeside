@@ -17,10 +17,10 @@ import {
 import { parseClientEvent, recordEvent } from "./events";
 import { cleanInput } from "./email-render";
 import {
-  Fa4ProjectRow, LegalConfig, createProject, latestMarketingConsent, recordMarketingConsent, exchangeLinkToken, latestResult, loadPublishedCatalog, normalizeEmail,
+  Fa4ProjectRow, LegalConfig, createProject, isDelivered, latestMarketingConsent, recordMarketingConsent, exchangeLinkToken, latestResult, loadPublishedCatalog, normalizeEmail,
   projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
 } from "./repository";
-import { deliverResult } from "./service";
+import { deliverResult, previewResult } from "./service";
 
 export interface Fa4Deps {
   db: Db;
@@ -112,6 +112,8 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   const handle = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => {
     fn(req, res).catch((error: unknown) => {
       if (error instanceof FaError) res.status(error.status).json({ error: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) });
+      // the database is the second line of defence of the delivered state (closed answers / delivery consistency): never a raw 500
+      else if (["BV604", "BV605", "BV606"].includes((error as { code?: string }).code ?? "")) res.status(409).json({ error: "ALREADY_DELIVERED", message: "this First Assessment was delivered" });
       else next(error);
     });
   };
@@ -160,6 +162,8 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   router.put("/session", handle(async (req, res) => {
     const p = await session(req);
+    // D-156: after the explicit delivery the questionnaire is closed (enforced here AND by a database trigger)
+    if (await isDelivered(deps.db, p.projectId)) throw new FaError("ALREADY_DELIVERED", "this First Assessment was delivered and can no longer be edited");
     const parsed = answersSchema.safeParse(bodyOf(req).answers);
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
     // Email and the two legal acknowledgements are pinned to what was captured at identity: the email can't be swapped silently
@@ -197,34 +201,46 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const p = await session(req);
     const r = await latestResult(deps.db, p.projectId);
     if (!r) throw new FaError("NOT_FOUND", "no result yet");
-    res.json({ resultId: r.resultId, model: r.model });
+    res.json({ resultId: r.resultId, model: r.model, delivered: true, deliveredAt: r.deliveredAt });
   }));
 
+  // PREVIEW (D-156): computes the YEV from the current answers. Nothing historical is stored and the project is NOT delivered. «Corregir algo» + regenerate stay available.
   router.post("/session/result", handle(async (req, res) => {
     const p = await session(req);
     if (p.answers.company.hasExistingBusiness === false) throw new FaError("NOT_APPLICABLE", "this First Assessment is for existing businesses");
-    const delivered = await deliverResult(deps.db, p.projectId, p.answers, deps.config.now());
-    const m = delivered.model;
+    const done = await latestResult(deps.db, p.projectId);
+    if (done) throw new FaError("ALREADY_DELIVERED", "this First Assessment was delivered", { resultId: done.resultId });
+    const { model, previewToken } = await previewResult(deps.db, p.projectId, p.answers, deps.config.now());
+    const m = model;
     await recordEvent(deps.db, {
-      name: "result_generated", source: "server", projectId: p.projectId, locale: p.answers.locale, step: "result", catalogVersion: m.catalogVersion,
+      name: "yev_previewed", source: "server", projectId: p.projectId, locale: p.answers.locale, step: "result", catalogVersion: m.catalogVersion,
       props: {
         destinations: m.destinations.map((d) => d.destination), destinationCount: m.destinations.length, applies: m.counts.applies, depends: m.counts.depends,
         shortcut: m.shortcut, activities: [...new Set(p.answers.components.flatMap((c) => c.activities))],
         noCoverageDestinations: m.destinations.filter((d) => d.countryMessage).map((d) => d.destination),
       },
     });
-    res.json(delivered);
+    res.set("Cache-Control", "no-store").json({ preview: true, previewToken, model });
   }));
+
+  /** Explicit delivery (D-156): idempotent; records `yev_delivered` once. Returns the sealed result. */
+  const deliver = async (p: Fa4ProjectRow, via: "EMAIL" | "CONTINUATION", body: Record<string, unknown>) => {
+    const token = typeof body.previewToken === "string" && /^[a-f0-9]{32}$/.test(body.previewToken) ? body.previewToken : undefined;
+    const d = await deliverResult(deps.db, p.projectId, deps.config.now(), { previewToken: token, requirePremium: via === "CONTINUATION" });
+    if (!d.alreadyDelivered)
+      await recordEvent(deps.db, { name: "yev_delivered", source: "server", projectId: p.projectId, locale: p.answers.locale, step: "result", catalogVersion: d.model.catalogVersion,
+        props: { via, premiumShown: d.model.premium.shown, destinationCount: d.model.destinations.length, applies: d.model.counts.applies, depends: d.model.counts.depends } });
+    return d;
+  };
 
   router.post("/session/result/email", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
     const p = await session(req);
-    const r = await latestResult(deps.db, p.projectId);
-    if (!r) throw new FaError("NOT_FOUND", "no result yet");
-    const q = await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", deps.config.now(), emailLimits, `${r.resultId}:`);
+    const d = await deliver(p, "EMAIL", bodyOf(req));                        // asking for the result by email IS the delivery (D-156); the email is sent for THIS sealed result
+    const q = await enqueueFa4Email(deps.db, p.projectId, "fa4_result_link", deps.config.now(), emailLimits, `${d.resultId}:`);
     if (q.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
     if (!q.deliveryId) throw new FaError("NOT_FOUND", "no such project");
     if (q.queued) await recordEvent(deps.db, { name: "yev_email_requested", source: "server", projectId: p.projectId, locale: p.answers.locale });
-    await settle(res, q.deliveryId, { email: maskEmail(p.email) });
+    await settle(res, q.deliveryId, { email: maskEmail(p.email), resultId: d.resultId });
   }));
 
   // "Hablar con beeside": an operational message to contact@beeside.you. Not marketing (never touches marketingConsent), not a provider
@@ -260,14 +276,15 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     res.status(204).end();
   }));
 
-  // "Continuar con beeside": explicit request tied to the same email; no marketing consent implied (LEGAL-1 pending).
+  // «Comienza tu expansión» (D-154): the explicit confirmation is the other delivery action. It delivers (idempotent) and records the Premium
+  // continuation for the SAME project + the definitive delivered result. Not marketing consent (D-140 / D-144). No payment in FA.
   router.post("/session/continue", handle(async (req, res) => {
     const p = await session(req);
-    const r = await latestResult(deps.db, p.projectId);
-    if (!r || !r.model.premium.shown) throw new FaError("NOT_APPLICABLE", "no continuation is offered for this result");
-    await requestContinuation(deps.db, p.projectId, r.resultId);
-    await recordEvent(deps.db, { name: "premium_continuation_requested", source: "server", projectId: p.projectId, locale: p.answers.locale, catalogVersion: r.model.catalogVersion });
-    res.json({ ok: true });
+    const d = await deliver(p, "CONTINUATION", bodyOf(req));
+    if (!d.model.premium.shown) throw new FaError("NOT_APPLICABLE", "no continuation is offered for this result");
+    await requestContinuation(deps.db, p.projectId, d.resultId);
+    await recordEvent(deps.db, { name: "premium_continuation_requested", source: "server", projectId: p.projectId, locale: p.answers.locale, catalogVersion: d.model.catalogVersion });
+    res.json({ ok: true, resultId: d.resultId });
   }));
 
   // Exchange an emailed RESUME link token (URL fragment) for a working session. The link is project-specific and SINGLE-USE:

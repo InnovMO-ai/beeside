@@ -2,7 +2,7 @@
  * Versioning of the FA4 historical result envelope (Public v1.0, D-157/D-158). One identifier per concern, no overlap:
  *  - RULES_VERSION              the deterministic rule set that produced the resolution (routing, topic activation, coverage, D-149 proxy…).
  *                               Bump it whenever a rule changes its outcome; `rules-golden.test.ts` fails if outcomes drift without a bump.
- *  - SOURCE_SCHEMA_VERSION      shape/semantics of the `source_snapshot` (v1 = Public v1.0, incl. `existing: commercial_traction`, D-153).
+ *  - SOURCE_SCHEMA_VERSION      shape/semantics of the the sealed source-facts column (v1 = Public v1.0, incl. `existing: commercial_traction`, D-153).
  *  - RESOLUTION_SCHEMA_VERSION  shape of the `resolution_snapshot`.
  *  - CONTRACT_VERSION           the FA4 → Precision contract (`Fa4PrecisionContextV1`).
  *  - MAPPER_VERSION             the pure mapper that builds the contract from a sealed result.

@@ -155,6 +155,20 @@
       "when": 1791853836233,
       "tag": "0021_fa4_email_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791995622160,
+      "tag": "0022_fa4_public_v1_envelope",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791995632197,
+      "tag": "0023_fa4_public_v1_envelope_integrity",
+      "breakpoints": true
     }
   ]
 }

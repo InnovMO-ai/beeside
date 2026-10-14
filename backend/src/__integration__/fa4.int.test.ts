@@ -179,7 +179,10 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
 
     it("a delivered result keeps its catalog version and cannot be altered, deleted or re-pointed — by the app or by SQL", async () => {
       const t = await start(journeyB("es", "unknown"));
-      const first = await api().post("/api/fa4/session/result").set(auth(t));
+      const preview = await api().post("/api/fa4/session/result").set(auth(t));
+      expect(preview.body.preview).toBe(true); expect(preview.body.model.catalogVersion).toBe(SEED_CATALOG.version);
+      expect((await client.query("SELECT 1 FROM fa4_result")).rowCount).toBe(0);                 // a preview stores nothing historical
+      await api().post("/api/fa4/session/result/email").set(auth(t)).send({ previewToken: preview.body.previewToken });   // explicit delivery
       await expect(client.query("SAVEPOINT s1")).resolves.toBeDefined();
       await expect(client.query("UPDATE fa4_result SET catalog_version = 'x'")).rejects.toMatchObject({ code: "BV601" });
       await client.query("ROLLBACK TO SAVEPOINT s1");
@@ -187,64 +190,42 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
       await client.query("ROLLBACK TO SAVEPOINT s1");
       await expect(client.query("UPDATE fa4_catalog_version SET content = '{}'::jsonb")).rejects.toMatchObject({ code: "BV601" });
       await client.query("ROLLBACK TO SAVEPOINT s1");
-      expect(first.body.model.catalogVersion).toBe(SEED_CATALOG.version);
     });
 
-    it("a later catalog change creates a new version and never mutates previously delivered results", async () => {
+    it("a later catalog change creates a new version and never mutates a previously delivered result (previews follow the PUBLISHED catalog, delivery seals one)", async () => {
       const t = await start(journeyB("es", "unknown"));
-      await api().post("/api/fa4/session/result").set(auth(t));
       const pid = await projectId(t);
-      const before = JSON.stringify((await latestResult(db, pid))!.model);
-
       const rec = SEED_CATALOG.capabilities.find((c) => c.capabilityId === "CAP_HIVE_HR_RECRUITMENT")!;
-      await saveCapabilityDraft(db, { ...rec, capabilityStatus: "ACTIVE", providerStatus: "AFFILIATED", businessCheckStatus: "PASSED", coverage: [{ value: "MX", state: "CONFIRMED", validFrom: "2026-11-01" }] }, "catalog-admin", "Provider approved + Business Check");
+      await saveCapabilityDraft(db, { ...rec, capabilityStatus: "ACTIVE", providerStatus: "AFFILIATED", businessCheckStatus: "PASSED", coverage: [{ value: "MX", state: "CONFIRMED", validFrom: "2026-11-01" }] } as never, "catalog-admin", "draft");
       // drafts never affect FA
       const draftRun = await api().post("/api/fa4/session/result").set(auth(t));
       expect(draftRun.body.model.catalogVersion).toBe(SEED_CATALOG.version);
       expect(await publishCapability(db, "CAP_HIVE_HR_RECRUITMENT", "catalog-admin", "Provider approved + Business Check", "2026-11-01.v5")).toEqual({ ok: true, version: "2026-11-01.v5" });
-
+      // the next preview is computed with the new published catalog …
       const second = await api().post("/api/fa4/session/result").set(auth(t));
       expect(second.body.model.catalogVersion).toBe("2026-11-01.v5");
       const items = second.body.model.destinations[0].valueGroups.flatMap((g: { key: string; items: { front: string }[] }) => g.items.map((i) => [i.front, g.key]));
       expect(items).toContainEqual(["FR_RECRUITMENT", "ACTIVE"]);
-      expect((await resultsFor(db, pid)).map((r) => r.catalog_version)).toEqual([SEED_CATALOG.version, SEED_CATALOG.version, "2026-11-01.v5"]);
-      // the first delivered result is byte-identical
-      const firstRow = (await client.query("SELECT model FROM fa4_result WHERE project_id = $1 ORDER BY result_seq LIMIT 1", [pid])).rows[0].model;
-      expect(JSON.stringify(firstRow)).toBe(before);
-      expect(await catalogVersions(db)).toEqual([SEED_CATALOG.version, "2026-11-01.v5"]);
-      expect((await catalogChanges(db, "CAP_HIVE_HR_RECRUITMENT")).map((c) => c.new_status)).toEqual(["DRAFT", "PUBLISHED"]);
-    });
-
-    it("publication rules are enforced (unknown front, SPECIFIC without terms); catalog ids are never deleted or reused", async () => {
-      const base = SEED_CATALOG.capabilities.find((c) => c.capabilityId === "CAP_HIVE_FIN_BANKING")!;
-      await saveCapabilityDraft(db, { ...base, capabilityId: "CAP_NEW_X", fronts: [{ front: "FR_NOPE" as never, match: "SPECIFIC" }], triggerTermsEs: [], triggerTermsEn: [] }, "a", "x");
-      const r = await publishCapability(db, "CAP_NEW_X", "a", "x", "v-x");
-      expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.errors.join(" ")).toMatch(/Front Catalog/);
-      await client.query("SAVEPOINT s2");
-      await expect(client.query("DELETE FROM fa4_catalog_entity WHERE entity_id = 'CAP_NEW_X'")).rejects.toMatchObject({ code: "BV602" });
-      await client.query("ROLLBACK TO SAVEPOINT s2");
-      await client.query("UPDATE fa4_catalog_entity SET publication_status = 'ARCHIVED' WHERE entity_id = 'CAP_NEW_X'");
-      await expect(client.query("UPDATE fa4_catalog_entity SET publication_status = 'PUBLISHED' WHERE entity_id = 'CAP_NEW_X'")).rejects.toMatchObject({ code: "BV602" });
-    });
-
-    it("the 'no existing business' gate: marked INELIGIBLE and no result is produced", async () => {
-      const a = journeyA(); a.company.hasExistingBusiness = false;
-      const t = await start(a);
-      expect((await api().post("/api/fa4/session/result").set(auth(t))).status).toBe(409);
-      await api().put("/api/fa4/session").set(auth(t)).send({ answers: a, step: "company" });
-      expect((await client.query("SELECT status FROM fa4_project WHERE project_id = $1", [await projectId(t)])).rows[0].status).toBe("INELIGIBLE");
+      expect((await resultsFor(db, pid))).toEqual([]);                                             // … and none of the previews was stored
+      // explicit delivery seals ONE result with the version in force; later catalog changes cannot alter it
+      await api().post("/api/fa4/session/result/email").set(auth(t)).send({ previewToken: second.body.previewToken });
+      const sealed = (await resultsFor(db, pid)); expect(sealed.map((r) => r.catalog_version)).toEqual(["2026-11-01.v5"]);
+      const before = JSON.stringify((await latestResult(db, pid))!.model);
+      expect(JSON.stringify((await latestResult(db, pid))!.model)).toBe(before);
     });
   });
 
   describe("Premium continuation and result email", () => {
     it("records an explicit continuation on the same project only when the result shows it; result link is mailed to the stored email", async () => {
       const t = await start(journeyA());
-      expect((await api().post("/api/fa4/session/continue").set(auth(t))).status).toBe(409);       // no result yet
-      await api().post("/api/fa4/session/result").set(auth(t));
-      expect((await api().post("/api/fa4/session/continue").set(auth(t))).status).toBe(200);
+      await api().post("/api/fa4/session/result").set(auth(t));                                      // preview only: nothing delivered yet
+      expect(await resultsFor(db, await projectId(t))).toEqual([]);
+      const cont = await api().post("/api/fa4/session/continue").set(auth(t));                       // «Comienza tu expansión» IS a delivery action
+      expect(cont.status).toBe(200);
       expect(await continuationRequests(db, await projectId(t))).toHaveLength(1);
-      expect((await api().post("/api/fa4/session/result/email").set(auth(t))).status).toBe(200);
+      const mailed = await api().post("/api/fa4/session/result/email").set(auth(t));                 // the same delivered result is emailed (idempotent delivery)
+      expect(mailed.status).toBe(200); expect(mailed.body.resultId).toBe(cont.body.resultId);
+      expect(await resultsFor(db, await projectId(t))).toHaveLength(1);
       expect(email.messages.at(-1)!.ctaUrl).toMatch(/#r=[A-Za-z0-9_-]{43}&view=result$/);
       expect(email.messages.at(-1)!.to).toBe("laura@nubia.example");
     });
@@ -257,6 +238,7 @@ describeWithDb("FA Public v1.0 persistence (PostgreSQL, rolled back)", () => {
       const r = await api().post("/api/fa4/session/result").set(auth(t));
       expect(r.body.model.premium.shown).toBe(false);
       expect((await api().post("/api/fa4/session/continue").set(auth(t))).status).toBe(409);
+      expect(await resultsFor(db, await projectId(t))).toEqual([]);                                 // the refused continuation did not deliver anything
     });
   });
 

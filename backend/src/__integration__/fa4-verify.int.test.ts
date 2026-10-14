@@ -96,6 +96,7 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
     });
 
     it("even the owner role cannot UPDATE / DELETE / TRUNCATE delivered results through ordinary SQL", async () => {
+      const p = await start(email("own")); await app().post("/api/fa4/session/result/email").set(auth(p.token));          // at least one sealed row exists
       await expect(admin.query("UPDATE fa4_result SET model = '{}'")).rejects.toMatchObject({ code: "BV601" });
       await expect(admin.query("DELETE FROM fa4_result")).rejects.toMatchObject({ code: "BV601" });
       await expect(admin.query("TRUNCATE fa4_result CASCADE")).rejects.toMatchObject({ code: "BV601" });
@@ -358,7 +359,7 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
   describe("M3 — authorized irreversible anonymization (no automatic purge)", () => {
     it("anonymizes personal data, keeps append-only structure and legal evidence, logs the erasure, revokes tokens", async () => {
       const e = email("m3"); const p = await start(e);
-      await app().post("/api/fa4/session/result").set(auth(p.token));
+      await app().post("/api/fa4/session/result/email").set(auth(p.token));          // explicit delivery seals the result
       const beforeVersion = (await q("SELECT catalog_version FROM fa4_result WHERE project_id = $1", [p.pid]))[0].catalog_version;
       await expect(admin.query("SELECT fa4_anonymize_project($1, '', 'x')", [p.pid])).rejects.toMatchObject({ code: "BV603" });          // actor and reason are mandatory
       await admin.query("SELECT fa4_anonymize_project($1, 'dpo@example.org', 'data-subject request #1')", [p.pid]);
@@ -453,7 +454,8 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
       await app().put("/api/fa4/session").set(auth(p.token)).send({ answers: answersFor(e), step: "company" });
       expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("IN_PROGRESS");
       await app().post("/api/fa4/session/result").set(auth(p.token));
-      await app().put("/api/fa4/session").set(auth(p.token)).send({ answers: answersFor(e), step: "result" });
+      expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("IN_PROGRESS");   // a preview does not deliver
+      await app().post("/api/fa4/session/result/email").set(auth(p.token));
       expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("DELIVERED");
     });
 

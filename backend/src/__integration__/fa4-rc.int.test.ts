@@ -313,8 +313,8 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       await api().post("/api/fa4/session/result/email").set(auth(t));
       await api().post("/api/fa4/session/continue").set(auth(t));
       const names = (await client.query("SELECT name FROM fa4_event ORDER BY occurred_at, event_id")).rows.map((r) => r.name);
-      for (const n of ["help_clicked", "project_created", "step_reached", "result_generated", "yev_email_requested", "yev_email_sent", "premium_continuation_requested"]) expect(names).toContain(n);
-      const gen = (await client.query("SELECT props, catalog_version FROM fa4_event WHERE name='result_generated'")).rows[0];
+      for (const n of ["help_clicked", "project_created", "step_reached", "yev_previewed", "yev_delivered", "yev_email_requested", "yev_email_sent", "premium_continuation_requested"]) expect(names).toContain(n);
+      const gen = (await client.query("SELECT props, catalog_version FROM fa4_event WHERE name='yev_previewed'")).rows[0];
       expect(gen.props.destinations).toEqual(["MX"]); expect(gen.catalog_version).toBe(SEED_CATALOG.version);
       expect(JSON.stringify(gen.props)).not.toMatch(/Nórtica|lucia/);
     });

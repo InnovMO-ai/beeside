@@ -6,7 +6,7 @@ import type { Resolution } from '../engine/resolve';
 import { RESOLUTION_SCHEMA_VERSION, SOURCE_SCHEMA_VERSION } from './versions';
 
 /**
- * SOURCE SNAPSHOT — the client-safe business/project facts that produced a delivered result (D-157).
+ * SOURCE FACTS (sealed with the result) — the client-safe business/project facts that produced a delivered result (D-157).
  * It is NOT the whole `Answers` object: contact PII, legal acceptance, marketing consent and internal flow state are left out
  * (see `coverage.ts` for the per-field classification, which a test keeps complete).
  */
@@ -47,7 +47,7 @@ export function buildSourceSnapshot(a: Answers): SourceSnapshotV1 {
 }
 
 /**
- * RESOLUTION SNAPSHOT — a sanitized, stable projection of what FA deterministically concluded (D-157): stable IDs and structured states only.
+ * RESOLUTION PROJECTION (sealed with the result) — a sanitized, stable projection of what FA deterministically concluded (D-157): stable IDs and structured states only.
  * Never stored: rule traces, capability/presentation names or scope-limit texts, capability kind (provider layer), provider/sourcing/triage fields.
  */
 export interface ResolutionSnapshotNeedV1 {

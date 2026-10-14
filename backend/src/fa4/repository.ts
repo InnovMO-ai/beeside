@@ -270,14 +270,14 @@ export async function exchangeLinkToken(db: Db, rawToken: string, now: Date, ses
 
 /**
  * Saves answers. Status is NORMALIZED from facts, never sticky: INELIGIBLE iff the answers say there is no existing business,
- * otherwise DELIVERED iff a result exists, else IN_PROGRESS. The captured email never changes here.
+ * otherwise DELIVERED iff a SEALED (explicitly delivered) result exists, else IN_PROGRESS. The captured email never changes here.
  */
 export async function saveProject(db: Db, projectId: string, answers: Answers, stepKey: string): Promise<void> {
   const ineligible = answers.company.hasExistingBusiness === false;
   await db.query(
     `UPDATE fa4_project SET answers = $2::jsonb, step_key = $3, locale = $4, updated_at = now(),
             status = CASE WHEN $5::boolean THEN 'INELIGIBLE'
-                          WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
+                          WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1 AND NOT r.legacy_unsealed) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
       WHERE project_id = $1 AND status <> 'ANONYMIZED'`,
     [projectId, JSON.stringify(answers), stepKey, answers.locale, ineligible],
   );
@@ -290,15 +290,32 @@ export async function recentProjectsForEmail(db: Db, email: string, limit: numbe
   return rows.map((r) => r.project_id);
 }
 
-// ------------------------------------------------------------------ results (append-only)
-export async function storeResult(tx: Db, projectId: string, model: YourExpansionViewModel): Promise<string> {
-  const { rows } = await tx.query<{ result_id: string }>("INSERT INTO fa4_result (project_id, catalog_version, model) VALUES ($1, $2, $3::jsonb) RETURNING result_id", [projectId, model.catalogVersion, JSON.stringify(model)]);
-  await tx.query("UPDATE fa4_project SET status = 'DELIVERED', updated_at = now() WHERE project_id = $1 AND status = 'IN_PROGRESS'", [projectId]);
-  return rows[0]!.result_id;
+// ------------------------------------------------------------------ results (the sealed historical envelope)
+/**
+ * A result row exists ONLY for an explicit delivery (D-156). It is written once, in the same transaction as the project's DELIVERED state, with the
+ * full A+ envelope (D-157): catalog + rules versions, source facts and the structured resolution. Rows are append-only (trigger + no UPDATE grant).
+ */
+export interface SealedEnvelope {
+  catalogVersion: string; rulesVersion: string;
+  sourceSchemaVersion: number; sourceSnapshot: unknown; resolutionSchemaVersion: number; resolutionSnapshot: unknown;
 }
-export async function latestResult(db: Db, projectId: string): Promise<{ resultId: string; model: YourExpansionViewModel } | null> {
-  const { rows } = await db.query<{ result_id: string; model: YourExpansionViewModel }>("SELECT result_id, model FROM fa4_result WHERE project_id = $1 ORDER BY result_seq DESC LIMIT 1", [projectId]);
-  return rows[0] ? { resultId: rows[0].result_id, model: rows[0].model } : null;
+export async function sealResult(tx: Db, projectId: string, model: YourExpansionViewModel, env: SealedEnvelope): Promise<{ resultId: string; deliveredAt: Date }> {
+  const { rows } = await tx.query<{ result_id: string; created_at: Date }>(
+    `INSERT INTO fa4_result (project_id, catalog_version, model, rules_version, source_schema_version, source_snapshot, resolution_schema_version, resolution_snapshot, legacy_unsealed)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7, $8::jsonb, false) RETURNING result_id, created_at`,
+    [projectId, env.catalogVersion, JSON.stringify(model), env.rulesVersion, env.sourceSchemaVersion, JSON.stringify(env.sourceSnapshot), env.resolutionSchemaVersion, JSON.stringify(env.resolutionSnapshot)],
+  );
+  await tx.query("UPDATE fa4_project SET status = 'DELIVERED', updated_at = now() WHERE project_id = $1 AND status <> 'ANONYMIZED'", [projectId]);
+  return { resultId: rows[0]!.result_id, deliveredAt: rows[0]!.created_at };
+}
+/** The DELIVERED result of a project (previews are never stored; rows from before Public v1.0 are legacy and ignored). */
+export async function latestResult(db: Db, projectId: string): Promise<{ resultId: string; model: YourExpansionViewModel; deliveredAt: Date } | null> {
+  const { rows } = await db.query<{ result_id: string; model: YourExpansionViewModel; created_at: Date }>(
+    "SELECT result_id, model, created_at FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed ORDER BY result_seq DESC LIMIT 1", [projectId]);
+  return rows[0] ? { resultId: rows[0].result_id, model: rows[0].model, deliveredAt: rows[0].created_at } : null;
+}
+export async function isDelivered(db: Db, projectId: string): Promise<boolean> {
+  return (await db.query("SELECT 1 FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed LIMIT 1", [projectId])).rows.length > 0;
 }
 export async function resultsFor(db: Db, projectId: string) {
   return (await db.query<{ result_id: string; catalog_version: string }>("SELECT result_id, catalog_version FROM fa4_result WHERE project_id = $1 ORDER BY result_seq", [projectId])).rows;

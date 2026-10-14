@@ -107,10 +107,26 @@ export const fa4Result = pgTable(
     resultSeq: bigserial("result_seq", { mode: "number" }).notNull(),
     projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
     catalogVersion: text("catalog_version").notNull().references(() => fa4CatalogVersion.version),
+    /** Historical YEV model (presentation, for the client). NOT the contract for Precision. */
     model: jsonb("model").notNull(),
+    /**
+     * A+ historical envelope (Public v1.0, D-157): a DELIVERED result is self-sufficient and immutable. `created_at` = the explicit delivery moment.
+     * Rows written before Public v1.0 (previews that were stored as results) are flagged `legacy_unsealed`: never eligible for Precision, never back-filled.
+     */
+    rulesVersion: text("rules_version"),
+    sourceSchemaVersion: integer("source_schema_version"),
+    sourceSnapshot: jsonb("source_snapshot"),
+    resolutionSchemaVersion: integer("resolution_schema_version"),
+    resolutionSnapshot: jsonb("resolution_snapshot"),
+    legacyUnsealed: boolean("legacy_unsealed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("fa4_result_project_idx").on(t.projectId, t.resultSeq), uniqueIndex("fa4_result_seq_unique").on(t.resultSeq)],
+  (t) => [
+    index("fa4_result_project_idx").on(t.projectId, t.resultSeq), uniqueIndex("fa4_result_seq_unique").on(t.resultSeq),
+    // v1.0: ONE canonical delivered result per project (a future Result B drops this index in its own migration)
+    uniqueIndex("fa4_result_one_sealed_per_project").on(t.projectId).where(sql`NOT ${t.legacyUnsealed}`),
+    check("fa4_result_sealed_envelope", sql`${t.legacyUnsealed} OR (${t.rulesVersion} IS NOT NULL AND ${t.sourceSchemaVersion} IS NOT NULL AND ${t.sourceSnapshot} IS NOT NULL AND ${t.resolutionSchemaVersion} IS NOT NULL AND ${t.resolutionSnapshot} IS NOT NULL AND jsonb_typeof(${t.sourceSnapshot}) = 'object' AND jsonb_typeof(${t.resolutionSnapshot}) = 'object')`),
+  ],
 );
 
 export const fa4DemandSignal = pgTable(
