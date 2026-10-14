@@ -139,6 +139,8 @@ export const adminApi = {
   setPrecisionConfig: (key: string, input: { locale: string; value: string; reason: string }) => call<Json>("PUT", `/precision/config/${encodeURIComponent(key)}`, input),
   resetPrecisionConfig: (key: string, locale: string) => call<Json>("DELETE", `/precision/config/${encodeURIComponent(key)}?locale=${encodeURIComponent(locale)}`),
 
+  precisionDeliveries: (status: string) => call<{ deliveries: Json[]; counts: Record<string, number> }>("GET", `/precision/deliveries${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+
   // ---- Precision statistics (same event layer Tableau reads)
   precisionMetrics: (view: "catalog" | "funnel" | "quality" | "ai" | "commercial", query: string) => call<Json>("GET", `/analytics/precision/${view}${query}`),
 

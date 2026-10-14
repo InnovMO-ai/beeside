@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
+import { DELIVERY_STATUSES, listPrecisionDeliveries } from "./precision-deliveries";
 import { MANAGED_LOCALES, configOverview, resetConfig, setConfig } from "./precision-config-admin";
 import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
@@ -663,6 +664,18 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
           : { result: (result as ErasurePlan).reason ?? "refused" },
         projectId: id,
       };
+    }),
+  );
+
+  // ------------------------------------------------------------------ Precision deliveries to Operation Hub (read-only)
+  router.get(
+    "/precision/deliveries",
+    allow("operations.read", "precision_deliveries.viewed"),
+    handle(async (req, res) => {
+      const status = typeof req.query.status === "string" && req.query.status ? oneOf(req.query.status, DELIVERY_STATUSES, "status") : null;
+      const out = await listPrecisionDeliveries(db, status);
+      await audit(req, "precision_deliveries.viewed", "ALLOWED", { details: { count: out.deliveries.length } });
+      res.json(out);
     }),
   );
 

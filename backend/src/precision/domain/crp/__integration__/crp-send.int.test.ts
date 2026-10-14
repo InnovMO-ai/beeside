@@ -66,6 +66,13 @@ describeWithDb("Preview and Send (PostgreSQL, simulated Operation Hub, test-only
     const { payloadChecksum } = await import("../../../ports/operation-hub");
     expect(payloadChecksum(h.spy.payloads[0]!)).toBe(pv.body.previewChecksum);
     expect(h.spy.payloads[0]!.contract.kind).toBe("first_send");
+    // clean content: no conversational debris, no internal markers, no platform names; and a person can read it
+    const { payloadHygiene } = await import("../../../ports/payload-hygiene");
+    const { sherpaBrief } = await import("../../../ports/sherpa-brief");
+    expect(payloadHygiene(h.spy.payloads[0]!)).toEqual([]);
+    const brief = sherpaBrief(h.spy.payloads[0]!);
+    expect(brief).toContain("PROJECT: Northwind Foods Ltd");
+    expect(brief).not.toMatch(/undefined|\[object|null/);
 
     const after = await preview(p, id);
     expect(after.body).toMatchObject({ sendState: "sent", canSend: false, previewChecksum: pv.body.previewChecksum });

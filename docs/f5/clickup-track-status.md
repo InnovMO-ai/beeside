@@ -221,3 +221,17 @@ no default address exists anywhere. A deployment-level fallback can be configure
 (or `PRECISION_SHERPA_CONTACT_EMAIL`); it is unset today. Without a channel the Operation Hub block offers general "Contact beeside"
 (`contact@beeside.you`); "Contact my Sherpa" appears only with a valid channel. **Product Owner decision pending (not blocking):** which
 channel the real Operation Hub exposes for the Sherpa (per-project address from the hub, or one shared Sherpa desk address in configuration).
+
+## 9. V1.0 Feature Complete additions (14 Oct 2026)
+
+* **Sherpa brief.** The task description now starts with a plain-text brief (`ports/sherpa-brief.ts`: project, confirmed Service Map frame, client
+  requirements, pending, required later; in the content language) and ends with the canonical JSON body as its LAST line (`beeside-oh/2`).
+  The brief is a pure function of the payload, so the delivery checksum is unchanged; read-back, idempotency and tamper detection still use the
+  machine body only. `beeside-oh/1` descriptions still parse. **To verify against real ClickUp:** description size limit and byte-exact round trip
+  now apply to brief + body (sandbox script row 5 covers the round trip; check the size with a large CRP).
+* **Neutral reference.** `OhExternalReference.taskId` became `workItemId` (references stored with `taskId=` still decode). No ClickUp term exists
+  outside `adapters/clickup-*`, the composition root and the lints; `ports/boundary.test.ts` enforces it.
+* **Payload hygiene.** `ports/payload-hygiene.ts` flags conversational debris (questions, assistant phrasing, role prefixes, code fences), placeholders,
+  internal markers/keys, platform or vendor names and e-mail addresses in the text that travels; the real send flow is asserted clean.
+* **Admin visibility.** `GET /api/admin/precision/deliveries` (+ Control Center "Precision → Operation Hub sends"): latest state per delivery,
+  internal codes only, read-only. Retrying a failed send stays a client action.

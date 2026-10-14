@@ -42,7 +42,8 @@ export interface OhHandoffPayload {
 export interface OhExternalReference {
   artifactId?: string;
   locationId?: string;
-  taskId?: string;
+  /** Platform-neutral id of the delivered work item (an adapter maps its own concept onto it). */
+  workItemId?: string;
   secureReference?: string;
 }
 

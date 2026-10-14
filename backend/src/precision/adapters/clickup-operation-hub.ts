@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { IntegrationDescriptor } from "../ports/integration-descriptor";
+import { briefFor, overviewBrief } from "../ports/sherpa-brief";
 import {
   OH_CONTRACT_VERSION,
   OhAccessState,
@@ -95,6 +96,9 @@ const DEFAULT_RETRY: ClickUpRetryPolicy = {
 };
 
 export const CLICKUP_MARKER = "beeside-oh/1";
+/** Description with a readable brief above the machine body. The checksum still covers the structured body only. */
+export const CLICKUP_MARKER_V2 = "beeside-oh/2";
+const MACHINE_DELIMITER = "\n--- machine ---\n";
 export const TAG_OVERVIEW = "oh-overview";
 
 interface CuTag { name: string }
@@ -143,16 +147,21 @@ function idCompare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-export function buildDescription(key: string, kind: string, body: string, checksum: string): string {
+export function buildDescription(key: string, kind: string, body: string, checksum: string, brief?: string): string {
+  // `brief` is plain text for the Sherpa to read; the canonical JSON body (a single line) is always the LAST line and the source of truth.
+  if (brief && brief.trim()) return `${CLICKUP_MARKER_V2}\nkey: ${key}\nchecksum: ${checksum}\nkind: ${kind}\n---\n${brief.trim()}${MACHINE_DELIMITER}${body}`;
   return `${CLICKUP_MARKER}\nkey: ${key}\nchecksum: ${checksum}\nkind: ${kind}\n---\n${body}`;
 }
 
 export function parseMarker(description: string | undefined): Marker | undefined {
   if (!description) return undefined;
   const normalised = description.replace(/\r\n/g, "\n");
-  const m = /^beeside-oh\/1\nkey: (.+)\nchecksum: ([0-9a-f]{64})\nkind: ([a-z_]+)\n---\n([\s\S]*)$/.exec(normalised);
+  const m = /^beeside-oh\/[12]\nkey: (.+)\nchecksum: ([0-9a-f]{64})\nkind: ([a-z_]+)\n---\n([\s\S]*)$/.exec(normalised);
   if (!m) return undefined;
-  return { key: m[1]!, checksum: m[2]!, kind: m[3]!, body: m[4]! };
+  // Canonical JSON never contains a raw newline, so the machine body is whatever follows the LAST delimiter.
+  const rest = m[4]!;
+  const cut = rest.lastIndexOf(MACHINE_DELIMITER);
+  return { key: m[1]!, checksum: m[2]!, kind: m[3]!, body: cut >= 0 ? rest.slice(cut + MACHINE_DELIMITER.length) : rest };
 }
 
 /** Checksum of what is actually stored: recomputed from the stored canonical body, not trusted from the marker. */
@@ -306,7 +315,7 @@ export class ClickUpOperationHub implements OperationHubPort {
     state.suspectCreated = true; // from here on, an unknown outcome may mean the task exists
     const created = await this.createTask(listId, {
       name,
-      description: buildDescription(key, kind, body, sentChecksum),
+      description: buildDescription(key, kind, body, sentChecksum, briefFor(payload)),
       tags: [keyTag(key), projectTag(projectId), `oh-${kind.replace("_", "-")}`],
     });
 
@@ -352,7 +361,7 @@ export class ClickUpOperationHub implements OperationHubPort {
     const list = task.list?.id;
     return {
       artifactId: task.id,
-      taskId: task.id,
+      workItemId: task.id,
       ...(folder || list ? { locationId: [folder, list].filter(Boolean).join("/") } : {}),
       ...(task.url ? { secureReference: task.url } : {}),
     };
@@ -399,7 +408,12 @@ export class ClickUpOperationHub implements OperationHubPort {
     });
     await this.createTask(listId, {
       name: `Project Service Map v${payload.provenance.psm_version}`,
-      description: buildDescription(key, "psm_overview", body, sha(body)),
+      description: buildDescription(key, "psm_overview", body, sha(body), overviewBrief({
+        companyName: String((payload.company_context as { display_name?: unknown }).display_name ?? ""),
+        psmVersion: payload.provenance.psm_version,
+        psm: (payload.project_context as { psm: Record<string, unknown> }).psm,
+        language: (payload.artifact.structured as { language?: unknown }).language === "es" ? "es" : "en",
+      })),
       tags: [keyTag(key), projectTag(projectId), TAG_OVERVIEW],
     });
   }

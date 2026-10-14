@@ -7,12 +7,13 @@ import { Json, KeyValues, Status, Table, errorMessage, formatWhen, text, useLoad
  * Admin-managed Precision links and routes, and the privacy policy. Statistics are aggregates: no conversation text, no personal data.
  */
 
-type Tab = "statistics" | "programs" | "links" | "privacy";
+type Tab = "statistics" | "deliveries" | "programs" | "links" | "privacy";
 const pct = (v: unknown): string => (typeof v === "number" ? `${Math.round(v * 1000) / 10}%` : "—");
 
 export function PrecisionView({ can }: { can: (p: Permission) => boolean }) {
   const tabs: Array<{ id: Tab; label: string; show: boolean }> = [
     { id: "statistics", label: "Statistics", show: can("analytics.read") },
+    { id: "deliveries", label: "Operation Hub sends", show: can("operations.read") },
     { id: "programs", label: "Programs & sponsors", show: can("projects.read") },
     { id: "links", label: "Links & routes", show: can("config.read") },
     { id: "privacy", label: "Privacy policy", show: can("privacy.manage") },
@@ -29,6 +30,7 @@ export function PrecisionView({ can }: { can: (p: Permission) => boolean }) {
       </div>
       <div role="tabpanel">
         {tab === "statistics" && <Statistics />}
+        {tab === "deliveries" && <Deliveries />}
         {tab === "programs" && <ProgramsAndSponsors can={can} />}
         {tab === "links" && <LinksAndRoutes canWrite={can("config.write")} />}
         {tab === "privacy" && can("privacy.manage") && <PrivacyPolicy />}
@@ -482,6 +484,46 @@ function PrivacyPolicy() {
         <button type="submit" className="button button-primary" disabled={days === "" || Number.isNaN(Number(days))}>Approve policy</button>
         {message && <p role="status">{message}</p>}
       </form>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------ Operation Hub sends
+function Deliveries() {
+  const [status, setStatus] = useState("");
+  const { data, error } = useLoad(() => adminApi.precisionDeliveries(status), [status]);
+  return (
+    <div className="admin-card">
+      <h2>Sends to Operation Hub</h2>
+      <p className="helper">Latest state of each delivery. A failed send is retried by the client; here you only see it. Internal codes, no content.</p>
+      <label>
+        Status
+        <select className="select admin-inline" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All</option>
+          <option value="delivered">Delivered</option>
+          <option value="failed">Failed</option>
+          <option value="queued">In progress</option>
+        </select>
+      </label>
+      <Status data={data} error={error} />
+      {data && (
+        <>
+          <KeyValues items={Object.entries(data.counts).map(([k, n]): [string, ReactNode] => [k, String(n)])} />
+          <Table
+            rows={data.deliveries}
+            empty="No deliveries."
+            columns={[
+              { label: "When", render: (d) => formatWhen(d.created_at) },
+              { label: "Project", render: (d) => <code>{text(d.project_id)}</code> },
+              { label: "Kind", render: (d) => text(d.kind) },
+              { label: "Version", render: (d) => text(d.artifact_version) },
+              { label: "Status", render: (d) => text(d.status) },
+              { label: "Attempt", render: (d) => text(d.attempt) },
+              { label: "Internal code", render: (d) => text(d.error_code) },
+            ]}
+          />
+        </>
+      )}
     </div>
   );
 }

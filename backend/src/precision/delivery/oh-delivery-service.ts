@@ -96,7 +96,7 @@ export function ohIdempotencyKey(i: { projectId: string; kind: OhLedgerKind; art
   return `${i.projectId}:${i.kind}:${i.artifactId}:${i.artifactVersion}`;
 }
 
-const REF_FIELDS = ["artifactId", "locationId", "taskId", "secureReference"] as const;
+const REF_FIELDS = ["artifactId", "locationId", "workItemId", "secureReference"] as const;
 
 /** Compact opaque string, no JSON: `artifactId=..|locationId=..` with values percent-encoded. Precision never interprets it. */
 export function encodeOhReference(ref: OhExternalReference): string {
@@ -107,7 +107,9 @@ export function decodeOhReference(text: string): OhExternalReference {
   const out: OhExternalReference = {};
   for (const part of text.split("|")) {
     const i = part.indexOf("=");
-    const k = part.slice(0, i) as (typeof REF_FIELDS)[number];
+    const raw = part.slice(0, i);
+    // `taskId` is the pre-neutral spelling of workItemId: references stored before the rename still read.
+    const k = (raw === "taskId" ? "workItemId" : raw) as (typeof REF_FIELDS)[number];
     if (i > 0 && REF_FIELDS.includes(k)) out[k] = decodeURIComponent(part.slice(i + 1));
   }
   return out;

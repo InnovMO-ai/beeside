@@ -305,6 +305,8 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
   });
   it("Precision links and routes: effective value + source per audience, validated versioned writes, reset, role limits; the audit never carries the value", async () => {
     const { admin, supervisor } = await people();
+    // other suites commit configuration rows; this test runs inside the rolled-back harness transaction and starts from a clean table
+    await h.client.query("DELETE FROM precision_config");
     const put = (cookie: string, key: string, b: unknown) => app().put(`/api/admin/precision/config/${key}`).set("Cookie", cookie).set("X-Beeside-Admin", "1").send(b as object);
     const del = (cookie: string, key: string, locale: string) => app().delete(`/api/admin/precision/config/${key}?locale=${locale}`).set("Cookie", cookie).set("X-Beeside-Admin", "1");
     const entry = (body: { entries: Array<{ key: string; effective: Array<{ locale: string; value: string | null; source: string }> }> }, key: string, locale: string) =>
@@ -355,5 +357,15 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
     expect(text).not.toContain("hub.example.test");
     expect(text).not.toContain("go live");
     expect(audit.rows.some((r) => r.action === "precision_config.set" && r.outcome === "DENIED")).toBe(true);
+  });
+  it("Precision deliveries to Operation Hub: read-only list by status for operations roles, ids and codes only", async () => {
+    const { supervisor } = await people();
+    const all = await get(supervisor, "/precision/deliveries");
+    expect(all.status).toBe(200);
+    expect(all.body).toHaveProperty("counts");
+    expect(Array.isArray(all.body.deliveries)).toBe(true);
+    expect((await get(supervisor, "/precision/deliveries?status=failed")).status).toBe(200);
+    expect((await get(supervisor, "/precision/deliveries?status=bogus")).status).toBe(400);
+    expect(JSON.stringify(all.body)).not.toMatch(/oh_reference|payload|structured/);
   });
 });

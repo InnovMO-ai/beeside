@@ -118,7 +118,7 @@ export class SimulatedOperationHub implements OperationHubPort, OhFaultInjector 
     const reference: OhExternalReference = {
       artifactId: `art_${this.sequence.toString().padStart(6, "0")}`,
       locationId: `loc_${createHash("sha1").update(payload.identity.project_id).digest("hex").slice(0, 8)}`,
-      taskId: `task_${this.sequence.toString().padStart(6, "0")}`,
+      workItemId: `item_${this.sequence.toString().padStart(6, "0")}`,
       secureReference: `sec_${createHash("sha256").update(`${key}:${this.sequence}`).digest("hex").slice(0, 16)}`,
     };
     const stored: StoredDelivery = {

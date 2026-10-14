@@ -60,7 +60,7 @@ describe("Control Center", () => {
     });
     render(<AdminApp />);
     const nav = await screen.findByRole("navigation", { name: "Control Center" });
-    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Operations"]);
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Precision", "Operations"]);
 
     fireEvent.change(screen.getByLabelText("Search projects"), { target: { value: "north" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -85,7 +85,7 @@ describe("Control Center", () => {
     window.history.replaceState(null, "", "/admin/operations");
     render(<AdminApp />);
     const nav = await screen.findByRole("navigation", { name: "Control Center" });
-    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Operations", "Audit", "People"]);
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual(["Projects", "Configuration", "Communications", "Precision", "Operations", "Audit", "People"]);
     fireEvent.click(await screen.findByRole("button", { name: "Run email delivery" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/email_outbox/run"))).toBe(true));
     const write = calls.find((c) => c.url.endsWith("/email_outbox/run"));
@@ -342,5 +342,17 @@ describe("Control Center", () => {
     expect(await screen.findByText("25%")).toBeInTheDocument();
     expect(await screen.findByText("Awaiting product layer")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Privacy policy" })).not.toBeInTheDocument();
+  });
+  it("lists Operation Hub sends with status counts and internal codes, read-only", async () => {
+    const supervisor = { ...SUPERVISOR, permissions: [...SUPERVISOR.permissions] };
+    const calls = mockApi({
+      "/api/admin/me": () => jsonResponse(supervisor),
+      "/api/admin/precision/deliveries": () => jsonResponse({ counts: { failed: 1, delivered: 3 }, deliveries: [{ created_at: "2026-10-10T10:00:00Z", project_id: "p-9", kind: "crp", artifact_version: 2, status: "failed", attempt: 3, error_code: "UNAVAILABLE" }] }),
+    });
+    window.history.replaceState(null, "", "/admin/precision");
+    render(<AdminApp />);
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+    expect(screen.getByText("p-9")).toBeInTheDocument();
+    expect(calls.every((c) => c.method === "GET")).toBe(true);
   });
 });

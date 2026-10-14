@@ -58,7 +58,7 @@ describeWithDb("OhDeliveryService (PostgreSQL, committed rows in a scratch datab
     const i = await crp(projectId, companyId);
     const r = await svc.send(i);
     expect(r.state).toBe("sent");
-    expect(decodeOhReference(r.reference!)).toMatchObject({ taskId: expect.stringMatching(/^task_/) });
+    expect(decodeOhReference(r.reference!)).toMatchObject({ workItemId: expect.stringMatching(/^item_/) });
     expect(r.reference).not.toContain("{");
     expect((await rows(i.key)).map((x) => `${x.status}:${x.attempt}`)).toEqual(["queued:1", "delivered:1"]);
     expect(sim.storedCount()).toBe(1);
@@ -158,7 +158,7 @@ describeWithDb("OhDeliveryService (PostgreSQL, committed rows in a scratch datab
     const { projectId, companyId } = await fx.newProject();
     const lying: OperationHubPort = {
       describe: () => new SimulatedOperationHub().describe(),
-      publish: async (p) => ({ reference: { taskId: "t1" }, checksum: "0".repeat(64), contractVersion: "1.1", acceptedAt: new Date().toISOString(), replayed: false, ...(p ? {} : {}) }),
+      publish: async (p) => ({ reference: { workItemId: "t1" }, checksum: "0".repeat(64), contractVersion: "1.1", acceptedAt: new Date().toISOString(), replayed: false, ...(p ? {} : {}) }),
       verify: async () => ({ found: false }),
       accessState: async () => ({ provisioned: true, clientAccessible: true, sherpaAssigned: true }),
     };
@@ -173,7 +173,7 @@ describeWithDb("OhDeliveryService (PostgreSQL, committed rows in a scratch datab
     const port: OperationHubPort = {
       describe: () => new SimulatedOperationHub().describe(),
       publish: async () => { throw new OhPortError("TIMEOUT", "no ack", { outcomeUnknown: true }); },
-      verify: async () => ({ found: true, reference: { taskId: "t9" }, checksum: "f".repeat(64) }),
+      verify: async () => ({ found: true, reference: { workItemId: "t9" }, checksum: "f".repeat(64) }),
       accessState: async () => ({ provisioned: true, clientAccessible: false, sherpaAssigned: false }),
     };
     const i = await crp(projectId, companyId);
@@ -312,7 +312,7 @@ describeWithDb("OhDeliveryService (PostgreSQL, committed rows in a scratch datab
       expect(r.state).toBe("sent");
       expect(h.server.taskCount()).toBe(1);
       expect(spy.verifyCalls).toBe(1);
-      expect(decodeOhReference(r.reference!).taskId).toBeTruthy();
+      expect(decodeOhReference(r.reference!).workItemId).toBeTruthy();
       const before = h.server.log.length;
       expect((await svc.send(i)).alreadySent).toBe(true);
       expect(h.server.log.length).toBe(before);

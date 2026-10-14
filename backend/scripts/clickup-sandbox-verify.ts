@@ -93,14 +93,14 @@ async function main(): Promise<void> {
     record("1 acceptance", "publish returns an acceptance", "FAIL", `${(acc as OhPortError).code}: ${acc.message}`);
     return finish(apiBase);
   }
-  created.push(acc.reference.taskId ?? "");
+  created.push(acc.reference.workItemId ?? "");
   record("1 acceptance", "publish returns an acceptance with acceptedAt + contractVersion", acc.acceptedAt && acc.contractVersion === "1.1" ? "PASS" : "FAIL", `acceptedAt=${acc.acceptedAt}`);
-  const got = await raw("GET", `/task/${acc.reference.taskId}`);
+  const got = await raw("GET", `/task/${acc.reference.workItemId}`);
   record("1 acceptance", "the referenced task really exists on the platform (GET /task/{id})", got.status === 200 ? "PASS" : "FAIL", `HTTP ${got.status}`);
 
   // ---------------------------------------------------------------- 2. stable external reference
   const again = await makeAdapter().publish(first);
-  record("2 reference", "a second adapter instance returns the SAME reference for the same key", JSON.stringify(again.reference) === JSON.stringify(acc.reference) && again.replayed ? "PASS" : "FAIL", `taskId ${acc.reference.taskId} vs ${again.reference.taskId}`);
+  record("2 reference", "a second adapter instance returns the SAME reference for the same key", JSON.stringify(again.reference) === JSON.stringify(acc.reference) && again.replayed ? "PASS" : "FAIL", `workItemId ${acc.reference.workItemId} vs ${again.reference.workItemId}`);
   const seen = await makeAdapter().verify(first.contract.idempotency_key);
   record("2 reference", "verify() returns the same reference", seen.found && JSON.stringify(seen.reference) === JSON.stringify(acc.reference) ? "PASS" : "FAIL");
   record("2 reference", "reference survives a human renaming/moving the task", "MANUAL", "rename the task in the ClickUp UI, then re-run verify(); the id is stable by ClickUp design but confirm");
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   const results = await Promise.all([port.publish(burstPayload), makeAdapter().publish(burstPayload), makeAdapter().publish(burstPayload)].map((p) => p.catch((e: unknown) => e as OhPortError)));
   await sleep(3000);
   const burstTasks = await tasksWithKey(burstPayload.contract.idempotency_key);
-  results.forEach((r) => { if (!(r instanceof Error)) created.push(r.reference.taskId ?? ""); });
+  results.forEach((r) => { if (!(r instanceof Error)) created.push(r.reference.workItemId ?? ""); });
   record("3 idempotent create", "3 simultaneous publishes (2 independent processes) of one key leave exactly 1 task", burstTasks.length === 1 ? "PASS" : "FAIL", `tasks found by key tag: ${burstTasks.length}${burstTasks.length > 1 ? " (cross-process race: the in-process mutex cannot prevent this; see status doc)" : ""}`);
   const structure = await raw("GET", `/space/${spaceId}/folder?archived=false`);
   const mine = (structure.json.folders ?? []).filter((f: any) => String(f.name).includes(clickUpProjectRef(projectId)));
@@ -128,9 +128,9 @@ async function main(): Promise<void> {
   record("5 checksum", "body with unicode/quotes/backslash/newline round-trips byte-exact through ClickUp", acc.checksum === payloadChecksum(first) && seen.checksum === payloadChecksum(first) ? "PASS" : "FAIL", "read-back checksum is recomputed from the stored description");
   const tamper = payloadFor("Sandbox Verify", "tamper");
   const t = await port.publish(tamper);
-  created.push(t.reference.taskId ?? "");
-  const stored = (await raw("GET", `/task/${t.reference.taskId}`)).json;
-  const put = await raw("PUT", `/task/${t.reference.taskId}`, { description: String(stored.description).replace("Sandbox Verification Co", "Tampered Co") });
+  created.push(t.reference.workItemId ?? "");
+  const stored = (await raw("GET", `/task/${t.reference.workItemId}`)).json;
+  const put = await raw("PUT", `/task/${t.reference.workItemId}`, { description: String(stored.description).replace("Sandbox Verification Co", "Tampered Co") });
   const afterTamper = await port.verify(tamper.contract.idempotency_key);
   const mism = await expectCode(port.publish(tamper));
   record("5 checksum", "a platform-side change to the stored body is detected (verify differs, publish -> CHECKSUM_MISMATCH)", put.status === 200 && afterTamper.checksum !== payloadChecksum(tamper) && mism?.code === "CHECKSUM_MISMATCH" ? "PASS" : "FAIL", `PUT HTTP ${put.status}, publish -> ${mism?.code ?? "accepted"}`);
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------- 6. duplicate send protection (platform side)
   const dup = payloadFor();
   const sequential = [await port.publish(dup), await port.publish(dup), await makeAdapter().publish(dup)];
-  created.push(sequential[0]!.reference.taskId ?? "");
+  created.push(sequential[0]!.reference.workItemId ?? "");
   await sleep(2500);
   record("6 duplicate send", "3 sequential publishes of one key (new process each time) leave 1 task, replayed=true after the first", (await tasksWithKey(dup.contract.idempotency_key)).length === 1 && sequential.slice(1).every((r) => r.replayed) ? "PASS" : "FAIL");
   const diff = payloadFor(); diff.contract.idempotency_key = dup.contract.idempotency_key;
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
   };
   const r1 = payloadFor();
   const retried = await makeAdapter({ fetch: chaos("fail503_before", 2), sleep: async (ms) => { sleeps.push(ms); await sleep(Math.min(ms, 200)); } }).publish(r1).catch((e: unknown) => e as OhPortError);
-  if (!(retried instanceof Error)) created.push(retried.reference.taskId ?? "");
+  if (!(retried instanceof Error)) created.push(retried.reference.workItemId ?? "");
   await sleep(2500);
   record("7 retry", "two synthetic 503s before the write, then success, exactly 1 task", !(retried instanceof Error) && (await tasksWithKey(r1.contract.idempotency_key)).length === 1 ? "PASS" : "FAIL", retried instanceof Error ? retried.message : `backoff delays ${sleeps.slice(-2).join(",")}ms`);
   record("7 retry", "real 429 + reset header honoured", process.env.CLICKUP_BURST === "1" ? "SKIP" : "SKIP", "see burst check below (CLICKUP_BURST=1)");
@@ -174,11 +174,11 @@ async function main(): Promise<void> {
   for (let i = 0; i < 20; i++) { if ((await makeAdapter().verify(t1.contract.idempotency_key)).found) { visibleAfter = Date.now() - t0; break; } await sleep(1000); }
   record("8 timeout", "the stored task becomes visible to verify() (search-after-write lag measured)", visibleAfter >= 0 ? "PASS" : "FAIL", visibleAfter >= 0 ? `visible after ~${visibleAfter} ms (adapter lookup window must exceed this; default 5 x 1500 ms)` : "never visible within 20 s -> tag search is not usable, rely on list scan only");
   const recovered = await makeAdapter().publish(t1).catch((e: unknown) => e as OhPortError);
-  if (!(recovered instanceof Error)) created.push(recovered.reference.taskId ?? "");
+  if (!(recovered instanceof Error)) created.push(recovered.reference.workItemId ?? "");
   record("8 timeout", "retry after the lost response creates no duplicate and returns replayed=true", !(recovered instanceof Error) && recovered.replayed && (await tasksWithKey(t1.contract.idempotency_key)).length === 1 ? "PASS" : "FAIL");
   const t2 = payloadFor();
   const selfHealed = await makeAdapter({ fetch: chaos("lose_response", 1) }).publish(t2).catch((e: unknown) => e as OhPortError);
-  if (!(selfHealed instanceof Error)) created.push(selfHealed.reference.taskId ?? "");
+  if (!(selfHealed instanceof Error)) created.push(selfHealed.reference.workItemId ?? "");
   await sleep(2500);
   record("8 timeout", "adapter self-heals within one publish() (default policy) with exactly 1 task", !(selfHealed instanceof Error) && (await tasksWithKey(t2.contract.idempotency_key)).length === 1 ? "PASS" : "FAIL", selfHealed instanceof Error ? selfHealed.message : "");
 
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
   const reset = await makeAdapter({ fetch: chaos("reset_after_send", 1), retry: { maxAttempts: 1 } }).publish(n1).then(() => undefined, (e: unknown) => e as OhPortError);
   record("9 network + taxonomy", "connection reset after the write -> UNAVAILABLE (outcome unknown)", reset?.code === "UNAVAILABLE" && reset.outcomeUnknown ? "PASS" : "FAIL", `${reset?.code ?? "no error"}`);
   await sleep(2500);
-  const afterReset = await makeAdapter().publish(n1); created.push(afterReset.reference.taskId ?? "");
+  const afterReset = await makeAdapter().publish(n1); created.push(afterReset.reference.workItemId ?? "");
   record("9 network + taxonomy", "recovery after the reset: replayed=true, 1 task", afterReset.replayed && (await tasksWithKey(n1.contract.idempotency_key)).length === 1 ? "PASS" : "FAIL");
   const bad = await expectCode(makeAdapter({ token: "pk_invalid_token_for_verification" }).publish(payloadFor()));
   record("9 network + taxonomy", "invalid token -> AUTH (401/403), not retried", bad?.code === "AUTH" ? "PASS" : "FAIL", `${bad?.code ?? "no error"}`);

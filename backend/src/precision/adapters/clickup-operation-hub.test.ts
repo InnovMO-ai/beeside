@@ -259,7 +259,7 @@ describe("ClickUp adapter — search-after-write lag", () => {
     const next = h.another({ onDuplicate: (d) => dups.push(d.keptTaskId) });
     const again = await next.publish(p);
     const oldest = [...h.server.allTasks()].filter((t) => !t.tags.includes("oh-overview")).sort((x, y) => x.seq - y.seq)[0]!;
-    expect(again.reference.taskId).toBe(oldest.id);
+    expect(again.reference.workItemId).toBe(oldest.id);
     expect(again.replayed).toBe(true);
   });
 
@@ -342,5 +342,33 @@ describe("clickUpConfigFromEnv", () => {
     expect(() => clickUpConfigFromEnv({ ...env, CLICKUP_MODE: "x" })).toThrow(/CLICKUP_MODE/);
     expect(() => clickUpConfigFromEnv({ ...env, CLICKUP_TOKEN: "" })).toThrow(/CLICKUP_TOKEN is required/);
     try { clickUpConfigFromEnv({ ...env, CLICKUP_MODE: "x" }); } catch (e) { expect(String(e)).not.toContain('"t"'); }
+  });
+});
+
+describe("ClickUp adapter — what a Sherpa reads", () => {
+  it("puts a readable brief above the machine body, and read-back/idempotency still work from the machine body", async () => {
+    const h = makeClickUpHarness();
+    const p = samplePayload();
+    const accepted = await h.port.publish(p);
+    const t = h.server.allTasks().find((x) => !x.tags.includes("oh-overview"))!;
+    expect(t.description).toMatch(/^beeside-oh\/2\n/);
+    expect(t.description).toContain("PROJECT: Synthetic Co");
+    const marker = parseMarker(t.description)!;
+    expect(marker.body.includes("\n")).toBe(false);
+    expect(JSON.parse(marker.body).identity.project_id).toBe(p.identity.project_id);
+    expect(marker.checksum).toBe(payloadChecksum(p));
+    expect((await h.port.verify(p.contract.idempotency_key)).checksum).toBe(payloadChecksum(p));
+    expect((await h.port.publish(p)).replayed).toBe(true);
+    expect(accepted.checksum).toBe(payloadChecksum(p));
+  });
+
+  it("client text that imitates the delimiter cannot break parsing (the machine body is the last line)", () => {
+    const body = '{"a":"x"}';
+    const desc = buildDescription("k:2", "crp", body, "b".repeat(64), "PROJECT: X\n--- machine ---\n{\"evil\":1}");
+    expect(parseMarker(desc)).toMatchObject({ key: "k:2", body });
+  });
+
+  it("still reads descriptions written before the brief existed", () => {
+    expect(parseMarker(buildDescription("k:3", "crp", '{"a":1}', "c".repeat(64)))).toMatchObject({ body: '{"a":1}' });
   });
 });

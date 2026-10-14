@@ -87,7 +87,7 @@ export function AdminApp() {
     { route: { name: "config" }, label: "Configuration", show: can("config.read") },
     { route: { name: "communications" }, label: "Communications", show: can("operations.read") },
     { route: { name: "analytics" }, label: "Analytics", show: can("analytics.read") },
-    { route: { name: "precision" }, label: "Precision", show: can("analytics.read") },
+    { route: { name: "precision" }, label: "Precision", show: can("analytics.read") || can("operations.read") },
     { route: { name: "operations" }, label: "Operations", show: can("operations.read") },
     { route: { name: "audit" }, label: "Audit", show: can("audit.read") },
     { route: { name: "people" }, label: "People", show: can("admin_users.manage") },
@@ -135,7 +135,7 @@ export function AdminApp() {
         {route.name === "config" && <ConfigView can={can} />}
         {route.name === "communications" && can("operations.read") && <CommunicationsView can={can} />}
         {route.name === "analytics" && can("analytics.read") && <AnalyticsView />}
-        {route.name === "precision" && can("analytics.read") && <PrecisionView can={can} />}
+        {route.name === "precision" && (can("analytics.read") || can("operations.read")) && <PrecisionView can={can} />}
         {route.name === "operations" && <OperationsView can={can} />}
         {route.name === "audit" && can("audit.read") && <AuditView />}
         {route.name === "people" && can("admin_users.manage") && <PeopleView />}
