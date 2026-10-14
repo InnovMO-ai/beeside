@@ -149,3 +149,29 @@ describe("briefing hygiene gate", () => {
     expect(clean.facts).toEqual([]);
   });
 });
+
+describe("category readiness depends on THIS project's material aspects", () => {
+  it("payroll is blocked by the headcount for a company that will hire; a coffee exporter's payroll is not blocked by anything", async () => {
+    const { categoryReadiness } = await import("../category-readiness");
+    const hire = new Conv("es", { ...SEED, needs: [] });
+    hire.say("Vamos a constituir una entidad local y contratar gente, algunos directamente y otros por un tercero.");
+    const pay = categoryReadiness(hire.frame, "people_payroll_employment");
+    expect(pay.open).toEqual(expect.arrayContaining(["workforce.headcount"]));
+    expect(pay.ready).toBe(false);
+
+    const coffee = new Conv("es", SEED);
+    coffee.say("Queremos exportar café en sacos de 70 kilos cada mes.");
+    const cpay = categoryReadiness(coffee.frame, "people_payroll_employment");
+    expect(cpay.material).toEqual([]);
+    expect(cpay.ready).toBe(true);
+  });
+  it("'I do not know' is honest knowledge for the specialist, never a blocker", async () => {
+    const { categoryReadiness } = await import("../category-readiness");
+    const c = new Conv("es", { ...SEED, needs: [] });
+    c.say("Vamos a contratar gente directamente.");
+    c.say("Todavía no lo sé.");
+    c.say("No lo sé todavía.");
+    const r = categoryReadiness(c.frame, "people_payroll_employment");
+    expect(r.open).not.toContain("workforce.headcount");
+  });
+});

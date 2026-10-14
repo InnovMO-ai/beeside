@@ -462,7 +462,7 @@ export const PROBES: readonly ProbeDef[] = [
       add(/bonos?|bonus/, "bonos", "bonuses");
       add(/aguinaldo superior|aguinaldo mayor|vacaciones adicionales|additional vacation/, "días o aguinaldo adicionales", "additional days or year-end pay");
       add(/prestaciones superiores|por encima de la ley|mas que la ley|above the legal|beyond the legal|superiores a las de ley/, "por encima del mínimo de ley", "above the legal minimum");
-      const minimum = /(?:solo|unicamente|nada mas que) (?:las )?(?:prestaciones )?(?:de ley|minimas|obligatorias|legales)|minimo (?:de ley|legal)|lo que (?:marca|exige|pide) la ley|prestaciones de ley|only (?:the )?legal|legal minimum|statutory (?:only|minimum)/.test(ctx.f);
+      const minimum = /(?:solo|unicamente|nada mas que) (?:las |lo |los )?(?:prestaciones )?(?:de ley|minimas|obligatorias|legales)|(?:solo|unicamente) lo (?:que )?(?:marca|dice|pide|exige) la ley|minimo (?:de ley|legal)|lo que (?:marca|exige|pide) la ley|prestaciones de ley|only (?:the )?legal|legal minimum|statutory (?:only|minimum)/.test(ctx.f);
       if (minimum && items.length === 0) return mk(ctx, "ley|legal", { mode: "legal_minimum", items: [] }, ctx.locale === "es" ? "Solo el mínimo de ley" : "Legal minimum only");
       if (items.length > 0) return mk(ctx, "prestaciones|benefits|seguro|vales|fondo de ahorro|bono", { mode: "above_minimum", items }, items.join(", "));
       return null;

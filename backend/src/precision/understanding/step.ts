@@ -122,10 +122,16 @@ export function promptFor(frame: Frame, a: Action, loc: Loc): { text: string; qu
       const sizing = probe && (probe.dimension === "scale" || probe.dimension === "tax" || probe.key === "workforce.benefits");
       const base = questionFor(frame, a.probeKey, loc, asks === 0 && Boolean(sizing));
       const numeric = probe && (probe.dimension === "scale" || ["workforce.headcount", "workforce.split", "trade.volume"].includes(probe.key));
-      const retry = asks >= 1 && numeric ? (loc === "es" ? "Una estimación me basta. " : "A rough estimate is enough. ") : asks >= 1 ? (loc === "es" ? "Te lo pregunto de otra forma. " : "Let me ask it another way. ") : "";
+      // A second ask is NOT the same question again: it lowers the bar (an approximation is enough, "I don't know" is an answer).
+      const label = (probe?.label[loc] ?? "").toLowerCase();
+      const retry = asks >= 1 && label
+        ? (numeric
+          ? (loc === "es" ? `Sobre ${label}: ¿cuál es tu mejor estimación? Con una cifra aproximada me basta, y si aún no la tienes también me sirve saberlo.` : `On ${label}: what is your best estimate? A rough figure is enough, and if you do not have one yet, that is useful to know.`)
+          : (loc === "es" ? `Sobre ${label}: ¿qué tienes ya claro, aunque sea a grandes rasgos? Si aún no lo sabes o no está decidido, dímelo y lo dejamos anotado.` : `On ${label}: what do you already have clear, even roughly? If you do not know yet or it is not decided, tell me and I will note it.`))
+        : "";
       const quick: QuickReply[] = probe?.onNo ? [{ value: "no", label: q("no"), intent: "answer" }] : [];
       if (probe && probe.dimension !== "project") quick.push({ value: "unknown", label: q("unknown"), intent: "unknown" });
-      return { text: `${retry}${base}`, quick };
+      return { text: retry || base, quick };
     }
     case "clarify_conflict": return { text: conflictQuestion(frame, a.key, loc), quick: [{ value: "new", label: q("newer"), intent: "correct" }, { value: "previous", label: q("prev"), intent: "confirm" }] };
     case "clarify_need": {

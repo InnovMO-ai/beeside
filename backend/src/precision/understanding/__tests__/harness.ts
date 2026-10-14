@@ -12,7 +12,7 @@ import { plan, promptFor, step, type Action, type QuickValue, type StepResult } 
 
 export const NOW = "2026-10-14T10:00:00.000Z";
 
-export interface Turn { client: string; bot: string; action: Action; changes: StepResult["changes"]; violations: Violation[] }
+export interface Turn { client: string; askedProbe: string | null; askedProbeResolved: boolean; bot: string; action: Action; changes: StepResult["changes"]; violations: Violation[] }
 
 export class Conv {
   frame: Frame;
@@ -42,7 +42,9 @@ export class Conv {
     });
     // The checkpoint summary lives in a card; its body is verified too (no question, no forbidden wording) — length is a conversation-text rule.
     if (r.card) violations.push(...verifyAssistantText(r.card.body, { locale: this.locale, surface: "understanding", introducedTerms: new Set(), sherpaAssigned: false, allowSherpaGeneral: false, approvedSources: [], questions: "none" }).filter((v) => v.code !== "too_long"));
-    this.transcript.push({ client: typeof input === "string" ? input : `[${input.quick}]`, bot: r.text, action: r.action, changes: r.changes, violations });
+    const askedProbe = r.action.kind === "ask_probe" ? r.action.probeKey : null;
+    const askedProbeResolved = askedProbe ? evaluateDepth(r.frame).statuses.some((x) => x.probe.key === askedProbe && x.state === "resolved") : false;
+    this.transcript.push({ askedProbe, askedProbeResolved, client: typeof input === "string" ? input : `[${input.quick}]`, bot: r.text, action: r.action, changes: r.changes, violations });
     return { ...r, violations };
   }
 
