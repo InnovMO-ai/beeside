@@ -43,10 +43,12 @@ export class FixtureFaContextReader implements FaContextReader {
 
   async read(projectId: string): Promise<FaContextRead | null> {
     const known = this.contexts.get(projectId);
-    if (known || !this.fallback) return known ?? null;
+    // Copies out: the caller can never alter what a later read returns.
+    if (known || !this.fallback) return known ? structuredClone(known) : null;
     const entry = await this.fallback(projectId);
     if (!entry) return null;
     this.add(entry);
-    return this.contexts.get(projectId) ?? null;
+    const added = this.contexts.get(projectId);
+    return added ? structuredClone(added) : null;
   }
 }
