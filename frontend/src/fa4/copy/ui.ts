@@ -152,10 +152,13 @@ export const UI = {
   valuedSupport: L('Lo que valoras en un apoyo', 'What you value in support'), keptTeam: L('Lo que mantienes en tu equipo', 'What you keep in-house'),
   criticalTag: L('Fecha crítica', 'Critical date'), nextStep: L('Siguiente paso', 'Next step'),
   premiumBody: L('Con acceso Premium, trabajamos contigo el detalle de cada tema y te presentamos propuestas con alcance, plazo y costo para que decidas.', 'With Premium access, we work through each topic with you and bring you proposals with scope, timing and cost so you can decide.'),
-  continueWith: L('Comienza tu expansión', 'Start your expansion'),
+  continueWith: L('Start Your Expansion', 'Start Your Expansion'),   // branded CTA, identical in ES and EN (PO, 2026-10-14)
   continued: L('Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago.', 'Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet.'),
   confirmTitle: L('¿Confirmas que quieres comenzar?', 'Do you confirm you want to start?'),
   confirmBody: L('Este será tu Your Expansion View definitivo: al confirmar, tus respuestas quedan cerradas. Tu beeside Sherpa lo revisará y te contactará. No hay ningún pago en este paso.', 'This will be your final Your Expansion View: once you confirm, your answers are closed. Your beeside Sherpa will review it and contact you. There is no payment in this step.'),
+  // Used only when a Premium purchase destination is configured (VITE_FA4_PREMIUM_PURCHASE_URL): no mention of Sherpa review or «no payment». ES/EN = proposal for copy sign-off.
+  confirmBodyPay: L('Este será tu Your Expansion View definitivo: al confirmar, tus respuestas quedan cerradas y continúas al siguiente paso.', 'This will be your final Your Expansion View: once you confirm, your answers are closed and you continue to the next step.'),
+  confirmGo: L('Confirmar y continuar', 'Confirm and continue'), continuedPay: L('Listo. Te llevamos al siguiente paso…', 'Done. Taking you to the next step…'),
   confirmYes: L('Sí, comenzar', 'Yes, start'), confirmNo: L('Todavía no', 'Not yet'),
   emailFinalNote: L('Al recibirlo por correo, este será tu Your Expansion View definitivo y tus respuestas quedarán cerradas.', 'Once you receive it by email, this will be your final Your Expansion View and your answers will be closed.'),
   deliveredNote: L('Este es tu Your Expansion View definitivo.', 'This is your final Your Expansion View.'),
@@ -165,8 +168,29 @@ export const UI = {
   backToStart: L('Volver al inicio', 'Back to the start'),
   footerCopy: L('© 2026 beeside', '© 2026 beeside'), termsLink: L('Términos y Condiciones', 'Terms and Conditions'), privacyLink: L('Política de Privacidad', 'Privacy Policy'),
   aboutBeeside: L('Sobre beeside', 'About beeside'),
-  vsHeadline: L('Expande tu negocio.\nNo tu carga de trabajo.', 'Expand your business.\nNot your workload.'),
-  // BeesideValueSection (PO-approved copy, D-134). Headline stays "Expande tu negocio. No tu carga de trabajo." (D-120).
+  // Discovery v1.0 (PO, 2026-10-14): approved localized brand lines (not literal translations).
+  vsHeadline: L('Piensa en grande.\nNosotros nos ocupamos del resto.', 'Think bigger.\nExpand smarter.'),
+  // Value of Continuing — commercial comparison (PO, 2026-10-14). EN = approved reference copy; ES = translation proposal for PO copy sign-off.
+  cmpEyebrow: L('Por qué continuar con beeside', 'Why continue with beeside'),
+  cmpTitle: L('Financiar un proceso fragmentado o contar con una capacidad coordinada', 'Funding a fragmented process, or buying coordinated capability'),
+  cmpLead: L('Cuanto más abajo en la lista, más costo y complejidad asumes directamente, sin ganar por ello la misma amplitud de capacidad.', 'The further down this list you go, the more cost and complexity you take on directly, without automatically gaining the same breadth of capability.'),
+  cmpOption: L('Opción', 'Option'), cmpComplexity: L('Complejidad', 'Complexity'),
+  cmpIncluded: L('Incluido', 'Included'), cmpNotIncluded: L('No incluido', 'Not included'),
+  cmpOf: L('{n} de {total} capacidades', '{n} of {total} capabilities'),
+  cmpOptions: [
+    { key: 'premium', name: L('beeside Premium', 'beeside Premium'), sub: L('Sistema coordinado', 'Coordinated system'), complexity: 0.18, covered: 8 },
+    { key: 'local', name: L('Contratar a una persona local', 'Hire one local person'), sub: L('Una sola especialidad, un solo punto de vista', 'One skillset, one point of view'), complexity: 0.45, covered: 0 },
+    { key: 'office', name: L('Oficina + una persona', 'Office + one person'), sub: L('Suma costos fijos', 'Fixed overhead added'), complexity: 0.7, covered: 0 },
+    { key: 'travel', name: L('Oficina + persona + viajes', 'Office + person + travel'), sub: L('El mayor costo y sigue fragmentado', 'Highest cost, still fragmented'), complexity: 0.97, covered: 0 },
+  ],
+  cmpDims: [L('Activación de varios servicios', 'Multi-service activation'), L('Acceso a especialistas', 'Specialist access'), L('Visibilidad del proyecto', 'Project visibility'), L('Coordinación', 'Coordination'),
+    L('Ecosistema seleccionado', 'Curated ecosystem'), L('Continuidad', 'Continuity'), L('Plataforma digital 24/7', '24/7 digital platform access'), L('Documentación centralizada', 'Centralized documentation')],
+  cmpNote: L('Solo dimensiones de capacidad coordinada: no es un juicio sobre las personas ni las oficinas, ni una cifra de costo. No se muestran importes hasta contar con datos comerciales validados. La comparación es ilustrativa y no representa precios garantizados.', 'Coordinated-capability dimensions only — not a judgment on the people or offices themselves, and not a cost figure. No monetary values are shown until validated commercial data is available. The comparison is illustrative and does not represent guaranteed pricing.'),
+  // Next step — destination-aware (PO, 2026-10-14)
+  nextOne: L('Concretar tu expansión en {country}', 'Define your expansion in {country}'),
+  nextMany: L('Concretar tu expansión en tus mercados objetivo', 'Define your expansion across your target markets'),
+  nextOpen: L('Concretar tu expansión', 'Define your expansion'),
+  // BeesideValueSection (PO-approved copy, D-134). Headline: see vsHeadline (Discovery v1.0 brand lines).
   vsSherpa: L('Tu Sherpa', 'Your Sherpa'), vsSherpaD: L('Una persona que coordina tu expansión y mantiene continuidad de principio a fin.', 'One person coordinating your expansion and keeping continuity from start to finish.'),
   vsHive: L('The Hive', 'The Hive'), vsHiveD: L('Especialistas y proveedores seleccionados para las necesidades de tu proyecto.', 'Curated specialists and providers for the needs of your project.'),
   vsHub: L('Operation Hub', 'Operation Hub'), vsHubD: L('Un solo lugar para seguir avances, tareas, documentos y próximos pasos.', 'One place to follow progress, tasks, documents and next steps.'),
@@ -175,7 +199,8 @@ export const UI = {
   idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu Discovery.', "Review and accept what's required to continue with your Discovery."),
   marketingConsent: L('Quiero recibir novedades, información y comunicaciones comerciales de beeside.', 'I would like to receive news, information and commercial communications from beeside.'),
   acceptContinue: L('Aceptar y continuar', 'Accept and continue'),
-  privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
+  // Discovery v1.0 (PO, 2026-10-14): approved customer-facing wording; no change to privacy logic.
+  privacyNotice: L('La información que nos compartiste no se comparte con proveedores en esta etapa. Si decides continuar, te pediremos autorización antes de compartirla.', "The information you shared with us is not shared with providers at this stage. If you decide to continue, we'll ask for your authorization before sharing it."),
 
   // ----- Presentation RC (Design): persistent access, contact, date picker, email + error/success states -----
   idOptionalTitle: L('Comunicaciones opcionales', 'Optional communications'), optionalTag: L('Opcional', 'Optional'),

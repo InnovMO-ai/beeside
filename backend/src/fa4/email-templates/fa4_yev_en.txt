@@ -30,7 +30,7 @@ Explore beeside Premium:
 
 <!--ENDIF:premium_enabled-->Questions about your result? Talk to beeside: {{talk_to_beeside_url}}
 
-Before Premium, we do not share your project with service providers.
+The information you shared with us is not shared with providers at this stage. If you decide to continue, we’ll ask for your authorization before sharing it.
 
 Terms and Conditions: https://beeside.you/termsandconditions
 Privacy Policy: https://www.beeside.you/privacy

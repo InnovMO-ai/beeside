@@ -2,6 +2,7 @@ import type { Locale } from '@beeside/fa-public-engine';
 import { Logo } from './Logo';
 import { COUNTRY_MESSAGES, STATE_MESSAGES, numberWord, type L10n } from '@beeside/fa-public-engine';
 import { UI, fill } from '../copy/ui';
+import { BRAND } from '../brand';
 import type { YevDestination, YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /**
@@ -20,7 +21,11 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
 
   return (
     <article aria-labelledby="yev-title">
-      <section className="res-hero">
+      <section className="res-hero photo">
+        <picture className="hero-photo" aria-hidden="true">
+          <source media="(max-width: 767px)" srcSet={BRAND.heroImage.mobile} />
+          <img src={BRAND.heroImage.src} alt="" />
+        </picture>
         <div className="in">
           <div>
             <Logo onDark />
@@ -74,6 +79,8 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
           {m.whereYouAre.alreadyHave.length > 0 && <div className="box"><h3>{t(UI.alreadyHave)}</h3><ul>{m.whereYouAre.alreadyHave.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
         </div>
       </section>
+
+      <figure className="editorial-photo" aria-hidden="true"><img src={BRAND.editorialImage.src} alt="" loading="lazy" /></figure>
 
       <section className="band" aria-labelledby="yev-value">
         <div className="sec">

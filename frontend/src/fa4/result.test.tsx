@@ -23,7 +23,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     expect(order[0]!.compareDocumentPosition(order[1]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(order[1]!.compareDocumentPosition(order[2]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const value = screen.getByTestId("beeside-value-section");
-    expect(within(value).getByText("Expande tu negocio.", { exact: false })).toBeInTheDocument();
+    expect(within(value).getByText("Piensa en grande.", { exact: false })).toBeInTheDocument();
     // the four fixed components as visible titles (PO-approved copy, D-134)
     expect(Array.from(value.querySelectorAll("[data-component]")).map((e) => e.getAttribute("data-component"))).toEqual(["sherpa", "hive", "operation-hub", "strategic-advisory"]);
     for (const t of ["Tu Sherpa", "The Hive", "Operation Hub", "Strategic Advisory"]) expect(within(value).getByText(t, { exact: true })).toBeInTheDocument();
@@ -42,8 +42,8 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     expect(screen.getAllByText("beeside puede ayudarte").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Tu beeside Sherpa buscará y validará la mejor opción para ti").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Depende de cómo decidas operar").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Comienza tu expansión" })).toBeInTheDocument();
-    expect(screen.getByText("Antes de Premium, no compartimos tu proyecto con proveedores.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start Your Expansion" })).toBeInTheDocument();
+    expect(screen.getAllByText("no se comparte con proveedores en esta etapa", { exact: false })[0]).toBeInTheDocument();
   });
 
   it("Journey B: multi-destination grouping, country message instead of per-service states (ES)", () => {
@@ -74,14 +74,14 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     const { container } = render(<ResultScreen model={modelFor(journeyB("en", "unknown"))} locale="en" />);
     for (const t of ["beeside can help", "Your beeside Sherpa will find and validate the best option for you", "beeside can explore the best option with you", "We'll review it with your Sherpa", "beeside does not yet have active coverage in this country."])
       expect(screen.getAllByText(t).length, t).toBeGreaterThan(0);
-    expect(screen.getByText("Expand your business.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Think bigger.", { exact: false })).toBeInTheDocument();
     expect(container.textContent).not.toContain("beeside puede ayudarte");
   });
 
   it("without real value there is no Premium call to action (D-050)", () => {
     const a = journeyA(); a.destinations = { list: [{ iso: "JP" }], open: false, sameInAll: true }; a.components = [{ ...a.components[0]!, destinations: ["JP"] }];
     render(<ResultScreen model={modelFor(a)} locale="es" onContinue={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: "Comienza tu expansión" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start Your Expansion" })).toBeNull();
     expect(screen.getByRole("button", { name: "Recibir este resultado por email" })).toBeInTheDocument();
   });
 
@@ -109,9 +109,9 @@ describe("frozen summary presentation (VERIFY M6-C)", () => {
   });
 });
 
-describe("D-154 / D-156 — «Comienza tu expansión» and the delivered state", () => {
-  it.each([["es", "Comienza tu expansión", "Sí, comenzar", "Todavía no", "Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago."],
-           ["en", "Start your expansion", "Yes, start", "Not yet", "Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet."]] as const)(
+describe("D-154 / D-156 — «Start Your Expansion» and the delivered state", () => {
+  it.each([["es", "Start Your Expansion", "Sí, comenzar", "Todavía no", "Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago."],
+           ["en", "Start Your Expansion", "Yes, start", "Not yet", "Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet."]] as const)(
     "(%s) the CTA asks for confirmation first, cancelling delivers nothing, confirming shows the approved final message — and no checkout/payment control exists", async (loc, cta, yes, no, done) => {
       const onContinue = vi.fn().mockResolvedValue(true);
       const { container } = render(<ResultScreen model={modelFor(journeyA(loc))} locale={loc} onContinue={onContinue} />);
@@ -130,7 +130,7 @@ describe("D-154 / D-156 — «Comienza tu expansión» and the delivered state",
   it("a failed confirmation is reported and can be retried; nothing claims success", async () => {
     const onContinue = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     render(<ResultScreen model={modelFor(journeyA("es"))} locale="es" onContinue={onContinue} />);
-    fireEvent.click(screen.getByRole("button", { name: "Comienza tu expansión" })); fireEvent.click(screen.getByRole("button", { name: "Sí, comenzar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Your Expansion" })); fireEvent.click(screen.getByRole("button", { name: "Sí, comenzar" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.queryByText(/Listo\. Tu beeside Sherpa/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Intentar de nuevo" })); fireEvent.click(screen.getByRole("button", { name: "Sí, comenzar" }));
@@ -146,5 +146,39 @@ describe("D-154 / D-156 — «Comienza tu expansión» and the delivered state",
     render(<ResultScreen model={m} locale="es" delivered />);
     expect(screen.queryByRole("button", { name: "Corregir algo" })).toBeNull();
     expect(screen.getByText("Este es tu Your Expansion View definitivo.")).toBeInTheDocument();
+  });
+});
+
+describe("Start Your Expansion — configurable Premium purchase destination", () => {
+  it("branded CTA is identical in both locales", () => {
+    for (const loc of ["es", "en"] as const) { const r = render(<ResultScreen model={modelFor(journeyA(loc))} locale={loc} onContinue={vi.fn()} />); expect(screen.getByRole("button", { name: "Start Your Expansion" })).toBeInTheDocument(); expect(r.container.textContent).not.toContain("Comienza tu expansión"); r.unmount(); }
+  });
+  it("with a configured https destination: confirm → delivery action → navigate there; no «no payment» claim", async () => {
+    const assign = vi.fn(); const orig = window.location; Object.defineProperty(window, "location", { configurable: true, value: { ...orig, assign } });
+    const onContinue = vi.fn().mockResolvedValue(true);
+    const { PremiumContinuation } = await import("./components/PremiumContinuation");
+    const m = modelFor(journeyA("es"));
+    const { container } = render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" onContinue={onContinue} purchaseUrl="https://pay.example/checkout" />);
+    fireEvent.click(screen.getByRole("button", { name: "Start Your Expansion" }));
+    expect(container.textContent).not.toMatch(/Todavía no hay ningún pago|Sherpa lo revisará/);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://pay.example/checkout"));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    Object.defineProperty(window, "location", { configurable: true, value: orig });
+  });
+  it("a failed delivery never navigates", async () => {
+    const assign = vi.fn(); const orig = window.location; Object.defineProperty(window, "location", { configurable: true, value: { ...orig, assign } });
+    const { PremiumContinuation } = await import("./components/PremiumContinuation");
+    const m = modelFor(journeyA("es"));
+    render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" onContinue={vi.fn().mockResolvedValue(false)} purchaseUrl="https://pay.example/checkout" />);
+    fireEvent.click(screen.getByRole("button", { name: "Start Your Expansion" })); fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument()); expect(assign).not.toHaveBeenCalled();
+    Object.defineProperty(window, "location", { configurable: true, value: orig });
+  });
+  it("destination-aware next step: one country / several / open", () => {
+    const t = (a: Parameters<typeof modelFor>[0], loc: "es" | "en" = "es") => { const r = render(<ResultScreen model={modelFor(a)} locale={loc} onContinue={vi.fn()} />); const h = screen.getByRole("heading", { level: 2, name: /Concretar|Define/ }).textContent; r.unmount(); return h; };
+    expect(t(journeyA("es"))).toMatch(/^Concretar tu expansión en .+/);
+    expect(t(journeyB("es", "unknown"))).toBe("Concretar tu expansión en tus mercados objetivo");
+    expect(t(journeyB("en", "unknown"), "en")).toBe("Define your expansion across your target markets");
   });
 });

@@ -19,8 +19,11 @@ export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRes
     <div data-testid="result-screen" className="result">
       <p className="sr-only" role="status" aria-live="polite">{UI.ready[locale]}</p>
       <YourExpansionView model={model} locale={locale} onEdit={onEdit} />
-      <BeesideValueSection locale={locale} />
-      <PremiumContinuation delivered={delivered} premium={model.premium} locale={locale} onContinue={onContinue} onEmail={onEmail} email={email} />
+      {/* Discovery v1.0: Value of Continuing = one composed zone on the warm page (same two components, same order, D-120) */}
+      <div className={`continue-zone ${model.premium.shown ? 'with-premium' : 'without-premium'}`}>
+        <BeesideValueSection locale={locale} />
+        <PremiumContinuation delivered={delivered} premium={model.premium} destinations={model.destinations} locale={locale} onContinue={onContinue} onEmail={onEmail} email={email} />
+      </div>
       {onRestart && <div className="sec restart"><button className="linkbtn subtle" onClick={onRestart}>{UI.backToStart[locale]}</button></div>}
       {footer && <div className="sec res-footer">{footer}</div>}
       <LegalFooter locale={locale} />

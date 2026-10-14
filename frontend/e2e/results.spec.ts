@@ -15,7 +15,7 @@ for (const c of cases) {
     await page.getByRole('button', { name: 'Ver mi resultado' }).click();
     await expect(page.getByTestId('result-screen')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(c.h1);
-    await expect(page.getByTestId('beeside-value-section')).toContainText('Expande tu negocio.');
+    await expect(page.getByTestId('beeside-value-section')).toContainText('Piensa en grande.');
     await expect(page.getByTestId('premium-continuation')).toBeVisible();
     await noHorizontalOverflow(page);
     expect(await axeViolations(page)).toEqual([]);
@@ -50,7 +50,7 @@ test('Result B in English — visible states and country messages are the canoni
   await expect(r.getByText('beeside can explore the best option with you').first()).toBeVisible();
   await expect(r.getByText("We'll review it with your Sherpa").first()).toBeVisible();
   await expect(r.getByText('beeside does not yet have active coverage in this country.').first()).toBeVisible();
-  await expect(r.getByText('Expand your business.')).toBeVisible();
+  await expect(r.getByText('Think bigger.')).toBeVisible();
   for (const t of ['Your Sherpa', 'The Hive', 'Operation Hub', 'Strategic Advisory']) await expect(r.getByTestId('beeside-value-section').getByText(t, { exact: true })).toBeVisible();
   await expect(r.getByText('beeside puede ayudarte')).toHaveCount(0);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');

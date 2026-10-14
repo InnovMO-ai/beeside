@@ -98,3 +98,30 @@ Structured server logs with masked e-mail and no tokens/answers/message bodies (
 **RELEASE BLOCKERS (external, Code cannot close):** LEGAL-1 final legal validation · `FA4_PRIVACY_VERSION` · production SMTP/worker/DB provisioning decisions.
 **Code-side blockers:** none known at this commit.
 **POST-LAUNCH:** native vector logo from Brand (BRAND-1; bee is an official raster, cropped at native resolution, never redrawn) · official typeface (BRAND-2) · Night Shift treatment (BRAND-3) · external error monitoring · Admin Demand & Catalog Console · erasure UI · Premium Resource / Operation Hub URLs · retention policy (legal) · legacy FA integration tests that already fail on this branch before the v1.0 delta (verified by stashing it) (`fa-core`, `fa-lifecycle`, `premium`, `operations`, `rules-snapshot`: snapshot-template version drift, unrelated to FA Public).
+
+---
+
+## 12. Discovery Public v1.0 — frozen visual delta (applied 2026-10-14)
+
+Applied from `Claude outputs/DISCOVERY_V1_VISUAL_DELTA.patch` (clean `git apply`; photographs used as supplied, never recreated). Not touched: Discovery logic, branching, delivery, A+ envelope, Precision.
+
+**CTA.** Branded `Start Your Expansion` in both locales (`UI.continueWith`). *Previous implementation:* the CTA opened the D-154 Sherpa confirmation («tu Sherpa te contactará · no hay ningún pago»). *Now:* the destination is central configuration — `VITE_FA4_PREMIUM_PURCHASE_URL` (https only; `PREMIUM_PURCHASE_URL` in `frontend/src/fa4/brand.ts`). Flow with a URL: confirmation (answers close) → delivery action on the server (`/session/continue`, project_id + result_id continuity) → `window.location.assign(url)`; a failed delivery never navigates. No URL, no Stripe, no checkout is invented. **Until the URL is supplied the CTA behaves as the D-154 recorded-continuation confirmation and says there is no payment yet** (the launch check lists the destination as PENDING/EXTERNAL). Identifiers are not appended to the URL; how the payment system correlates `project_id/result_id` is open for whoever supplies the destination. Copy variants used only when configured (`confirmBodyPay`, `confirmGo`, `continuedPay`) are my ES/EN proposal and need copy sign-off.
+
+**Destination-aware next step.** One helper (`nextStepTitle`, `PremiumContinuation.tsx`) from the model's destinations: one defined → «Concretar tu expansión en {país}», several (or one + "a country you choose") → «…en tus mercados objetivo», none → «Concretar tu expansión» (EN equivalents). Tested.
+
+**Privacy copy.** Approved wording applied to the UI notice and to the YEV email (ES/EN, html + txt). *Possible conflict to flag:* the copy promises "we'll ask for your authorization before sharing it". Discovery has no data-sharing step, and Premium/Precision does not exist yet, so nothing in the backend contradicts it today, but **the Premium flow must implement an explicit authorization step before any provider sharing**; no backend privacy behaviour was changed.
+
+**Global canvas / surfaces.** `--paper #F6F2EF`; fields, option cards, result cards, dialogs, confirmation and the comparison card stay white (asserted in `hero-widths.spec.ts`).
+
+**Hero.** Mobile = dedicated crop (≤767); ≥768 = wide crop with per-range framing (768, 900, 1200, 1440, 1680, 1920 breakpoints). Verified at 375/768/1024/1200/1440/1680/1920: no horizontal overflow, photo decoded, covers the Hero box, displayed with its natural aspect ratio (no distortion), axe clean. Evidence: `docs/fa4/visual/discovery-v1/` (cover, question, hero, editorial, value of continuing, CTA, confirmation at 375/768/1440).
+
+**320 px overflow — root cause.** The header (logo + nowrap «Guardar y seguir después» + 44 px help icon = 211 px of actions) exceeded the 288 px content box, so the page grew to 337 px. Fix: the label may wrap to two lines and the header items may shrink (`max-width: 479px` block in `fa4.css`). No `overflow-x` masking. `e2e/small-viewports.spec.ts` walks cover → identity → every question → YEV at 320/360/375/390 in ES and EN (8 tests, pass).
+
+**Control-border contrast.** Measured: old `#d9d8e6` = 1.41:1 on white (1.26 on the warm canvas) — below WCAG 1.4.11 (3:1). Design's `#8E8A99` = 3.36 white / **3.02** canvas (too close to the line). Final token `--control-line: #8A8696` = **3.54:1 on white, 3.18:1 on #F6F2EF**; applied to `.field`, `.choice`, `.chip`, `.seg button` only (decorative dividers keep `--line`).
+
+**Naming audit.** No customer-visible «First Assessment» / «FA» / «FA4» remains in UI copy, page title or customer emails. Remaining by design: the internal contact email's label «Idioma de FA / FA language» (staff-facing), code comments, API error messages, routes, tables, env vars, docs.
+
+**Old brand lines.** «Expande tu negocio. No tu carga de trabajo.» / «Expand your business. Not your workload.» removed from this experience (UI + tests); replaced by «Piensa en grande. Nosotros nos ocupamos del resto.» / «Think bigger. Expand smarter.».
+
+### ⚑ FLAG FOR FINAL RELEASE AUDIT — commercial comparison (Product/Legal)
+The frozen "Value of Continuing" comparison claims **beeside Premium covers 8 of 8 coordinated-capability dimensions while the three alternatives (local hire, office + person, office + person + travel) cover 0 of 8**, with relative "complexity" bars and the footnote that it is illustrative, shows no amounts and is not a guaranteed-price claim. Implemented exactly as frozen (`UI.cmpOptions` / `cmpDims` in `copy/ui.ts`); nothing was invented, weakened or strengthened. **It needs Product/Legal verification before public release** (comparative-advertising exposure; "0 of 8" for every alternative is an absolute claim). ES copy of the section is a translation proposal pending copy sign-off.

@@ -1,7 +1,7 @@
 /* FA Public v1.0 — tokens. Brand colours are established; typography/logo/Night Shift are placeholders (BRAND-1..3). */
 :root {
   --purple: #2E0879; --purple-2: #7357C1; --lav: #F1F1FA; --lav-2: #E4E1F5; --ink: #17181B; --ink-2: #4a4d57; --ink-3: #6b6e79;
-  --line: #d9d8e6; --white: #fff; --night: #17181B; --cream: #fbf6e6; --ok: #1f6b4a; --focus: #7357C1;
+  --line: #d9d8e6; --control-line: #8A8696;   /* WCAG 1.4.11: visible boundary of interactive controls ≥ 3:1 on white (3.54) AND on the warm canvas #F6F2EF (3.18); was #d9d8e6 = 1.41 */ --white: #fff; --night: #17181B; --cream: #fbf6e6; --ok: #1f6b4a; --focus: #7357C1;
   --radius: 12px; --gutter: 16px; --maxw: 1160px;
   --font-sans: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif;   /* BRAND-2 interim: same stack as the live First Assessment */
   color-scheme: light;
@@ -47,20 +47,20 @@ a { color: var(--purple); }
 .hint { color: var(--ink-3); font-size: 13px; }
 
 /* ---------- controls ---------- */
-.field { width: 100%; min-height: 48px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+.field { width: 100%; min-height: 48px; padding: 10px 14px; border: 1.5px solid var(--control-line); border-radius: 10px; background: #fff; }
 textarea.field { min-height: 96px; resize: vertical; }
 .field:focus-visible { border-color: var(--purple); }
 .choices { display: grid; gap: 8px; }
-.choice { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; text-align: left; width: 100%; }
+.choice { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; padding: 12px 14px; border: 1.5px solid var(--control-line); border-radius: 10px; background: #fff; cursor: pointer; text-align: left; width: 100%; }
 .choice input { margin-top: 3px; accent-color: var(--purple); width: 18px; height: 18px; flex: none; }
 .choice.on { border-color: var(--purple); background: #fff; box-shadow: inset 0 0 0 1px var(--purple); }
 .choice .sub { display: block; color: var(--ink-2); font-size: 13px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; }
+.chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--control-line); background: #fff; cursor: pointer; }
 .chip.on { background: var(--purple); border-color: var(--purple); color: #fff; }
 .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .seg.three { grid-template-columns: repeat(3, 1fr); }
-.seg button { min-height: 44px; padding: 4px 6px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; cursor: pointer; }
+.seg button { min-height: 44px; padding: 4px 6px; border: 1.5px solid var(--control-line); border-radius: 8px; background: #fff; font-size: 13px; cursor: pointer; }
 .seg button.on { background: var(--purple); color: #fff; border-color: var(--purple); }
 .card { background: #fff; border-radius: var(--radius); padding: 16px; border: 1px solid var(--line); }
 .card.soft { background: var(--lav); border-color: transparent; }
@@ -522,3 +522,175 @@ textarea.field { min-height: 88px; }
   .shell.has-deco .navbar .inner { margin: 0 auto; padding: 0 var(--gutter); }
 }
 @media (min-width: 900px) and (max-width: 1099px) { .navbar .inner { margin: 0 auto; max-width: 776px; padding: 0 var(--gutter); } .navbar { padding-left: 0; padding-right: 0; } }
+
+/* =====================================================================================
+   DISCOVERY PUBLIC V1.0 — FINAL CONTROLLED VISUAL DELTA (2026-10-14). Presentation only.
+   Four borrowed ideas: warm paper background · photographic YEV Hero · one editorial photograph · Value of Continuing composition.
+   Nothing from the legacy result layout (no diagnostics, no PDF, no decorative circles).
+   ===================================================================================== */
+:root { --paper: #F6F2EF; --paper-2: #EEE7E1; --paper-line: #E2D9D1; }
+
+/* 1 · Warm paper canvas for the whole Discovery journey (cards, fields and choices stay white) */
+body, .fa4, .shell, .shell.tinted { background: var(--paper); }
+.navbar, .shell.static-nav .navbar, .shell.tinted .navbar { background: var(--paper); border-top-color: var(--paper-line); }
+@media (min-width: 900px) { .navbar { background: var(--paper); border-top-color: var(--paper-line); } }
+@media (min-width: 1100px) { .deco { background: var(--paper-2); border-left: 1px solid var(--paper-line); } }
+.box, .stat, .card.soft { background: #fff; border: 1px solid var(--paper-line); }
+.box.dashed { background: transparent; border: 1.5px dashed #cfc5bb; }
+.stat.strong { border-color: var(--purple); }
+.band { background: transparent; }
+
+/* 2 · YEV Hero: full-bleed editorial photograph, headline on open sky, glance card as the project signal */
+.res-hero.photo { position: relative; overflow: hidden; isolation: isolate; background: #1d4a9e; color: #fff; }
+.res-hero.photo .hero-photo { position: absolute; inset: 0; z-index: -2; display: block; }
+.res-hero.photo .hero-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 21%; display: block; }
+.res-hero.photo::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(100deg, rgba(9, 20, 58, .46) 0%, rgba(9, 20, 58, .22) 42%, rgba(9, 20, 58, 0) 66%); }
+.res-hero.photo .eyebrow { color: #fff; opacity: .92; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 700; }
+.res-hero.photo h1 { color: #fff; }
+.res-hero.photo .sub { color: rgba(255, 255, 255, .94); font-size: 15px; max-width: 46ch; }
+.res-hero.photo .glance { box-shadow: 0 18px 44px rgba(9, 20, 58, .28); border: 0; }
+@media (min-width: 900px) {
+  .res-hero.photo .in { min-height: clamp(520px, 44vw, 700px); align-content: space-between; padding-top: 28px; padding-bottom: 40px; }
+  .res-hero.photo h1 { font-size: clamp(40px, 3.6vw, 56px); line-height: 1.06; max-width: 15ch; margin-top: clamp(16px, 2vw, 32px); }
+  .res-hero.photo .sub { font-size: 16px; margin-top: 14px; }
+}
+@media (min-width: 900px) { .res-hero.photo .in > div:last-child { align-self: end; } }
+/* Phone: art-directed crop (pre-cropped right/top of the same photograph) under the headline; the glance card overlaps onto the paper */
+@media (max-width: 899px) {
+  .res-hero.photo { display: grid; grid-template-areas: "hero" "glance"; background: var(--paper); }
+  .res-hero.photo .hero-photo, .res-hero.photo::before { grid-area: hero; position: relative; inset: auto; }
+  .res-hero.photo .hero-photo { z-index: 0; }
+  .res-hero.photo .hero-photo { align-self: stretch; overflow: hidden; }
+  .res-hero.photo .hero-photo img { position: absolute; inset: 0; object-position: 50% 60%; }
+  .res-hero.photo::before { z-index: 1; background: linear-gradient(180deg, rgba(9, 20, 58, .5) 0%, rgba(9, 20, 58, .36) 52%, rgba(9, 20, 58, 0) 78%); }
+  .res-hero.photo .in { display: contents; }
+  .res-hero.photo .in > div:first-child { grid-area: hero; z-index: 2; padding: 18px var(--gutter) 64px; min-height: 470px; }
+  .res-hero.photo .in > div:last-child { grid-area: glance; z-index: 3; padding: 0 var(--gutter); margin-top: -40px; }
+  .res-hero.photo h1 { font-size: 30px; line-height: 1.1; margin-top: 22px; max-width: 14ch; }
+}
+
+/* 3 · One editorial photograph: a calm chapter break between "where you are" and "where beeside adds value". Never data, never text. */
+.editorial-photo { max-width: var(--maxw); margin: 8px auto 0; padding: 0 var(--gutter); }
+.editorial-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 70%; border-radius: 16px; }
+@media (min-width: 768px) { .editorial-photo img { aspect-ratio: 21 / 8; object-position: 50% 64%; border-radius: 20px; } }
+
+/* 4 · Value of Continuing: warm page · contained dark panel with the approved photograph · one clear CTA on the paper */
+.continue-zone { padding: 24px 0 8px; }
+.continue-zone .night { background: transparent; padding: 0 var(--gutter); }
+.continue-zone .night .in { background: var(--night); border-radius: 20px; overflow: hidden; }
+.continue-zone .night .img { min-height: 220px; }
+.continue-zone .night .copy { padding: 26px 20px 30px; }
+.continue-zone .night h2 { font-size: 28px; }
+.continue-zone .night li div span { color: #d6d6dc; }
+@media (min-width: 900px) {
+  .continue-zone { padding-top: 40px; }
+  .continue-zone .night .in { grid-template-columns: 5fr 7fr; }
+  .continue-zone .night .img { min-height: 100%; }
+  .continue-zone .night .copy { padding: 48px 52px 52px; }
+  .continue-zone .night h2 { font-size: 38px; margin-bottom: 26px; }
+  .continue-zone .night ul { grid-template-columns: 1fr 1fr; gap: 24px 32px; }
+}
+.continue-zone .premium { background: transparent; color: var(--ink); border-radius: 0; padding: 36px 0 4px; text-align: center; justify-items: center; grid-template-columns: 1fr; gap: 8px; }
+.continue-zone .pc-eyebrow { color: var(--purple-2); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin: 0; }
+.continue-zone .pc-title { font-size: 28px; line-height: 1.12; margin: 6px auto 8px; max-width: 22ch; text-wrap: balance; letter-spacing: -.01em; }
+.continue-zone .pc-body { color: var(--ink-2); max-width: 56ch; margin: 0 auto; }
+@media (min-width: 900px) { .continue-zone .pc-title { font-size: 38px; } .continue-zone .premium { padding-top: 52px; } }
+.continue-zone .premium .btn.pc-cta { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 56px; margin-top: 14px; padding: 0 32px;
+  border-radius: 999px; background: var(--purple); border-color: var(--purple); color: #fff; font-size: 17px; box-shadow: 0 10px 24px rgba(46, 8, 121, .22); }
+.continue-zone .premium .btn.pc-cta:hover { background: #3a0f94; }
+@media (min-width: 600px) { .continue-zone .premium .btn.pc-cta { width: auto; min-width: 300px; } }
+.continue-zone .premium [role="group"] { width: 100%; max-width: 580px; margin-top: 14px; text-align: left; background: #fff; border: 1px solid var(--paper-line); border-radius: 16px; padding: 20px; }
+.continue-zone .pc-confirm-title { font-size: 18px; margin: 0 0 6px; }
+.continue-zone .pc-confirm-body { color: var(--ink-2); margin: 0 0 14px; }
+.continue-zone .premium [role="status"] { max-width: 580px; background: #fff; border: 1px solid var(--paper-line); border-radius: 16px; padding: 16px 18px; text-align: left; }
+.continue-zone .premium [role="group"] .btn.primary { background: var(--purple); color: #fff; border-color: var(--purple); }   /* confirmation sits on a white card: the generic .premium .btn (white on dark) would hide it */
+.continue-zone .premium .btn:not(.pc-cta):not(.primary) { background: #fff; color: var(--ink); border-color: var(--ink); }
+.continue-zone .state.err.on-dark { color: #7a1712; }
+.continue-zone .pc-secondary { justify-content: center; text-align: center; }
+.continue-zone .pc-secondary .pc-privacy { flex-basis: 100%; }
+.continue-zone.without-premium .card.soft { max-width: 760px; margin: 32px auto 0; text-align: center; padding: 22px 24px; }
+
+/* ---------- Discovery v1.0 · final adjustments (PO, 2026-10-14) ---------- */
+/* Cover joins the warm canvas (globe asset is transparent; nothing else changes) */
+.cover, .cv { background: var(--paper); }
+
+/* Value of Continuing · 1 — commercial comparison: white functional surface on the paper */
+.vc-compare { max-width: var(--maxw); margin: 0 auto; padding: 8px var(--gutter) 28px; display: grid; gap: 16px; }
+.vc-head { display: grid; gap: 6px; }
+.vc-head .eyebrow { color: var(--purple-2); text-transform: uppercase; letter-spacing: .1em; font-size: 12px; font-weight: 700; margin: 0; }
+.vc-head h2 { font-size: 26px; line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; margin: 0; max-width: 30ch; }
+.vc-head .lead { color: var(--ink-2); margin: 0; max-width: 62ch; }
+.vc-card { background: #fff; border: 1px solid var(--paper-line); border-radius: 20px; padding: 18px 16px 18px; display: grid; gap: 14px; min-width: 0; }
+.vc-table { width: 100%; border-collapse: collapse; }
+.vc-table thead th { font-size: 12px; font-weight: 600; color: var(--ink-3); text-align: left; padding: 0 0 10px; }
+.vc-table thead th.vc-dim { text-align: center; }
+.vc-table abbr { text-decoration: none; }
+.vc-table tbody th { text-align: left; font-weight: 400; padding: 12px 12px 12px 0; }
+.vc-table tbody th b { display: block; font-size: 15px; font-weight: 700; }
+.vc-table tbody th span { display: block; font-size: 13px; color: var(--ink-3); }
+.vc-table tbody tr + tr > * { border-top: 1px solid #ECE7E2; }
+.vc-cx { padding: 12px 16px 12px 0; vertical-align: middle; }
+.vc-bar { display: block; height: 10px; border-radius: 999px; background: #EFEDF5; overflow: hidden; min-width: 110px; }
+.vc-bar i { display: block; height: 100%; border-radius: 999px; }
+.vc-row.vc-premium .vc-bar i { background: var(--purple); }
+.vc-row.vc-local .vc-bar i { background: var(--purple-2); }
+.vc-row.vc-office .vc-bar i { background: #55565F; }
+.vc-row.vc-travel .vc-bar i { background: var(--night); }
+.vc-dim { text-align: center; vertical-align: middle; color: var(--purple); width: 6%; }
+.vc-dim svg { display: inline-block; vertical-align: middle; }
+.vc-no { display: inline-block; width: 16px; height: 2px; border-radius: 2px; background: #8E8983; vertical-align: middle; }
+.vc-sum { display: none; }
+.vc-legend { list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px solid #ECE7E2; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.vc-legend b { color: var(--ink); margin-right: 4px; }
+.vc-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-3); font-style: italic; }
+@media (min-width: 900px) {
+  .vc-compare { padding-top: 24px; gap: 20px; }
+  .vc-head h2 { font-size: 34px; }
+  .vc-card { padding: 26px 28px 22px; }
+  .vc-table tbody th { width: 30%; }
+  .vc-cx { width: 22%; }
+}
+/* Phone and small tablet: the 8 columns collapse into a per-option strip + count; the legend keeps the meaning */
+@media (max-width: 759px) {
+  .vc-table thead { display: none; }
+  .vc-table, .vc-table tbody { display: block; }
+  .vc-table tr { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 14px 0; }
+  .vc-table tbody tr + tr { border-top: 1px solid #ECE7E2; }
+  .vc-table tbody tr + tr > * { border-top: 0; }
+  .vc-table tbody th, .vc-cx { padding: 0; }
+  .vc-dim { display: none; }
+  .vc-sum { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .vc-dots { display: inline-flex; gap: 5px; }
+  .vc-dots i { width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.5px #8E8983; }
+  .vc-dots i.on { background: var(--purple); }
+  .vc-count { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+}
+.continue-zone { padding-top: 16px; }
+@media (min-width: 900px) { .continue-zone { padding-top: 24px; } }
+
+.vc-cx-label { display: none; }
+@media (max-width: 759px) { .vc-cx-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-bottom: 4px; } }
+
+/* ---------- Discovery v1.0 · final Hero crop (PO, 2026-10-14): tablet + desktop only ----------
+   More architecture anchors the bottom of the Hero; open sky stays behind the headline. Same photograph (wide crop asset), same Hero size,
+   same overlay, same text and card. Each range has its own framing: --hz = visible share of the asset width, --hx / --hy = offset (share of the image). */
+@media (min-width: 768px) {
+  .res-hero.photo .hero-photo img { position: absolute; inset: auto; left: 0; top: 0; width: calc(100% / var(--hz)); height: auto; max-width: none; object-fit: fill;
+    transform: translate(calc(var(--hx) * -100%), calc(var(--hy) * -100%)); }
+}
+@media (min-width: 768px) and (max-width: 899px) { .res-hero.photo { --hz: .632; --hx: .168; --hy: .10; } }
+@media (min-width: 900px) and (max-width: 1199px) { .res-hero.photo { --hz: .737; --hx: .211; --hy: .14; } }
+@media (min-width: 1200px) and (max-width: 1439px) { .res-hero.photo { --hz: .737; --hx: .179; --hy: .15; } }
+@media (min-width: 1440px) and (max-width: 1679px) { .res-hero.photo { --hz: .737; --hx: .084; --hy: .16; } }
+@media (min-width: 1680px) and (max-width: 1919px) { .res-hero.photo { --hz: .737; --hx: .074; --hy: .18; } }
+@media (min-width: 1920px) { .res-hero.photo { --hz: .737; --hx: .042; --hy: .24; } }
+
+/* Discovery v1.0 — root cause of the ~17px overflow at 320: the nowrap «save for later» label + logo + 44px icon (211px of actions) exceeded the 288px content box.
+   The label now wraps (2 lines) and every header item may shrink; nothing is clipped and no overflow rule is used. */
+@media (max-width: 479px) {
+  .top-actions { min-width: 0; flex: 0 1 auto; }
+  .topbar > :first-child { min-width: 0; flex: 0 1 auto; }
+  .topbar .logo { max-width: 100%; min-width: 0; object-fit: contain; }
+  .topbar .linkbtn.ta-save { white-space: normal; text-align: right; line-height: 1.2; min-width: 0; max-width: 118px; }
+}

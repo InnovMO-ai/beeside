@@ -44,7 +44,7 @@ for (const loc of ["es", "en"] as const) {
     expect(text).not.toMatch(/Presupuesto|Budget/);                                                        // VT-01
     expect(text).not.toMatch(/Sin espacio propio|No premises/);                                            // VT-02
     await expectNoRawOrInternal(page);
-    expect(text).toMatch(loc === "es" ? /Expande tu negocio\.\s*No tu carga de trabajo\./ : /Expand your business\.\s*Not your workload\./);
+    expect(text).toMatch(loc === "es" ? /Piensa en grande\.\s*Nosotros nos ocupamos del resto\./ : /Think bigger\.\s*Expand smarter\./);
     await expect(page.getByTestId("beeside-value-section").locator("[data-component]")).toHaveCount(4);
     await expect(page.getByRole("button", { name: t(UI.continueWith) })).toBeVisible();
     await expect(page.getByText(t(UI.privacyNotice))).toBeVisible();
