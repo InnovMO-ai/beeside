@@ -1,5 +1,5 @@
 {
-  "id": "a7714515-43f4-4bfe-b3ed-e54f7b5f8511",
+  "id": "079a7782-47dc-4797-aa62-286a6d3a8687",
   "prevId": "a68588fd-dfb1-4c74-8d7d-7e1e74cf276d",
   "version": "7",
   "dialect": "postgresql",
@@ -10100,6 +10100,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "company_scope": {
+          "name": "company_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_projects": {
+          "name": "max_projects",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source": {
           "name": "source",
           "type": "text",
@@ -10124,8 +10136,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "campaign_id": {
-          "name": "campaign_id",
+        "program_id": {
+          "name": "program_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -10236,11 +10248,11 @@
           "method": "btree",
           "with": {}
         },
-        "entitlement_grant_campaign_idx": {
-          "name": "entitlement_grant_campaign_idx",
+        "entitlement_grant_program_idx": {
+          "name": "entitlement_grant_program_idx",
           "columns": [
             {
-              "expression": "campaign_id",
+              "expression": "program_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -10266,11 +10278,11 @@
           "method": "btree",
           "with": {}
         },
-        "entitlement_grant_campaign_project_unique": {
-          "name": "entitlement_grant_campaign_project_unique",
+        "entitlement_grant_program_project_unique": {
+          "name": "entitlement_grant_program_project_unique",
           "columns": [
             {
-              "expression": "campaign_id",
+              "expression": "program_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -10283,16 +10295,16 @@
             }
           ],
           "isUnique": true,
-          "where": "\"entitlement_grant\".\"campaign_id\" IS NOT NULL AND \"entitlement_grant\".\"project_id\" IS NOT NULL",
+          "where": "\"entitlement_grant\".\"program_id\" IS NOT NULL AND \"entitlement_grant\".\"project_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "entitlement_grant_campaign_company_unique": {
-          "name": "entitlement_grant_campaign_company_unique",
+        "entitlement_grant_program_company_unique": {
+          "name": "entitlement_grant_program_company_unique",
           "columns": [
             {
-              "expression": "campaign_id",
+              "expression": "program_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -10305,7 +10317,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"entitlement_grant\".\"campaign_id\" IS NOT NULL AND \"entitlement_grant\".\"company_id\" IS NOT NULL",
+          "where": "\"entitlement_grant\".\"program_id\" IS NOT NULL AND \"entitlement_grant\".\"company_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -10338,15 +10350,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "entitlement_grant_campaign_id_promotion_campaign_campaign_id_fk": {
-          "name": "entitlement_grant_campaign_id_promotion_campaign_campaign_id_fk",
+        "entitlement_grant_program_id_entitlement_program_program_id_fk": {
+          "name": "entitlement_grant_program_id_entitlement_program_program_id_fk",
           "tableFrom": "entitlement_grant",
-          "tableTo": "promotion_campaign",
+          "tableTo": "entitlement_program",
           "columnsFrom": [
-            "campaign_id"
+            "program_id"
           ],
           "columnsTo": [
-            "campaign_id"
+            "program_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -10399,9 +10411,21 @@
           "name": "entitlement_grant_scope",
           "value": "(\"entitlement_grant\".\"project_id\" IS NULL) <> (\"entitlement_grant\".\"company_id\" IS NULL)"
         },
+        "entitlement_grant_company_scope": {
+          "name": "entitlement_grant_company_scope",
+          "value": "(\"entitlement_grant\".\"company_id\" IS NULL) = (\"entitlement_grant\".\"company_scope\" IS NULL)"
+        },
+        "entitlement_grant_company_scope_values": {
+          "name": "entitlement_grant_company_scope_values",
+          "value": "\"entitlement_grant\".\"company_scope\" IS NULL OR \"entitlement_grant\".\"company_scope\" IN ('current_projects', 'projects_created_in_period')"
+        },
+        "entitlement_grant_max_projects": {
+          "name": "entitlement_grant_max_projects",
+          "value": "\"entitlement_grant\".\"max_projects\" IS NULL OR (\"entitlement_grant\".\"company_id\" IS NOT NULL AND \"entitlement_grant\".\"max_projects\" > 0)"
+        },
         "entitlement_grant_source": {
           "name": "entitlement_grant_source",
-          "value": "\"entitlement_grant\".\"source\" IN ('complimentary', 'promotion', 'trial', 'manual', 'partner')"
+          "value": "\"entitlement_grant\".\"source\" IN ('complimentary', 'promotion', 'trial', 'manual', 'partner', 'sponsored')"
         },
         "entitlement_grant_window": {
           "name": "entitlement_grant_window",
@@ -10411,13 +10435,13 @@
           "name": "entitlement_grant_reason",
           "value": "length(btrim(\"entitlement_grant\".\"reason\")) > 0"
         },
-        "entitlement_grant_campaign_source": {
-          "name": "entitlement_grant_campaign_source",
-          "value": "(\"entitlement_grant\".\"source\" IN ('promotion', 'trial', 'partner')) OR \"entitlement_grant\".\"campaign_id\" IS NULL"
+        "entitlement_grant_program_source": {
+          "name": "entitlement_grant_program_source",
+          "value": "(\"entitlement_grant\".\"source\" IN ('promotion', 'trial', 'partner', 'sponsored')) OR \"entitlement_grant\".\"program_id\" IS NULL"
         },
-        "entitlement_grant_promotion_has_campaign": {
-          "name": "entitlement_grant_promotion_has_campaign",
-          "value": "\"entitlement_grant\".\"source\" <> 'promotion' OR \"entitlement_grant\".\"campaign_id\" IS NOT NULL"
+        "entitlement_grant_program_required": {
+          "name": "entitlement_grant_program_required",
+          "value": "\"entitlement_grant\".\"source\" NOT IN ('promotion', 'sponsored') OR \"entitlement_grant\".\"program_id\" IS NOT NULL"
         },
         "entitlement_grant_market_nonempty": {
           "name": "entitlement_grant_market_nonempty",
@@ -10438,12 +10462,12 @@
       },
       "isRLSEnabled": false
     },
-    "public.promotion_campaign": {
-      "name": "promotion_campaign",
+    "public.entitlement_program": {
+      "name": "entitlement_program",
       "schema": "",
       "columns": {
-        "campaign_id": {
-          "name": "campaign_id",
+        "program_id": {
+          "name": "program_id",
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
@@ -10466,6 +10490,18 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "sponsor_id": {
+          "name": "sponsor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agreement_ref": {
+          "name": "agreement_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "market_scope": {
           "name": "market_scope",
@@ -10496,6 +10532,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "eligibility": {
+          "name": "eligibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
         },
         "status": {
           "name": "status",
@@ -10544,8 +10587,8 @@
         }
       },
       "indexes": {
-        "promotion_campaign_code_unique": {
-          "name": "promotion_campaign_code_unique",
+        "entitlement_program_code_unique": {
+          "name": "entitlement_program_code_unique",
           "columns": [
             {
               "expression": "code",
@@ -10561,9 +10604,22 @@
         }
       },
       "foreignKeys": {
-        "promotion_campaign_created_by_admin_user_admin_user_id_fk": {
-          "name": "promotion_campaign_created_by_admin_user_admin_user_id_fk",
-          "tableFrom": "promotion_campaign",
+        "entitlement_program_sponsor_id_sponsor_sponsor_id_fk": {
+          "name": "entitlement_program_sponsor_id_sponsor_sponsor_id_fk",
+          "tableFrom": "entitlement_program",
+          "tableTo": "sponsor",
+          "columnsFrom": [
+            "sponsor_id"
+          ],
+          "columnsTo": [
+            "sponsor_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "entitlement_program_created_by_admin_user_admin_user_id_fk": {
+          "name": "entitlement_program_created_by_admin_user_admin_user_id_fk",
+          "tableFrom": "entitlement_program",
           "tableTo": "admin_user",
           "columnsFrom": [
             "created_by"
@@ -10574,9 +10630,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "promotion_campaign_approved_by_admin_user_admin_user_id_fk": {
-          "name": "promotion_campaign_approved_by_admin_user_admin_user_id_fk",
-          "tableFrom": "promotion_campaign",
+        "entitlement_program_approved_by_admin_user_admin_user_id_fk": {
+          "name": "entitlement_program_approved_by_admin_user_admin_user_id_fk",
+          "tableFrom": "entitlement_program",
           "tableTo": "admin_user",
           "columnsFrom": [
             "approved_by"
@@ -10592,45 +10648,361 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "promotion_campaign_code_format": {
-          "name": "promotion_campaign_code_format",
-          "value": "\"promotion_campaign\".\"code\" ~ '^[a-z0-9][a-z0-9_-]{2,40}$'"
+        "entitlement_program_code_format": {
+          "name": "entitlement_program_code_format",
+          "value": "\"entitlement_program\".\"code\" ~ '^[a-z0-9][a-z0-9_-]{2,40}$'"
         },
-        "promotion_campaign_kind": {
-          "name": "promotion_campaign_kind",
-          "value": "\"promotion_campaign\".\"kind\" IN ('promotion', 'trial', 'partner')"
+        "entitlement_program_kind": {
+          "name": "entitlement_program_kind",
+          "value": "\"entitlement_program\".\"kind\" IN ('promotion', 'trial', 'partner', 'sponsored')"
         },
-        "promotion_campaign_status": {
-          "name": "promotion_campaign_status",
-          "value": "\"promotion_campaign\".\"status\" IN ('draft', 'active', 'closed')"
+        "entitlement_program_status": {
+          "name": "entitlement_program_status",
+          "value": "\"entitlement_program\".\"status\" IN ('draft', 'active', 'closed')"
         },
-        "promotion_campaign_grant_days": {
-          "name": "promotion_campaign_grant_days",
-          "value": "\"promotion_campaign\".\"grant_days\" BETWEEN 1 AND 3650"
+        "entitlement_program_eligibility": {
+          "name": "entitlement_program_eligibility",
+          "value": "\"entitlement_program\".\"eligibility\" IN ('open', 'listed')"
         },
-        "promotion_campaign_window": {
-          "name": "promotion_campaign_window",
-          "value": "\"promotion_campaign\".\"ends_at\" > \"promotion_campaign\".\"starts_at\""
+        "entitlement_program_sponsor": {
+          "name": "entitlement_program_sponsor",
+          "value": "(\"entitlement_program\".\"kind\" = 'sponsored') = (\"entitlement_program\".\"sponsor_id\" IS NOT NULL)"
         },
-        "promotion_campaign_quota": {
-          "name": "promotion_campaign_quota",
-          "value": "\"promotion_campaign\".\"max_redemptions\" IS NULL OR \"promotion_campaign\".\"max_redemptions\" > 0"
+        "entitlement_program_grant_days": {
+          "name": "entitlement_program_grant_days",
+          "value": "\"entitlement_program\".\"grant_days\" BETWEEN 1 AND 3650"
         },
-        "promotion_campaign_market_nonempty": {
-          "name": "promotion_campaign_market_nonempty",
-          "value": "\"promotion_campaign\".\"market_scope\" IS NULL OR cardinality(\"promotion_campaign\".\"market_scope\") > 0"
+        "entitlement_program_window": {
+          "name": "entitlement_program_window",
+          "value": "\"entitlement_program\".\"ends_at\" > \"entitlement_program\".\"starts_at\""
         },
-        "promotion_campaign_reason": {
-          "name": "promotion_campaign_reason",
-          "value": "length(btrim(\"promotion_campaign\".\"reason\")) > 0"
+        "entitlement_program_quota": {
+          "name": "entitlement_program_quota",
+          "value": "\"entitlement_program\".\"max_redemptions\" IS NULL OR \"entitlement_program\".\"max_redemptions\" > 0"
         },
-        "promotion_campaign_active_is_approved": {
-          "name": "promotion_campaign_active_is_approved",
-          "value": "\"promotion_campaign\".\"status\" = 'draft' OR \"promotion_campaign\".\"approved_by\" IS NOT NULL"
+        "entitlement_program_market_nonempty": {
+          "name": "entitlement_program_market_nonempty",
+          "value": "\"entitlement_program\".\"market_scope\" IS NULL OR cardinality(\"entitlement_program\".\"market_scope\") > 0"
         },
-        "promotion_campaign_closed_coherent": {
-          "name": "promotion_campaign_closed_coherent",
-          "value": "(\"promotion_campaign\".\"status\" = 'closed') = (\"promotion_campaign\".\"closed_at\" IS NOT NULL)"
+        "entitlement_program_reason": {
+          "name": "entitlement_program_reason",
+          "value": "length(btrim(\"entitlement_program\".\"reason\")) > 0"
+        },
+        "entitlement_program_active_is_approved": {
+          "name": "entitlement_program_active_is_approved",
+          "value": "\"entitlement_program\".\"status\" = 'draft' OR \"entitlement_program\".\"approved_by\" IS NOT NULL"
+        },
+        "entitlement_program_closed_coherent": {
+          "name": "entitlement_program_closed_coherent",
+          "value": "(\"entitlement_program\".\"status\" = 'closed') = (\"entitlement_program\".\"closed_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.entitlement_program_eligibility": {
+      "name": "entitlement_program_eligibility",
+      "schema": "",
+      "columns": {
+        "program_id": {
+          "name": "program_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "entitlement_program_eligibility_program_id_entitlement_program_program_id_fk": {
+          "name": "entitlement_program_eligibility_program_id_entitlement_program_program_id_fk",
+          "tableFrom": "entitlement_program_eligibility",
+          "tableTo": "entitlement_program",
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "program_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "entitlement_program_eligibility_company_id_company_company_id_fk": {
+          "name": "entitlement_program_eligibility_company_id_company_company_id_fk",
+          "tableFrom": "entitlement_program_eligibility",
+          "tableTo": "company",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "company_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "entitlement_program_eligibility_created_by_admin_user_admin_user_id_fk": {
+          "name": "entitlement_program_eligibility_created_by_admin_user_admin_user_id_fk",
+          "tableFrom": "entitlement_program_eligibility",
+          "tableTo": "admin_user",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "admin_user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "entitlement_program_eligibility_program_id_company_id_pk": {
+          "name": "entitlement_program_eligibility_program_id_company_id_pk",
+          "columns": [
+            "program_id",
+            "company_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_privacy_event": {
+      "name": "project_privacy_event",
+      "schema": "",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "seq": {
+          "name": "seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "project_privacy_event_seq_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event": {
+          "name": "event",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "project_privacy_event_project_idx": {
+          "name": "project_privacy_event_project_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "project_privacy_event_project_id_project_project_id_fk": {
+          "name": "project_privacy_event_project_id_project_project_id_fk",
+          "tableFrom": "project_privacy_event",
+          "tableTo": "project",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "project_privacy_event_name": {
+          "name": "project_privacy_event_name",
+          "value": "\"project_privacy_event\".\"event\" IN ('access_blocked', 'access_restored', 'anonymized')"
+        },
+        "project_privacy_event_reason": {
+          "name": "project_privacy_event_reason",
+          "value": "\"project_privacy_event\".\"reason_code\" IN ('erasure_request', 'legal_order', 'contract_closure', 'security_action', 'other')"
+        },
+        "project_privacy_event_actor": {
+          "name": "project_privacy_event_actor",
+          "value": "length(btrim(\"project_privacy_event\".\"actor\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sponsor": {
+      "name": "sponsor",
+      "schema": "",
+      "columns": {
+        "sponsor_id": {
+          "name": "sponsor_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sponsor_name_unique": {
+          "name": "sponsor_name_unique",
+          "columns": [
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sponsor_created_by_admin_user_admin_user_id_fk": {
+          "name": "sponsor_created_by_admin_user_admin_user_id_fk",
+          "tableFrom": "sponsor",
+          "tableTo": "admin_user",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "admin_user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "sponsor_kind": {
+          "name": "sponsor_kind",
+          "value": "\"sponsor\".\"kind\" IN ('government', 'agency', 'chamber', 'accelerator', 'corporate', 'other')"
+        },
+        "sponsor_status": {
+          "name": "sponsor_status",
+          "value": "\"sponsor\".\"status\" IN ('active', 'inactive')"
+        },
+        "sponsor_country": {
+          "name": "sponsor_country",
+          "value": "\"sponsor\".\"country\" IS NULL OR \"sponsor\".\"country\" ~ '^[A-Z]{2}$'"
+        },
+        "sponsor_name": {
+          "name": "sponsor_name",
+          "value": "length(btrim(\"sponsor\".\"name\")) > 0"
         }
       },
       "isRLSEnabled": false
@@ -10651,7 +11023,8 @@
       "schema": "public",
       "values": [
         "ADMIN",
-        "SUPERVISOR"
+        "SUPERVISOR",
+        "SUPER_ADMIN"
       ]
     },
     "public.assessment_state": {

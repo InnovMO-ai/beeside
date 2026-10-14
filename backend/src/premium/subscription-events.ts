@@ -116,12 +116,21 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
   };
   const createSubscription = async () => {
     if (!input.periodEnd || Number.isNaN(input.periodEnd.getTime())) throw new FaError("INVALID_INPUT", "current_period_end is required", { fields: ["current_period_end"] });
-    const start = input.periodStart && !Number.isNaN(input.periodStart.getTime()) ? input.periodStart : at;
-    if (input.periodEnd.getTime() <= start.getTime()) throw new FaError("INVALID_INPUT", "current_period_end must be after current_period_start", { fields: ["current_period_end"] });
+    let start = input.periodStart && !Number.isNaN(input.periodStart.getTime()) ? input.periodStart : at;
+    let end = input.periodEnd;
+    if (end.getTime() <= start.getTime()) throw new FaError("INVALID_INPUT", "current_period_end must be after current_period_start", { fields: ["current_period_end"] });
+    // THE STACKING RULE: a paid term starts when the access the project already holds (free, sponsored, trial, ...) ends, so the
+    // client keeps every free day and is never charged for a day already covered. With no other access this is a no-op.
+    const held = (await tx.query<{ t: Date }>("SELECT entitlement_covered_until($1, $2) AS t", [input.projectId, at])).rows[0]?.t;
+    if (held && held.getTime() > start.getTime()) {
+      const length = end.getTime() - start.getTime();
+      start = held;
+      end = new Date(held.getTime() + length);
+    }
     const { rows } = await tx.query<{ subscription_id: string }>(
       `INSERT INTO subscription (project_id, status, current_period_start, current_period_end, created_at, updated_at)
        VALUES ($1, 'PREMIUM_ACTIVE', $2, $3, $4, $4) RETURNING subscription_id`,
-      [input.projectId, start, input.periodEnd, at],
+      [input.projectId, start, end, at],
     );
     return rows[0]?.subscription_id as string;
   };

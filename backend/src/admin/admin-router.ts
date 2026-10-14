@@ -494,7 +494,7 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
 
   router.post("/admin-users", allow("admin_users.manage", "admin_user.provisioned"), handle(async (req, res) => {
     const b = body(req);
-    const user = await provisionAdminUser(db, { email: b.email, role: b.role }, now());
+    const user = await provisionAdminUser(db, { email: b.email, role: b.role }, now(), (req.admin as AdminPrincipal).role);
     await audit(req, "admin_user.provisioned", "ALLOWED", { targetType: "admin_user", targetId: user.adminUserId, details: { role: user.role } });
     res.status(201).json(user);
   }));

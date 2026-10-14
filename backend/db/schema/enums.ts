@@ -37,7 +37,7 @@ export const priorityAlignmentStatusEnum = pgEnum("priority_alignment_status", [
   "TENSION_DETECTED",
 ]);
 
-export const adminRoleEnum = pgEnum("admin_role", ["ADMIN", "SUPERVISOR"]);
+export const adminRoleEnum = pgEnum("admin_role", ["ADMIN", "SUPERVISOR", "SUPER_ADMIN"]);
 
 export const signalStrengthEnum = pgEnum("signal_strength", [
   "STRONG",

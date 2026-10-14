@@ -29,6 +29,11 @@ export interface AccessRow {
    * close at its date even if the source sync has not run yet — same "the clock closes writes" rule as paid.
    */
   effective_until?: Date | null;
+  /**
+   * Privacy / data-lifecycle state (separate from commerce). `blocked` or `anonymized` beats ANY entitlement: a valid legal or
+   * privacy requirement overrides "paid until date X". Absent/`open` = no privacy restriction.
+   */
+  privacy_state?: "open" | "blocked" | "anonymized" | null;
 }
 
 export interface DerivedAccess {
@@ -42,6 +47,7 @@ export interface DerivedAccess {
  */
 export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<PremiumPolicy, "readonlyGraceDays">): DerivedAccess {
   if (!row) return { mode: "REVOKED", readonlyUntil: null };
+  if (row.privacy_state === "blocked" || row.privacy_state === "anonymized") return { mode: "REVOKED", readonlyUntil: null };
   let mode = row.precision_access_mode;
   let endedAt = row.premium_ended_at;
   let readonlyUntil = row.readonly_until;
@@ -71,8 +77,9 @@ export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<Prem
 export async function loadAccessRow(db: Db, projectId: string): Promise<AccessRow | null> {
   const { rows } = await db.query<AccessRow>(
     `SELECT e.premium_access_active, e.precision_access_mode, e.premium_ended_at, e.readonly_until, e.effective_until,
-            s.status AS subscription_status, s.current_period_end AS subscription_period_end
+            s.status AS subscription_status, s.current_period_end AS subscription_period_end, ps.state AS privacy_state
        FROM entitlement e
+       LEFT JOIN project_privacy_state ps ON ps.project_id = e.project_id
        LEFT JOIN LATERAL (SELECT status, current_period_end FROM subscription WHERE project_id = e.project_id
                            ORDER BY created_at DESC, current_period_start DESC LIMIT 1) s ON true
       WHERE e.project_id = $1`,
