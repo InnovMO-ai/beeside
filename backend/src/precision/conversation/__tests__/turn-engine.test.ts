@@ -507,7 +507,7 @@ describe("reading the client's answer", () => {
     const inherited = [{ fieldKey: "dest_country", value: ["CL"], displayText: "Chile", sourcePinId: "pin-1", sourceItemRef: "fa:q12" }];
     const w = new World({ surface: "category", locale: "es", inherited });
     const o = await w.open();
-    expect(o.turns[0]?.text).toContain("Con lo que me contaste en tu First Assessment, entiendo esto: Chile. ¿Sigue siendo así?");
+    expect(o.turns[0]?.text).toContain("Con lo que me contaste en Discovery, entiendo esto: Chile. ¿Sigue siendo así?");
     expect(o.turns[0]?.confirmCard).toMatchObject({ kind: "inherited_value", body: "Chile" });
     expect(o.meta.modelCalls).toBe(0);
     const token = o.turns[0]?.confirmCard?.token as string;

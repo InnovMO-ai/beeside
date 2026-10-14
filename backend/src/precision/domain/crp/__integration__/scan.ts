@@ -5,7 +5,7 @@ const RULES: Array<[string, RegExp]> = [
   ["internal markers", /\b(MOCK|STUB|SIMULATOR|SIMULATED|SANDBOX|BV409|BV404|JSON|CONTEXT_ONLY|CCIR)\b/],
   ["internal slugs", /new:|_generic|precision\.|[a-z]+_[a-z]+_[a-z_]+/],
   ["internal acronyms", /\b(PSM|MSM|OH|PbyC|PA|FA|FA4)\b/],
-  ["forbidden words", /\b(reopen|reabrir|Unmapped|Out of Scope|Discovery|ClickUp|Stripe|Anthropic)\b/i],
+  ["forbidden words", /\b(reopen|reabrir|Unmapped|Out of Scope|Discovery Mode|ClickUp|Stripe|Anthropic)\b/i],
   ["quality judgements", /\b(ready|validated|excellent|perfect|listo|lista|validado|excelente)\b/i],
   ["exclamation / emoji", /[!¡]|\p{Extended_Pictographic}/u],
   ["raw errors", /\b(stack|exception|undefined|NaN|TypeError|ECONN|SQLSTATE|violates)\b|\[object|\bnull\b/i],

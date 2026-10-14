@@ -241,7 +241,6 @@ type ActFn = (label: string, action: () => Promise<unknown>) => Promise<unknown>
 
 function ProgramDetail({ id, canManage, onAct }: { id: string; canManage: boolean; onAct: ActFn }) {
   const { data, error, reload } = useLoad(() => adminApi.program(id), [id]);
-  const [company, setCompany] = useState("");
   if (!data) return <Status data={data} error={error} />;
   const program = data.program as Json;
   return (
@@ -264,20 +263,38 @@ function ProgramDetail({ id, canManage, onAct }: { id: string; canManage: boolea
           { label: "Ended early", render: (g) => formatWhen(g.terminated_at) },
         ]}
       />
-      {canManage && program.eligibility === "listed" && (
-        <form
-          className="admin-actions"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void onAct("Add eligible company", () => adminApi.addEligibleCompany(id, company)).then(() => {
-              setCompany("");
-              reload();
-            });
-          }}
-        >
-          <input className="input" placeholder="Company id" value={company} onChange={(e) => setCompany(e.target.value)} aria-label="Company id" />
-          <button type="submit" className="button button-secondary" disabled={!company.trim()}>Add eligible company</button>
-        </form>
+      {canManage && program.eligibility === "listed" && <EligibleCompanyPicker onAdd={(companyId) => onAct("Add eligible company", () => adminApi.addEligibleCompany(id, companyId)).then(reload)} />}
+    </div>
+  );
+}
+
+function EligibleCompanyPicker({ onAdd }: { onAdd: (companyId: string) => Promise<unknown> }) {
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<{ companyId: string; name: string; domain: string | null }[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  return (
+    <div className="admin-actions">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          setProblem(null);
+          adminApi.searchCompanies(q.trim()).then((r) => setFound(r.companies)).catch((e: unknown) => setProblem(errorMessage(e)));
+        }}
+      >
+        <input className="input" placeholder="Search a company by name or domain" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search company" />
+        <button type="submit" className="button button-secondary" disabled={q.trim().length < 2}>Search</button>
+      </form>
+      {problem && <p className="helper" role="alert">{problem}</p>}
+      {found && found.length === 0 && <p className="helper">No company matches.</p>}
+      {found && found.length > 0 && (
+        <ul>
+          {found.map((c) => (
+            <li key={c.companyId}>
+              {c.name}{c.domain ? ` · ${c.domain}` : ""}{" "}
+              <button type="button" className="button button-secondary" onClick={() => void onAdd(c.companyId).then(() => setFound(null))}>Add eligible company</button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

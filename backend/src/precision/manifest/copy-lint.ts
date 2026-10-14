@@ -21,7 +21,7 @@ export const RULES: Record<"R1" | "R2" | "R7", { re: RegExp; msg: string }> = {
   },
   R7: {
     re: WB(
-      "listo|lista|listos|validado|validada|calificado|calificada|excelente|AAA|provider-ready|RFI|RFP|RFQ|SOW|ClickUp|Add Category|reabrir|reabierto|reopen|Strategic Advisory Brief|Unmapped Service|New Category|Discovery|Out of Scope|scenario|readiness score|Core|On-Demand|SOURCEABLE|NOT_OFFERED|no tenemos ese servicio",
+      "listo|lista|listos|validado|validada|calificado|calificada|excelente|AAA|provider-ready|RFI|RFP|RFQ|SOW|ClickUp|Add Category|reabrir|reabierto|reopen|Strategic Advisory Brief|Unmapped Service|New Category|Discovery Mode|Out of Scope|scenario|readiness score|Core|On-Demand|SOURCEABLE|NOT_OFFERED|no tenemos ese servicio",
     ),
     msg: "forbidden term or quality judgment",
   },

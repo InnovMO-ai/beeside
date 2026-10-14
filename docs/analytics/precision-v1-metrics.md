@@ -37,3 +37,11 @@ The machine-readable catalog is `GET /api/admin/analytics/precision/catalog` (so
 **AI**: processed turns by surface, outcome and latency bucket; unavailable rate; fallback rate (awaiting model-tier plumbing).
 
 **Commercial**: access now by mode and source; activations, renewals, reactivations, cancellations, periods ended, grants by source, extensions, moves to READ_ONLY / REVOKED, programs activated/redeemed/closed, privacy blocks. Privacy state is a separate dimension from commerce.
+
+## Terminology: Discovery
+**Discovery** is the Product name of what the code and historical event ids still call First Assessment / FA / `fa4_*`. Rules for this layer:
+
+* Historical ids are not renamed. `fa_journey_event` and every `event_type` stored in it (`channel = 'core'` in `analytics_v1_events`) keep their ids; **Product alias: Discovery journey events**. Any `fa.*` profile key (`src/analytics/project-profile.ts`) keeps its key; Product alias: Discovery answers.
+* New Product-facing event definitions, metric labels and Tableau field names use Discovery wording (e.g. "Discovery completed"); where an implementation id must still carry `fa`, the catalog states the alias in the definition.
+* Rename or versioning of historical ids is proposed only if it gives real value (it would break Tableau history); today it does not.
+* No raw client conversation is logged in any event (unchanged): events hold ids, enums and counters.

@@ -40,7 +40,7 @@ export const es: Record<DictKey, string> = {
 
   "cover.eyebrow": "Precision Center",
   "cover.title": "Tu proyecto, definido con precisión.",
-  "cover.body": "Precision toma lo que ya nos contaste en tu First Assessment y lo convierte en tu My Service Map, con los servicios que necesitas, y después en los requisitos de cada uno.",
+  "cover.body": "Precision toma lo que ya nos contaste en Discovery y lo convierte en tu My Service Map, con los servicios que necesitas, y después en los requisitos de cada uno.",
   "cover.destination": "Destino",
   "cover.continue": "Continuar",
   "cover.imageNote": "Ilustración",
@@ -293,7 +293,7 @@ export const es: Record<DictKey, string> = {
   "help.legal.privacy": "Política de privacidad",
   "help.legal.terms": "Términos y condiciones",
   "help.faq.1.q": "¿Qué es Precision Center?",
-  "help.faq.1.a": "Es donde convertimos lo que ya nos contaste en tu First Assessment en tu My Service Map, con los servicios que necesitas, y después en los requisitos de cada uno.",
+  "help.faq.1.a": "Es donde convertimos lo que ya nos contaste en Discovery en tu My Service Map, con los servicios que necesitas, y después en los requisitos de cada uno.",
   "help.faq.2.q": "¿Puedo pausar y continuar después?",
   "help.faq.2.a": "Sí. Todo lo que respondes se guarda. Puedes continuar desde donde lo dejaste en cualquier momento.",
   "help.faq.3.q": "¿Qué es My Service Map?",

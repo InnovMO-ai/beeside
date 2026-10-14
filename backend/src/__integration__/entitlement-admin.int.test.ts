@@ -368,4 +368,16 @@ describeWithDb("Admin entitlement API: grants, programs, sponsors, privacy — r
     expect((await get(supervisor, "/precision/deliveries?status=bogus")).status).toBe(400);
     expect(JSON.stringify(all.body)).not.toMatch(/oh_reference|payload|structured/);
   });
+  it("company search for program eligibility: read roles only, 2+ characters, names and domains (no people), wildcards are literal", async () => {
+    const { supervisor } = await people();
+    await h.client.query("INSERT INTO company (name) VALUES ('Zephyr Search Co'), ('Zephyr_Literal Co')");
+    const found = await get(supervisor, "/companies/search?q=zephyr");
+    expect(found.status).toBe(200);
+    expect((found.body.companies as Array<{ name: string }>).map((c) => c.name)).toEqual(expect.arrayContaining(["Zephyr Search Co"]));
+    for (const c of found.body.companies as Array<Record<string, unknown>>) expect(Object.keys(c).sort()).toEqual(["companyId", "domain", "name"]);
+    expect(((await get(supervisor, "/companies/search?q=z")).body.companies as unknown[])).toEqual([]);
+    const literal = await get(supervisor, "/companies/search?q=zephyr_l");
+    expect((literal.body.companies as Array<{ name: string }>).map((c) => c.name)).toEqual(["Zephyr_Literal Co"]);
+    expect(((await get(supervisor, "/companies/search?q=%25%25")).body.companies as unknown[])).toEqual([]);
+  });
 });

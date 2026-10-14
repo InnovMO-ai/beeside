@@ -48,8 +48,8 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
   },
   {
     key: "fa_prefill_confirm",
-    es: "Con lo que me contaste en tu First Assessment, entiendo esto: {value}. ¿Sigue siendo así?",
-    en: "From what you told me in your First Assessment, I understand this: {value}. Is that still the case?",
+    es: "Con lo que me contaste en Discovery, entiendo esto: {value}. ¿Sigue siendo así?",
+    en: "From what you told me in Discovery, I understand this: {value}. Is that still the case?",
     status: "draft",
     source: `${VP} fa_prefill_confirm`,
   },

@@ -17,7 +17,7 @@ export interface QuestionFx {
   blocking?: boolean;
   executionDependency?: boolean;
   section: string;
-  /** Inherited from the First Assessment: shown for confirmation, never re-asked. */
+  /** Inherited from Discovery: shown for confirmation, never re-asked. */
   prefill?: { title: Bi; value: Bi };
 }
 export interface SectionFx { id: string; title: Bi }
@@ -46,7 +46,7 @@ export const DISCLOSURE = bi(
 export const UNDERSTANDING_QUESTIONS: QuestionFx[] = [
   {
     key: "pa_destination_countries", section: "project", label: bi("Destination", "Destino"),
-    ask: bi("With what you told us in your First Assessment, I understand your destination is Mexico. Is that still right?", "Con lo que nos contaste en tu First Assessment, entiendo que tu destino es México. ¿Sigue siendo así?"),
+    ask: bi("With what you told us in Discovery, I understand your destination is Mexico. Is that still right?", "Con lo que nos contaste en Discovery, entiendo que tu destino es México. ¿Sigue siendo así?"),
     prefill: { title: bi("Destination", "Destino"), value: bi("Mexico", "México") },
   },
   {

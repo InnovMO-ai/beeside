@@ -42,7 +42,7 @@ export const en = {
   // ---- cover
   "cover.eyebrow": "Precision Center",
   "cover.title": "Your project, defined with precision.",
-  "cover.body": "Precision takes what you already told us in your First Assessment and turns it into your My Service Map, with the services you need, and then into the requirements for each one.",
+  "cover.body": "Precision takes what you already told us in Discovery and turns it into your My Service Map, with the services you need, and then into the requirements for each one.",
   "cover.destination": "Destination",
   "cover.continue": "Continue",
   "cover.imageNote": "Illustration",
@@ -302,7 +302,7 @@ export const en = {
   "help.legal.privacy": "Privacy Policy",
   "help.legal.terms": "Terms and Conditions",
   "help.faq.1.q": "What is the Precision Center?",
-  "help.faq.1.a": "It is where we turn what you already told us in your First Assessment into your My Service Map, with the services you need, and then into the requirements for each one.",
+  "help.faq.1.a": "It is where we turn what you already told us in Discovery into your My Service Map, with the services you need, and then into the requirements for each one.",
   "help.faq.2.q": "Can I pause and continue later?",
   "help.faq.2.a": "Yes. Everything you answer is saved. You can continue from where you left off at any time.",
   "help.faq.3.q": "What is My Service Map?",

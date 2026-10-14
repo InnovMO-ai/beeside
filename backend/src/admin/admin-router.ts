@@ -519,6 +519,21 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     }),
   );
 
+  // Finds a company by name or domain so a program's eligibility list never needs a pasted id. Names only (no people, no answers); 2+ characters, 15 rows.
+  router.get("/companies/search", allow("projects.read", "companies.searched"), handle(async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 80) : "";
+    if (q.length < 2) {
+      res.json({ companies: [] });
+      return;
+    }
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const { rows } = await db.query<{ company_id: string; name: string; normalized_domain: string | null }>(
+      "SELECT company_id, name, normalized_domain FROM company WHERE name ILIKE $1 OR normalized_domain ILIKE $1 ORDER BY name LIMIT 15",
+      [like],
+    );
+    res.json({ companies: rows.map((r) => ({ companyId: r.company_id, name: r.name, domain: r.normalized_domain })) });
+  }));
+
   router.get("/entitlement/programs", allow("projects.read", "entitlement.programs_listed"), handle(async (_req, res) => {
     res.json({ programs: await listPrograms(db) });
   }));

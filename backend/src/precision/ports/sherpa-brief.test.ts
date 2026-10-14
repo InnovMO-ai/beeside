@@ -77,26 +77,60 @@ describe("Sherpa brief", () => {
   });
 });
 
-describe("payload hygiene lint", () => {
-  const dirty = (value: string): ReturnType<typeof payloadHygiene> => {
+describe("payload hygiene lint — canonical content vs customer values vs residue", () => {
+  const withValue = (value: string): ReturnType<typeof payloadHygiene> => {
     const p = realistic();
-    (p.artifact.structured as { context: string[] }).context = [value];
+    (p.artifact.structured as { sections: Array<{ items: Array<{ value: string | null }> }> }).sections[0]!.items[0]!.value = value;
     return payloadHygiene(p);
   };
+  const withLabel = (label: string): ReturnType<typeof payloadHygiene> => {
+    const p = realistic();
+    (p.artifact.structured as { sections: Array<{ items: Array<{ label: string }> }> }).sections[0]!.items[0]!.label = label;
+    return payloadHygiene(p);
+  };
+
+  it("never judges approved canonical wording: questions, second person and interrogative phrasing pass", () => {
+    for (const label of ["¿Quién operará la logística diaria?", "Who will run day-to-day logistics?", "Do any flows involve hazardous or regulated materials?", "¿Necesitas almacenamiento dedicado?"]) {
+      expect(withLabel(label)).toEqual([]);
+    }
+    const p = realistic();
+    (p.artifact.structured as { title: string }).title = "Logistics — Category Requirement Pack (CRP)";
+    expect(payloadHygiene(p)).toEqual([]);
+  });
+
   it.each([
-    ["Do you ship by sea?", "question mark"],
-    ["¿Cuántos pallets?", "question mark"],
-    ["Sure! Let me know if you need more", "assistant phrasing"],
-    ["Assistant: here is the list", "chat role prefix"],
+    ["café, ya te lo había dicho", "meta-comment to the assistant"],
+    ["no te he dicho eso", "meta-comment to the assistant"],
+    ["I already told you that", "meta-comment to the assistant"],
+    ["quiero agregar más servicios", "request aimed at the assistant"],
+    ["I want to add another service", "request aimed at the assistant"],
+    ["no entiendo la pregunta", "frustration or confusion"],
+    ["you keep asking the same thing", "meta-comment to the assistant"],
+    ["Let me know if you need more", "assistant phrasing or instruction"],
+    ["ask the client for the invoice", "assistant phrasing or instruction"],
+    ["Assistant: here is the list", "transcript fragment"],
+    ["[cliente] sí", "transcript fragment"],
+    ["???", "unresolved marker"],
+  ])("flags customer value %j as residue", (text, rule) => {
+    const hits = withValue(text);
+    expect(hits.map((f) => f.rule)).toContain(rule);
+    expect(hits.every((f) => f.class === "residue" || f.class === "leak")).toBe(true);
+  });
+
+  it("does not treat a question mark or second person in a customer value as residue by itself", () => {
+    expect(withValue("Monthly ocean freight, 5 pallets, from Santiago to Veracruz")).toEqual([]);
+    expect(withValue("¿Se necesita almacén aduanero? Sí, uno propio")).toEqual([]);
+  });
+
+  it.each([
     ["```json {} ```", "code fence / markup"],
     ["value is undefined", "placeholder or empty literal"],
     ["logistics_flows_origin", "internal marker or key"],
     ["sent through ClickUp", "platform or vendor name"],
     ["write to ana@example.com", "e-mail address"],
-  ])("flags %s", (text, rule) => {
-    expect(dirty(text).map((f) => f.rule)).toContain(rule);
-  });
-  it("lets ordinary business content through", () => {
-    expect(dirty("Monthly ocean freight, 5 pallets, from Santiago to Veracruz")).toEqual([]);
+  ])("leaks are flagged in customer values (%j) AND in canonical wording", (text, rule) => {
+    expect(withValue(text).map((f) => f.rule)).toContain(rule);
+    expect(withLabel(text).map((f) => f.rule)).toContain(rule);
+    expect(withLabel(text).every((f) => f.class === "leak")).toBe(true); // canonical content is never judged as residue
   });
 });

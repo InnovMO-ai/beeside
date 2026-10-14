@@ -326,6 +326,27 @@ describe("Control Center", () => {
     await waitFor(() => expect(calls.find((c) => c.method === "DELETE" && c.url.includes("locale=*"))).toBeTruthy());
   });
 
+  it("adds an eligible company to a listed program by searching for it by name (no pasted ids)", async () => {
+    const calls = mockApi({
+      "/api/admin/me": () => jsonResponse(SUPER),
+      "/api/admin/companies/search": () => jsonResponse({ companies: [{ companyId: "c-9", name: "Northwind Foods", domain: "northwind.example" }] }),
+      "/api/admin/entitlement/programs/pr-1/eligibility": () => jsonResponse({ programId: "pr-1", companyId: "c-9" }, 201),
+      "/api/admin/entitlement/programs/pr-1": () => jsonResponse({ program: { program_id: "pr-1", code: "LISTED", name: "Listed", kind: "sponsored", status: "active", eligibility: "listed", eligible_companies: 0 }, grants: [] }),
+      "/api/admin/entitlement/programs": () => jsonResponse({ programs: [{ program_id: "pr-1", code: "LISTED", name: "Listed", kind: "sponsored", status: "active", grant_days: 30 }] }),
+      "/api/admin/entitlement/sponsors": () => jsonResponse({ sponsors: [] }),
+      "/api/admin/analytics/precision": () => jsonResponse({ stages: [], metrics: [], addService: {}, criticalItems: {}, awaitingProductLayer: [], fallback: {}, now: {}, period: {} }),
+    });
+    window.history.replaceState(null, "", "/admin/precision");
+    render(<AdminApp />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Programs & sponsors" }));
+    fireEvent.click(await screen.findByRole("button", { name: "LISTED" }));
+    fireEvent.change(await screen.findByLabelText("Search company"), { target: { value: "north" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(await screen.findByText(/Northwind Foods · northwind.example/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add eligible company" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "POST" && c.url.endsWith("/programs/pr-1/eligibility"))).toBeTruthy());
+  });
+
   it("shows Precision statistics (funnel, quality, commercial, catalog) to a read-only role, with no write controls", async () => {
     const supervisor = { ...SUPERVISOR, permissions: [...SUPERVISOR.permissions, "analytics.read"] };
     mockApi({

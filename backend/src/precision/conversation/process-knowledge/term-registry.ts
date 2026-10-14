@@ -23,7 +23,7 @@ export const TERM_REGISTRY: readonly TermEntry[] = [
   { id: "add_a_service", canonical: "Add a Service" },
   { id: "operation_hub", canonical: "Operation Hub" },
   { id: "sherpa", canonical: "Sherpa" },
-  { id: "first_assessment", canonical: "First Assessment" },
+  { id: "first_assessment", canonical: "Discovery" } /* product name (ex-First Assessment); the id is a stable technical key */,
   { id: "the_hive", canonical: "The Hive" },
 ];
 
@@ -48,7 +48,7 @@ export const FORBIDDEN_INTERNAL_TERMS: readonly ForbiddenTerm[] = [
   { id: "OH", pattern: /(?<![\p{L}\p{N}_])OH(?![\p{L}\p{N}_])/u, reason: "internal acronym (use Operation Hub)" },
   { id: "PbyC", pattern: /(?<![\p{L}\p{N}_])(?:PbyC|PBC)(?![\p{L}\p{N}_])/u, reason: "internal acronym (use Precision by Category)" },
   { id: "PA", pattern: /(?<![\p{L}\p{N}_])PA(?![\p{L}\p{N}_])/u, reason: "internal acronym (use Precision Understanding)" },
-  { id: "FA", pattern: /(?<![\p{L}\p{N}_])FA(?![\p{L}\p{N}_])/u, reason: "internal acronym (use First Assessment)" },
+  { id: "FA", pattern: /(?<![\p{L}\p{N}_])FA(?![\p{L}\p{N}_])/u, reason: "internal acronym (use Discovery)" },
   { id: "CCIR", pattern: /(?<![\p{L}\p{N}_])CCIR(?![\p{L}\p{N}_])/u, reason: "internal name" },
   { id: "KYC", pattern: /(?<![\p{L}\p{N}_])(?:KYC|due diligence)(?![\p{L}\p{N}_])/iu, reason: "forbidden compliance framing" },
   { id: "mock-labels", pattern: /(?<![\p{L}\p{N}_])(?:MOCK|STUB|SIMULATOR|SANDBOX|SIMULATED)(?![\p{L}\p{N}_])/u, reason: "environment label" },

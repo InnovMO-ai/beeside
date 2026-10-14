@@ -372,3 +372,19 @@ describe("ClickUp adapter — what a Sherpa reads", () => {
     expect(parseMarker(buildDescription("k:3", "crp", '{"a":1}', "c".repeat(64)))).toMatchObject({ body: '{"a":1}' });
   });
 });
+
+describe("ClickUp adapter — deliveries created before the Sherpa brief existed (beeside-oh/1)", () => {
+  it("a stored v1 task is still found, verified and replayed under the same key; no second task is created", async () => {
+    const h = makeClickUpHarness();
+    const p = samplePayload();
+    await h.port.publish(p);
+    const task = h.server.allTasks().find((x) => !x.tags.includes("oh-overview"))!;
+    const m = parseMarker(task.description)!;
+    (task as { description: string }).description = buildDescription(m.key, m.kind, m.body, m.checksum); // what a pre-brief adapter wrote
+    expect((await h.port.verify(p.contract.idempotency_key)).found).toBe(true);
+    const again = await h.port.publish(p);
+    expect(again.replayed).toBe(true);
+    expect(again.reference.workItemId).toBe(task.id);
+    expect(h.server.taskCount()).toBe(1);
+  });
+});

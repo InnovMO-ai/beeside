@@ -124,6 +124,7 @@ export const adminApi = {
   programs: () => call<{ programs: Json[] }>("GET", "/entitlement/programs"),
   program: (id: string) => call<Json>("GET", `/entitlement/programs/${id}`),
   createProgram: (input: Json) => call<Json>("POST", "/entitlement/programs", input),
+  searchCompanies: (q: string) => call<{ companies: { companyId: string; name: string; domain: string | null }[] }>("GET", `/companies/search?q=${encodeURIComponent(q)}`),
   addEligibleCompany: (programId: string, companyId: string) => call<Json>("POST", `/entitlement/programs/${programId}/eligibility`, { companyId }),
   activateProgram: (programId: string) => call<Json>("POST", `/entitlement/programs/${programId}/activate`, {}),
   closeProgram: (programId: string) => call<Json>("POST", `/entitlement/programs/${programId}/close`, {}),

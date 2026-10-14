@@ -115,6 +115,17 @@ export function decodeOhReference(text: string): OhExternalReference {
   return out;
 }
 
+/**
+ * Presents a stored reference in the neutral model. The ledger is append-only and is NEVER rewritten: rows written before the neutral
+ * `workItemId` (spelled `taskId` then) keep their text, and every read goes through here, so old state stays readable and new writes use
+ * the canonical spelling. An unreadable value is returned as it is (never dropped).
+ */
+export function normalizeOhReference(text: string): string {
+  const decoded = decodeOhReference(text);
+  const encoded = encodeOhReference(decoded);
+  return encoded === "" ? text : encoded;
+}
+
 const PAYLOAD_KINDS: Record<OhLedgerKind, ReadonlyArray<OhHandoffPayload["contract"]["kind"]>> = {
   crp: ["first_send", "crp"],
   psm: ["psm_update"],
@@ -170,7 +181,7 @@ export class OhDeliveryService {
     );
     const cur = current.rows[0];
     if (cur?.status === "delivered") {
-      return { state: "sent", idempotencyKey: key, alreadySent: true, ...(cur.oh_reference ? { reference: cur.oh_reference } : {}) };
+      return { state: "sent", idempotencyKey: key, alreadySent: true, ...(cur.oh_reference ? { reference: normalizeOhReference(cur.oh_reference) } : {}) };
     }
 
     // Activation gate: the first CRP send of a project must succeed before anything else is sent.
@@ -260,7 +271,7 @@ export class OhDeliveryService {
               attempt: last.attempt,
               artifactVersion: last.artifact_version,
               createdAt: last.created_at,
-              ...(last.oh_reference ? { reference: last.oh_reference } : {}),
+              ...(last.oh_reference ? { reference: normalizeOhReference(last.oh_reference) } : {}),
             },
           }
         : {}),

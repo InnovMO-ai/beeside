@@ -64,6 +64,58 @@ describeWithDb("OhDeliveryService (PostgreSQL, committed rows in a scratch datab
     expect(sim.storedCount()).toBe(1);
   });
 
+  describe("backward compatibility: references and attempts written before taskId became workItemId", () => {
+    const legacyDelivered = async (projectId: string, packId: string, key: string, reference: string) => {
+      for (const [status, ref] of [["queued", null], ["delivered", reference]] as const) {
+        await db.query(
+          "INSERT INTO oh_delivery (project_id, kind, pack_id, artifact_version, status, oh_reference, idempotency_key, attempt) VALUES ($1, 'crp', $2, 1, $3, $4, $5, 1)",
+          [projectId, packId, status, ref, key],
+        );
+      }
+    };
+
+    it("a delivered row with the old spelling still answers `sent` without calling the port, and is presented in the neutral model; the ledger text is untouched", async () => {
+      const { projectId, companyId } = await fx.newProject();
+      const i = await crp(projectId, companyId);
+      const legacy = "artifactId=T-1|taskId=T-1|locationId=folder%2Flist|secureReference=https%3A%2F%2Fexample.test%2Ft%2FT-1";
+      await legacyDelivered(projectId, i.packId, i.key, legacy);
+      const spy = new SpyPort(new SimulatedOperationHub());
+      const svc = service(spy);
+
+      const again = await svc.send(i);
+      expect(again).toMatchObject({ state: "sent", alreadySent: true });
+      expect(spy.publishCalls).toBe(0);
+      expect(again.reference).not.toContain("taskId");
+      expect(decodeOhReference(again.reference!)).toEqual({ artifactId: "T-1", workItemId: "T-1", locationId: "folder/list", secureReference: "https://example.test/t/T-1" });
+      // old and new spellings decode to the same thing
+      expect(decodeOhReference(legacy)).toEqual(decodeOhReference(again.reference!));
+      // append-only ledger: the stored text is exactly what was written back then
+      expect((await rows(i.key)).map((r) => r.oh_reference)).toEqual([null, legacy]);
+
+      const state = await svc.getSendState(projectId);
+      expect(state.firstSendDone).toBe(true);
+      expect(state.lastDelivery?.reference).toBe(again.reference);
+    });
+
+    it("an attempt that failed before the rename is retried under the SAME key as the next attempt, and succeeds with a neutral reference", async () => {
+      const { projectId, companyId } = await fx.newProject();
+      const i = await crp(projectId, companyId);
+      await db.query("INSERT INTO oh_delivery (project_id, kind, pack_id, artifact_version, status, idempotency_key, attempt) VALUES ($1, 'crp', $2, 1, 'queued', $3, 1)", [projectId, i.packId, i.key]);
+      await db.query("INSERT INTO oh_delivery (project_id, kind, pack_id, artifact_version, status, error_code, idempotency_key, attempt) VALUES ($1, 'crp', $2, 1, 'failed', 'UNAVAILABLE', $3, 1)", [projectId, i.packId, i.key]);
+      const sim = new SimulatedOperationHub();
+      const r = await service(sim).send(i);
+      expect(r).toMatchObject({ state: "sent", attempt: 2 });
+      expect(decodeOhReference(r.reference!)).toMatchObject({ workItemId: expect.stringMatching(/^item_/) });
+      expect((await rows(i.key)).map((x) => `${x.status}:${x.attempt}`)).toEqual(["queued:1", "failed:1", "queued:2", "delivered:2"]);
+    });
+
+    it("an unreadable stored reference is shown as it is, never dropped", async () => {
+      const { normalizeOhReference } = await import("../precision/delivery/oh-delivery-service");
+      expect(normalizeOhReference("opaque-value-from-somewhere")).toBe("opaque-value-from-somewhere");
+      expect(normalizeOhReference("taskId=a")).toBe("workItemId=a");
+    });
+  });
+
   it("duplicate click: a delivered key returns the stored result without calling the port", async () => {
     const { projectId, companyId } = await fx.newProject();
     const spy = new SpyPort(new SimulatedOperationHub());

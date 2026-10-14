@@ -48,7 +48,7 @@ export const PROCESS_TOPICS: readonly PackTopic[] = [
     topicKey: "precision_center",
     status: "approved",
     facts: [
-      F("pc-1", "Precision Center is the client space where what was told in First Assessment becomes a map of services and the requirements for each.", "Voice Pack §2 glossary; intro_once"),
+      F("pc-1", "Precision Center is the client space where what was told in Discovery becomes a map of services and the requirements for each.", "Voice Pack §2 glossary; intro_once"),
       F("pc-2", "The client decides when to continue and when to pause; there is no paused state.", "Voice Pack intro_once; pause_note"),
     ],
     sentences: {

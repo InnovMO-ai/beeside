@@ -10,7 +10,7 @@ export const RULES: Rule[] = [
   { id: "es-listo", re: /\b(listo|lista|listos|listas)\b/i, note: "'listo/lista' is forbidden (R7)" },
   { id: "ready", re: /\b(ready|validated|excellent|excelente|perfect|perfecto|genial)\b/i, note: "no quality judgements" },
   { id: "validado", re: /\bvalidad[oa]s?\b/i, note: "validado is forbidden" },
-  { id: "internal-labels", re: /\b(add category|new category|unmapped service|strategic advisory brief|discovery|out of scope|scenario|readiness score|provider-ready|AAA|core\/on-demand|on-demand)\b/i, note: "internal labels" },
+  { id: "internal-labels", re: /\b(add category|new category|unmapped service|strategic advisory brief|discovery mode|out of scope|scenario|readiness score|provider-ready|AAA|core\/on-demand|on-demand)\b/i, note: "internal labels" },
   { id: "rfx", re: /\b(RFI|RFP|RFQ|SOW)\b/, note: "procurement jargon" },
   { id: "tools", re: /\b(ClickUp|Stripe|Anthropic|OpenAI|Claude|GPT)\b/i, note: "vendor names" },
   { id: "acronyms", re: /\b(PSM|MSM|OH|FA4|FA 4\.0|CCIR|KYC|PbyC)\b/, note: "internal acronyms" },

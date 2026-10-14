@@ -30,7 +30,7 @@ function rendered(c: CrpV1Content): string[] {
 const FORBIDDEN: Array<[string, RegExp]> = [
   ["MOCK", /\bMOCK\b/i], ["STUB", /\bSTUB\b/i], ["SIMULATOR", /\bSIMULAT(OR|ED)\b/i], ["SANDBOX", /\bSANDBOX\b/i],
   ["BV409", /\bBV\d{3}\b/], ["JSON", /json/i], ["new:", /new:/i], ["_generic", /_generic/], ["CONTEXT_ONLY", /CONTEXT_ONLY/],
-  ["PSM/MSM/OH/PbyC/PA/FA", /\b(PSM|MSM|OH|PbyC|PA|FA)\b/], ["reopen", /reopen|reabrir/i], ["Discovery", /\bdiscovery\b/i],
+  ["PSM/MSM/OH/PbyC/PA/FA", /\b(PSM|MSM|OH|PbyC|PA|FA)\b/], ["reopen", /reopen|reabrir/i], ["Discovery Mode", /\bdiscovery mode\b/i],
   ["Out of Scope", /out of scope|fuera de alcance/i], ["Unmapped", /unmapped/i], ["Sherpa", /sherpa/i], ["listo/lista", /\blist[oa]s?\b/i],
   ["provider names", /clickup|stripe/i], ["exclamation", /[!¡]/], ["braces/brackets", /[{}[\]]/], ["snake_case token", /[a-z]+_[a-z]+/],
   ["CAP_ id", /\bCAP_/], ["version number", /\bv\d+\.\d+/i],

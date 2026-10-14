@@ -21,7 +21,7 @@ const R2_EN_YESNO_ECHO = /(?<![\p{L}\p{N}_])(?:noted|got it|understood)[,:.]?\s+
 const R2_SYMBOLS = /!|¡|\p{Extended_Pictographic}/u;
 
 const R7_ES = WB(
-  "listo|lista|listos|listas|validado|validada|validados|validadas|calificado|calificada|calificados|calificadas|excelente|excelentes|AAA|provider-ready|RFI|RFP|RFQ|SOW|ClickUp|Add Category|reabrir|reabierto|reopen|Strategic Advisory Brief|Unmapped Service|New Category|Discovery|Out of Scope|scenario|readiness score|On-Demand|SOURCEABLE|NOT_OFFERED|no tenemos ese servicio",
+  "listo|lista|listos|listas|validado|validada|validados|validadas|calificado|calificada|calificados|calificadas|excelente|excelentes|AAA|provider-ready|RFI|RFP|RFQ|SOW|ClickUp|Add Category|reabrir|reabierto|reopen|Strategic Advisory Brief|Unmapped Service|New Category|Discovery Mode|Out of Scope|scenario|readiness score|On-Demand|SOURCEABLE|NOT_OFFERED|no tenemos ese servicio",
 );
 const R7_CORE = /(?<![\p{L}\p{N}_])Core(?![\p{L}\p{N}_])/u;
 const R7_EN_QUALITY = new RegExp(
@@ -83,7 +83,7 @@ export function checkTone(text: string, ctx: Pick<VerifyContext, "locale" | "que
   if (!(ctx.locale === "es" && APPROVED_STATE_LABELS.has(trimmed))) {
     const es = ctx.locale === "es" ? t.match(R7_ES) : null;
     const en = ctx.locale === "en" ? t.match(R7_EN_QUALITY) : null;
-    const common = t.match(WB("ClickUp|Strategic Advisory Brief|Unmapped Service|New Category|Add Category|Out of Scope|readiness score|SOURCEABLE|NOT_OFFERED|RFI|RFP|RFQ|SOW|reopen|Discovery|AAA", "iu"));
+    const common = t.match(WB("ClickUp|Strategic Advisory Brief|Unmapped Service|New Category|Add Category|Out of Scope|readiness score|SOURCEABLE|NOT_OFFERED|RFI|RFP|RFQ|SOW|reopen|Discovery Mode|AAA", "iu"));
     const core = t.match(R7_CORE);
     const hit = es ?? en ?? common ?? core;
     if (hit) out.push(v("R7", "forbidden_term_or_quality_judgment", hit[0].trim(), "forbidden term or quality judgment"));
