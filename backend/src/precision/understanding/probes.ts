@@ -9,6 +9,7 @@
  * (unknown) or preferred not to say (withheld). "Unknown" is honest knowledge: it becomes a finding, never a blocker and never a guess.
  */
 import { countryName } from "./countries";
+import { LOCATION_CRITERIA } from "./criteria";
 import { answerKind, describeMoney, money, negated, ranges } from "./signals";
 import type { Range } from "./signals";
 import { fold, hasTerm, parseDuration, describeMonths, parseQuantity, quantities, quantityNear, spanAround, termRegex, NUMBER_SOURCE } from "./text";
@@ -574,6 +575,24 @@ export const PROBES: readonly ProbeDef[] = [
       if (ctx.asked && ctx.f.length > 12 && ctx.f.length <= 300 && !answerKind(ctx.f)) return { value: ctx.text.trim().slice(0, 200), display: ctx.text.trim().slice(0, 120), quote: ctx.text.trim().slice(0, 160) };
       return null;
     },
+  },
+  // ---------------------------------------------------------------- location (drives the Level 2 knowledge: what the client weighs decides what is retrieved)
+  {
+    key: "location.criteria", dimension: "location", order: 60,
+    label: { es: "Criterios para elegir ubicación", en: "Location criteria" },
+    question: L("Para elegir dónde instalarte en {dest}, ¿qué pesa más para ti: el talento disponible, la conectividad logística, los costos u otro factor?", "To choose where to set up in {dest}, what weighs most for you: available talent, logistics connectivity, costs or something else?"),
+    why: { es: "Lo que más pese define qué contexto del país te conviene revisar.", en: "What weighs most defines which country context is worth reviewing." },
+    topics: ["competitiveness_state"],
+    onNo: "undecided",
+    applies: (v) => v.hasAny(["location_choice", "industrial_site"]),
+    tier: () => "valuable",
+    extract: (ctx) => {
+      const hit = LOCATION_CRITERIA.filter((c) => c.terms.some((t) => hasTerm(ctx.f, t)));
+      if (hit.length === 0) return null;
+      const first = hit[0]!.terms.find((t) => hasTerm(ctx.f, t))!;
+      return mk(ctx, first, hit.map((c) => c.id), hit.map((c) => c.label[ctx.locale]).join(", "));
+    },
+    merge: (prev, inc) => [...new Set([...(Array.isArray(prev) ? (prev as string[]) : []), ...(Array.isArray(inc) ? (inc as string[]) : [])])],
   },
 ];
 
