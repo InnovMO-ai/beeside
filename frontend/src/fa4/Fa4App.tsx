@@ -39,6 +39,8 @@ export function Fa4App() {
   const [step, setStep] = useState<StepRef>({ id: 'cover' });
   const [hasSession, setHasSession] = useState(false);
   const [model, setModel] = useState<YourExpansionViewModel | null>(null);
+  const [previewToken, setPreviewToken] = useState<string | null>(null);
+  const [delivered, setDelivered] = useState(false);          // D-156: a delivered YEV is final (no «Corregir algo», no regeneration)
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
@@ -92,7 +94,7 @@ export function Fa4App() {
           setA(s.answers); setHasSession(true);
           if (link && !link.view) setToast(UI.resumed[s.answers.locale]);
           if (link?.view === 'result' || s.step === 'result') {
-            try { const r = await api.latestResult(); setModel(r.model); setStep({ id: 'result' }); if (openContactAfterBoot.current) { openContactAfterBoot.current = false; setContactOpen(true); } } catch { setStep({ id: 'extra' }); }
+            try { const r = await api.latestResult(); setModel(r.model); setDelivered(true); setStep({ id: 'result' }); if (openContactAfterBoot.current) { openContactAfterBoot.current = false; setContactOpen(true); } } catch { setStep({ id: 'extra' }); }
           } else setStep(parseKey(resolveSavedStep(s.step, s.answers)));
         }
       } catch (e) {
@@ -141,7 +143,7 @@ export function Fa4App() {
     setBusy(true); setStep({ id: 'result' }); setModel(null);
     try {
       await api.save(a, 'result');
-      setModel((await api.generateResult()).model); track('result_viewed');
+      const r = await api.generateResult(); setModel(r.model); setPreviewToken(r.previewToken); setDelivered(false); track('result_viewed');
     } catch { setToast(UI.resultError[locale]); } finally { setBusy(false); }
   }
 
@@ -178,7 +180,8 @@ export function Fa4App() {
     }
   }
   const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); return false; } };
-  const sendResultEmail = safely(() => confirmSend(api.emailResult(), 'result'));
+  const sendResultEmail = safely(async () => { const r = await confirmSend(api.emailResult(previewToken ?? undefined), 'result'); setDelivered(true); return r; });
+  const startExpansion = safely(async () => { await api.continueWithBeeside(previewToken ?? undefined); setDelivered(true); });
   // contact: pending after the server's wait is reported as "not confirmed" (the same form can be sent again: it is idempotent)
   const sendContact = async (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }) => {
     try { await confirmSend(api.contact({ ...p, stage: step.id === 'result' ? 'YEV' : 'FA' }), null); return true; } catch { return false; }
@@ -223,8 +226,8 @@ export function Fa4App() {
               {busy ? <p>{UI.generating[locale]}</p> : <><h1 className="h1">{UI.resolveErrorTitle[locale]}</h1><p className="lead">{UI.resolveErrorBody[locale]}</p>
                 <div className="sheet-actions"><button className="btn" onClick={() => setStep({ id: 'extra' })}>{UI.back[locale]}</button><button className="btn primary" onClick={generate}>{UI.tryAgain[locale]}</button></div></>}
             </main>
-          : <ResultScreen model={model} locale={locale} onEdit={() => setStep({ id: 'destinations' })}
-              onContinue={safely(api.continueWithBeeside)} onEmail={sendResultEmail} email={a.identity.email}
+          : <ResultScreen model={model} locale={locale} onEdit={delivered ? undefined : () => setStep({ id: 'destinations' })}
+              delivered={delivered} onContinue={startExpansion} onEmail={sendResultEmail} email={a.identity.email}
               footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}

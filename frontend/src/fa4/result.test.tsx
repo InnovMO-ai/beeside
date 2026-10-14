@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import axe from "axe-core";
 import { journeyA, journeyB, journeyC } from "@beeside/fa-public-engine/testing";
@@ -42,7 +42,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
     expect(screen.getAllByText("beeside puede ayudarte").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Tu beeside Sherpa buscará y validará la mejor opción para ti").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Depende de cómo decidas operar").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Continuar con beeside" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Comienza tu expansión" })).toBeInTheDocument();
     expect(screen.getByText("Antes de Premium, no compartimos tu proyecto con proveedores.", { exact: false })).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe("result composition: YourExpansionView → BeesideValueSection → Prem
   it("without real value there is no Premium call to action (D-050)", () => {
     const a = journeyA(); a.destinations = { list: [{ iso: "JP" }], open: false, sameInAll: true }; a.components = [{ ...a.components[0]!, destinations: ["JP"] }];
     render(<ResultScreen model={modelFor(a)} locale="es" onContinue={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: "Continuar con beeside" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Comienza tu expansión" })).toBeNull();
     expect(screen.getByRole("button", { name: "Recibir este resultado por email" })).toBeInTheDocument();
   });
 
@@ -106,5 +106,45 @@ describe("frozen summary presentation (VERIFY M6-C)", () => {
     const { container } = render(<ResultScreen model={modelFor(a)} locale="es" onContinue={vi.fn()} onEmail={vi.fn()} />);
     expect(container.querySelectorAll(".glance .topic-row").length).toBe(0);
     expect(container.querySelectorAll(".glance .row b").length).toBeGreaterThan(0);
+  });
+});
+
+describe("D-154 / D-156 — «Comienza tu expansión» and the delivered state", () => {
+  it.each([["es", "Comienza tu expansión", "Sí, comenzar", "Todavía no", "Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago."],
+           ["en", "Start your expansion", "Yes, start", "Not yet", "Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet."]] as const)(
+    "(%s) the CTA asks for confirmation first, cancelling delivers nothing, confirming shows the approved final message — and no checkout/payment control exists", async (loc, cta, yes, no, done) => {
+      const onContinue = vi.fn().mockResolvedValue(true);
+      const { container } = render(<ResultScreen model={modelFor(journeyA(loc))} locale={loc} onContinue={onContinue} />);
+      fireEvent.click(screen.getByRole("button", { name: cta }));
+      expect(onContinue).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: no }));
+      expect(onContinue).not.toHaveBeenCalled(); expect(screen.getByRole("button", { name: cta })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: cta })); fireEvent.click(screen.getByRole("button", { name: yes }));
+      await waitFor(() => expect(screen.getByRole("status", { name: "" }).textContent).toBeTruthy());
+      expect(onContinue).toHaveBeenCalledTimes(1);
+      expect(container.textContent).toContain(done);
+      expect(container.textContent ?? "").not.toMatch(/checkout|pagar ahora|pay now|subscribe|suscrib/i);
+      expect(await a11y(container)).toEqual([]);
+    });
+
+  it("a failed confirmation is reported and can be retried; nothing claims success", async () => {
+    const onContinue = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(<ResultScreen model={modelFor(journeyA("es"))} locale="es" onContinue={onContinue} />);
+    fireEvent.click(screen.getByRole("button", { name: "Comienza tu expansión" })); fireEvent.click(screen.getByRole("button", { name: "Sí, comenzar" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByText(/Listo\. Tu beeside Sherpa/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Intentar de nuevo" })); fireEvent.click(screen.getByRole("button", { name: "Sí, comenzar" }));
+    await waitFor(() => expect(screen.getByText(/Listo\. Tu beeside Sherpa/)).toBeInTheDocument());
+  });
+
+  it("before delivery «Corregir algo» is available; once delivered it is gone and the result says it is final", () => {
+    const m = modelFor(journeyA("es"));
+    const pre = render(<ResultScreen model={m} locale="es" onEdit={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Corregir algo" })).toBeInTheDocument();
+    expect(screen.getByText("Al recibirlo por correo, este será tu Your Expansion View definitivo y tus respuestas quedarán cerradas.")).toBeInTheDocument();
+    pre.unmount();
+    render(<ResultScreen model={m} locale="es" delivered />);
+    expect(screen.queryByRole("button", { name: "Corregir algo" })).toBeNull();
+    expect(screen.getByText("Este es tu Your Expansion View definitivo.")).toBeInTheDocument();
   });
 });

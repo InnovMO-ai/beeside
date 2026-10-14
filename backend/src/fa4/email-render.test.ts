@@ -64,4 +64,21 @@ describe("Premium block gate", () => {
     for (const c of [[false, "https://x.test/p", true], [true, undefined, true], [true, "", true], [true, "http://x.test/p", true], [true, "https://x.test/p", false], [true, "https://x.test/p", undefined]] as const)
       expect(premiumEnabled(c[0], c[1], c[2])).toBe(false);
   });
+
+  describe("brand header (FA Public v1.0)", () => {
+    const TAG = { es: "EXPANDE TU NEGOCIO CON CONFIANZA", en: "EXPAND YOUR BUSINESS WITH TRUST" } as const;
+    it.each(["es", "en"] as const)("%s: the YEV and resume emails open with the full official logo + tagline; the YEV has no repeated lower «beeside» wordmark", (l) => {
+      const logo = "https://fa.test/brand/beeside-lockup.png";
+      const html = renderFa4Email("yev", l, { first_name: "L", yev_url: "https://x.test/a", talk_to_beeside_url: "https://x.test/b", premium_url: "https://x.test/p", logo_url: logo }, { has_logo: true, premium_enabled: true });
+      expect(html.html).toContain(`<img src="${logo}"`); expect(html.html).toContain(TAG[l]);
+      expect(html.html).not.toMatch(/font-weight:bold;">beeside<\/p>/);                      // the repeated lower wordmark is gone
+      expect(html.text).not.toMatch(/\n\nbeeside\n\n/);
+      const r = renderFa4Email("resume", l, { first_name: "L", resume_url: "https://x.test/r", logo_url: logo }, { has_first_name: true, has_logo: true });
+      expect(r.html).toContain(`<img src="${logo}"`); expect(r.html).toContain(TAG[l]);
+    });
+    it("without a usable logo URL the header falls back to the text wordmark (never a broken image or a thrown error)", () => {
+      const r = renderFa4Email("resume", "es", { first_name: "L", resume_url: "https://x.test/r", logo_url: "" }, { has_first_name: true });
+      expect(r.html).not.toContain("<img"); expect(r.html).toContain(">beeside</span>");
+    });
+  });
 });

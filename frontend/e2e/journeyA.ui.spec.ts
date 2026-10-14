@@ -44,7 +44,10 @@ test('Journey A — hire only: one neutral regulation screen, topics, YEV with t
   expect(await axeViolations(page)).toEqual([]);
   // Premium continuation is an explicit request on the same email; the YEV email is confirmed by the server
   await page.getByRole('button', { name: UI.continueWith.es }).click();
-  await expect(page.getByText(/tu solicitud quedó registrada/)).toBeVisible();
+  await expect(page.getByTestId('start-confirm')).toBeVisible();                       // D-154: explicit confirmation before delivery
+  await page.getByRole('button', { name: UI.confirmYes.es }).click();
+  await expect(page.getByText(/tu beeside Sherpa revisará tu Your Expansion View/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: UI.fixSomething.es })).toHaveCount(0);   // delivered: editing is closed
   await page.getByRole('button', { name: UI.emailResult.es }).click();
   await expect(page.getByText(/Te enviamos tu Your Expansion View a lucia@nortica\.example/)).toBeVisible();
 });

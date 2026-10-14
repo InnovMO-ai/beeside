@@ -211,6 +211,8 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   const p = !d.project_id ? undefined : (await tx.query<{ email: string; locale: Locale; answers: Partial<Answers>; step_key: string }>(
     "SELECT email, locale, answers, step_key FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [d.project_id])).rows[0];
   const base = deps.config.appBaseUrl.replace(/\/$/, "");
+  // Official full lockup (wordmark + bee) rendered from the brand asset and served by the web app; without a usable https/localhost base the header falls back to the text wordmark.
+  const logoUrl = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/i.test(base) ? `${base}/brand/beeside-lockup.png` : "";
 
   if (d.template === "fa4_contact_request") {
     const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale; origin_stage: "FA" | "YEV" }>(
@@ -237,7 +239,7 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   if (d.template === "fa4_resume_link") {
     const token = await issueToken(tx, d.project_id, "RESUME", new Date(now.getTime() + deps.config.resumeLinkDays * 86_400_000));
     const url = `${base}/fa4#r=${token}`;
-    const r = renderFa4Email("resume", locale, { first_name: name, resume_url: url }, { has_first_name: !!name });
+    const r = renderFa4Email("resume", locale, { first_name: name, resume_url: url, logo_url: logoUrl }, { has_first_name: !!name, has_logo: !!logoUrl });
     return { template: d.template, to: p.email, locale, subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: url, projectId: d.project_id };
   }
 
@@ -246,14 +248,14 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   const yevUrl = `${base}/fa4#r=${token}&view=result`;
   const talkUrl = `${yevUrl}&contact=open&origin=yev_email`;
   const premiumUrl = deps.config.premiumResourceUrl?.[locale];
-  const hasPremium = ((await tx.query<{ shown: boolean }>("SELECT (model->'premium'->>'shown')::boolean AS shown FROM fa4_result WHERE project_id = $1 ORDER BY result_seq DESC LIMIT 1", [d.project_id])).rows[0]?.shown) === true;
+  const hasPremium = ((await tx.query<{ shown: boolean }>("SELECT (model->'premium'->>'shown')::boolean AS shown FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed ORDER BY result_seq DESC LIMIT 1", [d.project_id])).rows[0]?.shown) === true;
   const destination = destinationNames(p.answers, locale);
   const objective = truncateWords(p.answers.context?.success ?? "");
   const enabled = premiumEnabled(hasPremium, premiumUrl, deps.config.premiumCommercialContentAllowed);
   const r = renderFa4Email("yev", locale, {
     first_name: name, yev_url: yevUrl, talk_to_beeside_url: talkUrl, premium_url: enabled ? premiumUrl : "https://beeside.you/",
-    destination, declared_objective: objective,
-  }, { has_first_name: !!name, has_destination: !!destination, has_objective: !!objective, show_focus_block: !!destination || !!objective, premium_enabled: enabled });
+    destination, declared_objective: objective, logo_url: logoUrl,
+  }, { has_logo: !!logoUrl, has_first_name: !!name, has_destination: !!destination, has_objective: !!objective, show_focus_block: !!destination || !!objective, premium_enabled: enabled });
   return { template: d.template, to: p.email, locale, subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: yevUrl, projectId: d.project_id };
 }
 

@@ -21,7 +21,7 @@ export const UI = {
   // Product name stays "First Assessment" in both languages. Side words and benefits follow the locale (D-143); ES wording = proposal (LANG-1).
   coverProduct: L('First Assessment', 'First Assessment'),
   coverSideTop: [L('PERSONAS', 'PEOPLE'), L('IDEAS', 'IDEAS'), L('OPORTUNIDADES', 'OPPORTUNITIES'), L('UN MAÑANA MÁS BRILLANTE', 'A BRIGHTER TOMORROW')],   // ES = proposal (D-143 / LANG-1)
-  coverSideBottom: [L('EXPANDE', 'EXPAND'), L('CON', 'WITH'), L('CONFIANZA', 'CONFIDENCE')],
+  coverSideBottom: [L('EXPANDE TU NEGOCIO', 'EXPAND YOUR BUSINESS'), L('CON CONFIANZA', 'WITH TRUST')],   // approved tagline: «EXPANDE TU NEGOCIO CON CONFIANZA» / «EXPAND YOUR BUSINESS WITH TRUST»
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
   idTitle: L('Déjame conocerte.', 'Let me get to know you.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
@@ -152,7 +152,13 @@ export const UI = {
   valuedSupport: L('Lo que valoras en un apoyo', 'What you value in support'), keptTeam: L('Lo que mantienes en tu equipo', 'What you keep in-house'),
   criticalTag: L('Fecha crítica', 'Critical date'), nextStep: L('Siguiente paso', 'Next step'),
   premiumBody: L('Con acceso Premium, trabajamos contigo el detalle de cada tema y te presentamos propuestas con alcance, plazo y costo para que decidas.', 'With Premium access, we work through each topic with you and bring you proposals with scope, timing and cost so you can decide.'),
-  continueWith: L('Continuar con beeside', 'Continue with beeside'), continued: L('Listo: tu solicitud quedó registrada. Te escribiremos desde contact@beeside.you.', "Done: your request is recorded. We'll write to you from contact@beeside.you."),
+  continueWith: L('Comienza tu expansión', 'Start your expansion'),
+  continued: L('Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago.', 'Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet.'),
+  confirmTitle: L('¿Confirmas que quieres comenzar?', 'Do you confirm you want to start?'),
+  confirmBody: L('Este será tu Your Expansion View definitivo: al confirmar, tus respuestas quedan cerradas. Tu beeside Sherpa lo revisará y te contactará. No hay ningún pago en este paso.', 'This will be your final Your Expansion View: once you confirm, your answers are closed. Your beeside Sherpa will review it and contact you. There is no payment in this step.'),
+  confirmYes: L('Sí, comenzar', 'Yes, start'), confirmNo: L('Todavía no', 'Not yet'),
+  emailFinalNote: L('Al recibirlo por correo, este será tu Your Expansion View definitivo y tus respuestas quedarán cerradas.', 'Once you receive it by email, this will be your final Your Expansion View and your answers will be closed.'),
+  deliveredNote: L('Este es tu Your Expansion View definitivo.', 'This is your final Your Expansion View.'),
   emailResult: L('Recibir este resultado por email', 'Get this result by email'), emailed: L('Te lo enviamos al email que nos diste.', 'We sent it to the email you gave us.'),
   noPremiumTitle: L('Tu proyecto, más claro', 'Your project, with more clarity'),
   noPremiumBody: L('Por ahora no vemos un siguiente paso de beeside que aporte suficiente valor a este proyecto. Your Expansion View queda como tu resultado y puedes volver cuando el proyecto cambie o aparezca una nueva necesidad.', "For now, we don't see a next beeside step that would add enough value to this project. Your Expansion View remains your result, and you can come back when the project changes or a new need appears."),
