@@ -10,7 +10,7 @@ import { CRP_FULL, FORBIDDEN_INTERNAL_TERMS, TERM_REGISTRY, UNAPPROVED_VARIANTS,
 import type { ProcessTurnResult, Locale, Surface } from "../types";
 import { World } from "./helpers";
 
-const PARAMS: Record<string, string> = { category: "Logística", value: "Chile", need: "apoyo con contratación de personal", summary: "apoyo con contratación", label: "volumen mensual", name: "Acme", min: "11", max: "50" };
+const PARAMS: Record<string, string> = { category: "Logística", value: "Chile", need: "apoyo con contratación de personal", summary: "apoyo con contratación", label: "volumen mensual", name: "Acme", min: "11", max: "50", known: "personas en el país: 60 personas" };
 
 function offences(text: string): string[] {
   const out: string[] = [];

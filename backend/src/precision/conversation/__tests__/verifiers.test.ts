@@ -196,11 +196,11 @@ describe("fixed copy passes its own lint (16/16 automatic checks, both locales)"
     for (const k of SUPERSEDED_COPY_KEYS) expect(ALL_COPY_KEYS).not.toContain(k);
   });
   it("contains the keys the engine needs", () => {
-    for (const k of ["ai_disclosure_once", "understanding_welcome", "category_intro", "fa_prefill_confirm", "confirm_candidate", "pending_accept", "pending_accept_withheld", "pending_accept_estimate", "process_unknown", "process_resume_lead", "ai_unavailable_retry", "r10_cannot_confirm", "add_service_intro", "add_service_confirm_need", "fallback_question_wrapper", "fallback_question_generic", "category_review_ready", "understanding_review_ready", "guard_block"]) {
+    for (const k of ["ai_disclosure_once", "understanding_welcome", "category_intro", "category_intro_known", "fa_prefill_confirm", "confirm_candidate", "pending_accept", "pending_accept_withheld", "pending_accept_estimate", "process_unknown", "process_resume_lead", "ai_unavailable_retry", "r10_cannot_confirm", "add_service_intro", "add_service_confirm_need", "fallback_question_wrapper", "fallback_question_generic", "category_review_ready", "understanding_review_ready", "guard_block"]) {
       expect(ALL_COPY_KEYS).toContain(k);
     }
   });
-  const PARAMS: Record<string, string> = { category: "Logística", value: "Chile", need: "apoyo con contratación de personal", summary: "apoyo con contratación", label: "volumen mensual", name: "Acme", min: "11", max: "50" };
+  const PARAMS: Record<string, string> = { category: "Logística", value: "Chile", need: "apoyo con contratación de personal", summary: "apoyo con contratación", label: "volumen mensual", name: "Acme", min: "11", max: "50", known: "personas en el país: 60 personas; operaciones con la matriz: servicios entre empresas del grupo" };
   it.each(live.flatMap((e) => (["es", "en"] as const).map((l) => [e.key, l] as const)))("%s (%s) has no placeholders and is clean", (key, locale) => {
     const text = copyText(key, locale, PARAMS).text;
     expect(text).not.toMatch(/\{[a-z_]+\}|\[[^\]]+\]/);

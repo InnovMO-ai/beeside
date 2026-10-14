@@ -14,6 +14,7 @@ import { formatDate } from "../manifest/value-render";
 import { categoryInfo, buildServiceMapContent, openItemsFromEvaluations, type PsmV1Content } from "../manifest";
 import type { FaContextRead } from "../ports/fa-context";
 import { confirmPrecisionAssessment } from "../repository";
+import { loadFrame } from "./category-inheritance";
 import { listCategoryRefs, type CategoryRef } from "./category-ref";
 import { loadCategoryState, loadMapNeeds, projectCountries, settleProposedCategories, syncProposals, type CategoryState } from "./categories";
 import type { PrecisionDomainDeps } from "./deps";
@@ -83,7 +84,8 @@ export async function buildLiveMap(deps: MapDeps, q: Q, projectId: string, local
   // one query for every category's facts instead of one per category (GET /center, service map, confirm)
   const factsBy = await loadFactMaps(q, refs.map((r) => r.instanceId));
   const states: CategoryState[] = [];
-  for (const ref of refs) states.push(await loadCategoryState(scoped, ref, destinationCodes, locale, needsBy.get(ref.instanceId) ?? [], factsBy.get(ref.instanceId)));
+  const projectFrame = await loadFrame(scoped.db as never, projectId).catch(() => null);
+  for (const ref of refs) states.push(await loadCategoryState(scoped, ref, destinationCodes, locale, needsBy.get(ref.instanceId) ?? [], factsBy.get(ref.instanceId), projectFrame));
 
   const answered = (k: string): unknown => {
     const f = paFacts[k];

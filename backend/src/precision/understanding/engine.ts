@@ -67,6 +67,8 @@ export interface UnderstandingEngineDeps {
   orientation?: OrientationPort;
   /** Optional Country Resource Library: offers a guide once, in context, never required. */
   resources?: ResourcesPort;
+  /** After the frame is committed: lets the domain carry what was learned into the project's categories (inheritance). Best-effort. */
+  afterFrame?: (projectId: string) => Promise<void>;
   clock?: Clock;
   now?: () => Date;
 }
@@ -380,6 +382,7 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
     const facts = projectFacts(frame, turnKey);
     const saved = await deps.frames.commit(projectId, frame, stored.version, { turnKey, kind: "turn", payload: { action: a.action.kind, changes: a.changes.map((c) => `${c.kind}:${c.key}`).slice(0, 40) } });
     if (facts.length > 0 && deps.facts) await deps.facts.recordFacts({ projectId, scopeInstanceId, surface: "understanding", turnKey, facts });
+    if (deps.afterFrame) await deps.afterFrame(projectId).catch(() => undefined); // the categories catch up on their next load otherwise
     const structured = { ...replyStructured(turnKey, a.action, saved.version, a.p), ...a.extraStructured };
     const rows = await persistAssistant(ctx, { projectId, scopeInstanceId, turnKey, locale, kind: "message", text: s.text, structured });
     return resultOf({ ctx, status: "ok", turns: [a.clientTurn, ...rows], ready: a.ready, facts, started: a.started, usedFallback: s.fallback });

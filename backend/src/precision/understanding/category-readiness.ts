@@ -8,6 +8,8 @@
  *   unknown / withheld   -> honest knowledge: never a blocker, it goes to the specialist as a pending item
  *   undecided            -> the decision is open: never a blocker, the specialist helps decide
  */
+import type { FactMap } from "../manifest/types";
+import { PROBE_COVERAGE, inheritedProbes } from "./category-inheritance";
 import { evaluateDepth } from "./depth";
 import { PROBES, type Dimension } from "./probes";
 import type { Frame } from "./types";
@@ -50,6 +52,59 @@ export function categoryReadiness(frame: Frame, categoryKey: string): CategoryRe
 export function readinessByCategory(frame: Frame): CategoryReadiness[] {
   const keys = [...new Set(frame.needs.filter((n) => n.status !== "removed" && n.categoryKey).map((n) => n.categoryKey as string))];
   return keys.map((k) => categoryReadiness(frame, k));
+}
+
+/**
+ * Readiness of a category as the project experiences it: what the project conversation established, plus what the client answered
+ * IN the category (an answer given in either place resolves the aspect). Aspects that are still open split into:
+ *  - `asking`: the category itself asks them (a field of its manifest answers that aspect) — they close as the client answers;
+ *  - `forSpecialist`: no field of this category can hold the answer, so they travel to the specialist as pending information
+ *    instead of blocking a client who has no way to answer them here.
+ */
+export interface CategoryUnderstanding extends CategoryReadiness {
+  asking: string[];
+  /** Material aspects of this category that the project already settled or the category answered. */
+  settled: string[];
+}
+
+export function categoryUnderstanding(frame: Frame, categoryKey: string, facts: FactMap, manifestFields: ReadonlySet<string>): CategoryUnderstanding {
+  const base = categoryReadiness(frame, categoryKey);
+  const answeredHere = (probeKey: string): boolean => (PROBE_COVERAGE[probeKey] ?? []).some((f) => facts[f] !== undefined && facts[f]!.answerState !== "NOT_ASKED");
+  const coveredHere = (probeKey: string): boolean => (PROBE_COVERAGE[probeKey] ?? []).some((f) => manifestFields.has(f));
+  const open = base.open.filter((k) => !answeredHere(k));
+  const asking = open.filter(coveredHere);
+  const uncovered = open.filter((k) => !coveredHere(k));
+  return {
+    ...base,
+    open: asking,
+    asking,
+    forSpecialist: [...new Set([...base.forSpecialist, ...uncovered])],
+    settled: base.material.filter((k) => !base.open.includes(k) || answeredHere(k)),
+    ready: asking.length === 0,
+  };
+}
+
+/**
+ * What the category can say it already knows, in the client's language and short ("personas en el país: 60 personas"): the settled
+ * aspects of the project that inform THIS category. It opens the thread as a continuation of the project, not as a fresh interview.
+ */
+export function knownLines(frame: Frame, categoryKey: string, max = 3): string[] {
+  const loc = frame.locale;
+  const depth = evaluateDepth(frame);
+  const clip = (t: string): string => (t.length <= 70 ? t : `${t.slice(0, 70).replace(/\s+\S*$/, "").trimEnd()}…`);
+  const out: string[] = [];
+  const first = new Set(inheritedProbes(categoryKey));
+  const relevant = depth.statuses.filter((s) => first.has(s.probe.key) || (DIMENSION_CATEGORIES[s.probe.dimension] ?? []).includes(categoryKey));
+  relevant.sort((a, b) => Number(first.has(b.probe.key)) - Number(first.has(a.probe.key)) || a.probe.order - b.probe.order);
+  for (const s of relevant) {
+    const it = s.item;
+    if (!it || (it.status !== "known" && it.status !== "undecided") || s.state === "conflict") continue;
+    const display = it.display.trim();
+    if (!display) continue;
+    out.push(`${s.probe.label[loc].toLowerCase()}: ${clip(display.charAt(0).toLowerCase() + display.slice(1))}`);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 void PROBES;

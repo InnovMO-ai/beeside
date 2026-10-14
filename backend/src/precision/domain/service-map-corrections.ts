@@ -19,6 +19,7 @@ import { ensureCategoryInstance, loadMapNeeds, replaceMapNeeds, type MapNeed } f
 import { listCategoryRefs } from "./category-ref";
 import type { PrecisionDomainDeps } from "./deps";
 import { lockProjectMap } from "./facts";
+import { syncProjectInheritance } from "./category-inheritance";
 import { syncFrameMap } from "./frame-map";
 import { opaqueGroupId, opaqueId } from "./opaque";
 import { loadPaState } from "./project-state";
@@ -89,6 +90,7 @@ export async function applyCorrection(deps: Deps, projectId: string, locale: Loc
       }
     }
     await syncFrameMap(deps, projectId, (await frames.load(projectId))!.frame, { allowConfirmed: true });
+    await syncProjectInheritance(deps, projectId);
     return;
   }
 

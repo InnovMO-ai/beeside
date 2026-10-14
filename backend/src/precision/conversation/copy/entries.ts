@@ -47,6 +47,13 @@ export const COPY_ENTRIES: readonly CopyEntry[] = [
     source: NEW,
   },
   {
+    key: "category_intro_known",
+    es: "Vamos con {category}. Parto de lo que ya me contaste de tu proyecto ({known}) y solo profundizo en lo que falta. Te haré una pregunta a la vez, y si algo aún no lo sabes, lo dejamos como pendiente.",
+    en: "Let's work on {category}. I start from what you already told me about your project ({known}) and only go deeper where something is missing. I will ask one question at a time, and if you do not know something yet, we leave it as pending.",
+    status: "draft",
+    source: "Authored for Precision V1.0 (category inheritance: the category deepens the project, it does not restart it)",
+  },
+  {
     key: "fa_prefill_confirm",
     es: "Con lo que me contaste en Discovery, entiendo esto: {value}. ¿Sigue siendo así?",
     en: "From what you told me in Discovery, I understand this: {value}. Is that still the case?",

@@ -74,6 +74,8 @@ export interface ConversationContext {
   /** Manifest + facts + countries for the scope. Understanding uses the pa_* manifest. */
   evaluation: EvaluationInput;
   inherited: InheritedValue[];
+  /** Category threads: short client-language lines of what the project already established (the thread continues the project). */
+  known?: string[];
   flags: StateFlags;
   approvedSources: ApprovedSource[];
   /** Term ids the UI already showed in full to the client (counts as introduced). */

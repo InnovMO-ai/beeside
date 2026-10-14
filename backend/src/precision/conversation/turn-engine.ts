@@ -1150,6 +1150,16 @@ class Run {
     return { kind: "message", text: full, state: st, quickReplies: this.quickRepliesFor(next), facts, confirmedServiceNeed: null, serviceMapChanged: false, extra: {} };
   }
 
+  /** The category opens as a continuation of the project when it already knows something; otherwise the plain introduction. */
+  private categoryIntro(): string {
+    const known = (this.ctx.known ?? []).filter((k) => k.trim() !== "");
+    if (known.length > 0) {
+      const text = this.copy("category_intro_known", { category: this.ctx.title, known: known.join("; ") });
+      if (!verifyAssistantText(text, this.vctx({ questions: "none" })).some((v) => v.critical)) return text;
+    }
+    return this.copy("category_intro", { category: this.ctx.title });
+  }
+
   // ---------------------------------------------------------------- opening a thread
   async openThread(): Promise<ProcessTurnResult> {
     this.turnKey = `open.${this.scopeInstanceId}`.slice(0, 120);
@@ -1163,7 +1173,7 @@ class Run {
       const t = this.copy("add_service_intro");
       reply = this.simpleReply(t, { mode: "need", fieldKey: null, pendingQuestion: t });
     } else {
-      const intro = this.surface === "understanding" ? this.copy("understanding_welcome") : this.copy("category_intro", { category: this.ctx.title });
+      const intro = this.surface === "understanding" ? this.copy("understanding_welcome") : this.categoryIntro();
       const next = this.nextTarget(ev, this.ctx.evaluation.facts, this.ctx.focusFieldKey);
       if (!next) {
         reply = this.simpleReply(intro, { mode: "review", fieldKey: null, pendingQuestion: null });

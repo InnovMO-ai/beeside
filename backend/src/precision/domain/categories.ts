@@ -20,6 +20,9 @@ import { factKey, loadFactMap, lockProjectMap, recordSystemFact } from "./facts"
 import { parseCountryCodes } from "./fa-context";
 import { loadPaState } from "./project-state";
 import { frameOwnedFaNeedIds, syncFrameMapForProject } from "./frame-map";
+import { loadFrame } from "./category-inheritance";
+import { categoryUnderstanding, type CategoryUnderstanding } from "../understanding/category-readiness";
+import type { Frame } from "../understanding/types";
 
 
 export const MAP_NEEDS_KEY = "map_needs";
@@ -173,6 +176,8 @@ export async function syncProposals(deps: Pick<PrecisionDomainDeps, "db" | "regi
 // ------------------------------------------------------------------ evaluation shared by every surface
 export interface CategoryState {
   ref: CategoryRef;
+  /** What the project conversation established for this category, combined with what was answered in the category. Null without a frame. */
+  understanding: CategoryUnderstanding | null;
   label: string;
   iconKey: string;
   kind: ReturnType<typeof categoryInfo>["kind"];
@@ -195,15 +200,18 @@ export function labelOf(ref: Pick<CategoryRef, "categoryKey">, needs: readonly M
 }
 
 /** `prefetchedFacts`: the instance's current fact map when the caller already loaded it in a batch (list views). */
-export async function loadCategoryState(deps: Pick<PrecisionDomainDeps, "db" | "registry">, ref: CategoryRef, countries: string[], locale: Locale, needs?: MapNeed[], prefetchedFacts?: FactMap): Promise<CategoryState> {
+export async function loadCategoryState(deps: Pick<PrecisionDomainDeps, "db" | "registry">, ref: CategoryRef, countries: string[], locale: Locale, needs?: MapNeed[], prefetchedFacts?: FactMap, prefetchedFrame?: Frame | null): Promise<CategoryState> {
   const manifest = await deps.registry.getManifestForCategory(ref.categoryKey, ref.manifestVersion);
   const facts = prefetchedFacts ?? (await loadFactMap(deps.db, ref.instanceId));
   const evaluation = evaluateCategory({ manifest: manifest.manifest, facts, countries });
   const sendState = ref.lifecycle === "completed" ? await packSendState(deps.db, ref.currentPackId) : "not_sent";
   const mapNeeds = needs ?? parseMapNeeds(facts[MAP_NEEDS_KEY]?.value);
   const info = categoryInfo(ref.categoryKey);
+  const frame = prefetchedFrame !== undefined ? prefetchedFrame : await loadFrame(deps.db as never, ref.projectId).catch(() => null);
+  const understanding = frame ? categoryUnderstanding(frame, ref.categoryKey, facts, new Set(manifest.manifest.fields.map((f) => f.field_key))) : null;
   return {
     ref,
+    understanding,
     label: labelOf(ref, mapNeeds, locale),
     iconKey: info.iconKey,
     kind: info.kind,

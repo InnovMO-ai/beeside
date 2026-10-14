@@ -42,6 +42,7 @@ import { createFaContextService } from "../domain/fa-context";
 import { createPrecisionDomain, type PrecisionDomain } from "../domain";
 import { createPrecisionRouter } from "./router";
 import { createUnderstandingEngine } from "../understanding/engine";
+import { syncProjectInheritance } from "../domain/category-inheritance";
 import { createModelInterpreter } from "../understanding/model-interpreter";
 import { createPgFrameStore } from "../understanding/pg-store";
 import { seedFromFaContext } from "../understanding/seed-source";
@@ -106,7 +107,7 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   if ((env.PRECISION_KNOWLEDGE_SEED_ON_BOOT ?? "true") === "true") await seedInitialSources(knowledgeRepo);
   const conversation = (env.PRECISION_UNDERSTANDING_ENGINE ?? "core") === "legacy"
     ? genericEngine
-    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledgeRepo), resources: createResourcesPort(createPgCountryResources(db)), clock: systemClock, now });
+    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledgeRepo), resources: createResourcesPort(createPgCountryResources(db)), afterFrame: async (projectId) => { await syncProjectInheritance(core, projectId); }, clock: systemClock, now });
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 

@@ -20,6 +20,7 @@ import { ensureCategoryInstance, loadMapNeeds, replaceMapNeeds, type MapNeed } f
 import { listCategoryRefs } from "./category-ref";
 import type { PrecisionDomainDeps } from "./deps";
 import { lockProjectMap } from "./facts";
+import { syncProjectInheritance } from "./category-inheritance";
 import { loadPaState } from "./project-state";
 
 type MapDeps = Pick<PrecisionDomainDeps, "db" | "registry">;
@@ -172,7 +173,9 @@ export async function frameOwnedFaNeedIds(db: Pick<Db, "query">, projectId: stri
 export async function syncFrameMapForProject(deps: MapDeps, projectId: string, opts: { allowConfirmed?: boolean } = {}): Promise<boolean> {
   const stored = await createPgFrameStore(deps.db).load(projectId);
   if (!stored) return false;
-  return syncFrameMap(deps, projectId, stored.frame, opts);
+  const changed = await syncFrameMap(deps, projectId, stored.frame, opts);
+  await syncProjectInheritance(deps, projectId);
+  return changed;
 }
 
 export { conceptById };

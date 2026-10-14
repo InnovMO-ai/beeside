@@ -17,6 +17,7 @@ import type { Locale } from "../api/dto";
 import { ApiError } from "../api/errors";
 import { describeError } from "../../security/redact";
 import { MAP_NEEDS_KEY, labelOf, parseMapNeeds, projectCountries } from "./categories";
+import { knownForCategory, loadFrame, syncCategoryInheritance } from "./category-inheritance";
 import { loadCategoryRef, packSendState } from "./category-ref";
 import type { CoreDeps } from "./deps-types";
 import { loadFactMap } from "./facts";
@@ -114,6 +115,15 @@ export function createContextReader(deps: CoreDeps, fa: FaContextService): Conte
       const ref = await loadCategoryRef(deps.db, projectId, scopeInstanceId);
       if (!ref) throw new ApiError("NOT_FOUND");
       const manifest = await deps.registry.getManifestForCategory(ref.categoryKey, ref.manifestVersion);
+      // the category continues the project: what Understanding / Discovery established is carried in (with provenance) before anything is asked
+      let known: string[] = [];
+      try {
+        await syncCategoryInheritance(deps, projectId, scopeInstanceId);
+        const frame = await loadFrame(deps.db, projectId);
+        if (frame) known = knownForCategory(ref, frame);
+      } catch (error) {
+        deps.log("warn", "category inheritance could not be applied", { error: describeError(error) }); // ask normally rather than fail the turn
+      }
       const facts = await loadFactMap(deps.db, scopeInstanceId);
       const read = await fa.read(projectId);
       const crpSend = ref.lifecycle === "completed" ? await packSendState(deps.db, ref.currentPackId) : "not_sent";
@@ -123,6 +133,7 @@ export function createContextReader(deps: CoreDeps, fa: FaContextService): Conte
         title: labelOf(ref, parseMapNeeds(facts[MAP_NEEDS_KEY]?.value), locale),
         evaluation: { manifest: manifest.manifest, facts, countries: await projectCountries(deps.db, projectId, read) },
         inherited: [],
+        ...(known.length > 0 ? { known } : {}),
         flags: { ...baseFlags, crpState: ref.lifecycle === "completed" ? "confirmed" : ref.lifecycle === "in_progress" ? "in_progress" : "none", ohDeliveryState: crpSend },
         categoryStatus: statusOf,
         canWrite: writable && (ref.lifecycle === "confirmed" || ref.lifecycle === "in_progress"),
