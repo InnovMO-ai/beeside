@@ -155,12 +155,15 @@ export async function issueGrant(db: Db, input: GrantInput): Promise<GrantRow> {
   );
 }
 
-/** Write-once early end of a grant. The entitlement moves to READ_ONLY (or stays FULL if another source is still valid). */
+/**
+ * Write-once early end of a grant. The entitlement moves to READ_ONLY (or stays FULL if another source is still valid).
+ * A grant that has not started yet is voided: it ends at its own start, so it never grants a day.
+ */
 export async function terminateGrant(db: Db, input: { grantId: string; terminatedBy: string; reason: string; now: Date }): Promise<GrantRow> {
   return guarded(() =>
     db.transaction(async (tx) => {
       const { rows } = await tx.query<GrantRow>(
-        `UPDATE entitlement_grant SET terminated_at = $2, terminated_by = $3, termination_reason = $4 WHERE grant_id = $1 RETURNING *`,
+        `UPDATE entitlement_grant SET terminated_at = GREATEST($2::timestamptz, starts_at), terminated_by = $3, termination_reason = $4 WHERE grant_id = $1 RETURNING *`,
         [input.grantId, input.now, input.terminatedBy, input.reason],
       );
       if (!rows[0]) throw new FaError("NOT_FOUND", "grant not found");

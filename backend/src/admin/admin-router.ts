@@ -11,6 +11,23 @@ import { FaDeps } from "../fa/services/repository";
 import { AuditOutcome, recordAudit } from "../operations/audit";
 import { cancelDelivery, dispatchEmails, retryDelivery } from "../operations/email-outbox";
 import { isJobName, runJob } from "../operations/jobs";
+import {
+  CompanyScope,
+  GrantSource,
+  PrivacyEventName,
+  PrivacyReason,
+  ProgramKind,
+  SponsorKind,
+  activateProgram,
+  addEligibleCompany,
+  closeProgram,
+  createProgram,
+  createSponsor,
+  issueGrant,
+  recordPrivacyEvent,
+  redeemProgram,
+  terminateGrant,
+} from "../premium/entitlement-grants";
 import { isSubscriptionEventType, processSubscriptionEvent } from "../premium/subscription-events";
 import {
   ADMIN_LOGIN_COOKIE,
@@ -28,6 +45,7 @@ import {
   sealLoginState,
 } from "./admin-session";
 import { listAdminUsers, provisionAdminUser, updateAdminUser } from "./admin-users";
+import { listPrograms, listSponsors, programDetail, projectEntitlement } from "./entitlement-admin";
 import { communicationsOverview, saveAndPublishTemplate } from "./communications-service";
 import { AdminAuthError, AdminIdentityProvider, pkceChallenge, randomUrlToken } from "./oidc";
 import {
@@ -327,6 +345,265 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
       throw error;
     }
   }));
+
+  // ------------------------------------------------------------------ entitlement (grants, programs, sponsors, privacy)
+  // Authority is layered: the route permission is the first gate, the database guards (role of the approver, scope, window,
+  // quota, eligibility) are the second and cannot be bypassed by any caller. Audit details carry codes and counts, never the
+  // operator's free-text reason.
+  const asUuid = (value: unknown, field: string): string => {
+    if (typeof value !== "string" || !UUID.test(value)) throw new FaError("INVALID_INPUT", `${field} must be an id`, { fields: [field] });
+    return value;
+  };
+  const asText = (value: unknown, field: string, max = 500): string => {
+    if (typeof value !== "string" || value.trim().length === 0 || value.length > max) throw new FaError("INVALID_INPUT", `${field} is required`, { fields: [field] });
+    return value.trim();
+  };
+  const asInt = (value: unknown, field: string, min: number, max: number): number => {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw new FaError("INVALID_INPUT", `${field} must be a whole number between ${min} and ${max}`, { fields: [field] });
+    return value;
+  };
+  const asDate = (value: unknown, field: string): Date => {
+    const parsed = typeof value === "string" ? new Date(value) : new Date(NaN);
+    if (Number.isNaN(parsed.getTime())) throw new FaError("INVALID_INPUT", `${field} must be a date`, { fields: [field] });
+    return parsed;
+  };
+  const oneOf = <T extends string>(value: unknown, allowed: readonly T[], field: string): T => {
+    if (typeof value !== "string" || !(allowed as readonly string[]).includes(value)) throw new FaError("INVALID_INPUT", `${field} is not valid`, { fields: [field] });
+    return value as T;
+  };
+  const optionalRequestKey = (b: Record<string, unknown>, prefix: string): string | undefined =>
+    typeof b.requestId === "string" && UUID.test(b.requestId) ? `${prefix}-${b.requestId}` : undefined;
+  const adminId = (req: AdminRequest): string => (req.admin as AdminPrincipal).adminUserId;
+  const actorOf = (req: AdminRequest): string => `admin:${adminId(req)}`;
+
+  /** A write that is audited whether it succeeds or is refused. `fn` returns the HTTP status, the body and audit details. */
+  const mutation = (
+    action: string,
+    target: (req: AdminRequest) => { targetType: string; targetId: string; projectId?: string | null },
+    fn: (req: AdminRequest) => Promise<{ status: number; body: unknown; details?: Record<string, unknown>; projectId?: string | null }>,
+  ) =>
+    handle(async (req, res) => {
+      const t = target(req);
+      try {
+        const out = await fn(req);
+        await audit(req, action, "ALLOWED", { targetType: t.targetType, targetId: t.targetId, projectId: out.projectId ?? t.projectId ?? null, details: out.details });
+        res.status(out.status).json(out.body);
+      } catch (error) {
+        if (error instanceof FaError) await audit(req, action, "FAILED", { targetType: t.targetType, targetId: t.targetId, projectId: t.projectId ?? null, details: { reason: error.code } });
+        throw error;
+      }
+    });
+
+  const DIRECT_SOURCES = ["complimentary", "manual"] as const satisfies readonly GrantSource[];
+  const DAY_MS = 86_400_000;
+
+  router.get("/projects/:projectId/entitlement", allow("projects.read", "project.viewed"), section("entitlement", (id) => projectEntitlement(db, id, now())));
+
+  // An individual exception for one project (ADMIN). Programs and sponsorship go through /entitlement/programs.
+  router.post(
+    "/projects/:projectId/entitlement/grants",
+    allow("entitlement.manage", "entitlement.grant_issued"),
+    mutation("entitlement.grant_issued", (req) => ({ targetType: "project", targetId: projectId(req), projectId: projectId(req) }), async (req) => {
+      const id = projectId(req);
+      const b = body(req);
+      const source = oneOf(b.source, DIRECT_SOURCES, "source");
+      const days = asInt(b.days, "days", 1, 3650);
+      const startsAt = b.startsAt === undefined ? now() : asDate(b.startsAt, "startsAt");
+      const grant = await issueGrant(db, {
+        scope: { projectId: id },
+        source,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + days * DAY_MS),
+        reason: asText(b.reason, "reason"),
+        approvedBy: adminId(req),
+        actor: actorOf(req),
+        ...(optionalRequestKey(b, "admin-grant") ? { idempotencyKey: optionalRequestKey(b, "admin-grant") as string } : {}),
+        now: now(),
+      });
+      return { status: 201, body: { grant }, details: { source, days, grant_id: grant.grant_id } };
+    }),
+  );
+
+  // A company-level grant needs an explicit scope and is an elevated decision (SUPER_ADMIN): never unlimited by default.
+  router.post(
+    "/companies/:companyId/entitlement/grants",
+    allow("entitlement.programs.manage", "entitlement.company_grant_issued"),
+    mutation("entitlement.company_grant_issued", (req) => ({ targetType: "company", targetId: String(req.params.companyId ?? "") }), async (req) => {
+      const companyId = asUuid(req.params.companyId, "companyId");
+      const b = body(req);
+      const source = oneOf(b.source, ["complimentary", "manual", "partner"] as const satisfies readonly GrantSource[], "source");
+      const companyScope = oneOf(b.companyScope, ["current_projects", "projects_created_in_period"] as const satisfies readonly CompanyScope[], "companyScope");
+      const days = asInt(b.days, "days", 1, 3650);
+      const startsAt = b.startsAt === undefined ? now() : asDate(b.startsAt, "startsAt");
+      const maxProjects = b.maxProjects === undefined ? undefined : asInt(b.maxProjects, "maxProjects", 1, 10_000);
+      const grant = await issueGrant(db, {
+        scope: { companyId, companyScope, ...(maxProjects ? { maxProjects } : {}) },
+        source,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + days * DAY_MS),
+        reason: asText(b.reason, "reason"),
+        approvedBy: adminId(req),
+        actor: actorOf(req),
+        ...(optionalRequestKey(b, "admin-company-grant") ? { idempotencyKey: optionalRequestKey(b, "admin-company-grant") as string } : {}),
+        now: now(),
+      });
+      return { status: 201, body: { grant }, details: { source, days, company_scope: companyScope, max_projects: maxProjects ?? null, grant_id: grant.grant_id } };
+    }),
+  );
+
+  // Extending = a chained grant that starts exactly when the previous one ends (nothing is rewritten; the history stays whole).
+  router.post(
+    "/entitlement/grants/:grantId/extend",
+    allow("entitlement.manage", "entitlement.grant_extended"),
+    mutation("entitlement.grant_extended", (req) => ({ targetType: "entitlement_grant", targetId: String(req.params.grantId ?? "") }), async (req) => {
+      const grantId = asUuid(req.params.grantId, "grantId");
+      const b = body(req);
+      const days = asInt(b.days, "days", 1, 3650);
+      const { rows } = await db.query<{ project_id: string | null; company_id: string | null; company_scope: CompanyScope | null; max_projects: number | null; source: GrantSource; ends_at: Date; program_id: string | null; terminated_at: Date | null }>(
+        "SELECT project_id, company_id, company_scope, max_projects, source, ends_at, program_id, terminated_at FROM entitlement_grant WHERE grant_id = $1",
+        [grantId],
+      );
+      const g = rows[0];
+      if (!g) throw new FaError("NOT_FOUND", "grant not found");
+      if (g.terminated_at) throw new FaError("NOT_APPLICABLE", "a terminated grant cannot be extended");
+      if (g.program_id) throw new FaError("NOT_APPLICABLE", "a program grant follows its program terms; issue a direct exception instead");
+      const source = oneOf(g.source, ["complimentary", "manual", "partner"] as const satisfies readonly GrantSource[], "source");
+      const startsAt = g.ends_at;
+      const grant = await issueGrant(db, {
+        scope: g.project_id ? { projectId: g.project_id } : { companyId: g.company_id as string, companyScope: g.company_scope as CompanyScope, ...(g.max_projects ? { maxProjects: g.max_projects } : {}) },
+        source,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + days * DAY_MS),
+        reason: asText(b.reason, "reason"),
+        approvedBy: adminId(req),
+        actor: actorOf(req),
+        extendsGrantId: grantId,
+        ...(optionalRequestKey(b, "admin-extend") ? { idempotencyKey: optionalRequestKey(b, "admin-extend") as string } : {}),
+        now: now(),
+      });
+      return { status: 201, body: { grant }, details: { days, extends_grant_id: grantId, grant_id: grant.grant_id }, projectId: g.project_id };
+    }),
+  );
+
+  router.post(
+    "/entitlement/grants/:grantId/terminate",
+    allow("entitlement.manage", "entitlement.grant_terminated"),
+    mutation("entitlement.grant_terminated", (req) => ({ targetType: "entitlement_grant", targetId: String(req.params.grantId ?? "") }), async (req) => {
+      const grantId = asUuid(req.params.grantId, "grantId");
+      const grant = await terminateGrant(db, { grantId, terminatedBy: adminId(req), reason: asText(body(req).reason, "reason"), now: now() });
+      return { status: 200, body: { grant }, details: { grant_id: grantId }, projectId: grant.project_id };
+    }),
+  );
+
+  // ---- sponsors and programs (SUPER_ADMIN to change; any admin role may read)
+  router.get("/entitlement/sponsors", allow("projects.read", "entitlement.sponsors_listed"), handle(async (_req, res) => {
+    res.json({ sponsors: await listSponsors(db) });
+  }));
+  router.post(
+    "/entitlement/sponsors",
+    allow("entitlement.programs.manage", "entitlement.sponsor_created"),
+    mutation("entitlement.sponsor_created", () => ({ targetType: "sponsor", targetId: "new" }), async (req) => {
+      const b = body(req);
+      const kind = oneOf(b.kind, ["government", "agency", "chamber", "accelerator", "corporate", "other"] as const satisfies readonly SponsorKind[], "kind");
+      const sponsor = await createSponsor(db, {
+        name: asText(b.name, "name", 200),
+        kind,
+        ...(typeof b.country === "string" && b.country ? { country: b.country.toUpperCase() } : {}),
+        createdBy: adminId(req),
+      });
+      return { status: 201, body: { sponsor }, details: { sponsor_id: sponsor.sponsor_id, kind } };
+    }),
+  );
+
+  router.get("/entitlement/programs", allow("projects.read", "entitlement.programs_listed"), handle(async (_req, res) => {
+    res.json({ programs: await listPrograms(db) });
+  }));
+  router.get("/entitlement/programs/:programId", allow("projects.read", "entitlement.programs_listed"), handle(async (req, res) => {
+    res.json(await programDetail(db, asUuid(req.params.programId, "programId")));
+  }));
+  router.post(
+    "/entitlement/programs",
+    allow("entitlement.programs.manage", "entitlement.program_created"),
+    mutation("entitlement.program_created", () => ({ targetType: "entitlement_program", targetId: "new" }), async (req) => {
+      const b = body(req);
+      const kind = oneOf(b.kind, ["promotion", "trial", "partner", "sponsored"] as const satisfies readonly ProgramKind[], "kind");
+      const markets = Array.isArray(b.marketScope) ? b.marketScope.filter((m): m is string => typeof m === "string").map((m) => m.toUpperCase()) : undefined;
+      const program = await createProgram(db, {
+        code: asText(b.code, "code", 41),
+        name: asText(b.name, "name", 200),
+        kind,
+        ...(b.sponsorId !== undefined ? { sponsorId: asUuid(b.sponsorId, "sponsorId") } : {}),
+        ...(typeof b.agreementRef === "string" && b.agreementRef ? { agreementRef: b.agreementRef.slice(0, 200) } : {}),
+        ...(markets && markets.length > 0 ? { marketScope: markets } : {}),
+        grantDays: asInt(b.grantDays, "grantDays", 1, 3650),
+        startsAt: asDate(b.startsAt, "startsAt"),
+        endsAt: asDate(b.endsAt, "endsAt"),
+        ...(b.maxRedemptions !== undefined ? { maxRedemptions: asInt(b.maxRedemptions, "maxRedemptions", 1, 1_000_000) } : {}),
+        eligibility: b.eligibility === undefined ? "open" : oneOf(b.eligibility, ["open", "listed"] as const, "eligibility"),
+        reason: asText(b.reason, "reason"),
+        createdBy: adminId(req),
+      });
+      return { status: 201, body: { program }, details: { program_id: program.program_id, kind, grant_days: program.grant_days } };
+    }),
+  );
+  router.post(
+    "/entitlement/programs/:programId/eligibility",
+    allow("entitlement.programs.manage", "entitlement.program_eligibility_added"),
+    mutation("entitlement.program_eligibility_added", (req) => ({ targetType: "entitlement_program", targetId: String(req.params.programId ?? "") }), async (req) => {
+      const programId = asUuid(req.params.programId, "programId");
+      const companyId = asUuid(body(req).companyId, "companyId");
+      await addEligibleCompany(db, { programId, companyId, createdBy: adminId(req) });
+      return { status: 201, body: { programId, companyId }, details: { program_id: programId } };
+    }),
+  );
+  router.post(
+    "/entitlement/programs/:programId/activate",
+    allow("entitlement.programs.manage", "entitlement.program_activated"),
+    mutation("entitlement.program_activated", (req) => ({ targetType: "entitlement_program", targetId: String(req.params.programId ?? "") }), async (req) => {
+      const program = await activateProgram(db, asUuid(req.params.programId, "programId"), adminId(req));
+      return { status: 200, body: { program }, details: { program_id: program.program_id, kind: program.kind } };
+    }),
+  );
+  router.post(
+    "/entitlement/programs/:programId/close",
+    allow("entitlement.programs.manage", "entitlement.program_closed"),
+    mutation("entitlement.program_closed", (req) => ({ targetType: "entitlement_program", targetId: String(req.params.programId ?? "") }), async (req) => {
+      const program = await closeProgram(db, asUuid(req.params.programId, "programId"), now());
+      return { status: 200, body: { program }, details: { program_id: program.program_id } };
+    }),
+  );
+  // Redeeming applies the program's own rule to one project (window, market, quota, eligibility): the operator does not choose terms.
+  router.post(
+    "/entitlement/programs/:programId/redeem",
+    allow("entitlement.manage", "entitlement.program_redeemed"),
+    mutation("entitlement.program_redeemed", (req) => ({ targetType: "entitlement_program", targetId: String(req.params.programId ?? "") }), async (req) => {
+      const programId = asUuid(req.params.programId, "programId");
+      const b = body(req);
+      const id = asUuid(b.projectId, "projectId");
+      const grant = await redeemProgram(db, {
+        programId,
+        projectId: id,
+        ...(typeof b.market === "string" && b.market ? { market: b.market } : {}),
+        now: now(),
+        actor: actorOf(req),
+      });
+      return { status: 201, body: { grant }, details: { program_id: programId, grant_id: grant.grant_id }, projectId: id };
+    }),
+  );
+
+  // ---- privacy / data lifecycle: overrides any commercial entitlement (the legal rules themselves live with Privacy)
+  router.post(
+    "/projects/:projectId/privacy",
+    allow("privacy.manage", "privacy.event_recorded"),
+    mutation("privacy.event_recorded", (req) => ({ targetType: "project", targetId: projectId(req), projectId: projectId(req) }), async (req) => {
+      const id = projectId(req);
+      const b = body(req);
+      const event = oneOf(b.event, ["access_blocked", "access_restored", "anonymized"] as const satisfies readonly PrivacyEventName[], "event");
+      const reasonCode = oneOf(b.reasonCode, ["erasure_request", "legal_order", "contract_closure", "security_action", "other"] as const satisfies readonly PrivacyReason[], "reasonCode");
+      await recordPrivacyEvent(db, { projectId: id, event, reasonCode, actor: actorOf(req) });
+      return { status: 201, body: { projectId: id, event, reasonCode }, details: { event, reason_code: reasonCode } };
+    }),
+  );
 
   // ------------------------------------------------------------------ versioned configuration
   const configPermission = (req: Request): Permission => {
