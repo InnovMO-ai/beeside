@@ -284,3 +284,11 @@
 
 /* ------------------------------------------------------------ container gutters (the bar and the centred .pz-docwrap column are the shell's) */
 .pz-docmain { flex: 1; width: 100%; padding: clamp(20px, 4vw, 44px) 16px clamp(24px, 4vw, 56px); }
+
+/* My Service Map: client corrections */
+.pz-item-edit { font-size: 12.5px; }
+.pz-editform { display: grid; gap: 14px; }
+.pz-editfield { display: grid; gap: 4px; font-size: 13px; color: var(--pz-ink-soft, inherit); }
+.pz-editfield input, .pz-editfield textarea, .pz-editfield select { font: 400 15px/1.45 var(--pz-font-body); padding: 9px 12px; border: 1px solid var(--pz-line, #d8d6e6); border-radius: 10px; background: #fff; color: var(--pz-ink); min-height: 44px; }
+.pz-editfield textarea { resize: vertical; }
+.pz-edit-remove { justify-self: start; color: var(--pz-rose-ink); }

@@ -1,5 +1,5 @@
 import type {
-  AddServiceThreadDto, CategoryDto, CenterDto, ConfirmCrpRequest, ConfirmServiceMapRequest, ConfirmServiceMapResponse,
+  AddServiceThreadDto, CategoryDto, CenterDto, ConfirmCrpRequest, ConfirmServiceMapRequest, ConfirmServiceMapResponse, ResourceLinkDto, ServiceMapCorrectionRequest, ServiceMapCorrectionResponse,
   CrpViewDto, EntryDto, HelpDto, SupportDto, Locale, PreviewDto, SendRequest, SendResultDto, ServiceMapDto, SessionExchangeResponse, ThreadDto, TurnRequest, TurnResultDto,
 } from "./dto";
 import { ApiFailure, LOCALE_HEADER, liveTransport, type Transport } from "./transport";
@@ -50,6 +50,8 @@ export function createClient(deps: ClientDeps) {
     understanding: () => call<ThreadDto>("GET", "/understanding"),
     understandingTurn: (r: TurnRequest) => call<TurnResultDto>("POST", "/understanding/turns", r),
     serviceMap: () => call<ServiceMapDto>("GET", "/service-map"),
+    correctServiceMap: (r: ServiceMapCorrectionRequest) => call<ServiceMapCorrectionResponse>("POST", "/service-map/corrections", r),
+    resource: (id: string) => call<ResourceLinkDto>("GET", `/resources/${enc(id)}`),
     confirmServiceMap: (r: ConfirmServiceMapRequest) => call<ConfirmServiceMapResponse>("POST", "/service-map/confirm", r),
     addService: () => call<AddServiceThreadDto>("GET", "/add-service"),
     addServiceTurn: (r: TurnRequest) => call<TurnResultDto>("POST", "/add-service/turns", r),

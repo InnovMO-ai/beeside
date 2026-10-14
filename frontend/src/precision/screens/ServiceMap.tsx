@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { newKey } from "../api/client";
-import type { ServiceMapDto, ServiceMapGroupDto, ServiceMapItemDto, ServiceMapViewDto } from "../api/dto";
+import type { ServiceMapCorrectionRequest, ServiceMapDto, ServiceMapGroupDto, ServiceMapItemDto, ServiceMapViewDto } from "../api/dto";
 import { ApiFailure } from "../api/transport";
 import { useI18n } from "../i18n";
 import { failureKey, useSession } from "../state/app";
@@ -27,7 +27,10 @@ function groupTitle(g: ServiceMapGroupDto, t: ReturnType<typeof useI18n>["t"]): 
   return g.kind === "to_review" ? t("sm.group.to_review") : g.label;
 }
 
-function MapItem({ it }: { it: ServiceMapItemDto }) {
+/** Edit hook handed to the map body when the client may correct it (live view, write access). */
+export interface MapEditor { onEdit: (it: ServiceMapItemDto, group: ServiceMapGroupDto) => void }
+
+function MapItem({ it, group, editor }: { it: ServiceMapItemDto; group?: ServiceMapGroupDto; editor?: MapEditor }) {
   const { t } = useI18n();
   return (
     <li className="pz-item">
@@ -39,6 +42,7 @@ function MapItem({ it }: { it: ServiceMapItemDto }) {
         {it.priority ? <Priority level={it.priority} /> : null}
         {it.timing ? <span className="pz-timing"><span className="pz-sr">{t("sm.timing")}: </span>{it.timing}</span> : null}
         <ItemStateChip state={it.state} />
+        {editor && group ? <button type="button" className="pz-textlink pz-noprint pz-item-edit" onClick={() => editor.onEdit(it, group)} aria-label={t("sm.edit.aria", { label: it.label })}>{t("sm.edit")}</button> : null}
       </div>
     </li>
   );
@@ -48,7 +52,7 @@ function MapItem({ it }: { it: ServiceMapItemDto }) {
 export const MAP_SECTIONS = { summary: "pz-sec-summary", services: "pz-sec-services", open: "pz-sec-open" } as const;
 
 /** The document body, reused by My Service Map and by Preview before Send (compact: label/value rows inside a numbered block). */
-export function ServiceMapBody({ view, compact }: { view: ServiceMapViewDto; compact?: boolean }) {
+export function ServiceMapBody({ view, compact, editor }: { view: ServiceMapViewDto; compact?: boolean; editor?: MapEditor }) {
   const { t } = useI18n();
   const s = view.summary;
   const Row = ({ label, value }: { label: string; value: string | null }) => (
@@ -80,7 +84,7 @@ export function ServiceMapBody({ view, compact }: { view: ServiceMapViewDto; com
                   {g.categoryId && !compact ? <Link to={{ name: "category", id: g.categoryId }} className="pz-textlink pz-noprint">{t("sm.viewCategory")}<Icon name="arrow-right" size={14} /></Link> : null}
                 </div>
                 {g.kind === "to_review" ? <p className="pz-muted pz-group-note">{t("sm.group.to_review.note")}</p> : null}
-                <ul className="pz-items">{g.items.map((it) => <MapItem key={it.id} it={it} />)}</ul>
+                <ul className="pz-items">{g.items.map((it) => <MapItem key={it.id} it={it} group={g} editor={editor} />)}</ul>
               </div>
             </div>
           ))}
@@ -91,6 +95,71 @@ export function ServiceMapBody({ view, compact }: { view: ServiceMapViewDto; com
         {view.openItems.length ? <ul className="pz-bullets">{view.openItems.map((o) => <li key={o}>{o}</li>)}</ul> : <p className="pz-muted">{t("sm.openItems.none")}</p>}
       </section>
     </div>
+  );
+}
+
+/** A correction without its idempotency key (the screen adds it). */
+type CorrectionOp = ServiceMapCorrectionRequest extends infer T ? (T extends { requestKey: string } ? Omit<T, "requestKey"> : never) : never;
+type Priority3 = "high" | "medium" | "low" | "none";
+
+/** Correct one need: its wording, its priority, the reason it is on the map, the group it sits in — or remove it. Each change is the client's decision, applied as stated. */
+function EditDialog({ item, group, targets, onClose, onApply }: {
+  item: ServiceMapItemDto; group: ServiceMapGroupDto; targets: { id: string; label: string }[];
+  onClose: () => void; onApply: (ops: CorrectionOp[]) => Promise<string | null>;
+}) {
+  const { t } = useI18n();
+  const [label, setLabel] = useState(item.label);
+  const [why, setWhy] = useState(item.why ?? "");
+  const [priority, setPriority] = useState<Priority3>(item.priority ?? "none");
+  const [to, setTo] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const others = targets.filter((x) => x.label !== group.label);
+  const ops = (): CorrectionOp[] => {
+    const out: CorrectionOp[] = [];
+    if (label.trim() && label.trim() !== item.label) out.push({ op: "rename", itemId: item.id, text: label.trim() });
+    if (why.trim() !== (item.why ?? "") && why.trim()) out.push({ op: "set_why", itemId: item.id, text: why.trim() });
+    if (priority !== (item.priority ?? "none")) out.push({ op: "set_priority", itemId: item.id, priority: priority === "none" ? null : priority });
+    if (to) out.push({ op: "move", itemId: item.id, toGroupId: to });
+    return out;
+  };
+  const apply = async (list: CorrectionOp[]) => {
+    if (busy || list.length === 0) { if (!busy) onClose(); return; }
+    setBusy(true); setProblem(null);
+    const err = await onApply(list);
+    setBusy(false);
+    if (err) setProblem(err); else onClose();
+  };
+  return (
+    <Dialog title={t("sm.edit.title")} onClose={() => !busy && onClose()}
+      actions={removing
+        ? <><Button variant="quiet" onClick={() => setRemoving(false)} disabled={busy}>{t("shell.cancel")}</Button><Button busy={busy} onClick={() => void apply([{ op: "remove", itemId: item.id }])}>{t("sm.edit.removeConfirm")}</Button></>
+        : <><Button variant="quiet" onClick={onClose} disabled={busy}>{t("shell.cancel")}</Button><Button busy={busy} onClick={() => void apply(ops())}>{t("sm.edit.save")}</Button></>}>
+      {removing ? (
+        <p>{t("sm.edit.removeBody", { label: item.label })}</p>
+      ) : (
+        <div className="pz-editform">
+          <label className="pz-editfield"><span>{t("sm.edit.label")}</span><input value={label} maxLength={160} onChange={(e) => setLabel(e.target.value)} /></label>
+          <label className="pz-editfield"><span>{t("sm.edit.why")}</span><textarea rows={3} value={why} maxLength={400} onChange={(e) => setWhy(e.target.value)} /></label>
+          <label className="pz-editfield"><span>{t("sm.edit.priority")}</span>
+            <select value={priority} onChange={(e) => setPriority(e.target.value as Priority3)}>
+              <option value="high">{t("priority.high")}</option><option value="medium">{t("priority.medium")}</option><option value="low">{t("priority.low")}</option><option value="none">{t("sm.edit.priority.none")}</option>
+            </select>
+          </label>
+          {others.length ? (
+            <label className="pz-editfield"><span>{t("sm.edit.move")}</span>
+              <select value={to} onChange={(e) => setTo(e.target.value)}>
+                <option value="">{t("sm.edit.move.keep", { group: group.kind === "to_review" ? t("sm.group.to_review") : group.label })}</option>
+                {others.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+              </select>
+            </label>
+          ) : null}
+          <button type="button" className="pz-textlink pz-edit-remove" onClick={() => setRemoving(true)}>{t("sm.edit.remove")}</button>
+        </div>
+      )}
+      {problem ? <p className="pz-field-error" role="alert">{problem}</p> : null}
+    </Dialog>
   );
 }
 
@@ -153,6 +222,7 @@ export function ServiceMapScreen() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [justConfirmed, setJustConfirmed] = useState(false);
+  const [editing, setEditing] = useState<{ item: ServiceMapItemDto; group: ServiceMapGroupDto } | null>(null);
   const requestKey = useRef(newKey("sm"));
   const sm: ServiceMapDto | null = res.data;
   const notReady = res.error?.code === "NOT_READY";
@@ -176,6 +246,24 @@ export function ServiceMapScreen() {
       setProblem(t(f ? failureKey(f) : "error.generic"));
     } finally { setBusy(false); }
   };
+
+  /** Applies the client's corrections one after another (each is its own idempotent request); returns a message when one fails. */
+  const applyCorrections = async (ops: CorrectionOp[]): Promise<string | null> => {
+    try {
+      for (const op of ops) {
+        const r = await client.correctServiceMap({ ...op, requestKey: newKey("smc") } as ServiceMapCorrectionRequest);
+        res.setData(r.serviceMap);
+      }
+      setJustConfirmed(false); setTab("live");
+      void refreshCenter();
+      return null;
+    } catch (e) {
+      const f = e instanceof ApiFailure ? e : null;
+      if (f) noteAccessFailure(f);
+      return t(f ? failureKey(f) : "error.generic");
+    }
+  };
+  const editor: MapEditor | undefined = sm && canWrite && sm.canWrite && !showingConfirmed ? { onEdit: (item, group) => setEditing({ item, group }) } : undefined;
 
   let content;
   if (res.loading) content = <Skeleton lines={8} />;
@@ -214,7 +302,7 @@ export function ServiceMapScreen() {
             <ul>{sm.live.changesSinceConfirmed.map((c) => <li key={c.text}><strong>{t(`sm.change.${c.kind}`)}:</strong> {c.text}</li>)}</ul>
           </section>
         ) : null}
-        <ServiceMapBody view={view} />
+        <ServiceMapBody view={view} {...(editor ? { editor } : {})} />
         <footer className="pz-docfoot">
           {showingConfirmed ? <p className="pz-docnote">{t("sm.immutable")}</p> : null}
           {access.mode === "READ_ONLY" ? <p className="pz-docnote">{t("sm.readOnly")}</p> : null}
@@ -226,6 +314,7 @@ export function ServiceMapScreen() {
   return (
     <DocShell back={{ name: "center" }} backLabel={t("shell.backToCenter")}>
       {content}
+      {editing && sm ? <EditDialog item={editing.item} group={editing.group} targets={sm.moveTargets ?? []} onClose={() => setEditing(null)} onApply={applyCorrections} /> : null}
       {dialog ? (
         <Dialog title={t("sm.confirm.title")} onClose={() => !busy && setDialog(false)}
           actions={<><Button variant="quiet" onClick={() => setDialog(false)} disabled={busy}>{t("shell.cancel")}</Button><Button busy={busy} onClick={confirm}>{t("sm.confirm.button")}</Button></>}>

@@ -70,6 +70,37 @@ describe("Precision Center", () => {
   });
 });
 
+describe("My Service Map corrections", () => {
+  it("the client renames, re-prioritises and removes a need; the map follows and stays free of internal terms", async () => {
+    boot("/precision/service-map", { mock: "preset:understandingReady", locale: "en" });
+    await waitFor(() => expect(document.querySelectorAll(".pz-item").length).toBeGreaterThan(1), WAIT);
+    const before = document.querySelectorAll(".pz-item").length;
+    const edit = (await screen.findAllByRole("button", { name: /^Edit /i }, WAIT))[0]!;
+    await userEvent.click(edit);
+    const dialog = await screen.findByRole("dialog", undefined, WAIT);
+    const name = within(dialog).getByLabelText(/What you call it/i);
+    await userEvent.clear(name);
+    await userEvent.type(name, "Our own wording");
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Priority/i), "low");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Save changes/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), WAIT);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Our own wording/), WAIT);
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Edit /i }))[0]!);
+    const d2 = await screen.findByRole("dialog", undefined, WAIT);
+    await userEvent.click(within(d2).getByRole("button", { name: /Remove from My Service Map/i }));
+    await userEvent.click(within(d2).getByRole("button", { name: /Yes, remove/i }));
+    await waitFor(() => expect(document.querySelectorAll(".pz-item").length).toBe(before - 1), WAIT);
+    expect(bodyHits()).toEqual([]);
+  });
+
+  it("a read-only client sees the map without edit controls", async () => {
+    boot("/precision/service-map", { mock: "preset:understandingReady,access:read_only", locale: "en" });
+    await waitFor(() => expect(document.querySelectorAll(".pz-item").length).toBeGreaterThan(1), WAIT);
+    expect(screen.queryAllByRole("button", { name: /^Edit /i })).toHaveLength(0);
+  });
+});
+
 describe("documents", () => {
   it.each(["en", "es"] as const)("My Service Map, CRP, preview and sent pass the term scan (%s)", async (locale) => {
     const a = boot("/precision/service-map", { mock: "preset:understandingReady", locale });

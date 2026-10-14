@@ -114,3 +114,5 @@
   .pz-composer .pz-msg { min-height: 52px; padding: 14px 60px 14px 16px; }
   .pz-composer .pz-send { width: 44px; height: 44px; right: 3px; bottom: 3px; }
 }
+
+.pz-resource { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13.5px; }

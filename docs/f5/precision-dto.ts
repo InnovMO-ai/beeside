@@ -298,6 +298,8 @@ export const PRECISION_ROUTES = {
   understandingTurn: "POST /api/precision/understanding/turns",
   serviceMap: "GET /api/precision/service-map",
   serviceMapConfirm: "POST /api/precision/service-map/confirm",
+  serviceMapCorrections: "POST /api/precision/service-map/corrections",
+  resource: "GET /api/precision/resources/:id",
   addService: "GET /api/precision/add-service",
   addServiceTurn: "POST /api/precision/add-service/turns",
   category: "GET /api/precision/categories/:id",

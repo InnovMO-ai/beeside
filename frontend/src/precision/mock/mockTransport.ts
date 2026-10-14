@@ -8,7 +8,7 @@
  */
 import type {
   AccessDto, AccessMode, AddServiceThreadDto, CategoryCardDto, CategoryDto, CategoryProgressDto, CategoryStatus, CenterDto, CoverDto, CrpRequirementDto, CrpSectionDto, CrpViewDto,
-  EntryDto, HelpDto, ItemState, Locale, PreviewDto, SendResultDto, SendStateDto, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState,
+  EntryDto, HelpDto, ItemState, Locale, PreviewDto, SendResultDto, SendStateDto, ServiceMapCorrectionResponse, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState,
 } from "../api/dto";
 import { ApiFailure, type Transport, type TransportRequest, type TransportResponse } from "../api/transport";
 import {
@@ -60,6 +60,8 @@ interface MockState {
   smConfirmedAt: string | null;
   confirmedCategories: string[];
   smRequestKeys: string[];
+  /** Client corrections of the live map (by item id): applied on top of the mock content. */
+  smEdits?: Record<string, { removed?: boolean; label?: string; why?: string; priority?: "high" | "medium" | "low" | null; to?: string }>;
   needs: Need[];
   add: AddThread;
   cats: Record<string, CatState>;
@@ -254,11 +256,29 @@ export function createMockServer(opts: MockOptions = {}) {
       groups, openItems: open, changesSinceConfirmed: changes,
     };
   }
+  /** The live view with the client's corrections applied (remove, reword, reason, priority, move). */
+  function liveWithEdits(l: Locale): ServiceMapViewDto {
+    const view = mapView(l, "live");
+    const edits = st.smEdits ?? {};
+    if (Object.keys(edits).length === 0) return view;
+    const groups = view.groups.map((g, i) => ({ ...g, items: g.items.filter((it) => !edits[it.id]?.removed).map((it) => ({ ...it, ...(edits[it.id]?.label ? { label: edits[it.id]!.label! } : {}), ...(edits[it.id]?.why ? { why: edits[it.id]!.why! } : {}), ...(edits[it.id] && "priority" in edits[it.id]! ? { priority: edits[it.id]!.priority ?? null } : {}) })), _i: i }));
+    for (const g of groups) {
+      for (const it of [...g.items]) {
+        const to = edits[it.id]?.to;
+        const dest = to ? groups.find((x) => `g${x._i}` === to) : undefined;
+        if (dest && dest !== g) { g.items.splice(g.items.indexOf(it), 1); dest.items.push(it); }
+      }
+    }
+    return { ...view, groups: groups.filter((g) => g.items.length > 0).map(({ _i, ...g }) => { void _i; return g; }) };
+  }
+
   function serviceMap(l: Locale): ServiceMapDto {
     const ready = uState() === "ready_to_confirm";
     const canConfirm = canWrite() && (ready || (st.smConfirmedAt !== null && hasUnconfirmed()));
+    const live = liveWithEdits(l);
     return {
-      live: mapView(l, "live"),
+      live,
+      ...(canWrite() ? { moveTargets: mapView(l, "live").groups.map((g, i) => ({ id: `g${i}`, label: g.label })) } : {}),
       confirmed: st.smConfirmedAt ? { ...mapView(l, "confirmed"), confirmedAt: st.smConfirmedAt } : null,
       canConfirm, hasUnconfirmedChanges: hasUnconfirmed(), canWrite: canWrite(),
     };
@@ -476,6 +496,24 @@ export function createMockServer(opts: MockOptions = {}) {
     }
     if (m === "POST /understanding/turns") return handleTurnPost("understanding", req.body, l);
     if (m === "GET /service-map") { if (!["ready_to_confirm", "confirmed"].includes(uState())) fail("NOT_READY"); return serviceMap(l); }
+    if (m === "POST /service-map/corrections") {
+      if (!canWrite()) fail("PRECISION_READ_ONLY");
+      const b = (req.body ?? {}) as { requestKey?: string; op?: string; itemId?: string; text?: string; priority?: "high" | "medium" | "low" | null; toGroupId?: string };
+      if (typeof b.requestKey !== "string" || b.requestKey.length < 8 || typeof b.itemId !== "string") fail("INVALID_INPUT");
+      if (!st.smRequestKeys.includes(b.requestKey as string)) {
+        const edits = (st.smEdits ??= {});
+        const e = (edits[b.itemId as string] ??= {});
+        if (b.op === "remove") e.removed = true;
+        else if (b.op === "rename" && b.text?.trim()) e.label = b.text.trim();
+        else if (b.op === "set_why" && b.text?.trim()) e.why = b.text.trim();
+        else if (b.op === "set_priority") e.priority = b.priority ?? null;
+        else if (b.op === "move" && b.toGroupId) e.to = b.toGroupId;
+        else fail("INVALID_INPUT");
+        st.smRequestKeys.push(b.requestKey as string);
+      }
+      save();
+      return { serviceMap: serviceMap(l) } satisfies ServiceMapCorrectionResponse;
+    }
     if (m === "POST /service-map/confirm") {
       st.stats.confirmMapCalls++;
       const k = (req.body as { requestKey?: string } | undefined)?.requestKey;

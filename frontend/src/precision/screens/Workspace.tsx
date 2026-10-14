@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CategoryDto, CategoryProgressDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState } from "../api/dto";
 import { useI18n } from "../i18n";
+import { ApiFailure } from "../api/transport";
 import { useSession } from "../state/app";
 import { Link } from "../state/router";
 import { useThread, waitStage, type Pending } from "../state/thread";
@@ -45,6 +46,31 @@ function TurnView({ turn, last, active, onConfirm, saved, notSaved }: { turn: Tu
       <span className="pz-turn-who">{t("ws.assistant")}</span>
       <p className="pz-turn-text">{turn.kind === "notice" ? <Icon name="info" size={16} className="pz-turn-ico" /> : null}{turn.text}</p>
       {turn.confirmCard ? <ConfirmCard turn={turn} active={active && last} onAnswer={(i) => onConfirm(turn, i)} /> : null}
+      {turn.resourceOffer ? <ResourceLink offer={turn.resourceOffer} /> : null}
+    </div>
+  );
+}
+
+/** An optional country guide offered in context. The destination is Admin configuration, resolved only when the client opens it. */
+function ResourceLink({ offer }: { offer: { id: string; title: string } }) {
+  const { t } = useI18n();
+  const { client } = useSession();
+  const [state, setState] = useState<"idle" | "busy" | "gone">("idle");
+  const open = async () => {
+    if (state === "busy") return;
+    setState("busy");
+    try {
+      const r = await client.resource(offer.id);
+      if (r.kind === "url" && /^https:\/\//.test(r.ref)) { window.open(r.ref, "_blank", "noopener,noreferrer"); setState("idle"); }
+      else setState("gone");
+    } catch (e) {
+      setState(e instanceof ApiFailure ? "gone" : "idle");
+    }
+  };
+  return (
+    <div className="pz-resource">
+      <button type="button" className="pz-textlink" onClick={() => void open()} aria-busy={state === "busy" || undefined}>{t("ws.resource.open", { title: offer.title })}<Icon name="arrow-right" size={14} /></button>
+      {state === "gone" ? <span className="pz-muted" role="status">{t("ws.resource.gone")}</span> : null}
     </div>
   );
 }
