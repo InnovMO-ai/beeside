@@ -229,8 +229,9 @@ describeWithDb("Premium entitlement sources -> Core -> Precision (PostgreSQL, ro
     await sweepPrecisionAccess(h.deps.db, h.deps.bundles, { now: h.clock.now, policy: POLICY });
     h.clock.now = new Date(h.clock.now.getTime() + (POLICY.readonlyGraceDays + 1) * DAY);
     await sweepPrecisionAccess(h.deps.db, h.deps.bundles, { now: h.clock.now, policy: POLICY });
-    expect((await events("entitlement_mode_changed", a.id)).map((e) => `${e.from_mode}>${e.to_mode}`)).toEqual(["FULL>READ_ONLY", "READ_ONLY>REVOKED"]);
-    expect(await events("entitlement_ended", a.id)).toEqual([{ reason_code: "period_elapsed" }, { reason_code: "window_closed" }]);
+    // both transitions are written inside one rolled-back transaction (same timestamp), so the set is compared, not the physical order
+    expect((await events("entitlement_mode_changed", a.id)).map((e) => `${e.from_mode}>${e.to_mode}`).sort()).toEqual(["FULL>READ_ONLY", "READ_ONLY>REVOKED"]);
+    expect((await events("entitlement_ended", a.id)).map((e) => e.reason_code).sort()).toEqual(["period_elapsed", "window_closed"]);
 
     // early termination and privacy
     const c = await lockedProject();
