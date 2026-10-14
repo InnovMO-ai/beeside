@@ -23,6 +23,12 @@ export interface AccessRow {
   /** Latest subscription (null when none): lets the derivation close access at the period end even if the sweep is late. */
   subscription_status: "PREMIUM_ACTIVE" | "CANCELLATION_SCHEDULED" | "PREMIUM_INACTIVE" | null;
   subscription_period_end: Date | null;
+  /**
+   * Dated end of FULL access when the entitlement is not open-ended (a grant, or a paid period already scheduled to end).
+   * NULL = open-ended. Optional so callers that only know paid rows keep working. This is what lets any non-paid source
+   * close at its date even if the source sync has not run yet — same "the clock closes writes" rule as paid.
+   */
+  effective_until?: Date | null;
 }
 
 export interface DerivedAccess {
@@ -45,6 +51,11 @@ export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<Prem
       mode = "READ_ONLY";
       endedAt = row.subscription_period_end;
       readonlyUntil = null;
+    } else if (row.effective_until && row.effective_until.getTime() <= now.getTime() && !(open && row.subscription_period_end && row.subscription_period_end.getTime() > now.getTime())) {
+      // A dated source (grant) ran out and no paid period is still running.
+      mode = "READ_ONLY";
+      endedAt = row.effective_until;
+      readonlyUntil = null;
     } else {
       return { mode: "FULL", readonlyUntil: null };
     }
@@ -59,7 +70,7 @@ export function deriveAccess(row: AccessRow | null, now: Date, policy: Pick<Prem
 
 export async function loadAccessRow(db: Db, projectId: string): Promise<AccessRow | null> {
   const { rows } = await db.query<AccessRow>(
-    `SELECT e.premium_access_active, e.precision_access_mode, e.premium_ended_at, e.readonly_until,
+    `SELECT e.premium_access_active, e.precision_access_mode, e.premium_ended_at, e.readonly_until, e.effective_until,
             s.status AS subscription_status, s.current_period_end AS subscription_period_end
        FROM entitlement e
        LEFT JOIN LATERAL (SELECT status, current_period_end FROM subscription WHERE project_id = e.project_id

@@ -2,6 +2,7 @@ import { Db } from "../../db/database";
 import { BundleStore } from "../../fa/services/bundle-store";
 import { Logger, describeError, jsonLogger } from "../../security/redact";
 import { PremiumPolicy } from "../premium-policy";
+import { syncEntitlementSources } from "../entitlement-grants";
 import { sweepPrecisionAccess } from "../precision-access";
 import { StripeClient } from "./client";
 import { reconcileStripe } from "./reconcile";
@@ -30,6 +31,8 @@ export async function runBillingJobs(deps: BillingJobDeps): Promise<Record<strin
       log("error", "stripe reconciliation failed", { error: describeError(error) });
     }
   }
+  // Non-paid sources first (grants starting / ending by the clock), then the sweep settles the read-only windows.
+  result.sources = await syncEntitlementSources(deps.db, { now });
   result.sweep = await sweepPrecisionAccess(deps.db, deps.bundles, { now, policy: deps.policy });
   return result;
 }

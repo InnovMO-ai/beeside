@@ -113,6 +113,7 @@ END $$;
 \ir 50_additive.sql
 \ir 60_stripe_core.sql
 \ir 60_oh_delivery_attempts.sql
+\ir 65_entitlement_sources.sql
 \ir 70_product_surface.sql
 
 \echo '--- DONE: rolling back, no test data persists ---'

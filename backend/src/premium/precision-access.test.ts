@@ -45,3 +45,27 @@ describe("deriveAccess (pure; the clock decides, the stored state never grants m
     expect(deriveAccess(unsettled, new Date(T0.getTime() + 90 * D), grace).mode).toBe("REVOKED");
   });
 });
+
+describe("deriveAccess with a dated source (grant): the clock closes it even if the source sync has not run", () => {
+  const grantFull = (until: Date | null): AccessRow => ({
+    premium_access_active: true, precision_access_mode: "FULL", premium_ended_at: null, readonly_until: null,
+    subscription_status: null, subscription_period_end: null, effective_until: until,
+  });
+
+  it("FULL while the grant runs; open-ended entitlement (no date) stays FULL", () => {
+    expect(deriveAccess(grantFull(new Date(T0.getTime() + D)), T0, grace).mode).toBe("FULL");
+    expect(deriveAccess(grantFull(null), T0, grace).mode).toBe("FULL");
+  });
+
+  it("grant ran out and nothing synced -> READ_ONLY with the window from its date", () => {
+    const end = new Date(T0.getTime() - D);
+    const r = deriveAccess(grantFull(end), T0, grace);
+    expect(r.mode).toBe("READ_ONLY");
+    expect(r.readonlyUntil?.getTime()).toBe(end.getTime() + 90 * D);
+  });
+
+  it("a paid period that is still running keeps FULL even if an older grant date has passed", () => {
+    const row: AccessRow = { ...grantFull(new Date(T0.getTime() - D)), subscription_status: "PREMIUM_ACTIVE", subscription_period_end: new Date(T0.getTime() + 30 * D) };
+    expect(deriveAccess(row, T0, grace).mode).toBe("FULL");
+  });
+});
