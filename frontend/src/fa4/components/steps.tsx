@@ -267,7 +267,6 @@ export function ActivatorsStep(s: StepCtx & { mode: 'all' | 'sell' | 'site' }) {
   const destList = destNames.length > 1 ? `${destNames.slice(0, -1).join(', ')} ${UI.and[locale]} ${destNames[destNames.length - 1]}` : destNames.join('');
   const sellComps = showSell ? a.components.filter((c) => f.sells.includes(c.id)) : [];
   const siteComps = showSite ? a.components.filter((c) => f.location.includes(c.id)) : [];
-  const multi = (sellComps.length + siteComps.length) > 1;
   const blocks: Array<{ key: string; q: string; node: ReactNode }> = [];
   if (showReg) blocks.push({ key: 'reg', q: fill(UI.regulated, locale, { destinations: destList }), node: <><p className="help">{UI.regulatedHelp[locale]}</p><RadioGroup value={a.regulated} onChange={(v) => set((x) => ({ ...x, regulated: v }))} options={(['yes', 'no', 'unknown'] as const).map((v) => ({ value: v, label: T(UI[v], locale) }))} /></> });
   for (const c of sellComps) {

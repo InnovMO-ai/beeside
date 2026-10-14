@@ -19,7 +19,7 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
 
   await page.getByLabel('Ejecutar un contrato ganado').check();
-  await page.getByLabel(/Escríbelo con tus palabras/).fill('ganamos un contrato');
+  await page.getByLabel(/cuéntalo con tus palabras/i).fill('ganamos un contrato');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByLabel('Ya está en marcha').check();
   await page.getByRole('radio', { name: 'Cuanto antes' }).click();
@@ -31,13 +31,13 @@ test('Journey C — shortcut: mark what you need; unmarked stays NOT INDICATED',
 
   // no "scale" step in the shortcut; activators split in two thematic steps, BEFORE the list
   // VT-03: regulation is the only sell-side question → one neutral screen titled by the question itself
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('¿Tu producto o actividad está sujeto a alguna regulación específica?');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('¿Tu producto o actividad está sujeto a alguna regulación específica en México?');
   await page.getByLabel('No lo sé', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.getByRole('heading', { name: 'Sobre tu operación en México' })).toBeVisible();
   await expect(page.getByText('¿Ya sabes dónde estará la obra?')).toBeVisible();      // frozen Journey C wording
   await page.getByLabel('Aún no', { exact: true }).check();
-  await page.getByLabel('Personas de tu equipo').check();
+  await page.getByLabel('Personas de mi empresa').check();
   await page.getByLabel('Maquinaria, herramientas o equipos').check();
   await page.getByRole('button', { name: 'Continuar' }).click();
 

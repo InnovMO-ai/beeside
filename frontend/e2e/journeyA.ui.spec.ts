@@ -21,9 +21,9 @@ test('Journey A — hire only: one neutral regulation screen, topics, YEV with t
   await page.getByLabel(/¿Cuántas personas contratarías en México/).fill('3 a 5 personas');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   // VT-03: only regulation applies (nothing to sell, no premises) → a single screen titled by the question itself
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(UI.regulated.es);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(UI.regulated.es.replace('{destinations}', 'México'));
   await expect(page.getByText(UI.sellsTo.es.replace('{country}', 'México'))).toHaveCount(0);
-  await expect(page.getByText(UI.carries.es)).toHaveCount(0);
+  await expect(page.getByText(UI.carries.es.replace('{country}', 'México'))).toHaveCount(0);
   await page.getByRole('radio', { name: 'No', exact: true }).check();
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await expect(page.getByText('Banco y pagos en el país')).toBeVisible();                       // listed under "depends"

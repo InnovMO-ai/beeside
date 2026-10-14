@@ -8,7 +8,7 @@ import { createApp } from "../index";
 import { CaptureEmailTransport } from "../fa/email/email-adapter";
 import { deliverDueFa4Emails } from "../fa4/email";
 import {
-  allSignals, catalogChanges, catalogVersions, continuationRequests, latestResult, publishCapability, rawSignals, resultsFor,
+  allSignals, catalogVersions, continuationRequests, latestResult, publishCapability, rawSignals, resultsFor,
   saveCapabilityDraft, seedCatalogIfEmpty,
 } from "../fa4/repository";
 import { Fa4Deps } from "../fa4/routes";
