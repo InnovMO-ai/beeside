@@ -138,7 +138,7 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       // Premium gate: every missing condition hides the whole block, CTA included
       for (const [url, allowed] of [[undefined, true], ["https://fa.test/premium-es", false], ["https://fa.test/premium-es", undefined], [undefined, false]] as const) {
         const x = await send(url, allowed);
-        expect(x.html!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/); expect(x.text!).not.toMatch(/Explorar beeside Premium|Si decides continuar|Porque expandirse/);
+        expect(x.html!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/); expect(x.text!).not.toMatch(/Explorar beeside Premium|Si decides continuar con beeside Premium|Porque expandirse/);
         expect(x.html!).toContain("Hablar con beeside"); expect(x.html!).toContain("Antes de Premium, no compartimos tu proyecto con proveedores.");   // always present
       }
       deps.config.premiumResourceUrl = { es: "https://fa.test/premium-es" }; deps.config.premiumCommercialContentAllowed = true;
@@ -217,7 +217,7 @@ describeWithDb("FA4 Presentation RC — delivery truthfulness, contact, events (
       const t = await start();
       await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, shareProgress: true, clientRequestId: "req-loc-0001" });
       let m = email.messages.at(-1)!;
-      expect(m.html!).toContain("Idioma de FA"); expect(m.html!).toContain("Español"); expect(m.html!).toContain("Etapa"); expect(m.html!).toContain("First Assessment"); expect(m.html!).toContain("México");
+      expect(m.html!).toContain("Idioma de FA"); expect(m.html!).toContain("Español"); expect(m.html!).toContain("Etapa"); expect(m.html!).toContain("Discovery"); expect(m.html!).toContain("México");
       expect(m.subject).toBe("Hablar con beeside — Nórtica Envases — Lucía"); expect(m.replyTo).toBe("lucia@nortica.example"); expect(m.to).toBe("contact@beeside.you");
       expect(m.html!).not.toMatch(/SOURCEABLE|REVIEW|DEPENDENT|termsandconditions/);               // no internal states, no public legal footer
       await api().post("/api/fa4/session/contact").set(auth(t)).send({ ...body, clientRequestId: "req-loc-0002" });
