@@ -116,6 +116,7 @@ END $$;
 \ir 65_entitlement_sources.sql
 \ir 70_product_surface.sql
 \ir 75_privacy_erasure.sql
+\ir 80_understanding_knowledge.sql
 
 \echo '--- DONE: rolling back, no test data persists ---'
 ROLLBACK;
