@@ -200,6 +200,13 @@ describeWithDb("Precision API — client journey", () => {
       const catNow = (await api.get(`/categories/${logistics.id}`)).body;
       expect(card).toMatchObject({ status: "in_progress", progressPct: catNow.progress.progressPct, criticalOpen: catNow.progress.criticalOpen, pendingCount: catNow.progress.pendingCount });
       expect(catNow.status).toBe("in_progress");
+      // Analytics: each processed turn leaves one experience event (surface, outcome, latency bucket) — never the conversation text.
+      const turns = (await h.db.query<{ properties: Record<string, string> }>("SELECT properties FROM precision_journey_event WHERE event_name = 'ai_turn_completed' AND properties->>'surface' = 'category'")).rows;
+      expect(turns.length).toBeGreaterThanOrEqual(2);
+      for (const t of turns) {
+        expect(t.properties).toEqual({ surface: "category", status: "ok", latency_bucket: expect.stringMatching(/^(lt_2s|2_5s|5_10s|10_20s|gte_20s)$/) });
+      }
+      expect(JSON.stringify(turns)).not.toMatch(/third_party|Why do you need/);
     });
 
     it("ready is independent of progress: blocking items resolved => ready for review below 100%", async () => {

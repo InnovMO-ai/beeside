@@ -220,6 +220,11 @@ describeWithDb("Preview and Send (PostgreSQL, simulated Operation Hub, test-only
     expect(rows.filter((r) => r.status === "delivered")).toHaveLength(1);
     expect(Math.max(...rows.map((r) => r.attempt))).toBe(2);
     expect(h.sim.storedCount()).toBeGreaterThanOrEqual(1);
+    // Analytics: the failure and the retry are visible as codes (no error text), once each.
+    const ev = (await h.db.query<{ event_name: string; properties: Record<string, unknown> }>("SELECT event_name, properties FROM precision_journey_event WHERE project_id = $1 AND event_name LIKE 'operation_hub_send_%' ORDER BY event_name", [p.projectId])).rows;
+    expect(ev.map((e) => e.event_name)).toEqual(["operation_hub_send_completed", "operation_hub_send_failed", "operation_hub_send_retried"]);
+    expect(ev.find((e) => e.event_name === "operation_hub_send_failed")?.properties).toEqual({ error_class: "try_again_later", retryable: true, attempt: 1 });
+    expect(ev.find((e) => e.event_name === "operation_hub_send_retried")?.properties).toEqual({ attempt: 2 });
   });
 
   it("a refused delivery is reported as needing attention and is not offered as retryable", async () => {

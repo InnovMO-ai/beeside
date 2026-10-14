@@ -1,6 +1,8 @@
+import { emitV1Event } from "../analytics/v1-events";
 import { Db } from "../db/database";
 import { BundleStore } from "../fa/services/bundle-store";
 import { FaError } from "../fa/services/errors";
+import { accessModeOf, emitModeChange } from "./entitlement-grants";
 import { processSubscriptionEvent } from "./subscription-events";
 import { PremiumPolicy, addDays } from "./premium-policy";
 
@@ -123,8 +125,9 @@ export async function sweepPrecisionAccess(db: Db, bundles: BundleStore, input: 
   );
   for (const sub of due.rows) {
     try {
-      await db.transaction((tx) =>
-        processSubscriptionEvent(tx, bundles, {
+      await db.transaction(async (tx) => {
+        const before = await accessModeOf(tx, sub.project_id);
+        await processSubscriptionEvent(tx, bundles, {
           projectId: sub.project_id,
           eventType: "subscription_period_ended",
           // The end of Premium is the end of the paid period, not the (possibly late) sweep time.
@@ -132,8 +135,10 @@ export async function sweepPrecisionAccess(db: Db, bundles: BundleStore, input: 
           source: "core_sweep",
           providerReference: null,
           idempotencyKey: `period-end:${sub.subscription_id}`,
-        }),
-      );
+        });
+        // Another source (a grant) may still keep the project FULL: only a real change is reported.
+        if ((await emitModeChange(tx, sub.project_id, before)) !== "FULL") await emitV1Event(tx, "entitlement_ended", { projectId: sub.project_id, properties: { reason_code: "period_elapsed" } });
+      });
       stats.periodsEnded += 1;
     } catch (error) {
       // Already ended by a provider event or a concurrent sweep: nothing to do.
@@ -150,9 +155,14 @@ export async function sweepPrecisionAccess(db: Db, bundles: BundleStore, input: 
 
   const revoked = await db.query(
     `UPDATE entitlement SET precision_access_mode = 'REVOKED', revoked_at = $1, updated_at = $1
-      WHERE precision_access_mode = 'READ_ONLY' AND readonly_until IS NOT NULL AND readonly_until <= $1`,
+      WHERE precision_access_mode = 'READ_ONLY' AND readonly_until IS NOT NULL AND readonly_until <= $1
+      RETURNING project_id`,
     [now],
   );
   stats.revoked = revoked.rowCount ?? 0;
+  for (const r of revoked.rows as Array<{ project_id: string }>) {
+    await emitV1Event(db, "entitlement_ended", { projectId: r.project_id, properties: { reason_code: "window_closed" } });
+    await emitV1Event(db, "entitlement_mode_changed", { projectId: r.project_id, properties: { from_mode: "READ_ONLY", to_mode: "REVOKED" } });
+  }
   return stats;
 }

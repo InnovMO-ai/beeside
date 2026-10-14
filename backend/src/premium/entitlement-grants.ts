@@ -1,3 +1,4 @@
+import { emitV1Event } from "../analytics/v1-events";
 import { Db } from "../db/database";
 import { FaError } from "../fa/services/errors";
 import { addDays } from "./premium-policy";
@@ -150,6 +151,14 @@ export async function issueGrant(db: Db, input: GrantInput): Promise<GrantRow> {
       const grant = rows[0];
       if (!grant) throw new Error("grant insert returned no row");
       await recomputeFor(tx, grant, input.now);
+      // Analytics (opaque codes only: no reason text, no actor, no company data). Retries of an idempotent request returned earlier.
+      const programKind = grant.program_id ? (await tx.query<{ kind: string }>("SELECT kind FROM entitlement_program WHERE program_id = $1", [grant.program_id])).rows[0]?.kind : undefined;
+      await emitV1Event(tx, "entitlement_granted", {
+        projectId,
+        properties: { source_type: grant.source, scope: projectId ? "project" : "company", program_kind: programKind ?? "none", chained: Boolean(input.extendsGrantId) },
+      });
+      if (input.extendsGrantId) await emitV1Event(tx, "entitlement_extended", { projectId, properties: { source_type: grant.source } });
+      if (programKind) await emitV1Event(tx, "program_redeemed", { projectId, properties: { program_kind: programKind } });
       return grant;
     }),
   );
@@ -168,6 +177,7 @@ export async function terminateGrant(db: Db, input: { grantId: string; terminate
       );
       if (!rows[0]) throw new FaError("NOT_FOUND", "grant not found");
       await recomputeFor(tx, rows[0], input.now);
+      await emitV1Event(tx, "entitlement_ended", { projectId: rows[0].project_id, properties: { reason_code: "terminated_early" } });
       return rows[0];
     }),
   );
@@ -227,6 +237,7 @@ export async function activateProgram(db: Db, programId: string, approvedBy: str
   return guarded(async () => {
     const { rows } = await db.query<ProgramRow>("UPDATE entitlement_program SET status = 'active', approved_by = $2 WHERE program_id = $1 RETURNING *", [programId, approvedBy]);
     if (!rows[0]) throw new FaError("NOT_FOUND", "program not found");
+    await emitV1Event(db, "program_activated", { properties: { program_kind: rows[0].kind } });
     return rows[0];
   });
 }
@@ -235,6 +246,7 @@ export async function closeProgram(db: Db, programId: string, now: Date): Promis
   return guarded(async () => {
     const { rows } = await db.query<ProgramRow>("UPDATE entitlement_program SET status = 'closed', closed_at = $2 WHERE program_id = $1 RETURNING *", [programId, now]);
     if (!rows[0]) throw new FaError("NOT_FOUND", "program not found");
+    await emitV1Event(db, "program_closed", { properties: { program_kind: rows[0].kind } });
     return rows[0];
   });
 }
@@ -281,6 +293,19 @@ export async function entitlementCoveredUntil(db: Pick<Db, "query">, projectId: 
   return rows[0]?.t ?? now;
 }
 
+/** The stored access mode of a project (REVOKED when it has no entitlement row yet). */
+export async function accessModeOf(db: Pick<Db, "query">, projectId: string): Promise<"FULL" | "READ_ONLY" | "REVOKED"> {
+  const { rows } = await db.query<{ precision_access_mode: "FULL" | "READ_ONLY" | "REVOKED" }>("SELECT precision_access_mode FROM entitlement WHERE project_id = $1", [projectId]);
+  return rows[0]?.precision_access_mode ?? "REVOKED";
+}
+
+/** Emits `entitlement_mode_changed` when the stored mode differs from `before`; returns the new mode. */
+export async function emitModeChange(db: Db, projectId: string, before: "FULL" | "READ_ONLY" | "REVOKED"): Promise<"FULL" | "READ_ONLY" | "REVOKED"> {
+  const after = await accessModeOf(db, projectId);
+  if (after !== before) await emitV1Event(db, "entitlement_mode_changed", { projectId, properties: { from_mode: before, to_mode: after } });
+  return after;
+}
+
 export interface SourceSyncStats {
   activated: number;
   ended: number;
@@ -313,7 +338,9 @@ export async function syncEntitlementSources(db: Db, input: { now: Date }): Prom
     [now, BATCH],
   );
   for (const r of toActivate.rows) {
+    const before = await accessModeOf(db, r.project_id);
     await db.query("SELECT entitlement_recompute($1, $2)", [r.project_id, now]);
+    await emitModeChange(db, r.project_id, before);
     stats.activated += 1;
   }
 
@@ -325,7 +352,9 @@ export async function syncEntitlementSources(db: Db, input: { now: Date }): Prom
     [now, BATCH],
   );
   for (const r of toEnd.rows) {
+    const before = await accessModeOf(db, r.project_id);
     await db.query("SELECT entitlement_recompute($1, $2)", [r.project_id, now]);
+    if ((await emitModeChange(db, r.project_id, before)) === "READ_ONLY") await emitV1Event(db, "entitlement_ended", { projectId: r.project_id, properties: { reason_code: "period_elapsed" } });
     stats.ended += 1;
   }
   return stats;
@@ -340,4 +369,7 @@ export async function recordPrivacyEvent(db: Db, input: { projectId: string; eve
   await guarded(() =>
     db.query("INSERT INTO project_privacy_event (project_id, event, reason_code, actor) VALUES ($1, $2, $3, $4)", [input.projectId, input.event, input.reasonCode, input.actor]),
   );
+  if (input.event !== "access_restored") {
+    await emitV1Event(db, "privacy_block_applied", { projectId: input.projectId, properties: { privacy_event: input.event, reason_code: input.reasonCode } });
+  }
 }

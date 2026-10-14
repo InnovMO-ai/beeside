@@ -184,4 +184,61 @@ describeWithDb("Premium entitlement sources -> Core -> Precision (PostgreSQL, ro
     expect((await provider().get(a.id)).accessMode).toBe("REVOKED");
     await expect(recordPrivacyEvent(h.deps.db, { projectId: a.id, event: "access_restored", reasonCode: "other", actor: "x" })).rejects.toMatchObject({ code: "NOT_APPLICABLE" });
   });
+
+  it("ANALYTICS: every entitlement source change leaves an opaque, catalogued event — codes only, never a reason, e-mail or company name", async () => {
+    const a = await lockedProject();
+    const b = await lockedProject();
+    const adm = await admin("approver", "ADMIN");
+    const sup = await admin("elevated", "SUPER_ADMIN");
+    const t0 = h.clock.now;
+    const events = async (type: string, project?: string) =>
+      (await h.client.query("SELECT properties FROM fa_journey_event WHERE event_type = $1 AND ($2::uuid IS NULL OR project_id = $2) ORDER BY ctid", [type, project ?? null])).rows.map((r) => r.properties);
+
+    const g1 = await issueGrant(h.deps.db, { scope: { projectId: a.id }, source: "manual", startsAt: t0, endsAt: new Date(t0.getTime() + 10 * DAY), reason: "ana.rivera@northwind-test.example asked nicely", approvedBy: adm, actor: `admin:${adm}`, now: t0, idempotencyKey: "an-1" });
+    await issueGrant(h.deps.db, { scope: { projectId: a.id }, source: "manual", startsAt: t0, endsAt: new Date(t0.getTime() + 10 * DAY), reason: "retry", approvedBy: adm, actor: `admin:${adm}`, now: t0, idempotencyKey: "an-1" }); // idempotent retry: no second event
+    await issueGrant(h.deps.db, { scope: { projectId: a.id }, source: "manual", startsAt: new Date(t0.getTime() + 10 * DAY), endsAt: new Date(t0.getTime() + 20 * DAY), reason: "extension", approvedBy: adm, actor: `admin:${adm}`, now: t0, extendsGrantId: g1.grant_id });
+    expect(await events("entitlement_granted", a.id)).toEqual([
+      { source_type: "manual", scope: "project", program_kind: "none", chained: false },
+      { source_type: "manual", scope: "project", program_kind: "none", chained: true },
+    ]);
+    expect(await events("entitlement_extended", a.id)).toEqual([{ source_type: "manual" }]);
+
+    const program = await createProgram(h.deps.db, { code: "an-promo", name: "Analytics promo", kind: "promotion", grantDays: 30, startsAt: new Date(t0.getTime() - DAY), endsAt: new Date(t0.getTime() + 30 * DAY), reason: "market opening", createdBy: adm });
+    await activateProgram(h.deps.db, program.program_id, sup);
+    await redeemProgram(h.deps.db, { programId: program.program_id, projectId: b.id, now: t0, actor: "system:redeem" });
+    await redeemProgram(h.deps.db, { programId: program.program_id, projectId: b.id, now: t0, actor: "system:redeem" }); // idempotent
+    expect(await events("program_activated")).toEqual([{ program_kind: "promotion" }]);
+    expect(await events("program_redeemed", b.id)).toEqual([{ program_kind: "promotion" }]);
+    expect((await events("entitlement_granted", b.id))[0]).toEqual({ source_type: "promotion", scope: "project", program_kind: "promotion", chained: false });
+    await closeProgram(h.deps.db, program.program_id, t0);
+    expect(await events("program_closed")).toEqual([{ program_kind: "promotion" }]);
+
+    // the chained grants run out: the clock-driven sync reports the mode change and the end, once
+    h.clock.now = new Date(t0.getTime() + 21 * DAY);
+    await syncEntitlementSources(h.deps.db, { now: h.clock.now });
+    expect(await events("entitlement_mode_changed", a.id)).toEqual([{ from_mode: "FULL", to_mode: "READ_ONLY" }]);
+    expect(await events("entitlement_ended", a.id)).toEqual([{ reason_code: "period_elapsed" }]);
+    await syncEntitlementSources(h.deps.db, { now: h.clock.now });
+    expect(await events("entitlement_mode_changed", a.id)).toHaveLength(1);
+
+    // the read-only window closes: REVOKED, reported by the sweep
+    await sweepPrecisionAccess(h.deps.db, h.deps.bundles, { now: h.clock.now, policy: POLICY });
+    h.clock.now = new Date(h.clock.now.getTime() + (POLICY.readonlyGraceDays + 1) * DAY);
+    await sweepPrecisionAccess(h.deps.db, h.deps.bundles, { now: h.clock.now, policy: POLICY });
+    expect((await events("entitlement_mode_changed", a.id)).map((e) => `${e.from_mode}>${e.to_mode}`)).toEqual(["FULL>READ_ONLY", "READ_ONLY>REVOKED"]);
+    expect(await events("entitlement_ended", a.id)).toEqual([{ reason_code: "period_elapsed" }, { reason_code: "window_closed" }]);
+
+    // early termination and privacy
+    const c = await lockedProject();
+    const g = await issueGrant(h.deps.db, { scope: { projectId: c.id }, source: "trial", startsAt: h.clock.now, endsAt: new Date(h.clock.now.getTime() + 30 * DAY), reason: "t", approvedBy: adm, actor: `admin:${adm}`, now: h.clock.now });
+    await terminateGrant(h.deps.db, { grantId: g.grant_id, terminatedBy: adm, reason: "client left, see ticket 4821", now: h.clock.now });
+    expect(await events("entitlement_ended", c.id)).toEqual([{ reason_code: "terminated_early" }]);
+    await recordPrivacyEvent(h.deps.db, { projectId: c.id, event: "access_blocked", reasonCode: "legal_order", actor: `admin:${sup}` });
+    await recordPrivacyEvent(h.deps.db, { projectId: c.id, event: "access_restored", reasonCode: "other", actor: `admin:${sup}` });
+    expect(await events("privacy_block_applied", c.id)).toEqual([{ privacy_event: "access_blocked", reason_code: "legal_order" }]);
+
+    // nothing free-form reached any analytics row
+    const all = JSON.stringify((await h.client.query("SELECT properties FROM fa_journey_event")).rows);
+    expect(all).not.toMatch(/ana\.rivera|asked nicely|ticket 4821|northwind|Analytics promo|an-promo/i);
+  });
 });

@@ -1,3 +1,4 @@
+import { emitV1EventSafe } from "../../../analytics/v1-events";
 /**
  * Send to Operation Hub (Build Readiness E-5/E-6/E-7).
  *
@@ -70,15 +71,25 @@ export async function sendCrp(deps: SendDeps, actor: CrpActor, categoryId: strin
   } catch (e) {
     // Nothing is known about the outcome beyond the ledger; the client may simply try again (same key, safe).
     deps.log("error", "precision send failed unexpectedly", { error: describeError(e) });
+    await emitV1EventSafe(deps.db, "operation_hub_send_failed", { projectId: actor.projectId, eventKey: `operation_hub_send_failed:${h.key}:x:${deps.now().getTime()}`, locale: actor.locale, properties: { error_class: "unavailable", retryable: true } });
     throw new CrpError("TEMPORARILY_UNAVAILABLE", { cause: e });
   }
 
   if (result.state === "blocked") throw new CrpError("ACTIVATION_PENDING_RETRY_FIRST");
   const operationHub = await operationHubDto(deps.db, deps.delivery, actor.projectId, actor.locale).catch(() => ({ state: "hidden" as const, url: null, contact: null }));
+  if (typeof result.attempt === "number" && result.attempt > 1) {
+    await emitV1EventSafe(deps.db, "operation_hub_send_retried", { projectId: actor.projectId, eventKey: `operation_hub_send_retried:${h.key}:${result.attempt}`, locale: actor.locale, properties: { attempt: result.attempt } });
+  }
   if (result.state === "sent") {
     await recordSent(deps, actor.projectId, h, result.attempt, actor.locale);
     return { state: "sent", clientAction: null, retryable: false, operationHub };
   }
+  await emitV1EventSafe(deps.db, "operation_hub_send_failed", {
+    projectId: actor.projectId,
+    eventKey: `operation_hub_send_failed:${h.key}:${result.attempt ?? 0}`,
+    locale: actor.locale,
+    properties: { error_class: result.clientCategory === "needs_attention" ? "needs_attention" : "try_again_later", retryable: result.canRetry === true, ...(typeof result.attempt === "number" ? { attempt: result.attempt } : {}) },
+  });
   return {
     state: "failed",
     clientAction: result.clientCategory === "needs_attention" ? "needs_attention" : "try_again_later",

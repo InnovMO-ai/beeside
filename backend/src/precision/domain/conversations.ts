@@ -1,3 +1,4 @@
+import { emitV1EventSafe, latencyBucket } from "../../analytics/v1-events";
 /**
  * The three conversation surfaces (Understanding, Category, Add a Service): the thin domain layer around the conversation
  * engine. The engine phrases, extracts and verifies; this layer decides what the answers MEAN for the project:
@@ -159,9 +160,17 @@ export function createThreadServices(deps: PrecisionDomainDeps, fa: FaContextSer
   async function runTurn(input: ProcessTurnInput): Promise<ProcessTurnResult> {
     inFlight.add(input.turnKey);
     failed.delete(input.turnKey);
+    const started = Date.now();
     try {
       const r = await deps.conversation.processTurn(input);
       if (r.status === "ai_unavailable") failed.add(input.turnKey);
+      // Experience signal only (surface, outcome, latency bucket): never the text of the conversation.
+      if (r.status === "ok" || r.status === "ai_unavailable") await emitV1EventSafe(deps.db, "ai_turn_completed", {
+        projectId: input.projectId,
+        eventKey: `ai_turn_completed:${input.turnKey}:${r.status}`,
+        locale: input.locale,
+        properties: { surface: input.surface === "understanding" ? "understanding" : "category", status: r.status, latency_bucket: latencyBucket(Date.now() - started) },
+      });
       return r;
     } finally {
       inFlight.delete(input.turnKey);
