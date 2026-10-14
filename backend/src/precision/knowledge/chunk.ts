@@ -50,7 +50,7 @@ export function chunkSections(sections: Section[], ctx: ChunkContext): Knowledge
       const units = [...new Set([...states, ...places.map((p) => p.name), ...(ind ? [ind.unit] : [])])];
       const granularity: Granularity = places.length ? "municipality" : ind ? ind.unitKind : states.length ? "state" : "country";
       let topics = classifyTopics(`${part.text} ${ind?.name ?? ""}`);
-      if (topics.length === 0 && ctx.defaultTopics) topics = ctx.defaultTopics.slice(0, 2);
+      if (topics.length === 0 && ctx.defaultTopics && !ind) topics = ctx.defaultTopics.slice(0, 2);
       out.push({ id: `${ctx.documentId}:${ord}`, documentId: ctx.documentId, sourceId: ctx.sourceId, ordinal: ord++, text: part.text, location: part.location, topics, units, granularity, indicators: ind ? [ind] : [] });
     }
   }

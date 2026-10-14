@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseIndicatorSheet, parseTsv, type SheetRow } from "./pdf-sheets";
 
 export type DocFormat = "pdf" | "docx" | "html" | "csv" | "md" | "txt";
 export interface Section { location: string; text: string; row?: Record<string, string> }
@@ -29,8 +30,42 @@ function withTemp<T>(name: string, data: Buffer, fn: (path: string) => T): T {
 }
 
 export function extractPdf(data: Buffer): Section[] {
-  const out = withTemp("in.pdf", data, (p) => execFileSync("pdftotext", ["-layout", "-enc", "UTF-8", p, "-"], { maxBuffer: 256 * 1024 * 1024 }).toString("utf8"));
-  return out.split("\f").map((t, i) => ({ location: `p. ${i + 1}`, text: t.replace(/[ \t]+\n/g, "\n").trim() })).filter((s) => s.text.length > 0);
+  const run = (args: string[]): string => withTemp("in.pdf", data, (p) => execFileSync("pdftotext", [...args, "-enc", "UTF-8", p, "-"], { maxBuffer: 512 * 1024 * 1024 }).toString("utf8"));
+  const pages = (t: string): string[] => t.split("\f");
+  const layout = pages(run(["-layout"]));
+  const reading = pages(run([]));
+  // pages that carry indicator tables are read by word position (structured rows); the rest as text in reading order
+  let sheets = new Map<number, SheetRow[]>();
+  try {
+    const words = parseTsv(run(["-tsv"]));
+    for (const [page, ws] of words) {
+      const rows = parseIndicatorSheet(ws);
+      if (rows.length > 0) sheets.set(page, rows);
+    }
+  } catch { sheets = new Map(); }
+
+  const out: Section[] = [];
+  const total = Math.max(layout.length, reading.length);
+  for (let i = 0; i < total; i++) {
+    const page = i + 1;
+    const rows = sheets.get(page);
+    if (rows) {
+      for (const r of rows) {
+        const unit = r.description ? ` ${r.description}` : "";
+        const rank = r.rank !== undefined ? `; posición ${r.rank} entre las entidades comparadas (1 = mejor desempeño relativo)` : "";
+        out.push({
+          location: `p. ${page} · ${r.entity} · ${r.group}`,
+          text: `${r.entity} — ${r.group}: ${r.indicator} = ${r.display}${rank}.${unit}`,
+          row: { Estado: r.entity, Indicador: r.indicator, Valor: String(r.value).replace(/,/g, ""), ...(r.rank !== undefined ? { Posición: String(r.rank) } : {}), Subíndice: r.group },
+        });
+      }
+      continue;
+    }
+    const raw = layout[i] !== undefined && /\bIndicador\b/.test(layout[i]!) ? layout[i]! : reading[i] ?? layout[i] ?? "";
+    const text = raw.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (text.length > 0) out.push({ location: `p. ${page}`, text });
+  }
+  return out;
 }
 
 export function extractDocx(data: Buffer): Section[] {
