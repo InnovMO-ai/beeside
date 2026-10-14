@@ -9,7 +9,6 @@ import { describeWithDb, useHarness } from "./fa-harness";
 const ISSUER = "https://idp.test";
 const CLIENT_ID = "beeside-control-center";
 const APP_ORIGIN = "https://admin.test";
-const DAY = 86_400_000;
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const JWK = { ...publicKey.export({ format: "jwk" }), kid: "test-key-1", use: "sig", alg: "RS256" };
 

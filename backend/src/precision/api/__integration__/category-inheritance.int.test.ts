@@ -164,4 +164,91 @@ d("Category inheritance — the category deepens the project, it does not restar
     const wrote = await syncProjectInheritance({ db: h.db, registry: h.runtime.deps.registry } as never, projectId);
     expect(wrote).toBe(0);
   }, 180000);
+
+  it("end to end: the Portuguese company reaches Preview and Operation Hub with the depth of a strong first meeting, without repeating itself", async () => {
+    const { projectId, api } = await portugueseProject();
+    const id = await categoryIdOf(projectId, "tax_accounting_audit");
+    const opening = (await api.get(`/categories/${id}`)).body;
+    expect(opening.progress.ready).toBe(false);
+
+    // the category deepens: it only asks what is missing (registration, fiscal year, framework, group reporting, transfer-pricing status)
+    const asked: string[] = [];
+    const BY_FIELD: Record<string, Record<string, unknown>> = {
+      tax_registration_status: { quickReply: { value: "not_started", intent: "answer" } },
+      tax_fiscal_year_end: { text: "2026-12-31" },
+      tax_accounting_framework: { quickReply: { value: "ifrs", intent: "answer" } },
+      tax_parent_reporting_required: { quickReply: { value: "true", intent: "answer" } },
+      tax_parent_reporting_framework: { quickReply: { value: "ifrs", intent: "answer" } },
+      tax_transfer_pricing_documentation_status: { quickReply: { value: "not_started", intent: "answer" } },
+      tax_advisory_questions: { text: "Cómo estructurar el financiamiento desde Portugal y qué documentar entre empresas del grupo." },
+    };
+    let last: any = opening;
+    for (let i = 0; i < 20 && !last.progress.ready; i++) {
+      const field = (await h.db.query<{ structured: any }>("SELECT structured FROM precision_turn WHERE project_id = $1 AND role = 'assistant' AND scope_instance_id = $2 ORDER BY seq DESC LIMIT 1", [projectId, id])).rows[0]?.structured?.state?.fieldKey as string | undefined;
+      asked.push(String(field));
+      const body = (field && BY_FIELD[field]) ?? { text: "Todavía no lo sé." };
+      const r = await api.post(`/categories/${id}/turns`, { turnKey: key("t"), text: "", ...body });
+      expect(r.status).toBe(200);
+      last = r.body;
+    }
+    expect(last.progress.ready).toBe(true);
+    expect(asked).not.toEqual(expect.arrayContaining(["tax_has_intercompany_transactions", "tax_intercompany_transactions", "tax_services_in_scope"]));
+    expect(asked[0]).toBe("tax_registration_status"); // the first thing the category needs is what the project could not know
+    expect(asked.length).toBeLessThanOrEqual(8);
+
+    // CRP -> Preview -> send
+    expect((await api.post(`/categories/${id}/crp/confirm`, {})).status).toBe(200);
+    const preview = (await api.get(`/categories/${id}/preview`)).body;
+    expect(preview.canSend).toBe(true);
+    const previewText = JSON.stringify(preview.blocks);
+    expect(previewText).toMatch(/entidad/i);
+    expect(previewText).not.toMatch(/new:|_generic|fa4_|n:disc|fr:|¿/);
+    const sent = await api.post(`/categories/${id}/send`, { previewChecksum: preview.previewChecksum });
+    expect(sent.status).toBe(200);
+    expect(sent.body.state).toBe("sent");
+
+    // what the (simulated) platform actually received: richer than what Discovery alone could say
+    const received = h.runtime.deps.integrations.operationHub as unknown as { receivedPayloads(p: string): any[] };
+    const payloads = received.receivedPayloads(projectId);
+    const crp = payloads.find((p) => p.contract.kind === "crp") ?? payloads.find((p) => p.contract.kind === "first_send") ?? payloads[0];
+    expect(crp).toBeDefined();
+    const psm = crp.project_context.psm;
+    expect(psm.understanding.version).toBe(1);
+    const factText = psm.understanding.facts.map((f: any) => `${f.label}: ${f.value}`).join(" | ");
+    expect(factText).toMatch(/60 personas/);
+    expect(factText).toMatch(/3 millones/);
+    expect(psm.understanding.findings.length).toBeGreaterThan(2);
+    expect(psm.understanding.findings.map((f: any) => f.title).join(" ")).toMatch(/subcontratado|intercompa|matriz/i);
+    // the client's priority and reasons travel with the map, in the client's words
+    const entity = psm.categories.flatMap((c: any) => c.items).find((i: any) => /entidad/i.test(i.label));
+    expect(entity).toMatchObject({ priority: "high" });
+    expect(entity.why).toBeTruthy();
+    // the category record carries what was inherited AND what was deepened; the services and intercompany transactions were not re-asked
+    const structured = JSON.stringify(crp.artifact.structured);
+    expect(structured).toMatch(/transfer_pricing|precios de transferencia|Precios de transferencia/i);
+    expect(structured).toMatch(/Portugal/); // the counterparty country comes from the project, not from a new question
+    // corporate, legal, tax, labor, accounting and intercompany are all represented, and the specialist findings travel with them
+    const labels = psm.categories.map((c: any) => `${c.category_label}`).join(" | ");
+    expect(labels).toMatch(/Corporativo|legal/i);
+    expect(labels).toMatch(/Personas|nómina|empleo/i);
+    expect(labels).toMatch(/Impuestos|fiscal/i);
+    const allItems = psm.categories.flatMap((c: any) => c.items.map((i: any) => i.label.toLowerCase())).join(" | ");
+    expect(allItems).toMatch(/contabilidad/);
+    expect(allItems).toMatch(/intercompa|precios de transferencia/);
+    expect(allItems).toMatch(/seguridad social|laboral|contratar/);
+    const findings = psm.understanding.findings.map((f: any) => `${f.title} ${f.detail}`).join(" ").toLowerCase();
+    expect(findings).toMatch(/subcontrat|tercero/);
+    expect(findings).toMatch(/prestaciones|laboral|directa/);
+    expect(findings).toMatch(/intercompa|matriz/);
+    // Discovery alone gave ONE need; the platform now holds the whole project
+    expect(psm.categories.flatMap((c: any) => c.items).length).toBeGreaterThan(5);
+    // no conversational residue and no internal identifiers
+    expect(JSON.stringify(crp)).not.toMatch(/n:disc|"fr:|new:|_generic|fa4_|¿/);
+    // backward compatible: a consumer that ignores the additive block still reads a complete, valid payload
+    const { understanding: _ignored, ...legacyPsm } = psm;
+    void _ignored;
+    expect(legacyPsm.objectives.length).toBeGreaterThan(0);
+    expect(legacyPsm.categories.length).toBeGreaterThan(2);
+    expect(internalTermsIn(h.seen)).toEqual([]);
+  }, 240000);
 });

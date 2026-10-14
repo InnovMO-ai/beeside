@@ -51,6 +51,8 @@ interface StoredDelivery {
   acceptedAt: string;
   projectId: string;
   kind: string;
+  /** What the platform received (a copy), for acceptance tests that read the delivery back. */
+  payload: OhHandoffPayload;
 }
 
 export class SimulatedOperationHub implements OperationHubPort, OhFaultInjector {
@@ -88,6 +90,11 @@ export class SimulatedOperationHub implements OperationHubPort, OhFaultInjector 
 
   /** Test/review hook: counts what the platform actually holds (duplicate-protection assertions). */
   storedCount(): number { return this.deliveries.size; }
+
+  /** Test/review hook: the payloads the platform holds for a project, oldest first. */
+  receivedPayloads(projectId: string): OhHandoffPayload[] {
+    return [...this.deliveries.values()].filter((d) => d.projectId === projectId).map((d) => d.payload);
+  }
 
   async publish(payload: OhHandoffPayload): Promise<OhAcceptance> {
     const key = payload.contract.idempotency_key;
@@ -127,6 +134,7 @@ export class SimulatedOperationHub implements OperationHubPort, OhFaultInjector 
       acceptedAt: this.now().toISOString(),
       projectId: payload.identity.project_id,
       kind: payload.contract.kind,
+      payload: JSON.parse(JSON.stringify(payload)) as OhHandoffPayload,
     };
     this.deliveries.set(key, stored);
     this.provisionedProjects.add(payload.identity.project_id);

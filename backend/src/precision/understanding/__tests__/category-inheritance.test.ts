@@ -91,3 +91,46 @@ describe("category inheritance — the category deepens the project, it does not
     expect(answered.asking).not.toContain("tax.intercompany");
   });
 });
+
+describe("category inheritance across the acceptance corpus — only what each project established, nothing more", () => {
+  const inheritedBy = (frame: ReturnType<typeof runPersona>["conv"]["frame"], categories: string[]): Record<string, string[]> =>
+    Object.fromEntries(categories.map((k) => [k, deriveInherited(frame, k, fieldsOf(k) as never).map((f) => f.fieldKey)]));
+  const ALL = ["corporate_legal_admin", "people_payroll_employment", "tax_accounting_audit", "logistics", "international_trade_customs"];
+
+  it("a small office with five direct hires: the employment model and headcount carry over; nothing about groups or taxes is invented", () => {
+    const seed: DiscoverySeedInput = { locale: "es", destinationCodes: ["MX"], sector: "Software", objective: "Abrir una oficina en Querétaro", needs: [{ capabilityId: "office_search", label: "Oficina" }] };
+    const run = runPersona("es", seed, { opening: "Queremos una oficina en Querétaro y contratar a 5 personas nosotros mismos, contratación directa.", answers: { "workforce.benefits": "Solo las prestaciones de ley.", "workforce.origin": "Todo el personal sería contratado localmente." }, priority: "Lo más importante es la oficina." });
+    const frame = run.conv.frame;
+    const hr = deriveInherited(frame, "people_payroll_employment", fieldsOf("people_payroll_employment") as never);
+    expect(hr.find((f) => f.fieldKey === "hr_employment_model")?.value).toBe("direct_entity");
+    expect(hr.find((f) => f.fieldKey === "hr_employee_population_breakdown")?.value).toEqual([{ headcount: 5, country: ["MX"] }]);
+    const by = inheritedBy(frame, ALL);
+    expect(by.tax_accounting_audit).not.toContain("tax_has_intercompany_transactions");
+    expect(by.international_trade_customs).toEqual([]);
+  });
+
+  it("a coffee exporter has no payroll or entity facts to inherit", () => {
+    const seed: DiscoverySeedInput = {
+      locale: "es", destinationCodes: ["MX", "US"], sector: "Alimentos y bebidas", operatingCountries: ["CO"],
+      objective: "Queremos exportar café de Colombia a México y luego a Estados Unidos, con cadena de frío.",
+      needs: [{ capabilityId: "customs_advisory", label: "Asesoría aduanera y de comercio exterior" }, { capabilityId: "freight_transportation", label: "Transporte de carga" }],
+    };
+    const run = runPersona("es", seed, { opening: "Sí, es café verde de exportación, tostado después en destino.", answers: { "trade.volume": "Unos 20 contenedores al mes.", "trade.temperature": "Entre 2 y 8 °C.", "project.why": "Porque tenemos compradores en ambos mercados.", "project.phases": "Primero México y luego Estados Unidos." }, priority: "Primero la aduana y el transporte, porque ya tenemos el primer embarque.", implied: "yes" });
+    const by = inheritedBy(run.conv.frame, ALL);
+    expect(by.people_payroll_employment).toEqual([]);
+    expect(by.corporate_legal_admin).toEqual([]);
+    expect(by.tax_accounting_audit).toEqual([]);
+  });
+
+  it("the Portuguese case, by category: every inherited field exists in that category's manifest and carries a client-origin provenance", () => {
+    for (const k of ALL) {
+      const names = new Set(bundledCategoryManifest(k)!.fields.map((f) => f.field_key));
+      for (const f of deriveInherited(frame0(), k, fieldsOf(k) as never)) {
+        expect(names.has(f.fieldKey)).toBe(true);
+        expect(["client_answered", "client_confirmed", "client_corrected"]).toContain(f.provenance);
+      }
+    }
+  });
+});
+
+function frame0() { return runPersona("es", SEED, PERSONA).conv.frame; }
