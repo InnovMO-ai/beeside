@@ -21,6 +21,7 @@ import type { ModelProvider } from "../conversation";
 import { integrationStatus } from "../ports/registry";
 import type { InternalStatusDto, Locale, ResourceLinkDto } from "./dto";
 import { ApiError, classifyError, errorBody } from "./errors";
+import { isOpenable } from "../knowledge/country-resources";
 import { createPgCountryResources } from "../knowledge/pg-repo";
 import { createPgFrameStore } from "../understanding/pg-store";
 
@@ -178,8 +179,8 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
     const id = idOf(req);
     const stored = await createPgFrameStore(deps.db).load(a.projectId);
     const res = stored?.frame.asked[`res:${id}`] ? await createPgCountryResources(deps.db).get(id) : null;
-    if (!res || !res.active) throw new ApiError("NOT_FOUND");
-    return { id: res.id, title: res.title, kind: res.destination.kind, ref: res.destination.ref } satisfies ResourceLinkDto;
+    if (!res || !res.active || !isOpenable(res)) throw new ApiError("NOT_FOUND");
+    return { id: res.id, title: res.title, kind: "url", ref: res.destination.ref } satisfies ResourceLinkDto;
   });
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));

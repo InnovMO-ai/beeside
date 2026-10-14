@@ -15,6 +15,7 @@ import { MX_STATES } from "../geo";
 
 const LIBRO = process.env.IMCO_ICE_LIBRO ?? "";
 const ANEXO = process.env.IMCO_ICE_ANEXO ?? "";
+const BOLETAS = process.env.IMCO_ICE_BOLETAS ?? "";
 const have = existsSync(LIBRO) && existsSync(ANEXO);
 const NOW = "2026-10-14T12:00:00.000Z";
 const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-2025/";
@@ -117,4 +118,14 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     const all = await retrieve(repo, { text: "cuotas obrero-patronales", jurisdiction: "MX", limit: 20 });
     expect(all.every((h) => !h.mayGroundObligation)).toBe(true);
   }, 120000);
+
+  // the per-state bulletins ("Boletas") publish the same sheets as the book: they are a cross-check, not a second source of facts
+  (existsSync(BOLETAS) ? it : it.skip)("the Boletas carry exactly the state sheets of the book (independent corroboration; not ingested twice)", async () => {
+    const { extractPdf } = await import("../extract");
+    const rowsOf = (file: string): string[] =>
+      extractPdf(readFileSync(file)).filter((x) => x.row).map((x) => [x.row!.Estado, x.row!.Subíndice, x.row!.Indicador, x.row!.Valor, x.row!.Posición ?? ""].join("|")).sort();
+    const [b, l] = [rowsOf(BOLETAS), rowsOf(LIBRO)];
+    expect(b.length).toBe(1695); // 32 states x 53 indicators, minus the one cell published as "-"
+    expect(b).toEqual(l);
+  }, 240000);
 });

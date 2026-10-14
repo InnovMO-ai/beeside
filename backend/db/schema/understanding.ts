@@ -182,5 +182,7 @@ export const countryResource = pgTable(
     check("country_resource_language", sql`${t.language} ~ '^[a-z]{2}$'`),
     check("country_resource_kind", sql`${t.destinationKind} IN ('url','document')`),
     check("country_resource_https", sql`${t.destinationKind} <> 'url' OR ${t.destinationRef} ~ '^https://[^ ]+$'`),
+    // V1 (no document management): a customer-visible ACTIVE resource always resolves to an https URL
+    check("country_resource_active_resolvable", sql`NOT ${t.active} OR ${t.destinationKind} = 'url'`),
   ],
 );

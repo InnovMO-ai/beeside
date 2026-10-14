@@ -90,6 +90,21 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     expect(rows.length).toBeGreaterThanOrEqual(4);
     expect(JSON.stringify(rows)).not.toContain("guides.example.test");
 
+    // V1 (no document management): a document without a URL is a draft; it can never be made active for customers
+    const draft = await post(admin, "/precision/country-resources", { ...base, version: "draft", title: "Borrador sin URL", destination: { kind: "document", ref: "docs/borrador-mx" } });
+    expect(draft.status).toBe(201);
+    expect(draft.body.active).toBe(false);
+    expect((await post(admin, `/precision/country-resources/${draft.body.id}/activate`)).status).toBe(400);
+    expect((await post(admin, "/precision/country-resources", { ...base, version: "x1", title: "Otro borrador", active: true, destination: { kind: "document", ref: "docs/otro" } })).status).toBe(400);
+    // once it has a resolvable https URL it can go live (same resource, new destination)
+    const fixed = await put(admin, `/precision/country-resources/${draft.body.id}`, { destination: { kind: "url", ref: "https://guides.example.test/borrador-publicado" } });
+    expect(fixed.status).toBe(200);
+    expect((await post(admin, `/precision/country-resources/${draft.body.id}/activate`)).body.active).toBe(true);
+    // the database enforces the same rule
+    await h.client.query("SAVEPOINT raw_doc");
+    await expect(h.client.query("INSERT INTO country_resource (id, country_code, title, language, version, destination_kind, destination_ref, active, updated_at) VALUES ('raw-doc','MX','raw','es','1','document','docs/raw',true,'2026-10-14')")).rejects.toThrow(/country_resource_active_resolvable/);
+    await h.client.query("ROLLBACK TO SAVEPOINT raw_doc");
+
     const sources = await get(supervisor, "/precision/knowledge/sources");
     expect(sources.status).toBe(200);
     expect(Array.isArray(sources.body.sources)).toBe(true);

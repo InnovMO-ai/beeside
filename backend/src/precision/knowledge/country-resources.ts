@@ -32,8 +32,13 @@ export function validateResource(r: CountryResource): string[] {
   if (!r.version.trim()) e.push("version required");
   if (r.destination.kind === "url" && !/^https:\/\/[^\s]+$/.test(r.destination.ref)) e.push("url must be https");
   if (r.destination.kind === "document" && !/^[A-Za-z0-9][A-Za-z0-9_./:-]{2,200}$/.test(r.destination.ref)) e.push("document reference is invalid");
+  // V1 has no document management: a customer-visible (active) resource always resolves to a valid https URL
+  if (r.active && r.destination.kind !== "url") e.push("an active resource must resolve to an https URL; a document without a URL stays inactive");
   return e;
 }
+
+/** A customer can open it: an https URL. */
+export const isOpenable = (r: Pick<CountryResource, "destination">): boolean => r.destination.kind === "url" && /^https:\/\/[^\s]+$/.test(r.destination.ref);
 
 export class InMemoryCountryResources implements CountryResourceRepository {
   private m = new Map<string, CountryResource>();
@@ -45,7 +50,8 @@ export class InMemoryCountryResources implements CountryResourceRepository {
 /** Newest active version of each resource title for the country, in the client's language first. */
 export async function resolveResources(repo: CountryResourceRepository, q: { countryCode: string; language: string; topic?: string; now?: string }): Promise<CountryResource[]> {
   const all = await repo.list({ countryCode: q.countryCode.toUpperCase(), activeOnly: true });
-  const live = all.filter((r) => !r.effectiveAt || !q.now || r.effectiveAt <= q.now);
+  // only what can actually be opened is ever offered, whatever the stored row says
+  const live = all.filter((r) => isOpenable(r) && (!r.effectiveAt || !q.now || r.effectiveAt <= q.now));
   const latest = new Map<string, CountryResource>();
   for (const r of live) {
     const k = `${r.title}|${r.language}`;

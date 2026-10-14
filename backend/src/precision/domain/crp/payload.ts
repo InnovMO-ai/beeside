@@ -46,6 +46,8 @@ export interface PayloadPsm {
   open_items: string[];
   /** What Precision understood (additive; absent for projects understood by the generic engine). */
   understanding?: {
+    /** Contract version of this block (additive and backward compatible; consumers ignore fields they do not know). */
+    version: number;
     context: string[];
     facts: { label: string; value: string }[];
     pending: string[];
@@ -102,6 +104,7 @@ export function toPayloadPsm(snapshot: SnapshotRow): PayloadPsm {
   const u = obj(c.understanding);
   const SPECIALTIES = new Set(["legal", "tax", "labor", "customs", "regulatory", "corporate", "finance"]);
   const understanding = {
+    version: typeof u.version === "number" && Number.isInteger(u.version) && u.version >= 1 ? u.version : 1,
     context: strs(u.context, 400).slice(0, 8),
     facts: arr(u.facts).map((f) => ({ label: sanitizeText(obj(f).label, 120), value: sanitizeText(obj(f).value, 240) })).filter((f) => f.label && f.value).slice(0, 30),
     pending: strs(u.pending, 200).slice(0, 20),

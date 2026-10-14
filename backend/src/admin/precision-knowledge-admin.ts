@@ -30,7 +30,8 @@ function parseResource(id: string, b: Record<string, unknown>, now: Date): Count
     language: str(b.language, "language", 2).toLowerCase(),
     version: str(b.version, "version", 40),
     destination: { kind, ref: str(dest.ref, "destination.ref", 600) },
-    active: b.active === false ? false : true,
+    // a document without a URL cannot be opened by a customer in V1: it is kept as an inactive draft until it has an https URL
+    active: b.active === false ? false : b.active === true ? true : kind === "url",
     updatedAt: now.toISOString(),
     ...(effectiveAt ? { effectiveAt } : {}),
     ...(topic ? { topic } : {}),
@@ -65,6 +66,8 @@ export async function setCountryResourceActive(db: Db, id: string, active: boole
   const cur = await repo.get(id);
   if (!cur) throw new FaError("NOT_FOUND", "resource not found");
   const next = { ...cur, active, updatedAt: now.toISOString() };
+  const errors = validateResource(next);
+  if (errors.length) throw new FaError("INVALID_INPUT", errors.join("; "), { fields: ["resource"] });
   await repo.upsert(next);
   return next;
 }

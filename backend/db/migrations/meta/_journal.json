@@ -260,6 +260,13 @@
       "when": 1792011247780,
       "tag": "0036_understanding_knowledge_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792019731068,
+      "tag": "0037_country_resource_https_active",
+      "breakpoints": true
     }
   ]
 }

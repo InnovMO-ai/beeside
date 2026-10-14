@@ -16,7 +16,10 @@ import type { Frame, Loc, Specialty } from "./types";
 
 export interface BriefingFact { label: string; value: string }
 export interface BriefingFinding { title: string; detail: string; specialty: Specialty | null }
+/** Contract version of the `understanding` block that travels with the Service Map snapshot and the Operation Hub payload. Additive changes keep it; a breaking change bumps it. */
+export const BRIEFING_VERSION = 1;
 export interface Briefing {
+  version?: number;
   context: string[];
   facts: BriefingFact[];
   pending: string[];
@@ -65,7 +68,7 @@ export function buildBriefing(frame: Frame, now: string, knowledge: FindingKnowl
     .slice(0, MAX.findings)
     .map((f) => ({ title: clean(f.title[loc], 160), detail: clean(f.detail[loc], 420), specialty: f.specialty ?? null }));
 
-  return { context: context.filter(Boolean), facts: facts.slice(0, MAX.facts), pending: [...new Set(pending)], findings };
+  return { version: BRIEFING_VERSION, context: context.filter(Boolean), facts: facts.slice(0, MAX.facts), pending: [...new Set(pending)], findings };
 }
 
 // ------------------------------------------------------------------ hygiene gate
@@ -101,6 +104,7 @@ export function briefingHygiene(b: Briefing): string[] {
 export function sanitizeBriefing(b: Briefing): Briefing {
   const ok = (t: string): boolean => briefingHygiene({ context: [t], facts: [], pending: [], findings: [] }).length === 0;
   return {
+    version: b.version ?? BRIEFING_VERSION,
     context: b.context.filter(ok),
     facts: b.facts.filter((f) => ok(f.label) && ok(f.value)),
     pending: b.pending.filter(ok),

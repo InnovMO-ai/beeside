@@ -7,7 +7,7 @@ import { citation, retrieve, wordingClass } from "../retrieve";
 import { describeComparison, orient } from "../orient";
 import { buildRefsFor, orientationOffer, resolveRef, topicDrivers } from "../drivers";
 import { InMemoryCandidateStore, applyCandidate, decideCandidate, isDue, reviewPath, runAgentCycle, type SourceFetcher } from "../agent";
-import { InMemoryCountryResources, offerResource, resolveResources } from "../country-resources";
+import { InMemoryCountryResources, isOpenable, offerResource, resolveResources } from "../country-resources";
 import { findPlaces, findStates } from "../geo";
 import { emptyFrame } from "../../understanding/types";
 import type { KnowledgeSource } from "../types";
@@ -221,6 +221,26 @@ describe("Country Resource Library", () => {
     expect(off.text.es).toMatch(/No es necesario leerla/);
     expect(offerResource(rs, { topics: ["taxes"], alreadyOffered: ["r3", "r2"], language: "es" })).toBeNull();
     expect(offerResource([rs[0]!], { topics: ["customs"], alreadyOffered: [], language: "es" })).toBeNull(); // topic-bound resource, topic not touched
+  });
+});
+describe("Country Resource Library — V1 rule: every customer-visible resource resolves to an https URL", () => {
+  const base = { countryCode: "MX", title: "Hacer negocios en México", language: "es", version: "2026", updatedAt: "2026-09-01" };
+  it("an active document without a URL is refused; as an inactive draft it is kept but never resolved, offered or opened", async () => {
+    const repo = new InMemoryCountryResources();
+    await expect(repo.upsert({ id: "d1", ...base, destination: { kind: "document", ref: "docs/hacer-negocios-mx" }, active: true })).rejects.toThrow(/https URL/);
+    await repo.upsert({ id: "d1", ...base, destination: { kind: "document", ref: "docs/hacer-negocios-mx" }, active: false });
+    expect((await repo.list()).map((r) => r.id)).toEqual(["d1"]);
+    expect(await resolveResources(repo, { countryCode: "MX", language: "es" })).toEqual([]);
+    expect(isOpenable({ destination: { kind: "document", ref: "docs/x" } })).toBe(false);
+    expect(isOpenable({ destination: { kind: "url", ref: "http://insecure.example.test" } })).toBe(false);
+    expect(isOpenable({ destination: { kind: "url", ref: "https://beeside.example/hacer-negocios-en-mexico.pdf" } })).toBe(true);
+  });
+  it("country -> resource -> version -> configurable URL: a new edition (new URL) supersedes the previous one without touching code", async () => {
+    const repo = new InMemoryCountryResources();
+    await repo.upsert({ id: "v1", ...base, destination: { kind: "url", ref: "https://beeside.example/dbm-2026.pdf" }, active: true });
+    await repo.upsert({ id: "v2", ...base, version: "2027", updatedAt: "2027-01-10", destination: { kind: "url", ref: "https://beeside.example/dbm-2027.pdf" }, active: true });
+    const r = await resolveResources(repo, { countryCode: "MX", language: "es" });
+    expect(r.map((x) => [x.id, x.destination.ref])).toEqual([["v2", "https://beeside.example/dbm-2027.pdf"]]);
   });
 });
 async function resolveRef0(repo: InMemoryCountryResources) { return resolveResources(repo, { countryCode: "mx", language: "es", topic: "taxes" }); }

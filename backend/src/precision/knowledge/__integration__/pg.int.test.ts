@@ -111,7 +111,7 @@ describeWithDb("Knowledge Service + frame store (PostgreSQL)", () => {
   it("country resources: configured destinations are validated and resolved", async () => {
     const repo = createPgCountryResources(db);
     await repo.upsert({ id: "dbm-en", countryCode: "MX", title: "Doing Business in Mexico", language: "en", version: "2026", destination: { kind: "url", ref: "https://example.org/dbm.pdf" }, active: true, updatedAt: "2026-09-01" });
-    await repo.upsert({ id: "dbm-es", countryCode: "MX", title: "Hacer negocios en México", language: "es", version: "2026", destination: { kind: "document", ref: "docs/hacer-negocios-mx-2026" }, active: true, updatedAt: "2026-09-01", topic: "taxes" });
+    await repo.upsert({ id: "dbm-es", countryCode: "MX", title: "Hacer negocios en México", language: "es", version: "2026", destination: { kind: "url", ref: "https://guides.example.test/hacer-negocios-mx-2026" }, active: true, updatedAt: "2026-09-01", topic: "taxes" });
     await expect(repo.upsert({ id: "bad", countryCode: "MX", title: "x", language: "es", version: "1", destination: { kind: "url", ref: "http://insecure" }, active: true, updatedAt: "2026-09-01" })).rejects.toThrow();
     const rs = await resolveResources(repo, { countryCode: "MX", language: "es", topic: "taxes" });
     expect(rs.map((r) => r.id)).toEqual(["dbm-es", "dbm-en"]);
