@@ -9,7 +9,6 @@
  *  - Progress and status come from the engine's evaluation (`CategoryState`), never from the conversation.
  */
 import type { AccessDto, CategoryCardDto, CenterDto, CoverDto, EntryDto, HelpDto, Locale } from "../api/dto";
-import { ApiError } from "../api/errors";
 import { addServiceAvailability, categoryInfo } from "../manifest";
 import type { EntitlementState } from "../ports/entitlement";
 import { accessPermits } from "../ports/entitlement";

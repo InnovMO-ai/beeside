@@ -62,7 +62,7 @@ describeWithDb("First Assessment save/resume lifecycle (PostgreSQL, rolled back)
   it("expires access on day 15, recovers with an immediate structured extension, and caps access at day 45", async () => {
     const token = await start();
     await h.api().post("/api/fa/session/finish-later").set("Authorization", `Bearer ${token}`);
-    const link = lastLinkToken(h);
+    let link = lastLinkToken(h);
     const start0 = new Date((await lifecycle(token)).access_window_started_at).getTime();
 
     // A working session opened just before day 15 stops working when access expires.
@@ -77,10 +77,14 @@ describeWithDb("First Assessment save/resume lifecycle (PostgreSQL, rolled back)
     const recovered = await h.api().post("/api/fa/links/extend").send({ token: link, days: 15, reason: "unsure_market_timing" });
     expect(recovered.status).toBe(200);
     expect(new Date(recovered.body.accessUntil).getTime()).toBe(h.clock.now.getTime() + 15 * DAY);
+    // An extension immediately sends a confirmation email carrying a fresh resume link; the previous link is superseded.
+    expect(h.email.messages[h.email.messages.length - 1]?.template).toBe("access_extension_confirmed");
+    link = lastLinkToken(h);
     expect((await h.api().post("/api/fa/links/continue").send({ token: link })).status).toBe(201);
 
     const capped = await h.api().post("/api/fa/links/extend").send({ token: link, days: 30, reason: "missing_information" });
     expect(new Date(capped.body.accessUntil).getTime()).toBe(start0 + 45 * DAY);
+    link = lastLinkToken(h);
     expect((await h.api().post("/api/fa/links/extend").send({ token: link, days: 15, reason: "something_else" })).body).toMatchObject({
       error: "NOT_RECOVERABLE",
       details: { reason: "maximum_reached" },

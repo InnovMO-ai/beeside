@@ -1,3 +1,4 @@
+import { FA_SNAPSHOT_TEMPLATE_VERSION } from "../snapshot/template";
 import { FA_FIELDS } from "@beeside/canonical-fields";
 import { checkFieldRegistry } from "../fa/admin/field-registry";
 import { getFirstAssessmentPrecisionContext } from "../precision-context/first-assessment-context";
@@ -155,12 +156,12 @@ describeWithDb("First Assessment core (PostgreSQL, rolled back)", () => {
       projectObjective: "set_up_local_operation",
       timing: { launchTimingStatus: "firm_commitment", launchTarget: { precision: "quarter", value: "2027-Q2" }, timingDriver: "customer_contract" },
       declaredPriority: { priorityKnown: "yes", clientPriority: "local_entity_legal_setup", timing: "within_30_days", reason: null },
-      assessment: { status: "COMPLETED_LOCKED", questionBankVersion: "fa-qb-1.1.0", rulesEngineVersion: "re-1.0.0", snapshotTemplateVersion: "st-1.0.0" },
+      assessment: { status: "COMPLETED_LOCKED", questionBankVersion: "fa-qb-1.1.0", rulesEngineVersion: "re-1.0.0", snapshotTemplateVersion: FA_SNAPSHOT_TEMPLATE_VERSION },
     });
     // Phases 7–8: the locked assessment now carries its findings, capability ranks and Snapshot.
     expect(context?.findings).toHaveLength(14);
     expect(context?.relevantCapabilities.length).toBeGreaterThan(0);
-    expect(context?.snapshot?.snapshotTemplateVersion).toBe("st-1.0.0");
+    expect(context?.snapshot?.snapshotTemplateVersion).toBe(FA_SNAPSHOT_TEMPLATE_VERSION);
     expect(context?.assessment.completedAt).not.toBeNull();
     expect(context?.openTextAnswers["fa.project.story_raw"]?.value).toBe(MANUFACTURER.STORY);
     expect(context?.structuredAnswers["fa.operation.components"]?.value).toEqual(["manufacturing", "import_export", "local_workforce"]);
