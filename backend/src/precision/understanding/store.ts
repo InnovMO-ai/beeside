@@ -13,6 +13,13 @@ export interface FrameStore {
   create(projectId: string, frame: Frame): Promise<StoredFrame>;
   /** Saves `frame` as expectedVersion + 1. Throws FrameConflictError when the stored version moved. */
   save(projectId: string, frame: Frame, expectedVersion: number, opts?: { closed?: boolean }): Promise<StoredFrame>;
+  /**
+   * Saves the frame AND records the event in ONE atomic step (so a crash can never leave a frame that advanced without its event).
+   * Throws FrameConflictError when the stored version moved.
+   */
+  commit(projectId: string, frame: Frame, expectedVersion: number, event: { turnKey: string; kind: FrameEventKind; payload: Record<string, unknown> }, opts?: { closed?: boolean }): Promise<StoredFrame>;
+  /** True when the event of this turn was already recorded (the frame already reflects it). */
+  hasEvent(projectId: string, turnKey: string, kind: FrameEventKind): Promise<boolean>;
   /** Idempotent by (project, turnKey, kind): returns false when it already existed. */
   appendEvent(projectId: string, turnKey: string, kind: FrameEventKind, frameVersion: number, payload: Record<string, unknown>): Promise<boolean>;
   events(projectId: string): Promise<{ turnKey: string; kind: FrameEventKind; frameVersion: number; payload: Record<string, unknown> }[]>;
@@ -34,6 +41,15 @@ export class InMemoryFrameStore implements FrameStore {
     const s: StoredFrame = { frame: clone(frame), version: expectedVersion + 1, discoveryPinId: frame.discoveryPinId ?? null, closedAt: opts?.closed ? "closed" : ex.closedAt };
     s.frame.version = s.version; this.frames.set(projectId, s); return clone(s);
   }
+  async commit(projectId: string, frame: Frame, expectedVersion: number, event: { turnKey: string; kind: FrameEventKind; payload: Record<string, unknown> }, opts?: { closed?: boolean }): Promise<StoredFrame> {
+    const ex = this.frames.get(projectId);
+    if (!ex || ex.version !== expectedVersion) throw new FrameConflictError(projectId);
+    if (await this.hasEvent(projectId, event.turnKey, event.kind)) throw new FrameConflictError(projectId);
+    const s = await this.save(projectId, frame, expectedVersion, opts);
+    await this.appendEvent(projectId, event.turnKey, event.kind, s.version, event.payload);
+    return s;
+  }
+  async hasEvent(projectId: string, turnKey: string, kind: FrameEventKind): Promise<boolean> { return (this.ev.get(projectId) ?? []).some((e) => e.turnKey === turnKey && e.kind === kind); }
   async appendEvent(projectId: string, turnKey: string, kind: FrameEventKind, frameVersion: number, payload: Record<string, unknown>): Promise<boolean> {
     const l = this.ev.get(projectId) ?? [];
     if (l.some((e) => e.turnKey === turnKey && e.kind === kind)) return false;

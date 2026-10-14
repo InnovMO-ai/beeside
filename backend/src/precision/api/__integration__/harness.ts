@@ -73,7 +73,7 @@ async function ensureFaConfiguration(db: Db): Promise<void> {
   });
 }
 
-export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string } = {}): Promise<Harness> {
+export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy" } = {}): Promise<Harness> {
   if (!TEST_DATABASE_URL) throw new Error("TEST_DATABASE_URL is required");
   const pool = new Pool({ connectionString: TEST_DATABASE_URL, max: 10 });
   const db = createPoolDb(pool);
@@ -83,7 +83,7 @@ export async function setupHarness(options: { fixture?: ScriptedFixture; limiter
   const entitlement = new FixtureEntitlementProvider();
   const fa = new FixtureFaContextReader();
   const runtime = await createPrecisionRuntime({
-    env: { ...(options.internalKey ? { PRECISION_INTERNAL_KEY: options.internalKey } : {}) } as NodeJS.ProcessEnv,
+    env: { PRECISION_UNDERSTANDING_ENGINE: options.engine ?? "legacy", ...(options.internalKey ? { PRECISION_INTERNAL_KEY: options.internalKey } : {}) } as NodeJS.ProcessEnv,
     pool,
     db,
     log: (level, message, fields) => void logs.push(JSON.stringify({ level, message, ...(fields ?? {}) })),
