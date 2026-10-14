@@ -48,7 +48,7 @@ export async function answerNorticaProject(page: Page, loc: Loc) {
   await page.getByRole("checkbox", { name: t(UI.acts.hire, loc), exact: true }).check();
   await page.getByRole("checkbox", { name: t(UI.withs.goods, loc), exact: true }).check();
   await next(page, loc).click();
-  await answerPresence(page, loc, { presence: "own_physical", permanence: "permanent", existing: "via_third", clarity: "no" });
+  await answerPresence(page, loc, { presence: "own_physical", permanence: "permanent", existing: "commercial_traction", clarity: "no" });
   // why / when (+ the project size, D-149 → people)
   await page.getByRole("checkbox", { name: t(UI.reasons.follow_clients, loc) }).check();
   await page.getByRole("checkbox", { name: t(UI.reasons.growth, loc) }).check();
@@ -104,7 +104,7 @@ export async function walkUnknown(page: Page, loc: Loc) {
   await page.getByRole("checkbox", { name: t(UI.acts.sell, loc), exact: true }).check();
   await page.getByRole("checkbox", { name: t(UI.withs.goods, loc), exact: true }).check();
   await next(page, loc).click();
-  await answerPresence(page, loc, { presence: "open", permanence: "open", existing: "via_third" });
+  await answerPresence(page, loc, { presence: "open", permanence: "open", existing: "commercial_traction" });
   await page.getByRole("checkbox", { name: t(UI.reasons.follow_clients, loc) }).check();
   await next(page, loc).click();
   await page.getByRole("radio", { name: t(UI.dec.exploring, loc) }).check();

@@ -16,3 +16,7 @@ export * from "./engine/demand";
 export * from "./engine/flow";
 export { proxyFor } from "./engine/scale";
 export * from "./i18n/messages";
+export * from "./precision/versions";
+export * from "./precision/snapshots";
+export * from "./precision/context";
+export * from "./precision/coverage";

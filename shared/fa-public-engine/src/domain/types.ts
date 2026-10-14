@@ -28,7 +28,17 @@ export type WithWhat = 'goods' | 'services' | 'digital';
 /** I-06. own_physical = own premises; own_onsite = own execution on site without own premises. */
 export type Presence = 'remote' | 'third_parties' | 'own_physical' | 'own_onsite' | 'acquisition' | 'open';
 export type Permanence = 'permanent' | 'temporary' | 'open';
-export type ExistingInDest = 'nothing' | 'via_third' | 'own';
+/**
+ * What the company has TODAY in a destination (per component / country).
+ *  - nothing:             no activity there yet.
+ *  - commercial_traction: customers, orders, advanced prospects or commercial conversations WITHOUT own presence (D-153). It never means that the
+ *                         company already operates through an established local third party.
+ *  - via_third:           LEGACY (before Public v1.0): «I sell or work there through third parties (distributor, partner, customers)». Still valid in stored
+ *                         data and mapped as-is (never silently widened); the questionnaire no longer offers it.
+ *  - own:                 own presence (office, staff or company).
+ * No routing rule, topic activation or coverage decision reads this value; it feeds the YEV («Lo que ya tienes») and the Precision context.
+ */
+export type ExistingInDest = 'nothing' | 'commercial_traction' | 'via_third' | 'own';
 /** Stored values. CONDITIONAL is derived (see deriveDecision in answers.ts): never a stored option (Rule 7). */
 export type DecisionState = 'exploring' | 'decided' | 'in_progress';
 export type SellsTo = 'companies' | 'government' | 'consumers' | 'mixed';

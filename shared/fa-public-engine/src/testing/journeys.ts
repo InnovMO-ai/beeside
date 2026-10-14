@@ -94,7 +94,7 @@ export function journeyNortica(locale: 'es' | 'en' = 'es'): Answers {
   a.company = { hasExistingBusiness: true, sector: 'Fabricación de envases sostenibles para alimentación', size: '51-250', operatesIn: ['ES', 'PT'] };
   a.destinations = { list: [{ iso: 'MX' }], open: false, sameInAll: null };
   a.components = [comp({ id: 'c1', destinations: ['MX'], activities: ['sell', 'hire'], withWhat: ['goods'], presence: 'own_physical', permanence: 'permanent',
-    existing: 'via_third', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes', location: 'region_only', locationText: 'Bajío', carries: ['nothing'] })];
+    existing: 'commercial_traction', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes', location: 'region_only', locationText: 'Bajío', carries: ['nothing'] })];
   a.projectConfirmed = true; a.knowsNeeds = false;
   a.reasons = ['follow_clients', 'growth'];
   a.reasonText = 'Nuestros clientes en México nos piden servicio local y entregas más rápidas.';
@@ -113,7 +113,7 @@ export function journeyNortica(locale: 'es' | 'en' = 'es'): Answers {
 export function journeyUnknown(locale: 'es' | 'en' = 'es'): Answers {
   const a = journeyNortica(locale);
   a.components = [comp({ id: 'c1', destinations: ['MX'], activities: ['sell'], withWhat: ['goods'], presence: 'open', permanence: 'open',
-    existing: 'via_third', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes' })];
+    existing: 'commercial_traction', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes' })];
   a.decision = 'exploring'; a.startWhen = 'unknown';
   a.scale = { c1: { proxy: 'products', text: '', declined: false } };
   a.regulated = 'unknown'; a.reasons = ['follow_clients', 'growth'];

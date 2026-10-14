@@ -21,13 +21,14 @@ export function TextField({ label, value, onChange, type = 'text', placeholder, 
 }
 
 /** Single choice (radio group) */
-export function RadioGroup<T extends string>({ legend, value, options, onChange, two, three }: {
-  legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean; three?: boolean;
+export function RadioGroup<T extends string>({ legend, value, options, onChange, two, three, help }: {
+  help?: ReactNode; legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean; three?: boolean;
 }) {
   const name = useId();
   return (
     <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
+      {help && <p className="help">{help}</p>}
       <div className={`choices ${two ? 'two' : ''} ${three ? 'three' : ''}`}>
         {options.map((o) => (
           <label key={o.value} className={`choice ${value === o.value ? 'on' : ''}`}>

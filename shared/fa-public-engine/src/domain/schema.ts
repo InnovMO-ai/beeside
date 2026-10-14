@@ -12,7 +12,7 @@ const component = z.object({
   presence: z.enum(['remote', 'third_parties', 'own_physical', 'own_onsite', 'acquisition', 'open']).nullable(),
   permanence: z.enum(['permanent', 'temporary', 'open']).nullable(),
   durationMonths: z.number().int().min(1).max(600).optional(),
-  existing: z.enum(['nothing', 'via_third', 'own']).nullable(), existingNote: s(500).optional(),
+  existing: z.enum(['nothing', 'commercial_traction', 'via_third', 'own']).nullable(), existingNote: s(500).optional(),
   sellsTo: z.enum(['companies', 'government', 'consumers', 'mixed']).nullable(),
   ownBrand: z.enum(['yes', 'no', 'unknown']).nullable(),
   location: z.enum(['defined', 'region_only', 'undecided']).nullable(), locationText: s(300).optional(),
