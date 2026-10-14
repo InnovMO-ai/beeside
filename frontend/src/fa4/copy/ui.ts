@@ -18,8 +18,8 @@ export const UI = {
   coverNoteStrong: L('Dedicar 10–15 minutos hoy puede darte más claridad para lo que sigue.', 'Spending 10–15 minutes today can give you more clarity for what comes next.'),
   coverNote: L('Puedes guardar y continuar después.', 'You can save and continue later.'),
   switchLanguage: L('Cambiar idioma a', 'Switch language to'),
-  // Product name stays "First Assessment" in both languages. Side words and benefits follow the locale (D-143); ES wording = proposal (LANG-1).
-  coverProduct: L('First Assessment', 'First Assessment'),
+  // Product name stays "Discovery" in both languages. Side words and benefits follow the locale (D-143); ES wording = proposal (LANG-1).
+  coverProduct: L('Discovery', 'Discovery'),
   coverSideTop: [L('PERSONAS', 'PEOPLE'), L('IDEAS', 'IDEAS'), L('OPORTUNIDADES', 'OPPORTUNITIES'), L('UN MAÑANA MÁS BRILLANTE', 'A BRIGHTER TOMORROW')],   // ES = proposal (D-143 / LANG-1)
   coverSideBottom: [L('EXPANDE TU NEGOCIO', 'EXPAND YOUR BUSINESS'), L('CON CONFIANZA', 'WITH TRUST')],   // approved tagline: «EXPANDE TU NEGOCIO CON CONFIANZA» / «EXPAND YOUR BUSINESS WITH TRUST»
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
@@ -40,8 +40,8 @@ export const UI = {
   size: L('Aproximadamente, ¿cuántas personas trabajan hoy en tu empresa?', 'Roughly how many people work at your company today?'),
   sizes: { '1-10': L('1–10', '1–10'), '11-50': L('11–50', '11–50'), '51-250': L('51–250', '51–250'), '251-1000': L('251–1,000', '251–1,000'), '1000+': L('Más de 1,000', 'More than 1,000') },
   operatesIn: L('¿En qué países tiene hoy actividad tu empresa?', 'In which countries is your company active today?'), operatesInHelp: L('Donde tienes oficinas, plantas o equipo. Si ya vendes en el país al que quieres ir, lo indicarás más adelante.', 'Where you have offices, plants or staff. If you already sell in the country you want to expand to, you will tell us later.'), searchCountry: L('Busca un país', 'Search for a country'), none: L('Sin resultados', 'No results'),
-  exitTitle: L('Por ahora, First Assessment es para negocios en marcha', 'For now, First Assessment is for operating businesses'),
-  exitBody: L('First Assessment está pensado para empresas o negocios que ya operan y quieren expandirse.', 'First Assessment is designed for businesses that already operate and want to expand.'),
+  exitTitle: L('Por ahora, Discovery es para negocios en marcha', 'For now, Discovery is for operating businesses'),
+  exitBody: L('Discovery está pensado para empresas o negocios que ya operan y quieren expandirse.', 'Discovery is designed for businesses that already operate and want to expand.'),
 
   destTitle: L('¿A qué país o países quieres expandir tu empresa?', 'Which country or countries do you want to expand your company to?'), destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
   destLabel: L('Destino', 'Destination'), destOpen: L('Aún no lo tengo decidido', "I haven't decided yet"), region: L('Región o estado (opcional)', 'Region or state (optional)'),
@@ -63,7 +63,7 @@ export const UI = {
     r1Know: L('¿Ya tienes claro qué necesitas para avanzar?', 'Do you already know what you need to move forward?'), r1KnowHelp: L('Puedes ir directo a marcarlo; antes te haremos tres preguntas cortas.', "You can go straight to marking it; first we'll ask three short questions."),
   colTopic: L('Aplican a tu proyecto', 'Apply to your project'), colStatus: L('¿En qué punto está?', 'Where does it stand?'),
   colSupport: L('¿Quieres apoyo aquí?', 'Do you want support here?'), readyBefore: L('¿Listo antes de', 'Ready before'),
-  catalogErrorTitle: L('No pudimos cargar First Assessment', "We couldn't load First Assessment"),
+  catalogErrorTitle: L('No pudimos cargar Discovery', "We couldn't load Discovery"),
   catalogErrorBody: L('Revisa tu conexión e inténtalo de nuevo.', 'Check your connection and try again.'),
   retry: L('Reintentar', 'Try again'),
   progress: L('Progreso', 'Progress'), remove: L('Quitar', 'Remove'), marked: L('Marcados', 'Marked'),
@@ -172,7 +172,7 @@ export const UI = {
   vsHub: L('Operation Hub', 'Operation Hub'), vsHubD: L('Un solo lugar para seguir avances, tareas, documentos y próximos pasos.', 'One place to follow progress, tasks, documents and next steps.'),
   vsAdvisory: L('Strategic Advisory', 'Strategic Advisory'), vsAdvisoryD: L('Experiencia especializada para ayudarte a resolver decisiones complejas de expansión.', 'Specialized expertise to help you navigate complex expansion decisions.'),
   idBeforeTitle: L('Antes de continuar', 'Before you continue'),
-  idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu First Assessment.', "Review and accept what's required to continue with your First Assessment."),
+  idBeforeLead: L('Revisa y acepta lo necesario para continuar con tu Discovery.', "Review and accept what's required to continue with your Discovery."),
   marketingConsent: L('Quiero recibir novedades, información y comunicaciones comerciales de beeside.', 'I would like to receive news, information and commercial communications from beeside.'),
   acceptContinue: L('Aceptar y continuar', 'Accept and continue'),
   privacyNotice: L('Lo que nos contaste no se usa para evaluarte. Antes de Premium, no compartimos tu proyecto con proveedores.', "What you told us isn't used to assess you. Before Premium, we don't share your project with providers."),
@@ -184,7 +184,7 @@ export const UI = {
   talkTitle: L('Hablar con beeside', 'Talk to beeside'),
   talkLead: L('Escríbenos y una persona del equipo de beeside te responderá desde {contact}.', 'Write to us and someone from the beeside team will reply from {contact}.'),
   talkMessage: L('Mensaje', 'Message'), talkSend: L('Enviar mensaje', 'Send message'), talkSending: L('Enviando…', 'Sending…'),
-  talkShare: L('Compartir mi avance del First Assessment para que podamos ayudarte mejor.', 'Share my First Assessment progress so we can help you better.'),
+  talkShare: L('Compartir mi avance del Discovery para que podamos ayudarte mejor.', 'Share my Discovery progress so we can help you better.'),
   talkNote: L('Es un mensaje directo al equipo de beeside. No te suscribe a comunicaciones comerciales y no se comparte con proveedores.', "This goes straight to the beeside team. It doesn't subscribe you to commercial communications and isn't shared with providers."),
   talkSent: L('Recibimos tu mensaje. Te responderemos en {email}.', "We've received your message. We'll reply to {email}."),
   talkError: L('No pudimos enviar tu mensaje. Revisa tu conexión e inténtalo de nuevo; lo que escribiste sigue aquí.', "We couldn't send your message. Check your connection and try again; what you wrote is still here."),
@@ -213,7 +213,7 @@ export const UI = {
   startNew: L('Empezar de nuevo', 'Start over'),
   resolveErrorTitle: L('No pudimos preparar tu resultado', "We couldn't prepare your result"),
   resolveErrorBody: L('Tus respuestas están guardadas. Inténtalo de nuevo en un momento.', 'Your answers are saved. Please try again in a moment.'),
-  catalogErrorTitle2: L('No pudimos cargar First Assessment', "We couldn't load First Assessment"),
+  catalogErrorTitle2: L('No pudimos cargar Discovery', "We couldn't load Discovery"),
   ready: L('Your Expansion View ya está listo.', 'Your Expansion View is ready.'),
   conditions: L('Condiciones de los servicios', 'Service conditions'),
   noTopicFound: L('No encontramos un tema para esto; lo guardamos tal como lo escribiste.', "We couldn't match this to a topic; we've saved it as you wrote it."),

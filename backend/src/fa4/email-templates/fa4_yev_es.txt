@@ -4,7 +4,7 @@ Tu expansión ya tiene un punto de partida. Ahora, dale dirección.
 
 <!--IF:has_first_name-->Hola, {{first_name}}:<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hola:<!--ENDIFNOT:has_first_name-->
 
-Has completado tu First Assessment y ya tienes una primera visión de lo que significa llevar tu empresa hacia un nuevo mercado.
+Has completado tu Discovery y ya tienes una primera visión de lo que significa llevar tu empresa hacia un nuevo mercado.
 
 Preparamos Your Expansion View a partir de la información que compartiste: reúne los principales elementos de tu proyecto, lo que ya está definido y lo que todavía necesita atención.
 

@@ -222,7 +222,7 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
     const r = renderFa4Email("talk", c.language, {
       topic: c.language === "es" ? "Hablar con beeside" : "Talk to beeside",
       message: c.message, name: c.name, company: c.company, email: c.email, destinations: dests,
-      stage: c.origin_stage === "YEV" ? "YEV" : "First Assessment",
+      stage: c.origin_stage === "YEV" ? "YEV" : "Discovery",
       fa_language: c.language === "es" ? "Español" : "English",   // the language the person used in FA (internal context), shown in the email's own language
       project_id: d.project_id ?? "",
     }, { has_destinations: !!dests, has_project_id: !!d.project_id });

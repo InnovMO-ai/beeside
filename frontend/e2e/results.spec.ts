@@ -138,6 +138,6 @@ test('Ineligible (no existing business) exits early and respectfully', async ({ 
   await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
   await page.getByLabel('Sí', { exact: true }).check(); await page.getByLabel('No', { exact: true }).check();
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: /First Assessment es para negocios en marcha/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Discovery es para negocios en marcha/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar' })).toHaveCount(0);
 });

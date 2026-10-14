@@ -1,16 +1,16 @@
-FIRST ASSESSMENT
+DISCOVERY
 
 Your next market starts with a clearer perspective.
 
 <!--IF:has_first_name-->Hi {{first_name}},<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hi,<!--ENDIFNOT:has_first_name-->
 
-Your First Assessment has been saved and is ready when you are.
+Your Discovery has been saved and is ready when you are.
 
 Exploring a new market comes with important decisions. This first step helps you organize what you already know about your project, identify what still needs definition, and see more clearly what comes next.
 
-There's no need to start over. You can continue your First Assessment right where you left off.
+There's no need to start over. You can continue your Discovery right where you left off.
 
-Continue My First Assessment:
+Continue My Discovery:
 {{resume_url}}
 
 Once completed, you'll receive Your Expansion View: an initial structured view of your project, built from the information you shared.

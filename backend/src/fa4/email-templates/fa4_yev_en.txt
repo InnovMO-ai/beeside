@@ -4,7 +4,7 @@ Your expansion has a starting point. Now, give it direction.
 
 <!--IF:has_first_name-->Hi {{first_name}},<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hi,<!--ENDIFNOT:has_first_name-->
 
-You've completed your First Assessment and now have an initial view of what taking your business into a new market could mean.
+You've completed your Discovery and now have an initial view of what taking your business into a new market could mean.
 
 We prepared Your Expansion View from the information you shared. It brings together the key elements of your project, what is already defined, and what still needs attention.
 

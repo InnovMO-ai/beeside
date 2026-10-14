@@ -1,16 +1,16 @@
-FIRST ASSESSMENT
+DISCOVERY
 
 Tu próximo mercado empieza con una mejor perspectiva.
 
 <!--IF:has_first_name-->Hola, {{first_name}}:<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hola:<!--ENDIFNOT:has_first_name-->
 
-Tu First Assessment está guardado y listo para continuar.
+Tu Discovery está guardado y listo para continuar.
 
 Explorar un nuevo mercado implica muchas decisiones. Este primer paso te ayuda a ordenar lo que ya sabes sobre tu proyecto, identificar lo que todavía necesita definición y empezar a ver con más claridad lo que sigue.
 
-No necesitas empezar de nuevo. Puedes retomar tu First Assessment justo donde lo dejaste.
+No necesitas empezar de nuevo. Puedes retomar tu Discovery justo donde lo dejaste.
 
-Retomar mi First Assessment:
+Retomar mi Discovery:
 {{resume_url}}
 
 Cuando lo completes, recibirás Your Expansion View: una primera visión estructurada de tu proyecto, construida a partir de la información que compartiste.

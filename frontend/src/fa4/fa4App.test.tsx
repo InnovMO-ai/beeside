@@ -166,7 +166,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     mockApi((c) => (c.url === "/api/fa4/catalog" && failing ? json({ error: "X" }, 500) : null));
     render(<Fa4App />);
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("No pudimos cargar First Assessment");
+    expect(alert).toHaveTextContent("No pudimos cargar Discovery");
     failing = false;
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     await screen.findByRole("button", { name: "Comenzar" });

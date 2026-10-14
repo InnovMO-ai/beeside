@@ -1,10 +1,10 @@
-SOLICITUD DESDE FIRST ASSESSMENT
+SOLICITUD DESDE DISCOVERY
 
 {{name}} quiere hablar con beeside sobre su proyecto.
 
 Hola, equipo beeside:
 
-Se recibió una nueva solicitud desde First Assessment.
+Se recibió una nueva solicitud desde Discovery.
 
 Tema: {{topic}}
 Mensaje: {{message}}

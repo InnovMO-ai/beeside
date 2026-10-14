@@ -1,10 +1,10 @@
-REQUEST FROM FIRST ASSESSMENT
+REQUEST FROM DISCOVERY
 
 {{name}} would like to talk to beeside about their project.
 
 Hi beeside team,
 
-A new contact request was submitted from First Assessment.
+A new contact request was submitted from Discovery.
 
 Topic: {{topic}}
 Message: {{message}}
