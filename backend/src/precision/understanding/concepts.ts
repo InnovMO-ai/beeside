@@ -179,7 +179,7 @@ export const CONCEPTS: readonly ConceptDef[] = [
   c({
     id: "industrial_site", kind: "need", category: "industrial_real_estate", services: ["warehouse_industrial_building_rental", "industrial_parks", "industrial_site_selection"],
     label: { es: "Nave o parque industrial", en: "Industrial site" }, phrase: { es: "una nave o parque industrial", en: "an industrial site" },
-    terms: { es: ["parque industrial", "nave industrial", "renta de nave", "terreno industrial", "planta de produccion", "instalaciones industriales"], en: ["industrial park", "industrial building", "industrial land", "production plant", "industrial site"] },
+    terms: { es: ["parque industrial", "nave industrial", "renta de nave", "espacio (?:de|para) almac\\w+", "renta de almacen", "terreno industrial", "planta de produccion", "instalaciones industriales"], en: ["warehouse space", "industrial park", "industrial building", "industrial land", "production plant", "industrial site"] },
   }),
   c({
     id: "industrial_works", kind: "need", category: "industrial_infrastructure", services: ["plant_construction_expansion", "engineering", "electrical_installations", "specialized_installations"],

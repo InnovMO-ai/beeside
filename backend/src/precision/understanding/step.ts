@@ -317,7 +317,7 @@ export function step(input: StepInput): StepResult {
 
   // ---- 3. short phrases that are not (yet) a known need: ambiguity, noise, meta, unknown-but-legitimate
   const words = fold(input.text).trim().split(/\s+/).filter(Boolean).length;
-  if (!asked && words <= 10 && interp.observations.length === 0 && !quick) {
+  if (words <= 14 && interp.observations.length === 0 && !quick && !interp.answerState && !yes && !no) {
     const r = classifyPhrase(input.text);
     if (r.kind === "ambiguous") {
       const id = `n:u:${fold(input.text).replace(/[^a-z0-9]+/g, "-").slice(0, 30)}`;

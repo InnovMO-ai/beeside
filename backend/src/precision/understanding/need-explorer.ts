@@ -34,7 +34,7 @@ const SERVICE_SHAPE = /(?:servicio|servicios|asesoria|asesoramiento|apoyo|ayuda|
 const AMBIGUOUS: { terms: string[]; unless: string[]; options: { conceptId: string; label: { es: string; en: string } }[]; question: { es: string; en: string } }[] = [
   {
     terms: ["almacen", "almacenes", "bodega", "bodegas", "warehouse", "warehouses"],
-    unless: ["nave", "parque industrial", "renta", "rentar", "operador logistico", "3pl", "inventario", "wms", "industrial park", "lease", "rent", "storage service"],
+    unless: ["nave", "parque industrial", "renta", "rentar", "espacio", "operador logistico", "3pl", "inventario", "wms", "industrial park", "lease", "rent", "space", "storage service"],
     options: [
       { conceptId: "industrial_site", label: { es: "un espacio para rentar", en: "a space to rent" } },
       { conceptId: "warehousing", label: { es: "un servicio que almacene y opere tu mercancía", en: "a service that stores and handles your goods" } },

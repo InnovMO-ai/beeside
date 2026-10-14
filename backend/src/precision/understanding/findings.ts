@@ -158,7 +158,7 @@ export function computeFindings(frame: Frame, now: string, knowledge: FindingKno
   }
   for (const n of frame.needs) {
     if (n.status === "removed") continue;
-    if (n.resolution === "unresolved" && !n.categoryKey) {
+    if ((n.resolution === "unresolved" || n.resolution === "outcome" || n.resolution === "ambiguous") && !n.categoryKey) {
       add({
         id: `f:need:${n.id}`, kind: "unresolved_need",
         title: L(`Necesidad fuera del catálogo: ${n.text}`, `Need outside the catalog: ${n.text}`),
