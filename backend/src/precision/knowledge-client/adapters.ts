@@ -50,9 +50,11 @@ export function createOrientationPort(kl: KnowledgeLayer): OrientationPort {
       else {
         const u = res.units[0]!;
         const body = clip(u.text.replace(/\s+/g, " "), 260);
+        // related knowledge that does not answer the question is offered as such: the engine adds what remains unanswered
+        const related = u.support === "contextual";
         parts.push(locale === "es"
-          ? `Como contexto de ${u.source.institution}: ${body} Fuente: ${u.citation}. Es contexto, no una obligación ni una recomendación.`
-          : `As context from ${u.source.institution}: ${body} Source: ${u.citation}. This is context, not an obligation or a recommendation.`);
+          ? `Como contexto${related ? " relacionado (no responde directamente a lo que preguntas)" : ""} de ${u.source.institution}: ${body} Fuente: ${u.citation}. Es contexto, no una obligación ni una recomendación.`
+          : `As ${related ? "related context (it does not directly answer what you asked) " : "context "}from ${u.source.institution}: ${body} Source: ${u.citation}. This is context, not an obligation or a recommendation.`);
       }
       const granular = res.limits.length > 0;
       return {

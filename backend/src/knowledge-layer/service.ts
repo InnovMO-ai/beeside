@@ -12,6 +12,8 @@ import { assertNormalized, demandFromSignal, readQuestion, type DemandRepository
 import { isOpenable, resolveResources, type CountryResourceRepository } from "./country-resources";
 import { describeComparison, orient } from "./orient";
 import { citation, wordingClass } from "./retrieve";
+import { TOPIC_FAMILY, assessSufficiency } from "./sufficiency";
+import { TOPICS } from "./types";
 import type { Hit, KnowledgeRepository, Topic } from "./types";
 
 export interface KnowledgeLayerDeps {
@@ -35,6 +37,7 @@ function unitOf(h: Hit): KnowledgeUnit {
     },
     citation: citation(p),
     wording: wordingClass(h),
+    support: "direct",
   };
 }
 
@@ -75,7 +78,12 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
 
       // an answered question is about the topics it is about; project context is about the topics the consumer names
       const asked = interpretation.topics;
-      const topics: Topic[] = (req.intent === "project_context" ? [...new Set([...asked, ...(req.topics ?? [])])] : asked).slice(0, 4);
+      const base4: Topic[] = (req.intent === "project_context" ? [...new Set([...asked, ...(req.topics ?? [])])] : asked).slice(0, 4);
+      // a BROAD ask for the picture of a theme is answered by the whole theme (its family); a SPECIFIC ask is looked up for what it names
+      const primaryTopic = interpretation.topic === "unclassified" ? null : interpretation.topic;
+      // (related units of the asked theme are retrieved either way; whether they ANSWER or only give context is decided by the sufficiency judgement)
+      const askedFamilies = new Set((req.intent === "answer_question" ? [...(primaryTopic ? [primaryTopic] : []), ...interpretation.topics] : []).map((t) => TOPIC_FAMILY[t]));
+      const topics: Topic[] = askedFamilies.size > 0 ? [...new Set([...base4, ...TOPICS.filter((t) => askedFamilies.has(TOPIC_FAMILY[t]))])] : base4;
       if (topics.length === 0) return unavailable(boundary ? "professional_judgment" : "no_hits");
 
       const res = await orient(knowledge, { text: question, jurisdiction: j, topics, ...(req.context?.candidates ? { candidates: req.context.candidates } : {}), limit: req.limit ?? 3 });
@@ -93,19 +101,30 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
       // nothing usable: no passage and no comparison
       if (units.length === 0 && !comparison) return unavailable(boundary ? "professional_judgment" : "no_hits", specialistNote ? { specialistNote } : {});
 
-      // a granularity limit or a professional-judgment ask means approved knowledge covers only part of what was asked
+      // sufficiency is judged against the information intent asked, not against any unit that happens to share a topic
+      const judged = req.intent === "answer_question"
+        ? assessSufficiency(interpretation, units.map((u) => ({ topics: u.topics, text: u.text, groundsObligation: u.wording === "obligation" })))
+        : { sufficient: true, missing: [] as Topic[], direct: units.map(() => true) };
+      units.forEach((u, i) => { u.support = judged.direct[i] ? "direct" : "contextual"; });
+      // a related unit is useful context only within the asked theme's family; anything else is noise, not partial knowledge
+      const useful = units.filter((u) => u.support === "direct" || askedFamilies.size === 0 || u.topics.some((t) => askedFamilies.has(TOPIC_FAMILY[t])));
+      // lead with what addresses the asked thing itself, then the rest of its theme; retrieval order (relevance) holds within each rank
+      const rank = (u: KnowledgeUnit): number => (u.support === "direct" ? (primaryTopic && u.topics.includes(primaryTopic) ? 2 : 1) : 0);
+      units.sort((a, b) => rank(b) - rank(a));
+      if (useful.length === 0 && !comparison) return unavailable(boundary ? "professional_judgment" : "no_hits", specialistNote ? { specialistNote } : {});
+      const shown = units.filter((u) => useful.includes(u));
+
+      // a granularity limit, a professional-judgment ask or an unanswered part of the request means approved knowledge covers only part of what was asked
       const granular = limits.length > 0;
-      const covered = new Set(units.flatMap((u) => u.topics));
       const unresolved: Unresolved[] = [
         ...limits.map((l): Unresolved => ({ kind: "granularity", detail: l.message })),
         ...(boundary ? [{ kind: "professional_judgment", detail: boundary.area } as Unresolved] : []),
-        ...topics.filter((t) => !covered.has(t)).map((t): Unresolved => ({ kind: "topic_not_covered", topic: t })),
+        ...judged.missing.map((t): Unresolved => ({ kind: "topic_not_covered", topic: t })),
       ];
-      // topics asked but not covered are reported in `unresolved`; they do not by themselves make the answer partial (a neighbouring topic can fully answer it)
-      const availability = granular || boundary ? "partial" : "sufficient";
+      const availability = granular || boundary || !judged.sufficient ? "partial" : "sufficient";
       return {
-        ...base, availability, units, limits, unresolved,
-        ...(availability === "partial" ? { reason: granular ? ("granularity" as const) : ("professional_judgment" as const) } : {}),
+        ...base, availability, units: shown, limits, unresolved,
+        ...(availability === "partial" ? { reason: granular ? ("granularity" as const) : boundary ? ("professional_judgment" as const) : ("no_hits" as const) } : {}),
         ...(comparison ? { comparison } : {}), ...(specialistNote ? { specialistNote } : {}),
       };
     },

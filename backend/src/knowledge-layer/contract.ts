@@ -97,6 +97,8 @@ export interface KnowledgeUnit {
   citation: string;
   /** How the consumer must word it: only an official primary obligation source may be stated as a requirement; everything else is context. */
   wording: "obligation" | "context";
+  /** `direct`: the unit addresses what was asked. `contextual`: related approved knowledge offered as context only; it does not answer the request. */
+  support: "direct" | "contextual";
 }
 
 export interface Limit { kind: "granularity"; place: string; message: L10n }

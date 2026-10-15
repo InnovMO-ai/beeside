@@ -5,7 +5,7 @@ Fecha: 2026-10-15 · Estado de partida: `f462946` (núcleo Precision FC en modo 
 **Estado de feature complete**
 
 - NÚCLEO DEL PRODUCTO PRECISION — FEATURE COMPLETE EN MODO SIMULADO: **SÍ**.
-- PRECISION MVP1 COMPLETO (incluida la integración permanente con Knowledge Layer): **SÍ en modo simulado/local, pendiente de tu aceptación de este checkpoint.** No queda ningún requisito interno de MVP1 abierto (ver §6). Lo que falta para Public Ready es externo y va separado (§7).
+- PRECISION MVP1 COMPLETO (incluida la integración permanente con Knowledge Layer): **SÍ en modo simulado/local (checkpoint aceptado; corrección semántica de suficiencia aplicada, §8).** No queda ningún requisito interno de MVP1 abierto (ver §6). Lo que falta para Public Ready es externo y va separado (§7).
 
 No se reabrió: arquitectura de Understanding, materialidad, herencia de categoría, Service Map, caso Portugal, filosofía KSeed, prohibición de búsqueda en vivo, frontera profesional. Solo se movió el conocimiento detrás de la frontera correcta.
 
@@ -80,7 +80,7 @@ Ninguna bloqueante. Menores, todas con tamaño pequeño:
 1. Las rutas HTTP de Admin siguen bajo `/precision/knowledge/*` (el módulo ya es de KL). Cambio cosmético con alias; no afecta al producto.
 2. KL corre **en proceso** (frontera de paquete + contrato async). Separarlo como servicio es decisión de plataforma, no de MVP1.
 3. `refs.ts` (referencias de hallazgos → pasajes) vive en KL pero ningún flujo de Precision lo consume todavía (ya era así antes del movimiento).
-4. Cuando un tema preguntado no está cubierto pero uno vecino sí, KL lo reporta en `unresolved` (`topic_not_covered`) y la respuesta sigue `sufficient`. Probé volverlo `partial` y descarté el cambio: degradaba respuestas legítimas (p. ej. informalidad como respuesta a mercado laboral). Decisión de producto que puedes revertir si prefieres más conservadurismo.
+4. ~~Tema vecino cubierto = respuesta suficiente~~ — **resuelto en §8** (la suficiencia ahora se mide contra la intención de información).
 
 ## 7. Bloqueantes externos de Public Ready (separados)
 
@@ -91,10 +91,30 @@ Ninguna bloqueante. Menores, todas con tamaño pequeño:
 - Política de retención y recorridos humanos finales.
 - **Contenido:** Doing Business in Mexico (PDF/URL que proporcionas), ICE 2026 (no bloqueante), y los materiales de las 12 brechas KSeed / aprobaciones de The Hive (paquete de solicitud ya entregado).
 
+## 8. Corrección semántica final — suficiente vs. parcial (intención de información)
+
+**Regla.** La suficiencia se evalúa contra lo que el usuario quiso saber, no contra "hay una unidad del mismo tema".
+
+- `sufficient`: el conocimiento aprobado responde materialmente la necesidad preguntada.
+- `partial`: hay conocimiento aprobado útil, pero una parte material de lo pedido sigue sin soporte.
+- `unavailable`: no hay conocimiento aprobado capaz de abordar materialmente la solicitud.
+
+**Cómo, sin reglas de palabras clave frágiles** (`knowledge-layer/sufficiency.ts`, todo sobre los vocabularios controlados que KL ya usaba):
+
+1. **Amplitud de la intención.** Una pregunta amplia ("cuéntame del mercado laboral") se responde por la *familia* del tema (informalidad es un componente legítimo); una específica (subtema o tipo de información determinado) exige evidencia de lo que nombra.
+2. **Familias de temas** (taxonomía exhaustiva, con test): un tema hermano de la misma familia es contexto, no respuesta.
+3. **Ajuste de autoridad.** Una pregunta de regla (requisito legal, tratamiento fiscal) solo la responde una fuente oficial primaria que fundamente obligaciones; análisis o contenido curado nunca la vuelve suficiente, por cercano que sea el texto.
+4. **Evidencia del subtema** con el mismo vocabulario controlado de subtemas (no una lista nueva de palabras).
+5. **Sesgo conservador a `partial`** ante duda, y varios temas en la pregunta → cada uno debe estar cubierto por sí mismo.
+
+**Contrato:** `KnowledgeUnit.support: "direct" | "contextual"` (las unidades contextuales se ofrecen como contexto, no como respuesta); `unresolved` incluye `topic_not_covered`; `partial` con `reason: no_hits` cuando lo pedido queda sin soporte. Recuperación ampliada a la familia del tema preguntado; unidades de otra familia no cuentan como parcial (ruido → `unavailable`). El adaptador de Precision redacta lo contextual como "contexto relacionado" y nunca como respuesta.
+
+**Ejemplos verificados:** "mercado laboral en Nuevo León" → suficiente (informalidad es un componente); "prestaciones obligatorias en México" con solo conocimiento laboral/informalidad → parcial, unidades solo contextuales, `topic_not_covered`; con fuente oficial IMSS que habla de aguinaldo/prima → suficiente, esa unidad directa y primera; IMMEX preguntado con solo exportaciones → parcial; sin nada de la familia → no disponible; con IMCO real de 3 PDFs ambos casos pasan.
+
 ## Verificación
 
 - `tsc` y `eslint` limpios.
-- Unitarias: **78 suites / 1783 tests** verdes (incluye contrato KL, adaptadores Precision y la guardia de arquitectura).
-- Integración PG en BD limpia (40 migraciones): **36 suites / 299 tests** verdes, IMCO real 6/6.
+- Unitarias: **78 suites / 1800 tests** verdes (incluye contrato KL, adaptadores Precision y la guardia de arquitectura).
+- Integración PG en BD limpia (40 migraciones): **35 suites / 293 tests** verdes (más 3 suites condicionadas a archivos externos), IMCO real 6/6 con las aserciones de suficiencia.
 - Guardia de arquitectura nueva (`src/__tests__/knowledge-layer-boundary.test.ts`): Precision importa de KL solo el contrato (y el cableado de composición); KL no importa Precision; solo Admin/scripts tocan internos; el contrato es solo tipos; sin red ni búsqueda web en Precision ni KL; el agente de fetch no es alcanzable desde conversación ni desde el servicio. Verifiqué que la guardia falla si se introduce una importación indebida.
 - Sin cambios de esquema/migraciones ni de frontend en este bloque (por eso no se re-ejecutaron SQL ni frontend).

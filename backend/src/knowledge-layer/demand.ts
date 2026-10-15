@@ -82,6 +82,11 @@ const SUBTOPICS: { topic: Topic; id: string; keywords: string[] }[] = [
 ];
 
 export const SUBTOPIC_IDS: ReadonlySet<string> = new Set(["general", ...SUBTOPICS.map((s) => s.id)]);
+/** Does a text speak to a subtopic? Uses the SAME controlled vocabulary that classifies demand, so "what is asked" and "what counts as answered" never drift apart. */
+export function textAddressesSubtopic(text: string, subtopic: string): boolean {
+  const f = ` ${fold(text)} `;
+  return SUBTOPICS.some((s) => s.id === subtopic && s.keywords.some((k) => f.includes(fold(k))));
+}
 const topicOfSubtopic = new Map(SUBTOPICS.map((s) => [s.id, s.topic] as const));
 
 const INFO_RULES: { type: InfoType; any: string[] }[] = [
@@ -89,7 +94,7 @@ const INFO_RULES: { type: InfoType; any: string[] }[] = [
   { type: "cost_estimate", any: ["cuanto cuesta", "costo", "precio", "tarifa", "cuanto pagar", "how much", "cost of", "price"] },
   { type: "timeline", any: ["cuanto tarda", "cuanto tiempo", "plazo", "en cuanto tiempo", "how long", "timeline", "lead time"] },
   { type: "tax_treatment", any: ["impuesto", "isr", "iva", "tributa", "deducible", "retencion", "tax treatment", "taxed"] },
-  { type: "regulatory_requirement", any: ["requisito", "obligatorio", "obligacion", "necesito para", "permiso", "licencia", "regulacion", "requirement", "required", "regulation"] },
+  { type: "regulatory_requirement", any: ["requisito", "obligatori", "obligacion", "por ley", "legalmente", "exige", "mandatory", "necesito para", "permiso", "licencia", "regulacion", "requirement", "required", "regulation"] },
   { type: "procedure_steps", any: ["como se hace", "como hago", "pasos", "proceso para", "tramite", "procedimiento", "how do i", "steps", "procedure"] },
   { type: "statistics_comparison", any: ["comparar", "comparacion", "ranking", "cuantos", "estadistica", "indice", "versus", " vs ", "compare", "statistics"] },
   { type: "market_data", any: ["tamano de mercado", "demanda", "competidores", "clientes potenciales", "market size", "demand", "competitors"] },

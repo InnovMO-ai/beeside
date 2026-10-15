@@ -63,9 +63,17 @@ describe("orientation adapter — the layer's availability states, worded for th
   it("UNAVAILABLE: nothing approved applies -> null (the engine states the limit); a determination with no context still carries the boundary", async () => {
     const { kl } = await world();
     const port = createOrientationPort(kl);
-    expect(await port.answer(frame(), "¿Qué requisitos tiene el IMMEX?", "es")).toBeNull();
+    expect(await port.answer(frame(), "¿Cuánto cuesta el IVA?", "es")).toBeNull();
     expect(await port.answer(frame(), "¿Cuánto ISR voy a pagar este año?", "es")).toMatchObject({ text: "", coverage: "none", boundary: { kind: "tax_conclusion" } });
     expect(await port.answer(frame(), "¿Y si llueve ese día?", "es")).toBeNull();
+  });
+
+  it("PARTIAL: a specific ask met only by neighbouring knowledge says so — related context, never worded as the answer", async () => {
+    const { kl } = await world();
+    const o = await createOrientationPort(kl).answer(frame(), "¿Qué requisitos tiene el IMMEX?", "es");
+    expect(o?.coverage).toBe("partial");
+    expect(o?.reason).toBeUndefined();            // not granularity: the engine adds the "this part is not covered" line
+    expect(o?.text).toMatch(/contexto relacionado \(no responde directamente a lo que preguntas\)/);
   });
 
   it("UNAVAILABLE: a country with no approved sources is not guessed (and has no jurisdiction -> no sources)", async () => {

@@ -109,8 +109,8 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
 
   // the permanent flow: real IMCO source -> Knowledge Layer ingestion/publication -> consumer request -> layer response (never the store)
   it("through the CONTRACT: real IMCO published in the layer answers a Precision-style request with full provenance; PARTIAL and NO-knowledge states are explicit", async () => {
-    const { repo, libro } = await ingestBoth();
-    if (libro.status !== "ingested") throw new Error("not ingested");
+    const { repo, libro, anexo } = await ingestBoth();
+    if (libro.status !== "ingested" || anexo.status !== "ingested") throw new Error("not ingested");
     const kl = createKnowledgeLayer({ knowledge: repo, demand: createPgDemandRepository(db), resources: createPgCountryResources(db), now: () => new Date(NOW) });
 
     // SUFFICIENT: labor market, with IMCO's edition/version/publication date/authority class/risk/confidence and a checkable citation
@@ -118,11 +118,12 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     expect(labor.availability).toBe("sufficient");
     expect(labor.units.length).toBeGreaterThan(0);
     for (const u of labor.units) {
-      expect(u.source).toMatchObject({ sourceId: "imco-ice", edition: "2025", version: 1, jurisdiction: "MX", publishedAt: "2025-06-09", authority: "trusted_institutional", status: "active", documentId: libro.document.id });
+      expect(u.source).toMatchObject({ sourceId: "imco-ice", edition: "2025", version: 1, jurisdiction: "MX", publishedAt: "2025-06-09", authority: "trusted_institutional", status: "active" });
+      expect([libro.document.id, anexo.document.id]).toContain(u.source.documentId);
       expect(u.source.risk).toBeDefined();
       expect(u.source.confidence).toBeDefined();
       expect(u.wording).toBe("context");
-      expect(u.citation).toMatch(/Índice de Competitividad Estatal \(2025\).*p\. \d+/);
+      expect(u.citation).toMatch(/(Índice de Competitividad Estatal|Anexo Metodológico ICE) \(2025\).*p\. \d+/);
     }
 
     // SUFFICIENT with a comparison: two candidate states, ranked by the published position, never a recommendation
@@ -141,6 +142,14 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     const best = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuál es la mejor opción de estado para mi operación según el mercado de trabajo?", language: "es" });
     expect(best).toMatchObject({ availability: "partial", reason: "professional_judgment", boundary: { kind: "best_option" }, recommends: false });
     expect(best.units.length).toBeGreaterThan(0);
+
+    // intent-based sufficiency on real data: the broad labour-market picture is answered by IMCO; mandatory employee benefits are NOT (IMCO says nothing about them)
+    const broad = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "Cuéntame sobre el mercado laboral en Nuevo León", language: "es" });
+    expect(broad.availability).toBe("sufficient");
+    const benefits = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuáles son las prestaciones obligatorias de los empleados en México?", language: "es" });
+    expect(benefits.availability).not.toBe("sufficient");
+    expect(benefits.units.every((u) => u.support === "contextual")).toBe(true);
+    expect(benefits.unresolved).toEqual(expect.arrayContaining([{ kind: "topic_not_covered", topic: "wages" }]));
 
     // a tax DETERMINATION is never answered by IMCO: whatever context exists is worded as context, never as an obligation, and the specialist area is named
     const tax = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuánto ISR voy a pagar este año?", language: "es" });

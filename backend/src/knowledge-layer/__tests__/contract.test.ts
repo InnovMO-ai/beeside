@@ -78,16 +78,17 @@ describe("availability states", () => {
     expect(await ask(kl, "¿Cómo está el mercado laboral?", null)).toMatchObject({ availability: "unavailable", reason: "no_sources" });
   });
 
-  it("a topic asked but not covered is reported as unresolved even when a neighbouring topic answers", async () => {
+  it("a specific ask met only by neighbouring knowledge is PARTIAL: the neighbour is context, and what is unanswered is reported", async () => {
     const { kl } = await layer();
     const r = await ask(kl, "¿Qué requisitos tiene el IMMEX para una importación temporal?");
-    expect(r.units.every((u) => !u.topics.includes("customs"))).toBe(true);
+    expect(r).toMatchObject({ availability: "partial", reason: "no_hits" });
+    expect(r.units.every((u) => !u.topics.includes("customs") && u.support === "contextual")).toBe(true);
     expect(r.unresolved).toEqual(expect.arrayContaining([{ kind: "topic_not_covered", topic: "customs" }]));
   });
 
   it("UNAVAILABLE (sources exist, nothing approved applies to the question)", async () => {
     const { kl } = await layer();
-    expect(await ask(kl, "¿Qué requisitos tiene el IMMEX?")).toMatchObject({ availability: "unavailable", reason: "no_hits", units: [], interpretation: { topic: "customs", subtopic: "duty_regimes" } });
+    expect(await ask(kl, "¿Cuánto cuesta el IVA?")).toMatchObject({ availability: "unavailable", reason: "no_hits", units: [], interpretation: { topic: "taxes" } });
     expect(await ask(kl, "¿Y si llueve ese día?")).toMatchObject({ availability: "unavailable", reason: "no_hits", interpretation: { topic: "unclassified" } });
   });
 
@@ -110,6 +111,79 @@ describe("availability states", () => {
     const r = await ask(kl, "¿Cómo está el mercado laboral y la informalidad?");
     expect(r.units.length).toBeGreaterThan(0);
     expect(r.units.every((u) => u.source.status === "active")).toBe(true);
+  });
+});
+
+describe("sufficiency is judged against the information intent (neighbouring knowledge is context, never the answer)", () => {
+  const txt = (body: string): Buffer => Buffer.from(body, "utf8");
+  async function withDoc(body: string, sourceId = "imco-ice") {
+    const w = await layer({ ice: false });
+    await ingestDocument(w.knowledge, { sourceId, edition: "2025", locator: sourceId === "imss" ? "https://www.imss.gob.mx/doc-fixture" : "https://imco.org.mx/indices/doc-fixture", now: NOW, title: "Doc (fixture)", filename: "doc.txt", data: txt(body), publishedAt: "2025-09-01" });
+    return w;
+  }
+  const LABOR_PICTURE = "La informalidad laboral es alta en varias entidades: una parte importante de la población ocupada no cuenta con seguridad social. La participación laboral y el mercado de trabajo varían entre estados.";
+
+  it("BROAD ask: the labour-market picture is answered collectively by its family (informality is a component) -> sufficient", async () => {
+    const { kl } = await withDoc("La informalidad laboral es alta en varias entidades: una parte importante de la población ocupada trabaja sin seguridad social.");
+    const r = await ask(kl, "Cuéntame sobre el mercado laboral");
+    expect(r.interpretation.topic).toBe("labor_market");
+    expect(r.availability).toBe("sufficient");
+    expect(r.units.length).toBeGreaterThan(0);
+    expect(r.units.every((u) => u.support === "direct")).toBe(true);
+    expect(r.unresolved).toEqual([]);
+  });
+
+  it("SPECIFIC ask (mandatory employee benefits): general labour-market/informality knowledge does NOT make it sufficient -> partial, and it is only context", async () => {
+    const { kl } = await withDoc(LABOR_PICTURE);
+    const r = await ask(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?");
+    expect(r.interpretation).toMatchObject({ topic: "wages", subtopic: "mandatory_benefits" });
+    expect(r.availability).toBe("partial");
+    expect(r.reason).toBe("no_hits");
+    expect(r.units.length).toBeGreaterThan(0);
+    expect(r.units.every((u) => u.support === "contextual")).toBe(true);
+    expect(r.unresolved).toEqual(expect.arrayContaining([{ kind: "topic_not_covered", topic: "wages" }]));
+  });
+
+  it("a RULE ask is never answered by analytical or curated context, however closely it talks about the topic (authority fit)", async () => {
+    const { kl } = await withDoc(`Prestaciones obligatorias: el aguinaldo equivale a quince días de salario y la prima vacacional es de al menos el veinticinco por ciento.`);
+    const r = await ask(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?");
+    expect(r.interpretation.infoType).toBe("regulatory_requirement");
+    expect(r.availability).toBe("partial");
+    expect(r.units.every((u) => u.support === "contextual" && u.wording === "context")).toBe(true);
+  });
+
+  it("SPECIFIC rule ask answered by an official source that speaks to the subtopic -> sufficient, that unit is direct and first", async () => {
+    const { kl } = await withDoc(`${LABOR_PICTURE}\n\nPrestaciones obligatorias: el aguinaldo equivale a quince días de salario y la prima vacacional es de al menos el veinticinco por ciento. Los salarios deben pagarse en moneda de curso legal.`, "imss");
+    const r = await ask(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?");
+    expect(r.availability).toBe("sufficient");
+    expect(r.units[0]!.support).toBe("direct");
+    expect(r.units[0]!.text).toMatch(/aguinaldo/);
+  });
+
+  it("SPECIFIC ask met only by a sibling topic in the same family (customs asked, exports known) -> partial, never sufficient", async () => {
+    const { kl } = await withDoc("Las exportaciones manufactureras explican parte de la diferencia entre estados y el comercio exterior se concentra en pocas entidades.");
+    const r = await ask(kl, "¿Qué requisitos tiene el IMMEX para una importación temporal?");
+    expect(r.interpretation).toMatchObject({ topic: "customs", subtopic: "duty_regimes" });
+    expect(r.availability).toBe("partial");
+    expect(r.units.every((u) => u.support === "contextual")).toBe(true);
+  });
+
+  it("nothing in the asked theme at all -> unavailable (a neighbour from another theme is noise, not partial knowledge)", async () => {
+    const { kl } = await withDoc("Las exportaciones manufactureras explican parte de la diferencia entre estados.");
+    expect(await ask(kl, "¿Cuántos días de vacaciones corresponden por ley?")).toMatchObject({ availability: "unavailable" });
+  });
+
+  it("a second theme in the question must be covered on its own", async () => {
+    const { kl } = await withDoc(LABOR_PICTURE);
+    const r = await ask(kl, "Cuéntame sobre el mercado laboral y la infraestructura");
+    expect(r.availability).toBe("partial");
+    expect(r.unresolved).toEqual(expect.arrayContaining([{ kind: "topic_not_covered", topic: "infrastructure" }]));
+  });
+
+  it("every topic belongs to a family (the taxonomy is exhaustive)", async () => {
+    const { TOPIC_FAMILY } = await import("../sufficiency");
+    const { TOPICS } = await import("../types");
+    for (const t of TOPICS) expect(TOPIC_FAMILY[t]).toBeDefined();
   });
 });
 
