@@ -17,7 +17,7 @@ import { FixtureFaContextReader } from "../../adapters/fixture-fa-context";
 import { ScriptedModelProvider, type ScriptedFixture } from "../../conversation";
 import type { RateLimiter } from "../../../security/rate-limit";
 import { createLinkToken } from "../../domain/tokens";
-import type { FaClientSafeContext } from "../../ports/fa-context";
+import type { FaClientSafeContext, FaContextReader } from "../../ports/fa-context";
 import type { EntitlementState } from "../../ports/entitlement";
 import { createPrecisionRuntime, type PrecisionRuntime } from "../wiring";
 import type { KnowledgeLayer } from "../../../knowledge-layer/contract";
@@ -50,7 +50,7 @@ export interface Harness {
   provider: ScriptedModelProvider;
   entitlement: FixtureEntitlementProvider;
   fa: FixtureFaContextReader;
-  newProject(opts?: { context?: FaClientSafeContext | null; mode?: EntitlementState["accessMode"]; premium?: boolean }): Promise<{ projectId: string; companyId: string }>;
+  newProject(opts?: { context?: FaClientSafeContext | null; mode?: EntitlementState["accessMode"]; premium?: boolean; projectId?: string }): Promise<{ projectId: string; companyId: string }>;
   /** A one-time link token for the project (what the invitation e-mail carries). */
   link(projectId: string, ttlMs?: number): Promise<string>;
   /** Exchanges a fresh link for a session token. */
@@ -74,7 +74,7 @@ async function ensureFaConfiguration(db: Db): Promise<void> {
   });
 }
 
-export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy"; knowledge?: (db: Db) => Promise<KnowledgeLayer> | KnowledgeLayer } = {}): Promise<Harness> {
+export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy"; knowledge?: (db: Db) => Promise<KnowledgeLayer> | KnowledgeLayer; faReader?: (db: Db) => FaContextReader; /** Extra environment for the runtime (e.g. PRECISION_UNDERSTANDING_INTERPRETER). */ env?: Record<string, string>; /** true: the model provider is selected from the environment (PRECISION_MODEL_PROVIDER=gateway) instead of the scripted one. */ modelFromEnv?: boolean } = {}): Promise<Harness> {
   if (!TEST_DATABASE_URL) throw new Error("TEST_DATABASE_URL is required");
   const pool = new Pool({ connectionString: TEST_DATABASE_URL, max: 10 });
   const db = createPoolDb(pool);
@@ -84,12 +84,12 @@ export async function setupHarness(options: { fixture?: ScriptedFixture; limiter
   const entitlement = new FixtureEntitlementProvider();
   const fa = new FixtureFaContextReader();
   const runtime = await createPrecisionRuntime({
-    env: { PRECISION_UNDERSTANDING_ENGINE: options.engine ?? "legacy", ...(options.internalKey ? { PRECISION_INTERNAL_KEY: options.internalKey } : {}) } as NodeJS.ProcessEnv,
+    env: { PRECISION_UNDERSTANDING_ENGINE: options.engine ?? "legacy", ...(options.env ?? {}), ...(options.internalKey ? { PRECISION_INTERNAL_KEY: options.internalKey } : {}) } as NodeJS.ProcessEnv,
     pool,
     db,
     log: (level, message, fields) => void logs.push(JSON.stringify({ level, message, ...(fields ?? {}) })),
-    integrations: { operationHub: new SimulatedOperationHub(), entitlement, faContext: fa },
-    provider,
+    integrations: { operationHub: new SimulatedOperationHub(), entitlement, faContext: options.faReader ? options.faReader(db) : fa },
+    ...(options.modelFromEnv ? {} : { provider }),
     publishManifests: true,
     ...(options.knowledge ? { knowledge: await options.knowledge(db) } : {}),
     ...(options.limiter ? { limiter: options.limiter } : {}),
@@ -124,10 +124,10 @@ export async function setupHarness(options: { fixture?: ScriptedFixture; limiter
         [`${randomUUID()}@beeside-test.invalid`],
       )).rows[0]!.id;
       const project = (await db.query<{ id: string }>(
-        `INSERT INTO project (company_id, created_by_person_id, responsible_person_id, question_bank_version, rules_engine_version, snapshot_template_version)
-         VALUES ($1, $2, $2, (SELECT version FROM question_bank_version WHERE is_current), (SELECT version FROM rules_engine_version WHERE is_current), (SELECT version FROM snapshot_template_version WHERE is_current))
+        `INSERT INTO project (project_id, company_id, created_by_person_id, responsible_person_id, question_bank_version, rules_engine_version, snapshot_template_version)
+         VALUES (COALESCE($3::uuid, gen_random_uuid()), $1, $2, $2, (SELECT version FROM question_bank_version WHERE is_current), (SELECT version FROM rules_engine_version WHERE is_current), (SELECT version FROM snapshot_template_version WHERE is_current))
          RETURNING project_id AS id`,
-        [company, person],
+        [company, person, opts.projectId ?? null],
       )).rows[0]!.id;
       if (opts.premium !== false) await db.query("UPDATE project SET premium_ever_activated = true, premium_first_activated_at = now() WHERE project_id = $1", [project]);
       entitlement.set({ projectId: project, premiumActive: (opts.mode ?? "FULL") === "FULL", accessMode: opts.mode ?? "FULL" });

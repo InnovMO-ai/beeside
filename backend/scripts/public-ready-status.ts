@@ -9,7 +9,7 @@ import { Pool } from "pg";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-type State = "READY_TO_PROVE" | "WAITING_ON_INPUT" | "BUILT_NOT_PROVEN";
+type State = "PROVEN" | "READY_TO_PROVE" | "WAITING_ON_INPUT" | "BUILT_NOT_PROVEN";
 const env = process.env;
 const has = (k: string): boolean => Boolean(env[k] && env[k]!.trim() !== "");
 const missing = (keys: string[]): string[] => keys.filter((k) => !has(k));
@@ -17,12 +17,15 @@ const rows: { front: string; state: State; detail: string; proof: string }[] = [
 
 async function main(): Promise<void> {
   // 1 Discovery
-  const reader = existsSync(join(__dirname, "../src/precision/adapters/fa4-fa-context.ts"));
+  const adapter = existsSync(join(__dirname, "../src/precision/adapters/fa4-discovery-context-reader.ts"));
+  const proof = existsSync(join(__dirname, "../src/precision/api/__integration__/discovery-real.int.test.ts"));
   rows.push({
-    front: "1 Discovery contract + real continuity",
-    state: reader ? "READY_TO_PROVE" : "WAITING_ON_INPUT",
-    detail: reader ? "permanent reader adapter present" : "no permanent reader (by decision: none is built before the canonical Discovery contract); PRECISION_FA_CONTEXT_PROVIDER=reader refuses to start",
-    proof: "docs/precision-discovery-bridge-acceptance: reconcile contract vs G1–G5, then real project/result -> Premium -> Precision -> pin -> Understanding",
+    front: "1 Discovery -> Precision continuity (canonical contract fa4-precision-context/1)",
+    state: adapter && proof ? "PROVEN" : "WAITING_ON_INPUT",
+    detail: adapter && proof
+      ? "permanent in-process adapter (getFa4PrecisionContext, no HTTP, no hardcoded URL) + real-Discovery acceptance suite present; select with PRECISION_FA_CONTEXT_PROVIDER=discovery"
+      : "adapter or acceptance suite missing",
+    proof: "TEST_DATABASE_URL=... npx jest -c jest.integration.config.js --runInBand discovery-real   (18 checks: conformance x2, identity/provenance, continuity-not-completion, immutability, Portuguese end to end)",
   });
   // 2 Real model / ZDR
   const m = missing(["PRECISION_GATEWAY_PRIMARY_ENDPOINT", "PRECISION_GATEWAY_PRIMARY_MODEL"]);
@@ -30,7 +33,7 @@ async function main(): Promise<void> {
     front: "2 Real model rehearsal (ZDR / privacy)",
     state: env.PRECISION_MODEL_PROVIDER === "gateway" && m.length === 0 ? "READY_TO_PROVE" : "WAITING_ON_INPUT",
     detail: `PRECISION_MODEL_PROVIDER=${env.PRECISION_MODEL_PROVIDER ?? "scripted"}; gateway settings missing: ${m.join(", ") || "none"}; ZDR approval is an external attestation (the model interpreter stays off until it is recorded)`,
-    proof: "PRECISION_MODEL_PROVIDER=gateway + synthetic data only: route-rehearsal-real-model.int.test.ts (rehearsal A–J)",
+    proof: "ONE command: npm run rehearsal:real-model  (dry run with the scripted provider passes today; with PRECISION_REHEARSAL_PROVIDER=gateway it judges 11 qualities on real Discovery output; synthetic data only)",
   });
   // 3 Stripe
   const sk = env.STRIPE_SECRET_KEY ?? "";

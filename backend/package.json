@@ -33,7 +33,9 @@
     "admin:provision": "tsx src/scripts/provision-admin.ts",
     "dev:oidc": "tsx src/scripts/dev-oidc-provider.ts",
     "fa4:seed-catalog": "tsx src/scripts/seed-fa4-catalog.ts",
-    "precision:seed-demo": "tsx src/scripts/seed-precision-demo.ts"
+    "precision:seed-demo": "tsx src/scripts/seed-precision-demo.ts",
+    "rehearsal:real-model": "PRECISION_REHEARSAL=1 jest -c jest.integration.config.js --runInBand real-model-rehearsal",
+    "discovery:acceptance": "jest -c jest.integration.config.js --runInBand discovery-real"
   },
   "dependencies": {
     "@beeside/canonical-fields": "0.1.0",

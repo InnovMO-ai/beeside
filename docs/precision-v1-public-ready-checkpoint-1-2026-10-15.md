@@ -1,5 +1,7 @@
 # PRECISION V1.0 — PUBLIC READY · Checkpoint 1
 
+> **SUPERSEDED (2026-10-15):** el frente 1 (Discovery) quedó PROBADO con salida real; ver `precision-v1-public-ready-checkpoint-2-2026-10-15.md` y el evidence pack único `precision-public-ready-evidence-pack-2026-10-15.md`.
+
 Fecha: 2026-10-15 · Base: `a5fcf34` (corrección de suficiencia de KL sobre `d4b6675`).
 
 **Estado.** Núcleo del producto: FEATURE COMPLETE (simulado/local). MVP1 con KL: FEATURE COMPLETE (simulado/local). Corrección semántica de suficiencia aplicada y con regresión completa verde: tsc/eslint limpios; unitarias 78 suites / 1800; integración PG en BD limpia 35 suites / 293; IMCO real 6/6 (amplio "mercado laboral" = suficiente; "prestaciones obligatorias" con solo informalidad = no suficiente). Detalle en `precision-knowledge-layer-integration-2026-10-15.md` §8.

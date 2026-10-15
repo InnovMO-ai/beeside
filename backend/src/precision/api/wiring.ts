@@ -6,7 +6,7 @@
  *   PRECISION_MODEL_PROVIDER              scripted (default) | gateway
  *   PRECISION_OH_PROVIDER                 simulator (default) | clickup
  *   PRECISION_ENTITLEMENT_PROVIDER        fixture (default) | core
- *   PRECISION_FA_CONTEXT_PROVIDER         fixture (default) | reader (no adapter yet: refuses to start)
+ *   PRECISION_FA_CONTEXT_PROVIDER         fixture (default) | discovery (canonical Discovery contract, in process; "reader" is an alias)
  *   PRECISION_INTERNAL_KEY                enables GET /api/precision/internal/status (absent -> 404)
  *   PRECISION_UNDERSTANDING_ENGINE        core (default) | legacy — the Understanding surface runs on the Understanding Core, or on the generic manifest-driven engine (rollback lever)
  *   PRECISION_UNDERSTANDING_INTERPRETER   rules (default) | model — the model reads the client's words (governed, with the rule baseline as fallback); stays off until the real-model privacy approval (zero data retention) is in place
@@ -37,6 +37,7 @@ import { selectionFromEnv } from "../ports/registry";
 import { createContextReader } from "../domain/context-reader";
 import { createFactHooks } from "../domain/conversations";
 import type { PrecisionDomainDeps } from "../domain/deps";
+import { Fa4DiscoveryContextReader } from "../adapters/fa4-discovery-context-reader";
 import { DbFactWriter } from "../domain/facts";
 import { createFaContextService } from "../domain/fa-context";
 import { createPrecisionDomain, type PrecisionDomain } from "../domain";
@@ -76,11 +77,11 @@ export interface PrecisionRuntime {
 
 export function integrationsFromEnv(env: NodeJS.ProcessEnv, db: Db): PrecisionIntegrations {
   const sel = selectionFromEnv(env);
-  if (sel.faContext === "reader") throw new Error("PRECISION_FA_CONTEXT_PROVIDER=reader: the First Assessment reader adapter is not available yet (use fixture)");
   return {
     operationHub: sel.operationHub === "clickup" ? new ClickUpOperationHub(clickUpConfigFromEnv(env)) : new SimulatedOperationHub(),
     entitlement: sel.entitlement === "core" ? new CoreEntitlementProvider(db, { policy: premiumPolicyFromEnv(env) }) : new FixtureEntitlementProvider(),
-    faContext: new FixtureFaContextReader(),
+    // "reader" is the former name of the Discovery reader and stays accepted
+    faContext: sel.faContext === "fixture" ? new FixtureFaContextReader() : new Fa4DiscoveryContextReader(db),
   };
 }
 

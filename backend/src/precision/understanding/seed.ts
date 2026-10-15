@@ -86,8 +86,11 @@ export function seedFromDiscovery(input: DiscoverySeedInput, now: string): SeedR
     interpretation.countries = interpretation.countries.filter((c) => !(c.role === "operation" && frame.countries.some((x) => x.role === "operation" && x.code !== c.code) && input.destinationCodes.length > 0 && !input.destinationCodes.includes(c.code)));
     const applied = applyInterpretation(frame, interpretation, { now, source: "discovery", asked: null, text: t.text, ...ref(t.path) });
     frame = applied.frame;
-    // Needs read from free text are hints, not Discovery needs: they stay `proposed` with narrative origin removed to keep the map honest.
-    for (const n of frame.needs) if (n.origin === "discovery" && !n.id.startsWith("n:disc:") && !n.quote) n.quote = t.text.slice(0, 100);
+    // Free text feeds facts, observations, rationale and countries — it never creates a service need. Discovery's structured capabilities
+    // (`n:disc:*`) are its needs; a sentence the client wrote ("what the company does", "why the project exists") is not a service label, and
+    // putting it on My Service Map would show the client their own sentence as if it were a service. What the text implies the client still
+    // confirms in the conversation (the concepts it mentioned stay known, so the implied-need offer can name them properly).
+    frame.needs = frame.needs.filter((n) => n.id.startsWith("n:disc:") || n.origin !== "discovery");
   }
   frame.version = 1;
   return { frame, interpretations };

@@ -198,6 +198,14 @@ export function readRationale(text: string): RationaleHit[] {
 // ------------------------------------------------------------------ the rule interpreter
 const CORRECTION = /(?:en realidad|corrijo|me equivoque|mas bien|no son|no es asi|ya no|cambio de plan|cambiamos|cambio de|me corrijo|rectifico|perdon|actually|correction|i meant|no longer|we changed|that is wrong|that's wrong|instead of)/;
 const ADD_SERVICE = /(?:quiero agregar|queremos agregar|agregar (?:mas )?servicios|anadir (?:mas )?servicios|necesito (?:otro|mas) servicio|add (?:more )?services?|add another service)/;
+/** True when every sentence of the message is a question (¿…? / …?) and there is at least one: no statement hides in it. */
+export function isOnlyQuestions(text: string): boolean {
+  const t = text.trim();
+  if (!/[?¿]/.test(t)) return false;
+  const parts = t.split(/(?<=[?.!])\s+/).map((x) => x.trim()).filter(Boolean);
+  return parts.length > 0 && parts.every((x) => /^¿/.test(x) || /\?$/.test(x));
+}
+
 const QUESTION_START = /^(?:que|como|cuanto|cuantos|cuantas|cual|cuales|donde|por que|cuando|quien|me puedes|puedes|podrias|sabes|es necesario|hay que|what|how|which|where|why|when|who|can you|could you|do i|should i|is it|are there)\b/;
 
 export function createRuleInterpreter(): Interpreter {
@@ -257,7 +265,17 @@ export function interpretByRules(input: InterpretInput): Interpretation {
   // Intent.
   if (kind === "done") out.intent = "done";
   else if (ADD_SERVICE.test(f)) out.intent = "add_service";
-  else if (/[?¿]/.test(trimmed) && (QUESTION_START.test(f.replace(/^[¿\s]+/, "")) || trimmed.endsWith("?")) && out.observations.length === 0 && out.needs.length === 0) {
+  else if (isOnlyQuestions(trimmed)) {
+    // A message that is nothing but questions ("¿Qué régimen fiscal me conviene? ¿Me garantizan…?") is a question even though it names topics:
+    // the topics it mentions are what the client is asking ABOUT, not needs they stated, and nothing in it is an answer to the pending probe.
+    out.intent = "question";
+    out.question = trimmed.slice(0, 400);
+    out.observations = [];
+    out.needs = [];
+    out.priorities = [];
+    out.rationale = [];
+    out.answerState = null;
+  } else if (/[?¿]/.test(trimmed) && (QUESTION_START.test(f.replace(/^[¿\s]+/, "")) || trimmed.endsWith("?")) && out.observations.length === 0 && out.needs.length === 0) {
     out.intent = "question";
     out.question = trimmed.slice(0, 400);
   } else if (/[?¿]/.test(trimmed) && QUESTION_START.test(f.replace(/^[¿\s]+/, "")) && f.length < 220 && out.observations.length === 0) {

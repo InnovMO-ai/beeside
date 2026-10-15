@@ -81,7 +81,8 @@ export function faContextConformance(name: string, make: () => FaContextSubject 
       expect(keysOutside(first.context.company, ALLOWED_COMPANY)).toEqual([]);
       for (const n of first.context.needs) {
         expect(keysOutside(n, ALLOWED_NEED)).toEqual([]);
-        expect(["high", "medium", "low"]).toContain(n.priority);
+        // priority is optional: a source that does not know the client's priority must not invent one
+        if (n.priority !== undefined) expect(["high", "medium", "low"]).toContain(n.priority);
         expect(typeof n.capabilityId).toBe("string");
       }
       expect(["es", "en"]).toContain(first.context.locale);

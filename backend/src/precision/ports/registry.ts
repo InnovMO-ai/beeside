@@ -27,7 +27,7 @@ export function integrationStatus(i: PrecisionIntegrations): IntegrationStatusRe
 
 export type OperationHubProviderName = "simulator" | "clickup";
 export type EntitlementProviderName = "fixture" | "core";
-export type FaContextProviderName = "fixture" | "reader";
+export type FaContextProviderName = "fixture" | "discovery" | "reader";
 
 export interface IntegrationSelection {
   operationHub: OperationHubProviderName;
@@ -46,6 +46,6 @@ export function selectionFromEnv(env: NodeJS.ProcessEnv = process.env): Integrat
   return {
     operationHub: pick(env.PRECISION_OH_PROVIDER, ["simulator", "clickup"] as const, "simulator", "PRECISION_OH_PROVIDER"),
     entitlement: pick(env.PRECISION_ENTITLEMENT_PROVIDER, ["fixture", "core"] as const, "fixture", "PRECISION_ENTITLEMENT_PROVIDER"),
-    faContext: pick(env.PRECISION_FA_CONTEXT_PROVIDER, ["fixture", "reader"] as const, "fixture", "PRECISION_FA_CONTEXT_PROVIDER"),
+    faContext: pick(env.PRECISION_FA_CONTEXT_PROVIDER, ["fixture", "discovery", "reader"] as const, "fixture", "PRECISION_FA_CONTEXT_PROVIDER"),
   };
 }
