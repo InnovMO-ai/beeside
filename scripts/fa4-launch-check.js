@@ -40,6 +40,12 @@ add('Premium resource URL (optional)', true, env.FA4_PREMIUM_RESOURCE_URL_ES || 
 const pp = env.VITE_FA4_PREMIUM_PURCHASE_URL;
 add('Premium purchase destination (EXTERNAL)', !!pp && /^https:\/\//i.test(pp), pp && /^https:\/\//i.test(pp) ? 'configured (https)' : 'VITE_FA4_PREMIUM_PURCHASE_URL not set — a PUBLIC build without it renders NO «Start Your Expansion» CTA (fail-closed; the no-payment fallback exists only with VITE_FA4_ALLOW_PURCHASE_FALLBACK=true: staging/tests); the approved Stripe/embedded destination is still to be supplied');
 
+// Canonical production routes (PO 2026-10-14): public Discovery https://beeside.you/discovery · internal administration https://beeside.you/ops-control (never linked from Discovery).
+const pp2 = env.FA4_PUBLIC_PATH;
+add('Public route /discovery in e-mailed links', pp2 === '/discovery', pp2 === '/discovery' ? 'FA4_PUBLIC_PATH=/discovery' : `FA4_PUBLIC_PATH is ${pp2 ? pp2 : 'unset'} — links in e-mails would point to /fa4 (it still works, but the canonical public URL is /discovery)`);
+const base = env.APP_BASE_URL;
+add('APP_BASE_URL (public host)', base === 'https://beeside.you', base ? `APP_BASE_URL=${base}` : 'APP_BASE_URL not set (expected https://beeside.you; it also hosts /brand/beeside-lockup.png for e-mails)');
+
 const w = Math.max(...rows.map((r) => r.id.length));
 for (const r of rows) console.log(`${r.ok === true ? 'READY  ' : r.ok === 'partial' ? 'PARTIAL' : 'PENDING'}  ${r.id.padEnd(w)}  ${r.detail}`);
 const pending = rows.filter((r) => r.ok !== true).length;

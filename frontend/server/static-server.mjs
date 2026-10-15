@@ -176,6 +176,8 @@ export const server = http.createServer((request, response) => {
       return;
     }
     const requested = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+    // Internal administration is never indexed, whatever the environment (canonical route /ops-control; /admin is the technical alias).
+    if (/^\/(ops-control|admin)(\/|$)/.test(requested)) response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
     const candidate = path.join(ROOT, requested);
     // Path traversal: anything resolving outside dist/ is answered with the app shell, not the file.
     if (candidate.startsWith(ROOT + path.sep) && path.extname(candidate) !== "") {

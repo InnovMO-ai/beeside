@@ -15,14 +15,14 @@ import { jsonLogger } from "../security/redact";
 export async function runFa4OutboxOnce(env: NodeJS.ProcessEnv = process.env): Promise<{ sent: number; failed: number; dead: number }> {
   const fa4 = fa4DepsFromEnv({ ...env, FA4_API_ENABLED: "true" });
   if (!fa4) throw new Error("FA4 is not configured");
-  return deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
+  return deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
 }
 
 /* istanbul ignore next -- process entry point */
 if (require.main === module) {
   const fa4 = fa4DepsFromEnv({ ...process.env, FA4_API_ENABLED: "true" });
   if (!fa4) throw new Error("FA4 is not configured");
-  const emailDeps = { db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } };
+  const emailDeps = { db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } };
   const pollMs = Number(process.env.FA4_WORKER_POLL_MS ?? 5_000);
   let busy = false; let stopping = false;
   const tick = async () => {

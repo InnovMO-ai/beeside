@@ -121,6 +121,7 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
     email: fa4EmailTransportFromEnv(env, staging),
     config: {
       appBaseUrl: env.APP_BASE_URL,
+      publicPath: env.FA4_PUBLIC_PATH || undefined,
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
       resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
       emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),

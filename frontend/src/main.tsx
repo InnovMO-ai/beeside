@@ -2,12 +2,14 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 // Three experiences share one build but not one stylesheet or bundle entry:
-//  - /admin  -> internal Control Center,
-//  - /fa4    -> FA Public v1.0 (isolated module; its own CSS, never mixed with the legacy styles),
+//  - /admin (alias /ops-control) -> internal Control Center,
+//  - /fa4 (alias /discovery)    -> Discovery / FA Public v1.0 (isolated module; its own CSS, never mixed with the legacy styles),
 //  - the rest -> the existing First Assessment.
 const path = window.location.pathname;
-const isControlCenter = path === "/admin" || path.startsWith("/admin/");
-const isFa4 = path === "/fa4" || path.startsWith("/fa4/");
+// Canonical public/internal routes: /discovery (public Discovery = the /fa4 module) and /ops-control (internal administration = the /admin module).
+// The technical paths keep working. /ops-control is never linked from Discovery.
+const isControlCenter = /^\/(admin|ops-control)(\/|$)/.test(path);
+const isFa4 = /^\/(fa4|discovery)(\/|$)/.test(path);
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
 async function boot() {

@@ -97,3 +97,11 @@ describe("release audit — customer emails", () => {
     expect(r.html).not.toMatch(/Start Your Expansion/);                                      // the CTA button is not part of the email design
   });
 });
+
+import { safeReturnTo } from "../admin/admin-session";
+describe("canonical routes", () => {
+  it("safeReturnTo accepts the technical and the canonical admin routes and nothing else", () => {
+    expect(safeReturnTo("/ops-control/audit")).toBe("/ops-control/audit"); expect(safeReturnTo("/admin/audit")).toBe("/admin/audit");
+    for (const bad of ["/discovery", "//evil.test", "/ops-controlx", "https://evil.test/admin", "/ops-control/../x", "/ops-control//x"]) expect(safeReturnTo(bad)).toBe("/admin");
+  });
+});

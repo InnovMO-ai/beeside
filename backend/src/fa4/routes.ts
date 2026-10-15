@@ -44,6 +44,8 @@ export interface Fa4Deps {
     /** Approved Terms / Privacy identifiers recorded as immutable acceptance evidence (LEGAL-1 / CHK-1 pending). */
     legal: LegalConfig;
     /** Overrides of the technical abuse-prevention limits (see FA4_RATE_LIMITS). */
+    /** Public path of Discovery used in e-mailed links (default "/fa4"; production: "/discovery"). */
+    publicPath?: string;
     rateLimits?: Partial<Record<keyof typeof FA4_RATE_LIMITS, { limit: number; windowSeconds: number }>>;
   };
   /** "inline" delivers the outbox before responding (tests / local); otherwise the worker or an explicit job delivers. */
@@ -88,7 +90,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   const emailDeps: Fa4EmailDeps = {
     db: deps.db, email: deps.email,
-    config: { appBaseUrl: deps.config.appBaseUrl, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
+    config: { appBaseUrl: deps.config.appBaseUrl, publicPath: deps.config.publicPath, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
   };
   const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };

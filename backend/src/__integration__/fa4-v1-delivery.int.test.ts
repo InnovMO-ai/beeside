@@ -26,9 +26,10 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   const rt = new Pool({ connectionString: runtimeUrl, max: 8 });
   const adminDb: Db = createPoolDb(admin); const rtDb: Db = createPoolDb(rt);
   const mail = new CaptureEmailTransport();
+  let publicPath: string | undefined;
   const deps = (): Fa4Deps => ({
     db: rtDb, email: mail, emailDispatch: "inline",
-    config: { appBaseUrl: "https://fa.test", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
+    config: { appBaseUrl: "https://fa.test", publicPath, sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
   });
   const app = () => request(createApp({ fa4: deps() }));
   const q = async (sql: string, v: unknown[] = []) => (await admin.query(sql, v)).rows;
@@ -226,6 +227,19 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       expect((await q("SELECT source_snapshot, resolution_snapshot, model FROM fa4_result WHERE project_id = $1", [pid]))[0]).toEqual({ source_snapshot: { anonymized: true }, resolution_snapshot: { anonymized: true }, model: { anonymized: true } });
       await expect(getFa4PrecisionContext(rtDb, pid, (await q("SELECT result_id FROM fa4_result WHERE project_id = $1", [pid]))[0].result_id)).rejects.toMatchObject({ code: "NOT_RECOVERABLE" });
     });
+  });
+
+  it("e-mailed links use the configured public path (/discovery in production); an invalid value falls back to /fa4", async () => {
+    for (const [cfg, expected] of [["/discovery", "https://fa.test/discovery#r="], ["/Evil Path", "https://fa.test/fa4#r="], [undefined, "https://fa.test/fa4#r="]] as const) {
+      publicPath = cfg; mail.messages.length = 0;
+      const { token } = await start();
+      await app().post("/api/fa4/session/result/email").set(auth(token));
+      await app().post("/api/fa4/session/finish-later").set(auth(token)).send({ answers: undefined });
+      const links = mail.messages.map((m) => m.ctaUrl).filter(Boolean);
+      expect(links.length).toBeGreaterThan(0);
+      for (const l of links) expect(l!.startsWith(expected)).toBe(true);
+    }
+    publicPath = undefined;
   });
 
   it("journey A also delivers through the explicit action and its envelope is complete", async () => {
