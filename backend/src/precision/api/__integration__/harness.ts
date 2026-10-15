@@ -20,6 +20,7 @@ import { createLinkToken } from "../../domain/tokens";
 import type { FaClientSafeContext } from "../../ports/fa-context";
 import type { EntitlementState } from "../../ports/entitlement";
 import { createPrecisionRuntime, type PrecisionRuntime } from "../wiring";
+import type { KnowledgeLayer } from "../../../knowledge-layer/contract";
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -73,7 +74,7 @@ async function ensureFaConfiguration(db: Db): Promise<void> {
   });
 }
 
-export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy" } = {}): Promise<Harness> {
+export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy"; knowledge?: (db: Db) => Promise<KnowledgeLayer> | KnowledgeLayer } = {}): Promise<Harness> {
   if (!TEST_DATABASE_URL) throw new Error("TEST_DATABASE_URL is required");
   const pool = new Pool({ connectionString: TEST_DATABASE_URL, max: 10 });
   const db = createPoolDb(pool);
@@ -90,6 +91,7 @@ export async function setupHarness(options: { fixture?: ScriptedFixture; limiter
     integrations: { operationHub: new SimulatedOperationHub(), entitlement, faContext: fa },
     provider,
     publishManifests: true,
+    ...(options.knowledge ? { knowledge: await options.knowledge(db) } : {}),
     ...(options.limiter ? { limiter: options.limiter } : {}),
   });
   const seen: Seen[] = [];

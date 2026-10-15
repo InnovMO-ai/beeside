@@ -4,14 +4,16 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { Pool, type PoolClient } from "pg";
-import { createSavepointDb, type Db } from "../../../db/database";
-import { databaseUrl, describeWithDb } from "../../../__integration__/fa-harness";
+import { createSavepointDb, type Db } from "../../db/database";
+import { databaseUrl, describeWithDb } from "../../__integration__/fa-harness";
 import { seedInitialSources } from "../registry";
 import { ingestDocument } from "../ingest";
 import { citation, retrieve, wordingClass } from "../retrieve";
 import { orient } from "../orient";
 import { createPgKnowledgeRepository } from "../pg-repo";
 import { MX_STATES } from "../geo";
+import { createKnowledgeLayer } from "../service";
+import { createPgCountryResources, createPgDemandRepository } from "../pg-repo";
 
 const LIBRO = process.env.IMCO_ICE_LIBRO ?? "";
 const ANEXO = process.env.IMCO_ICE_ANEXO ?? "";
@@ -103,6 +105,55 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
       if (ranked.length === r.entries.length) expect(r.leader).toBe([...ranked].sort((a, b) => a.rank! - b.rank!)[0]!.unit);
       for (const e of r.entries) expect(citation(e.hit.provenance)).toMatch(/IMCO/);
     }
+  }, 120000);
+
+  // the permanent flow: real IMCO source -> Knowledge Layer ingestion/publication -> consumer request -> layer response (never the store)
+  it("through the CONTRACT: real IMCO published in the layer answers a Precision-style request with full provenance; PARTIAL and NO-knowledge states are explicit", async () => {
+    const { repo, libro } = await ingestBoth();
+    if (libro.status !== "ingested") throw new Error("not ingested");
+    const kl = createKnowledgeLayer({ knowledge: repo, demand: createPgDemandRepository(db), resources: createPgCountryResources(db), now: () => new Date(NOW) });
+
+    // SUFFICIENT: labor market, with IMCO's edition/version/publication date/authority class/risk/confidence and a checkable citation
+    const labor = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Qué dice IMCO sobre el mercado de trabajo y la informalidad laboral?", language: "es" });
+    expect(labor.availability).toBe("sufficient");
+    expect(labor.units.length).toBeGreaterThan(0);
+    for (const u of labor.units) {
+      expect(u.source).toMatchObject({ sourceId: "imco-ice", edition: "2025", version: 1, jurisdiction: "MX", publishedAt: "2025-06-09", authority: "trusted_institutional", status: "active", documentId: libro.document.id });
+      expect(u.source.risk).toBeDefined();
+      expect(u.source.confidence).toBeDefined();
+      expect(u.wording).toBe("context");
+      expect(u.citation).toMatch(/Índice de Competitividad Estatal \(2025\).*p\. \d+/);
+    }
+
+    // SUFFICIENT with a comparison: two candidate states, ranked by the published position, never a recommendation
+    const cmp = await kl.request({ jurisdiction: "MX", intent: "project_context", topics: ["labor_market", "infrastructure"], context: { candidates: ["Nuevo León", "Querétaro"] }, language: "es" });
+    expect(cmp.recommends).toBe(false);
+    expect(cmp.comparison?.rows.length).toBeGreaterThan(3);
+    expect(cmp.comparison?.summary.es).toMatch(/no una recomendación/);
+
+    // PARTIAL: a municipality is outside the state-level source -> the limit is declared, state context is labelled, specialist flagged
+    const city = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cómo está el mercado laboral en Apodaca?", language: "es" });
+    expect(city).toMatchObject({ availability: "partial", reason: "granularity" });
+    expect(city.limits[0]).toMatchObject({ kind: "granularity", place: "Apodaca" });
+    expect(city.units.every((u) => u.granularity !== "municipality")).toBe(true);
+
+    // PARTIAL: a determination -> context plus the professional boundary
+    const best = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuál es la mejor opción de estado para mi operación según el mercado de trabajo?", language: "es" });
+    expect(best).toMatchObject({ availability: "partial", reason: "professional_judgment", boundary: { kind: "best_option" }, recommends: false });
+    expect(best.units.length).toBeGreaterThan(0);
+
+    // a tax DETERMINATION is never answered by IMCO: whatever context exists is worded as context, never as an obligation, and the specialist area is named
+    const tax = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuánto ISR voy a pagar este año?", language: "es" });
+    expect(tax.availability).not.toBe("sufficient");
+    expect(tax.boundary).toMatchObject({ kind: "tax_conclusion", specialistCategoryKey: "tax_accounting_audit" });
+    expect(tax.units.every((u) => u.wording === "context" && u.source.authority === "trusted_institutional")).toBe(true);
+
+    // UNAVAILABLE: a country without approved sources has nothing — nothing is borrowed from another country
+    expect(await kl.request({ jurisdiction: "CL", intent: "answer_question", question: "¿Cómo está el mercado laboral?", language: "es" })).toMatchObject({ availability: "unavailable", reason: "no_sources", units: [] });
+
+    // the unmet part comes back as a normalised demand signal, aggregated by the layer
+    const receipt = await kl.recordDemand({ projectId: "p-real", turnKey: "t-real" }, { country: "MX", topic: tax.interpretation.topic, subtopic: tax.interpretation.subtopic, infoType: tax.interpretation.infoType, categoryKey: "tax_accounting_audit", serviceKey: null, outcome: { coverage: "none", reason: "no_hits", boundary: "tax_conclusion" } });
+    expect(receipt).toMatchObject({ disposition: "specialist_service", reason: "professional_judgment", boundary: { kind: "tax_conclusion" } });
   }, 120000);
 
   it("granularity and authority guards hold on the real data: state level only, never a legal or tax authority", async () => {

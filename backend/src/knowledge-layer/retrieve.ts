@@ -8,9 +8,9 @@ export async function retrieve(repo: KnowledgeRepository, q: RetrieveQuery): Pro
     const src = await repo.getSource(r.doc.sourceId);
     if (!src) continue;
     const provenance: Provenance = {
-      institution: src.institution, documentTitle: r.doc.title, edition: r.doc.edition, version: r.doc.version,
-      ...(r.doc.publishedAt ? { publishedAt: r.doc.publishedAt } : {}), retrievedAt: r.doc.retrievedAt, jurisdiction: r.doc.jurisdiction,
-      locator: r.doc.locator, location: r.passage.location, authority: src.authority, sourceRoles: src.roles, documentStatus: r.doc.status,
+      sourceId: src.id, documentId: r.doc.id, institution: src.institution, documentTitle: r.doc.title, edition: r.doc.edition, version: r.doc.version,
+      ...(r.doc.publishedAt ? { publishedAt: r.doc.publishedAt } : {}), ...(r.doc.effectiveAt ? { effectiveAt: r.doc.effectiveAt } : {}), retrievedAt: r.doc.retrievedAt, jurisdiction: r.doc.jurisdiction,
+      locator: r.doc.locator, location: r.passage.location, authority: src.authority, sourceRoles: src.roles, risk: src.risk, confidence: r.doc.confidence, documentStatus: r.doc.status,
     };
     hits.push({ passage: r.passage, score: r.score, provenance, mayGroundObligation: src.authority === "official_primary" && src.roles.includes("obligation") && r.doc.status === "active" });
   }

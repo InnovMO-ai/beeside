@@ -6,7 +6,7 @@
  * work. Precision may give general, sourced context when approved knowledge exists, but it states the boundary and leaves the
  * determination to a beeside specialist. Pure and bilingual (Spanish is the product language; English is kept for parity).
  */
-import { fold } from "../understanding/text";
+import { fold } from "./text";
 
 export const BOUNDARY_KINDS = ["best_option", "tax_conclusion", "legal_opinion", "labor_advice", "logistics_optimization", "market_entry_comparison", "investment_recommendation"] as const;
 export type BoundaryKind = (typeof BOUNDARY_KINDS)[number];

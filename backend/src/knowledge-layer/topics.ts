@@ -1,5 +1,5 @@
 /** Topic classification for passages and queries. Keyword-based baseline; same vocabulary is used for question-drivers. */
-import { fold } from "../understanding/text";
+import { fold } from "./text";
 import type { Topic } from "./types";
 
 const KEYWORDS: Record<Topic, string[]> = {

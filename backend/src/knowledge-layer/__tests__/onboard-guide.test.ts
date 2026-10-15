@@ -3,18 +3,15 @@ import { join } from "node:path";
 import { InMemoryKnowledgeRepository } from "../memory-repo";
 import { InMemoryCountryResources, resolveResources } from "../country-resources";
 import { guideSourceId, onboardCountryGuide } from "../onboard-guide";
-import { createOrientationPort } from "../orientation-port";
-import { createResourcesPort } from "../resources-port";
 import { assessKSeed } from "../kseed-spec";
 import { retrieve } from "../retrieve";
-import { emptyFrame } from "../../understanding/types";
-import type { Frame } from "../../understanding/types";
+import { createKnowledgeLayer } from "../service";
+import { InMemoryDemandRepository } from "../demand";
 
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "fixtures", n));
 const URL1 = "https://guides.beeside.example/doing-business-in-mexico-2026.pdf";
 const URL2 = "https://guides.beeside.example/doing-business-in-mexico-2027.pdf";
 const base = { countryCode: "MX", title: "Doing business in Mexico", language: "en", edition: "2026", url: URL1, file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: "2026-10-16T09:00:00.000Z", publishedAt: "2026-10-16" };
-const frame = (): Frame => { const f = emptyFrame("en"); f.countries.push({ code: "MX", role: "operation", provenance: "client_stated", at: "2026-10-16T00:00:00.000Z" } as never); return f; };
 
 describe("country guide onboarding — the document drops in without code changes", () => {
   it("one operation: curated source, versioned KSeed material, country resource with its HTTPS destination", async () => {
@@ -63,22 +60,16 @@ describe("country guide onboarding — the document drops in without code change
     expect(customs.status).toBe("partial"); // context exists, but obligations still need an official primary source
   });
 
-  it("Understanding can use it: orientation answers from the guide naming the source, and the guide is offered once, optionally", async () => {
+  it("the layer serves it through its contract: units with the guide's provenance, and the guide as a country resource", async () => {
     const k = new InMemoryKnowledgeRepository(); const r = new InMemoryCountryResources();
     await onboardCountryGuide(k, r, { ...base, language: "es", title: "Hacer negocios en México" });
-    const o = await createOrientationPort(k).answer(frame(), "¿Qué es el IMMEX?", "es");
-    expect(o?.coverage).toBe("full");
-    expect(o?.text).toMatch(/Hacer negocios en México/);
-    expect(o?.text).toMatch(/no una obligación/);
-    const ports = (await assessKSeed(k)).find((a) => a.need.id === "mx.logistics.ports")!;
-    expect(ports.status).toBe("covered");
-    const f = frame(); f.locale = "es";
-    const port = createResourcesPort(r);
-    const offer = await port.offer(f, "es", "2026-10-17T00:00:00.000Z", "priority");
-    expect(offer?.title).toBe("Hacer negocios en México");
-    expect(offer?.text).not.toMatch(/https?:/);                         // the link is configuration, never in the chat text
-    expect(offer?.text).toMatch(/No es necesario leerla/);
-    f.asked[offer!.key] = 1;
-    expect(await port.offer(f, "es", "2026-10-17T00:00:00.000Z", "priority")).toBeNull();
+    const kl = createKnowledgeLayer({ knowledge: k, demand: new InMemoryDemandRepository(), resources: r });
+    const res = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Qué es el IMMEX?", language: "es" });
+    expect(res.availability).toBe("sufficient");
+    expect(res.units[0]).toMatchObject({ wording: "context", source: { sourceId: guideSourceId("MX"), documentTitle: "Hacer negocios en México", edition: "2026", version: 1, authority: "beeside_curated", status: "active", locator: URL1 } });
+    expect((await kl.resources({ country: "MX", language: "es" })).map((x) => x.title)).toEqual(["Hacer negocios en México"]);
+    expect(await kl.openResource(out0(await r.list()))).toMatchObject({ url: URL1 });
   });
 });
+
+const out0 = (rs: { id: string }[]): string => rs[0]!.id;

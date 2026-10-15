@@ -1,18 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Pool, type PoolClient } from "pg";
-import { createSavepointDb, type Db } from "../../../db/database";
-import { setupPrecisionFixture } from "../../../__tests__/helpers/precision-fixtures";
-import { databaseUrl, describeWithDb } from "../../../__integration__/fa-harness";
-import { emptyFrame } from "../../understanding/types";
-import { FrameConflictError } from "../../understanding/store";
-import { createPgFrameStore } from "../../understanding/pg-store";
+import { createSavepointDb, type Db } from "../../db/database";
+import { databaseUrl, describeWithDb } from "../../__integration__/fa-harness";
 import { applyCandidate, decideCandidate, runAgentCycle, type SourceFetcher } from "../agent";
 import { seedInitialSources } from "../registry";
 import { ingestDocument } from "../ingest";
 import { retrieve, wordingClass } from "../retrieve";
 import { orient } from "../orient";
-import { buildRefsFor, resolveRef } from "../drivers";
+import { buildRefsFor, resolveRef } from "../refs";
 import { createPgCandidateStore, createPgCountryResources, createPgKnowledgeRepository } from "../pg-repo";
 import { resolveResources } from "../country-resources";
 
@@ -110,28 +106,6 @@ describeWithDb("Knowledge Service + frame store (PostgreSQL)", () => {
     const res = await applyCandidate(repo, store, pend[0]!.id, NOW);
     expect(res.status).toBe("ingested");
     expect((await store.get(pend[0]!.id))?.candidate.status).toBe("auto_applied");
-  });
-
-  it("frame store: optimistic versions, idempotent events, conflict on stale write", async () => {
-    const fx = await setupPrecisionFixture(db);
-    const { projectId } = await fx.newProject("Frame");
-    const store = createPgFrameStore(db);
-    expect(await store.load(projectId)).toBeNull();
-    const f = emptyFrame("es");
-    const a = await store.create(projectId, f);
-    expect(a.version).toBe(1);
-    const again = await store.create(projectId, { ...f, locale: "en" });
-    expect(again.frame.locale).toBe("es"); // the first creation wins
-    const f2 = { ...a.frame, notes: [{ text: "nota", at: NOW }] };
-    const b = await store.save(projectId, f2, 1);
-    expect(b.version).toBe(2);
-    expect(b.frame.version).toBe(2);
-    await expect(store.save(projectId, f2, 1)).rejects.toBeInstanceOf(FrameConflictError);
-    expect(await store.appendEvent(projectId, "turn-key-0001", "turn", 2, { changed: ["x"] })).toBe(true);
-    expect(await store.appendEvent(projectId, "turn-key-0001", "turn", 2, { changed: ["x"] })).toBe(false);
-    expect((await store.events(projectId)).length).toBe(1);
-    const c = await store.save(projectId, b.frame, 2, { closed: true });
-    expect(c.closedAt).not.toBeNull();
   });
 
   it("country resources: configured destinations are validated and resolved", async () => {

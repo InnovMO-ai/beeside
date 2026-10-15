@@ -5,11 +5,10 @@ import { InMemoryKnowledgeRepository } from "../memory-repo";
 import { ingestDocument } from "../ingest";
 import { citation, retrieve, wordingClass } from "../retrieve";
 import { describeComparison, orient } from "../orient";
-import { buildRefsFor, orientationOffer, resolveRef, topicDrivers } from "../drivers";
+import { buildRefsFor, resolveRef } from "../refs";
 import { InMemoryCandidateStore, applyCandidate, decideCandidate, isDue, reviewPath, runAgentCycle, type SourceFetcher } from "../agent";
 import { InMemoryCountryResources, isOpenable, offerResource, resolveResources } from "../country-resources";
 import { findPlaces, findStates } from "../geo";
-import { emptyFrame } from "../../understanding/types";
 import type { KnowledgeSource } from "../types";
 
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "fixtures", n));
@@ -142,25 +141,7 @@ describe("Granularity helpers", () => {
   });
 });
 
-describe("Knowledge drives questions and findings", () => {
-  it("150 hires make labor-market knowledge relevant; a logistics hub makes infrastructure relevant", () => {
-    const f = emptyFrame("es");
-    f.items["workforce.headcount"] = { key: "workforce.headcount", value: { min: 150, max: 150 }, display: "150 personas", status: "known", provenance: "client_stated", interpretive: "observed", quote: "150", at: NOW };
-    f.concepts["logistics_transport"] = { first: "logística", origin: "client" };
-    const t = topicDrivers(f).map((d) => d.topic);
-    expect(t).toEqual(expect.arrayContaining(["labor_market", "wages", "infrastructure", "transportation_logistics"]));
-  });
-  it("the orientation offer is optional, appears only after criteria are known and only once", () => {
-    const f = emptyFrame("es");
-    expect(orientationOffer(f, true)).toBeNull();
-    f.items["location.criteria"] = { key: "location.criteria", value: ["talent"], display: "talento disponible", status: "known", provenance: "client_stated", interpretive: "observed", quote: "talento", at: NOW };
-    const o = orientationOffer(f, true)!;
-    expect(o.topics).toEqual(expect.arrayContaining(["labor_market"]));
-    expect(o.question.es).toMatch(/no una recomendación/);
-    expect(orientationOffer(f, false)).toBeNull();
-    f.asked["offer:orientation"] = 1;
-    expect(orientationOffer(f, true)).toBeNull();
-  });
+describe("Findings references", () => {
   it("refsFor feeds findings with traceable references, official first", async () => {
     const repo = await world();
     const refs = await buildRefsFor(repo, "MX");

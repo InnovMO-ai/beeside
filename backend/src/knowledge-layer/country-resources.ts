@@ -2,7 +2,7 @@
  * Country Resource Library — "Doing Business in Mexico"-style guides. Minimal by design (no DMS): a configurable list of resources per
  * country, offered in context and never mandatory. Destinations (URL or document reference) are configuration managed in Admin; nothing is hardcoded.
  */
-import type { L10n } from "../understanding/types";
+export interface L10n { es: string; en: string }
 
 export type ResourceDestination = { kind: "url"; ref: string } | { kind: "document"; ref: string };
 export interface CountryResource {

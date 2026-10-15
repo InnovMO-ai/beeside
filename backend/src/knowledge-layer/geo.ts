@@ -1,5 +1,5 @@
 /** Geography helpers: the granularity guard depends on knowing what a unit IS (state vs municipality/city). */
-import { fold } from "../understanding/text";
+import { fold } from "./text";
 
 export const MX_STATES = [
   "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango",

@@ -5,7 +5,7 @@
  * Granularity guard: a state-level source cannot speak about a municipality or city. When the client names one, the answer says so,
  * offers the state-level context clearly labelled as such (or another approved source if one exists), and flags it for the specialist.
  */
-import { fold } from "../understanding/text";
+import { fold } from "./text";
 import { findPlaces, findStates } from "./geo";
 import { retrieve } from "./retrieve";
 import type { Granularity, Hit, Indicator, KnowledgeRepository, Topic } from "./types";

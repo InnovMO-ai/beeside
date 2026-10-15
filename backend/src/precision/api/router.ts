@@ -21,8 +21,7 @@ import type { ModelProvider } from "../conversation";
 import { integrationStatus } from "../ports/registry";
 import type { InternalStatusDto, Locale, ResourceLinkDto } from "./dto";
 import { ApiError, classifyError, errorBody } from "./errors";
-import { isOpenable } from "../knowledge/country-resources";
-import { createPgCountryResources } from "../knowledge/pg-repo";
+import type { KnowledgeLayer } from "../../knowledge-layer/contract";
 import { createPgFrameStore } from "../understanding/pg-store";
 
 const policy = (name: string, limit: number, windowSeconds: number): RateLimitPolicy => ({ name, limit, windowSeconds });
@@ -47,6 +46,8 @@ export interface PrecisionRouterOptions {
   /** Described on the internal status page only. */
   modelProvider?: ModelProvider;
   env?: Record<string, string | undefined>;
+  /** The Knowledge Layer (contract): where a country guide opens. */
+  knowledge?: KnowledgeLayer;
 }
 
 export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: PrecisionDomain, options: PrecisionRouterOptions = {}): Router {
@@ -178,9 +179,9 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
     // only a guide that was offered to THIS project in its conversation, and only while it is active
     const id = idOf(req);
     const stored = await createPgFrameStore(deps.db).load(a.projectId);
-    const res = stored?.frame.asked[`res:${id}`] ? await createPgCountryResources(deps.db).get(id) : null;
-    if (!res || !res.active || !isOpenable(res)) throw new ApiError("NOT_FOUND");
-    return { id: res.id, title: res.title, kind: "url", ref: res.destination.ref } satisfies ResourceLinkDto;
+    const res = stored?.frame.asked[`res:${id}`] && options.knowledge ? await options.knowledge.openResource(id) : null;
+    if (!res) throw new ApiError("NOT_FOUND");
+    return { id: res.id, title: res.title, kind: "url", ref: res.url } satisfies ResourceLinkDto;
   });
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));

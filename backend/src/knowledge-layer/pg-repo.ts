@@ -1,6 +1,6 @@
 /** Postgres implementations of the knowledge ports (migrations 0035/0036). Mirrors the in-memory reference semantics. */
-import type { Db } from "../../db/database";
-import { fold } from "../understanding/text";
+import type { Db } from "../db/database";
+import { fold } from "./text";
 import { tokens } from "./memory-repo";
 import type { CandidateStatus, CandidateStore, CandidateUpdate } from "./agent";
 import type { CountryResource, CountryResourceRepository } from "./country-resources";

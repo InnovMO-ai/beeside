@@ -1,5 +1,5 @@
 /** In-memory repository: reference implementation of the retrieval semantics (tests, local runs). The Postgres implementation mirrors it with FTS. */
-import { fold } from "../understanding/text";
+import { fold } from "./text";
 import type { KnowledgeDocument, KnowledgePassage, KnowledgeRepository, KnowledgeSource, RetrieveQuery } from "./types";
 
 const STOP = new Set(["de", "la", "el", "los", "las", "en", "y", "o", "a", "un", "una", "que", "por", "para", "con", "del", "al", "se", "es", "the", "of", "and", "in", "to", "for", "a", "an", "is"]);

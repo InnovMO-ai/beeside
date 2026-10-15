@@ -7,8 +7,8 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createPgDemandRepository, createPgKnowledgeRepository } from "../../knowledge/pg-repo";
-import { ingestDocument } from "../../knowledge/ingest";
+import { createPgDemandRepository, createPgKnowledgeRepository } from "../../../knowledge-layer/pg-repo";
+import { ingestDocument } from "../../../knowledge-layer/ingest";
 import { createPgFrameStore } from "../../understanding/pg-store";
 import { setupHarness, TEST_DATABASE_URL, type Harness } from "./harness";
 import { internalTermsIn, key } from "./drive";
@@ -117,7 +117,7 @@ d("Knowledge-first, not search-first (PostgreSQL)", () => {
     const repo = createPgKnowledgeRepository(h.db);
     const res = await ingestDocument(repo, {
       sourceId: "imco-ice", title: `ICE (fixture knowledge-first ${Date.now()})`, edition: "2025", locator: "https://imco.org.mx/indices/ice-fixture", filename: "ice.pdf", now: new Date().toISOString(),
-      data: readFileSync(join(__dirname, "..", "..", "knowledge", "__tests__", "fixtures", "ice-sintetico.pdf")),
+      data: readFileSync(join(__dirname, "..", "..", "..", "knowledge-layer", "__tests__", "fixtures", "ice-sintetico.pdf")),
     });
     try {
       const { projectId, api } = await startedProject();

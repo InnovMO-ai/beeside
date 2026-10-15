@@ -92,17 +92,22 @@ export interface KnowledgePassage {
 
 /** Provenance returned with every retrieved passage so the answer can always cite its source. */
 export interface Provenance {
+  sourceId: string;
+  documentId: string;
   institution: string;
   documentTitle: string;
   edition: string;
   version: number;
   publishedAt?: string;
+  effectiveAt?: string;
   retrievedAt: string;
   jurisdiction: string;
   locator: string;
   location: string;
   authority: AuthorityLevel;
   sourceRoles: SourceRole[];
+  risk: RiskClass;
+  confidence: KnowledgeDocument["confidence"];
   documentStatus: KnowledgeDocument["status"];
 }
 

@@ -8,10 +8,10 @@ import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { Pool } from "pg";
 import { createPoolDb, type Db } from "../db/database";
-import { ingestDocument } from "../precision/knowledge/ingest";
-import { createPgKnowledgeRepository } from "../precision/knowledge/pg-repo";
-import { seedInitialSources } from "../precision/knowledge/registry";
-import { TOPICS, type Topic } from "../precision/knowledge/types";
+import { ingestDocument } from "../knowledge-layer/ingest";
+import { createPgKnowledgeRepository } from "../knowledge-layer/pg-repo";
+import { seedInitialSources } from "../knowledge-layer/registry";
+import { TOPICS, type Topic } from "../knowledge-layer/types";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);

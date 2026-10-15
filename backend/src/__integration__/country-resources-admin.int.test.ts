@@ -7,12 +7,11 @@ import { createApp } from "../index";
 import { describeWithDb, useHarness } from "./fa-harness";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../precision/knowledge/pg-repo";
-import { ingestDocument } from "../precision/knowledge/ingest";
-import { seedInitialSources } from "../precision/knowledge/registry";
-import { onboardCountryGuide } from "../precision/knowledge/onboard-guide";
-import { describeDemand } from "../precision/knowledge/demand";
-import { emptyFrame } from "../precision/understanding/types";
+import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../knowledge-layer/pg-repo";
+import { ingestDocument } from "../knowledge-layer/ingest";
+import { seedInitialSources } from "../knowledge-layer/registry";
+import { onboardCountryGuide } from "../knowledge-layer/onboard-guide";
+import { createKnowledgeLayer } from "../knowledge-layer";
 
 const ISSUER = "https://idp.test";
 const CLIENT_ID = "beeside-control-center";
@@ -119,12 +118,11 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
 
   it("knowledge demand and KSeed status: readable by SUPERVISOR, decided only by ADMIN, audited; recurrence alone never changes the status", async () => {
     const { admin, supervisor } = await people();
+    // Precision's signals reach the layer's registry through the contract (the layer aggregates; recurrence only informs)
+    const kl = createKnowledgeLayer({ knowledge: createPgKnowledgeRepository(h.deps.db), demand: createPgDemandRepository(h.deps.db), resources: createPgCountryResources(h.deps.db), now: () => h.clock.now });
+    const reading = await kl.interpret("¿Qué requisitos tiene el IMMEX para una importación temporal?");
+    for (let i = 0; i < 3; i++) await kl.recordDemand({ projectId: `p${i}`, turnKey: "t1" }, { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
     const repo = createPgDemandRepository(h.deps.db);
-    const frame = emptyFrame("es");
-    frame.countries.push({ code: "MX", role: "operation", provenance: "client_stated", at: "2026-10-15T10:00:00.000Z" } as never);
-    const d = describeDemand(frame, "¿Qué requisitos tiene el IMMEX para una importación temporal?", { coverage: "none", reason: "no_hits" })!;
-    const now = h.clock.now.toISOString();
-    for (let i = 0; i < 3; i++) await repo.register(d, { projectId: `p${i}`, turnKey: "t1" }, now);
 
     const listed = await get(supervisor, "/precision/knowledge/demand?topic=customs&minOccurrences=2");
     expect(listed.status).toBe(200);
@@ -138,7 +136,7 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     const decided = await post(admin, `/precision/knowledge/demand/${row.id}/decision`, { status: "accepted_for_curation", note: "Prioridad V1: aduanas" });
     expect(decided.status).toBe(200);
     expect(decided.body).toMatchObject({ status: "accepted_for_curation", decisionNote: "Prioridad V1: aduanas" });
-    await repo.register(d, { projectId: "p9", turnKey: "t1" }, now);
+    await kl.recordDemand({ projectId: "p9", turnKey: "t1" }, { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
     expect((await repo.get(row.id))!.status).toBe("accepted_for_curation");
 
     const kseed = await get(supervisor, "/precision/knowledge/kseed");
@@ -173,7 +171,7 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     expect((await get(supervisor, "/precision/knowledge/candidates")).status).toBe(200);
 
     // the guide arrives later: one operation, and Admin already shows its HTTPS destination
-    await onboardCountryGuide(k, createPgCountryResources(h.deps.db), { countryCode: "MX", title: "Doing business in Mexico", language: "en", edition: "2026", url: "https://guides.example.test/dbm-2026.pdf", file: { filename: "dbm.txt", data: readFileSync(join(__dirname, "..", "precision", "knowledge", "__tests__", "fixtures", "guia-pais-sintetica.txt")) }, now: "2026-10-16T09:00:00.000Z" });
+    await onboardCountryGuide(k, createPgCountryResources(h.deps.db), { countryCode: "MX", title: "Doing business in Mexico", language: "en", edition: "2026", url: "https://guides.example.test/dbm-2026.pdf", file: { filename: "dbm.txt", data: readFileSync(join(__dirname, "..", "knowledge-layer", "__tests__", "fixtures", "guia-pais-sintetica.txt")) }, now: "2026-10-16T09:00:00.000Z" });
     const list = await get(supervisor, "/precision/country-resources?countryCode=MX");
     expect(list.status).toBe(200);
     expect((list.body.resources ?? list.body).some((r: { title: string; destination: { ref: string }; active: boolean }) => r.title === "Doing business in Mexico" && r.destination.ref === "https://guides.example.test/dbm-2026.pdf" && r.active)).toBe(true);

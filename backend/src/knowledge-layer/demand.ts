@@ -10,8 +10,7 @@
  * rejects any record that is not made of vocabulary values, so free text cannot reach storage.
  */
 import { createHash } from "node:crypto";
-import { fold } from "../understanding/text";
-import type { Frame } from "../understanding/types";
+import { fold } from "./text";
 import { BOUNDARY_KINDS, professionalAsk, type BoundaryKind } from "./boundary";
 import { classifyTopics } from "./topics";
 import { TOPICS, type Topic } from "./types";
@@ -96,16 +95,8 @@ const INFO_RULES: { type: InfoType; any: string[] }[] = [
   { type: "market_data", any: ["tamano de mercado", "demanda", "competidores", "clientes potenciales", "market size", "demand", "competitors"] },
 ];
 
-/** Default category for a topic when the project's own map does not settle it. */
-const TOPIC_CATEGORY: Partial<Record<Topic, string>> = {
-  taxes: "tax_accounting_audit", corporate_law: "corporate_legal_admin", foreign_investment: "corporate_legal_admin", regulatory_environment: "corporate_legal_admin",
-  labor_market: "people_payroll_employment", wages: "people_payroll_employment", social_security: "people_payroll_employment", immigration_mobility: "people_payroll_employment",
-  customs: "international_trade_customs", exports_trade: "international_trade_customs",
-  transportation_logistics: "logistics", infrastructure: "industrial_real_estate", energy: "industrial_real_estate",
-  competitiveness_state: "market_intelligence", economy_innovation: "market_intelligence", education_talent: "market_intelligence", rule_of_law: "market_intelligence",
-};
-
-// ------------------------------------------------------------------ describe
+// ------------------------------------------------------------------ interpret + describe
+/** How much approved knowledge covered a question (the Knowledge Layer's availability, in the demand vocabulary). */
 export interface DemandOutcome {
   coverage: "none" | "partial" | "full";
   reason: DemandReason;
@@ -139,47 +130,53 @@ export function topicsOfQuestion(question: string, max = 4): Topic[] {
   return st && !t.includes(st) ? [...t, st].slice(0, max) : t;
 }
 
-function countryOf(frame: Frame): string {
-  const op = frame.countries.find((c) => c.role === "operation") ?? frame.countries.find((c) => c.role === "sales");
-  return op?.code ? String(op.code).toUpperCase().slice(0, 2) : "unknown";
+/** What a question is about, in the layer's own controlled vocabularies. The question is read for classification only and is not part of the result. */
+export interface QuestionReading {
+  topics: Topic[];
+  topic: Topic | "unclassified";
+  subtopic: string;
+  infoType: InfoType;
+  boundary: BoundaryKind | null;
 }
 
-/**
- * Normalises one unmet question. Returns null when the knowledge fully covered it (nothing to register).
- * The question is read for classification only and is not part of the result.
- */
-export function describeDemand(frame: Frame, question: string, outcome: DemandOutcome): KnowledgeDemand | null {
-  if (outcome.coverage === "full" && !outcome.boundary) return null;
-  const boundary = outcome.boundary ?? professionalAsk(question);
-  const topics = classifyTopics(question, 1);
-  let topic: Topic | "unclassified" = topics[0] ?? "unclassified";
+export function readQuestion(question: string): QuestionReading {
+  const boundary = professionalAsk(question);
+  const first = classifyTopics(question, 1);
+  let topic: Topic | "unclassified" = first[0] ?? "unclassified";
   let subtopic = classifySubtopic(question, topic);
   // a specific subtopic keyword can point at a topic the topic classifier missed or tied on (e.g. "IMMEX" -> customs, "Manzanillo" -> logistics)
   if (subtopic === "general" && topic !== "unclassified") {
     const any = classifySubtopic(question, "unclassified");
     if (any !== "general") { subtopic = any; topic = topicOfSubtopic.get(any) ?? topic; }
   } else if (topic === "unclassified" && subtopic !== "general") topic = topicOfSubtopic.get(subtopic) ?? "unclassified";
-  const infoType = classifyInfoType(question);
-  const categoryKey = categoryFor(frame, topic, boundary);
-  const serviceKey = categoryKey ? (frame.needs.find((n) => n.status !== "removed" && n.categoryKey === categoryKey)?.serviceKeys[0] ?? null) : null;
+  return { topics: topicsOfQuestion(question), topic, subtopic, infoType: classifyInfoType(question), boundary };
+}
 
-  const specialist = boundary !== null || infoType === "local_provider_or_site";
+/**
+ * The normalised demand SIGNAL a consumer sends to the layer: only controlled values, never the question. The consumer owns what it
+ * knows (country of the operation, the category/service the question belongs to in ITS own service map); the layer owns the vocabulary,
+ * the classification, the aggregation and the decisions.
+ */
+export interface DemandSignal {
+  country: string;
+  topic: Topic | "unclassified";
+  subtopic: string;
+  infoType: InfoType;
+  categoryKey: string | null;
+  serviceKey: string | null;
+  outcome: DemandOutcome;
+}
+
+/** Turns a signal into the normalised demand to register. Returns null when the knowledge fully covered it (nothing to register). */
+export function demandFromSignal(s: DemandSignal): KnowledgeDemand | null {
+  const { outcome } = s;
+  if (outcome.coverage === "full" && !outcome.boundary) return null;
+  const boundary = outcome.boundary ?? null;
+  const specialist = boundary !== null || s.infoType === "local_provider_or_site";
   const coverage: DemandCoverage = outcome.coverage === "partial" ? "partial" : "absent";
-  const reason: DemandReason = boundary ? "professional_judgment" : topic === "unclassified" ? "unclassified" : outcome.reason;
-  return { country: countryOf(frame), topic, subtopic, categoryKey, serviceKey, infoType, coverage, disposition: specialist ? "specialist_service" : "candidate_knowledge", reason, boundary };
+  const reason: DemandReason = boundary ? "professional_judgment" : s.topic === "unclassified" ? "unclassified" : outcome.reason;
+  return { country: s.country, topic: s.topic, subtopic: s.subtopic, categoryKey: s.categoryKey, serviceKey: s.serviceKey, infoType: s.infoType, coverage, disposition: specialist ? "specialist_service" : "candidate_knowledge", reason, boundary };
 }
-
-function categoryFor(frame: Frame, topic: Topic | "unclassified", boundary: BoundaryKind | null): string | null {
-  const open = new Set(frame.needs.filter((n) => n.status !== "removed" && n.categoryKey).map((n) => n.categoryKey as string));
-  const preferred = topic !== "unclassified" ? TOPIC_CATEGORY[topic] ?? null : null;
-  if (preferred && open.has(preferred)) return preferred;
-  if (boundary) {
-    const b = boundaryCategory(boundary);
-    if (b && open.has(b)) return b;
-  }
-  return preferred ?? (boundary ? boundaryCategory(boundary) : null);
-}
-const boundaryCategory = (b: BoundaryKind): string | null => ({ tax_conclusion: "tax_accounting_audit", legal_opinion: "corporate_legal_admin", labor_advice: "people_payroll_employment", logistics_optimization: "logistics", market_entry_comparison: "market_intelligence", best_option: null, investment_recommendation: null } as Record<BoundaryKind, string | null>)[b];
 
 // ------------------------------------------------------------------ normalisation guard
 const SLUG = /^[a-z][a-z0-9_]{1,63}$/;

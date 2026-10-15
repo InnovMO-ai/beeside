@@ -46,11 +46,9 @@ import { syncProjectInheritance } from "../domain/category-inheritance";
 import { createModelInterpreter } from "../understanding/model-interpreter";
 import { createPgFrameStore } from "../understanding/pg-store";
 import { seedFromFaContext } from "../understanding/seed-source";
-import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../knowledge/pg-repo";
-import { createResourcesPort } from "../knowledge/resources-port";
-import { createOrientationPort } from "../knowledge/orientation-port";
-import { createDemandPort } from "../knowledge/demand-port";
-import { seedInitialSources } from "../knowledge/registry";
+import { createPgKnowledgeLayer } from "../../knowledge-layer";
+import type { KnowledgeLayer } from "../../knowledge-layer/contract";
+import { createDemandPort, createOrientationPort, createResourcesPort } from "../knowledge-client";
 
 export interface PrecisionRuntimeOptions {
   env?: NodeJS.ProcessEnv;
@@ -63,6 +61,8 @@ export interface PrecisionRuntimeOptions {
   /** Overrides (tests and local rehearsal). */
   integrations?: PrecisionIntegrations;
   provider?: ModelProvider;
+  /** The Knowledge Layer Precision consumes (default: the production assembly over this database). Tests can supply any implementation of the contract. */
+  knowledge?: KnowledgeLayer;
   /** Publish the bundled manifests before serving. Default: env PRECISION_PUBLISH_MANIFESTS_ON_BOOT. */
   publishManifests?: boolean;
 }
@@ -104,11 +104,14 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
   const context = createContextReader(core, fa);
   const facts = new DbFactWriter(db, createFactHooks(core, fa));
   const genericEngine = createConversationEngine({ store, context, facts, evaluate: evaluateCategory, provider, renderer: engineValueRenderer, clock: systemClock });
-  const knowledgeRepo = createPgKnowledgeRepository(db);
-  if ((env.PRECISION_KNOWLEDGE_SEED_ON_BOOT ?? "true") === "true") await seedInitialSources(knowledgeRepo);
+  // Precision consumes approved knowledge ONLY through the Knowledge Layer contract (the layer owns the store, the sources, the editions and the demand registry).
+  const knowledge = options.knowledge ?? await createPgKnowledgeLayer(db, {
+    seedSources: (env.PRECISION_KNOWLEDGE_SEED_ON_BOOT ?? "true") === "true", now,
+    onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }),
+  });
   const conversation = (env.PRECISION_UNDERSTANDING_ENGINE ?? "core") === "legacy"
     ? genericEngine
-    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledgeRepo), demand: createDemandPort(createPgDemandRepository(db), { now, onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }) }), resources: createResourcesPort(createPgCountryResources(db)), afterFrame: async (projectId) => { await syncProjectInheritance(core, projectId); }, clock: systemClock, now });
+    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledge), demand: createDemandPort(knowledge, { onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }) }), resources: createResourcesPort(knowledge), afterFrame: async (projectId) => { await syncProjectInheritance(core, projectId); }, clock: systemClock, now });
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 
@@ -116,6 +119,6 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
     const { loadFixtureProject } = await import("../domain/seed");
     await loadFixtureProject(db, { faContext: integrations.faContext as never, entitlement: integrations.entitlement as never });
   }
-  const router = createPrecisionRouter(deps, domain, { ...(options.limiter ? { limiter: options.limiter } : {}), modelProvider: provider, env });
+  const router = createPrecisionRouter(deps, domain, { knowledge, ...(options.limiter ? { limiter: options.limiter } : {}), modelProvider: provider, env });
   return { deps, domain, router, provider };
 }

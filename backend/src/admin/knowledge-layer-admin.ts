@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "../db/database";
 import { FaError } from "../fa/services/errors";
-import { validateResource, type CountryResource } from "../precision/knowledge/country-resources";
-import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../precision/knowledge/pg-repo";
-import { DEMAND_STATUSES, type DemandStatus, type StoredDemand } from "../precision/knowledge/demand";
-import { assessKSeed, type KSeedAssessment } from "../precision/knowledge/kseed-spec";
-import { renderGapReport } from "../precision/knowledge/kseed-report";
-import { renderSourceRequestPack, renderV1GapList } from "../precision/knowledge/kseed-gaps";
-import { compareDocuments, listSeries, type EditionComparison, type Series } from "../precision/knowledge/editions";
-import { createPgCandidateStore } from "../precision/knowledge/pg-repo";
-import type { CandidateUpdate } from "../precision/knowledge/agent";
+import { validateResource, type CountryResource } from "../knowledge-layer/country-resources";
+import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../knowledge-layer/pg-repo";
+import { DEMAND_STATUSES, type DemandStatus, type StoredDemand } from "../knowledge-layer/demand";
+import { assessKSeed, type KSeedAssessment } from "../knowledge-layer/kseed-spec";
+import { renderGapReport } from "../knowledge-layer/kseed-report";
+import { renderSourceRequestPack, renderV1GapList } from "../knowledge-layer/kseed-gaps";
+import { compareDocuments, listSeries, type EditionComparison, type Series } from "../knowledge-layer/editions";
+import { createPgCandidateStore } from "../knowledge-layer/pg-repo";
+import type { CandidateUpdate } from "../knowledge-layer/agent";
 
 /**
  * Admin side of the Country Resource Library and the Source Registry (read-only view). Destinations are configuration:

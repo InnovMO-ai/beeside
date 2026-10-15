@@ -8,8 +8,8 @@ import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { Pool } from "pg";
 import { createPoolDb, type Db } from "../db/database";
-import { onboardCountryGuide } from "../precision/knowledge/onboard-guide";
-import { createPgCountryResources, createPgKnowledgeRepository } from "../precision/knowledge/pg-repo";
+import { onboardCountryGuide } from "../knowledge-layer/onboard-guide";
+import { createPgCountryResources, createPgKnowledgeRepository } from "../knowledge-layer/pg-repo";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);

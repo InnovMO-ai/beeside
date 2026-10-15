@@ -33,10 +33,8 @@ import { seedFromDiscovery, type DiscoverySeedInput } from "./seed";
 import { plan, promptFor, step, type Action, type QuickValue, type StepResult } from "./step";
 import { FrameConflictError, type FrameStore, type StoredFrame } from "./store";
 import { emptyFrame, type Frame } from "./types";
-import type { ResourcesPort } from "../knowledge/resources-port";
-import type { DemandPort } from "../knowledge/demand-port";
-import type { DemandOutcome } from "../knowledge/demand";
-import { BOUNDARY_AREA, type BoundaryKind } from "../knowledge/boundary";
+import { orientationOffer } from "../knowledge-client/drivers";
+import type { DemandOutcome, DemandPort, OrientationPort, ResourcesPort } from "../knowledge-client/ports";
 import { projectFacts } from "./facts-projection";
 
 // ------------------------------------------------------------------ ports
@@ -47,17 +45,8 @@ export const rulesInterpreter: UnderstandingInterpreter = {
   async interpret(r) { return interpretByRules({ text: r.text, locale: r.locale, frame: r.frame, asked: r.asked, source: "client" }); },
 };
 
-/** Optional Level-2 orientation: answers a client question from approved knowledge (never a recommendation, never an obligation). */
-export interface OrientationPort {
-  /** True when approved sources exist for the project's jurisdiction. */
-  available(frame: Frame): Promise<boolean>;
-  /**
-   * Text answering the client's question or the offered orientation; null when nothing approved applies.
-   * `coverage` (default "full") says how much of the question approved knowledge covered; `boundary` is set when the client asked for a
-   * determination that belongs to a specialist (the engine then states the boundary). An empty `text` with a boundary is valid.
-   */
-  answer(frame: Frame, question: string, locale: Locale): Promise<{ text: string; sourceRefs: string[]; sherpaNote?: string; coverage?: "full" | "partial" | "none"; reason?: DemandOutcome["reason"]; boundary?: BoundaryKind } | null>;
-}
+// Level-2 orientation, country resources and knowledge demand reach approved knowledge ONLY through ../knowledge-client (the Knowledge Layer contract).
+export type { OrientationPort } from "../knowledge-client/ports";
 
 export interface SeedSource { (projectId: string, locale: Locale): Promise<DiscoverySeedInput | null> }
 
@@ -314,17 +303,17 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
         const avail = await deps.orientation.available(frame);
         const o = avail ? await deps.orientation.answer(frame, r.routeQuestion, locale) : null;
         const outcome: DemandOutcome = o
-          ? { coverage: o.coverage ?? "full", reason: o.reason ?? "no_hits", ...(o.boundary ? { boundary: o.boundary } : {}) }
+          ? { coverage: o.coverage ?? "full", reason: o.reason ?? "no_hits", ...(o.boundary ? { boundary: o.boundary.kind } : {}) }
           : { coverage: "none", reason: avail ? "no_hits" : "no_sources" };
         if (o?.text) { answerLead = o.text; refs = o.sourceRefs; }
         if (o?.sherpaNote) sherpaNote = o.sherpaNote;
-        if (outcome.boundary) limitLine = copyText(answerLead ? "knowledge_boundary" : "knowledge_boundary_alone", locale, { area: BOUNDARY_AREA[outcome.boundary][locale] }, introduced).text;
+        if (outcome.boundary) limitLine = copyText(answerLead ? "knowledge_boundary" : "knowledge_boundary_alone", locale, { area: o!.boundary!.area[locale] }, introduced).text;
         else if (outcome.coverage === "none") limitLine = copyText("knowledge_limit_none", locale, {}, introduced).text;
         else if (outcome.coverage === "partial" && outcome.reason !== "granularity") limitLine = copyText("knowledge_limit_partial", locale, {}, introduced).text;
         if (deps.demand && (outcome.coverage !== "full" || outcome.boundary)) {
           const d = await deps.demand.register({ projectId, turnKey, frame, question: r.routeQuestion, outcome });
           if (d) {
-            const note = `Pregunta fuera de la base de conocimiento aprobada (${d.topic}/${d.subtopic}; ${d.infoType}; ${d.coverage === "partial" ? "cobertura parcial" : "sin cobertura"})${d.boundary ? `; requiere criterio de especialista: ${BOUNDARY_AREA[d.boundary].es}` : ""}.`;
+            const note = `Pregunta fuera de la base de conocimiento aprobada (${d.topic}/${d.subtopic}; ${d.infoType}; ${d.coverage === "partial" ? "cobertura parcial" : "sin cobertura"})${d.boundary ? `; requiere criterio de especialista: ${d.boundary.area.es}` : ""}.`;
             sherpaNote = sherpaNote ? `${sherpaNote} ${note}` : note;
           }
         }
@@ -339,7 +328,6 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
       let composed = answerLead || limitLine ? [answerLead, limitLine, r.prompt].filter(Boolean).join(" ") : r.text;
       let nextAction: Pending["action"] = action;
       if (deps.orientation && !r.routeQuestion && (action.kind === "ask_priority" || action.kind === "checkpoint") && (await deps.orientation.available(frame))) {
-        const { orientationOffer } = await import("../knowledge/drivers");
         const offer = orientationOffer(frame, true);
         if (offer) {
           frame.asked["offer:orientation"] = 1;

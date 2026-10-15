@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { Pool } from "pg";
 import { createPoolDb, type Db } from "../db/database";
-import { kseedStatus } from "../admin/precision-knowledge-admin";
+import { kseedStatus } from "../admin/knowledge-layer-admin";
 
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
