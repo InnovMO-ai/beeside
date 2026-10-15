@@ -170,8 +170,9 @@ export const UI = {
   vsHeadline: L('Piensa en grande.\nNosotros nos ocupamos del resto.', 'Think bigger.\nExpand smarter.'),
   // Value of Continuing — commercial comparison (PO, 2026-10-14). EN = approved reference copy; ES = translation proposal for PO copy sign-off.
   cmpEyebrow: L('Por qué continuar con beeside', 'Why continue with beeside'),
-  cmpTitle: L('Financiar un proceso fragmentado o contar con una capacidad coordinada', 'Funding a fragmented process, or buying coordinated capability'),
-  cmpLead: L('Cuanto más abajo en la lista, más costo y complejidad asumes directamente, sin ganar por ello la misma amplitud de capacidad.', 'The further down this list you go, the more cost and complexity you take on directly, without automatically gaining the same breadth of capability.'),
+  // PO copy (2026-10-15): fixed institutional text, identical for every result (never project data). EN subtitle = translation proposal pending PO sign-off.
+  cmpTitle: L('Entrar es solo el comienzo; crecer viene con beeside.', 'Entering a market is a milestone. Building a presence takes beeside.'),
+  cmpLead: L('Continuar con beeside significa mantener integrada la estrategia, coordinación y red local que tu proyecto necesita para avanzar.', 'Continuing with beeside means keeping integrated the strategy, coordination and local network your project needs to move forward.'),
   cmpOption: L('Opción', 'Option'), cmpComplexity: L('Complejidad', 'Complexity'),
   cmpIncluded: L('Incluido', 'Included'), cmpNotIncluded: L('No incluido', 'Not included'),
   cmpOf: L('{n} de {total} capacidades', '{n} of {total} capabilities'),

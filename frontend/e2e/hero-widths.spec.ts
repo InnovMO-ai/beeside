@@ -20,12 +20,14 @@ for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1200, 800], [1440, 
       const r = img?.getBoundingClientRect(); const bg = getComputedStyle(document.body).backgroundColor;
       const card = document.querySelector<HTMLElement>(".vc-card"); const field = getComputedStyle(card ?? document.body).backgroundColor;
       const hero = document.querySelector(".res-hero.photo")!.getBoundingClientRect(); const cover = !!r && r.left <= hero.left + 1 && r.top <= hero.top + 1 && r.right >= hero.right - 1 && r.bottom >= hero.bottom - 1;
-      const ratioErr = img && r ? Math.abs(r.width / r.height - img.naturalWidth / img.naturalHeight) / (img.naturalWidth / img.naturalHeight) : 1;
-      return { cover, ratioErr, hasImg: !!img, natural: img ? [img.naturalWidth, img.naturalHeight] : null, shown: r ? [Math.round(r.width), Math.round(r.height)] : null, fit: img ? getComputedStyle(img).objectFit : null, src: img?.currentSrc.split("/").pop(), bg, card: field };
+      const scale = img && r ? Math.max(r.width / img.naturalWidth, r.height / img.naturalHeight) : 0; const ratioErr = img && r ? Math.abs(r.width / r.height - img.naturalWidth / img.naturalHeight) / (img.naturalWidth / img.naturalHeight) : 1;
+      return { cover, scale, ratioErr, hasImg: !!img, natural: img ? [img.naturalWidth, img.naturalHeight] : null, shown: r ? [Math.round(r.width), Math.round(r.height)] : null, fit: img ? getComputedStyle(img).objectFit : null, src: img?.currentSrc.split("/").pop(), bg, card: field };
     });
     expect(m.hasImg, "photographic hero present").toBeTruthy(); expect(m.natural![0]).toBeGreaterThan(0);
-    if (w >= 768) expect(m.cover, "photo fully covers the Hero box").toBeTruthy();
-    if (w >= 768) expect(m.ratioErr, "wide crop: displayed with its natural aspect (no distortion)").toBeLessThan(0.01); else expect(m.fit).toBe("cover");
+    expect(m.fit, "cropped by object-fit (never stretched or zoomed)").toBe("cover");
+    if (w >= 900) expect(m.cover, "photo fully covers the Hero box").toBeTruthy();
+    expect(m.natural![0], "decoded source is the real asset").toBeGreaterThanOrEqual(w <= 767 ? 1000 : 2000);
+    expect(m.scale, "never enlarged beyond its pixels at 1× (no pixelation)").toBeLessThanOrEqual(w <= 767 ? 1.0 : 1.0);
     expect(m.bg).toBe("rgb(246, 242, 239)"); expect(m.card).toBe("rgb(255, 255, 255)");      // #F6F2EF canvas · white comparison card
     expect(await axeViolations(page)).toEqual([]);
     if (OUT) { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: `${OUT}/yev-hero-${w}.png` });
