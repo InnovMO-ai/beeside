@@ -2,18 +2,13 @@
 
 Audited build: PR #6 `feat/fa4-launch-config`, base HEAD `07c6368` plus the audit commit that carries this file. Production was not touched; PR #6 was not merged.
 
-## 1. Staging
+## 1. Staging (re-audited after `gcloud auth login`)
 
-**NOT REDEPLOYED — execution blocker.** `gcloud` answers `Reauthentication failed. cannot prompt during non-interactive execution` (active account `mo@beeside.you`). Required, interactive, by a human:
+Redeployed from HEAD with `bash staging/fa4-internal/deploy-gcp.sh` (prepare job ran the migrations and `fa4 staging prepared`). First deploy at `9892e50`: backend `fa4-staging-backend-00020-8qq`, web `fa4-staging-web-00010-lpm`. **Final deploy at `686237c`** (includes the canonical routes below): backend `fa4-staging-backend-00022-fzs`, web `fa4-staging-web-00011-lpz`, images tagged `:686237c` (confirmed from the services' image fields). URL: `https://fa4-staging-web-640247497574.northamerica-south1.run.app/fa4` (IAP; Google sign-in with a `@beeside.you` account).
 
-```bash
-gcloud auth login
-```
-then, from the repo root at the commit to verify:
-```bash
-bash staging/fa4-internal/deploy-gcp.sh
-```
-(tag = short commit SHA; the Cloud Build file now also passes `VITE_FA4_ALLOW_PURCHASE_FALLBACK=true` so the staging build keeps the no-payment confirmation; pass `_PURCHASE_URL` to test a real destination). Last deployed staging build is still backend `fa4-staging-backend-00018-zzp` / web `fa4-staging-web-00009-4s7` (commit `afe8786`, **pre-Public-v1.0**). Revision names and the deployed SHA of the current build cannot be reported until that is done. **No staging verification is claimed.** Everything below marked LOCAL was run against the production-built stack (PostgreSQL → Express `dist` → static server → Chromium) on this machine. `e2e/release-smoke.spec.ts` can be pointed at staging (`baseURL`, `E2E_BASIC_AUTH`) once deployed.
+**Limit of this verification (honest):** the staging web URL sits behind Google IAP and cannot be opened without a human sign-in (credentials are not entered by the agent). The browser smoke was therefore run with the web bundle built from the same commit with the staging build arguments, served locally, talking to the **real staging backend revision and staging database** through an authenticated Cloud Run proxy (Origin rewritten to the allowed staging origin). Backend behaviour, database, rate limiting, migrations and e-mail generation are real staging; the static web container and the IAP gate were not browsed. Someone with a domain account should open the URL once for a visual sign-off.
+
+Staging evidence on the final revision: `release-smoke` (8: ES/EN journeys with destination-aware title, multi-destination, open destination, no-premium, legal links, Start Your Expansion delivery + lock + reload, email-result delivery + lock) + `routes` + `brand-assets` = **16/16 passed**; the evidence/hero/axe batches (incl. colour contrast, 375 and 1440, ES/EN) passed on `9892e50` staging (screenshots in `docs/fa4/visual/staging-9892e50/`, `staging-686237c/`). Observed on staging: real rate limiter (10 session creations / 10 min / address → 429 with `retryAfterSeconds`), no ERROR-severity log lines in the audited hour, and the e-mail log line `template=fa4_result_link … to=s***@example.test` (address masked). Staging uses the log e-mail transport by design (`FA4_EMAIL_TRANSPORT=log`), so SMTP delivery on staging is not exercised by this run.
 
 ## 2–3. Smoke and visual verification (LOCAL, not staging)
 
@@ -162,3 +157,9 @@ After Discovery Public v1.0: **v1.0.x** = patches/fixes; **v1.1** = backward-com
 | Rollback | READY (documented) | restore-based after first delivery |
 | Monitoring | POST-LAUNCH | none configured; logs only |
 | Smoke test | BLOCKED | LOCAL pass; staging/production smoke not run |
+
+## 20. Canonical production routes (PO, 2026-10-14)
+
+- **Public Discovery:** `https://beeside.you/discovery`. The app now serves it as an alias of the technical `/fa4` module (both work); e-mailed links take their path from `FA4_PUBLIC_PATH` (default `/fa4`, production value `/discovery`; applied in the request path **and** in the outbox worker; invalid values fall back to `/fa4`; integration-tested). Launch check rows: `FA4_PUBLIC_PATH=/discovery`, `APP_BASE_URL=https://beeside.you`.
+- **Internal administration:** `https://beeside.you/ops-control`. Served as an alias of the existing Control Center (`/admin` keeps working): links keep the operator on the route they used, post-login `returnTo` accepts both, responses carry `X-Robots-Tag: noindex` on both. Without this alias the SPA fallback would have shown the legacy public First Assessment at that URL.
+- **Isolation:** Discovery never links to or mentions `/ops-control` or `/admin` (e2e scans the cover and identity DOM and every anchor). The Control Center itself still needs its own production configuration (admin API enabled, OIDC provider/redirect URI registered for the `/ops-control` return path) — EXTERNAL, not exercised here.
