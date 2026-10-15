@@ -24,6 +24,7 @@
     "config:publish-dev": "tsx src/scripts/publish-dev-config.ts",
     "billing:inject-event": "tsx src/scripts/inject-subscription-event.ts",
     "billing:jobs": "tsx src/scripts/run-billing-jobs.ts",
+    "public-ready:status": "tsx scripts/public-ready-status.ts",
     "stripe:sandbox-verify": "tsx scripts/stripe-sandbox-verify.ts",
     "worker": "node dist/worker.js",
     "jobs:run": "tsx src/scripts/run-job.ts",
