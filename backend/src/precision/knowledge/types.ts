@@ -133,6 +133,7 @@ export interface KnowledgeRepository {
   getDocument(id: string): Promise<KnowledgeDocument | null>;
   listDocuments(filter?: { sourceId?: string; status?: KnowledgeDocument["status"] }): Promise<KnowledgeDocument[]>;
   markSuperseded(oldId: string, newId: string): Promise<void>;
+  listPassages(documentId: string): Promise<KnowledgePassage[]>;
   getPassage(id: string): Promise<{ passage: KnowledgePassage; doc: KnowledgeDocument } | null>;
   search(q: RetrieveQuery): Promise<{ passage: KnowledgePassage; doc: KnowledgeDocument; score: number }[]>;
 }

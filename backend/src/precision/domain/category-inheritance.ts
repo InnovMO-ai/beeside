@@ -20,6 +20,7 @@ import type { Frame } from "../understanding/types";
 import { loadCategoryRef, listCategoryRefs, type CategoryRef } from "./category-ref";
 import type { PrecisionDomainDeps } from "./deps";
 import { loadFactMap, recordCandidateFact, recordSystemFact } from "./facts";
+import { mapNeedId, planFrameMap } from "./frame-map";
 
 export const INHERITED_LEDGER_KEY = "frame_inherited";
 
@@ -54,7 +55,51 @@ function fieldIndex(manifest: CategoryManifestContent): Map<string, { field_key:
 /** What the frame says for this category (pure view over the registry manifest). */
 export async function inheritedFor(deps: Pick<PrecisionDomainDeps, "registry">, ref: CategoryRef, frame: Frame): Promise<InheritedFact[]> {
   const manifest = await deps.registry.getManifestForCategory(ref.categoryKey, ref.manifestVersion);
-  return deriveInherited(frame, ref.categoryKey, fieldIndex(manifest.manifest) as never);
+  const fields = fieldIndex(manifest.manifest);
+  return [...deriveInherited(frame, ref.categoryKey, fields as never), ...deriveGenericNeeds(frame, ref.categoryKey, fields)];
+}
+
+type GenericItem = Record<string, unknown>;
+const norm = (v: unknown): string => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+const blank = (v: unknown): boolean => v === undefined || v === null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+
+/**
+ * A category backed by the GENERIC manifest (no authored manifest: a need the catalog cannot place) starts from what the project already
+ * knows about that need — the client's own words, the reason they gave and the priority they set — so the category conversation deepens
+ * instead of restarting with "tell me what you need". Pure; only what the client said or confirmed, never an AI proposal.
+ */
+export function deriveGenericNeeds(frame: Frame, categoryKey: string, fields: ReadonlyMap<string, { field_key: string; type: string }>): InheritedFact[] {
+  if (!fields.has("generic_needs")) return [];
+  const planned = planFrameMap(frame).needs.filter((p) => p.categoryKey === categoryKey);
+  const items: GenericItem[] = [];
+  for (const p of planned) {
+    const n = frame.needs.find((x) => mapNeedId(x) === p.need.id);
+    if (!n || n.status === "removed" || n.origin === "implied") continue; // an AI proposal the client did not accept is not inherited
+    const item: GenericItem = { need_description: n.text.trim() };
+    if (p.need.why) item.problem = p.need.why;
+    if (p.need.priority) item.urgency = p.need.priority;
+    items.push(item);
+  }
+  if (items.length === 0) return [];
+  const confirmed = frame.needs.some((n) => planned.some((p) => p.need.id === mapNeedId(n)) && n.status === "confirmed");
+  const first = frame.needs.find((n) => mapNeedId(n) === planned[0]!.need.id)!;
+  const out: InheritedFact[] = [{
+    fieldKey: "generic_needs", value: items, valueType: "repeatable_group", answerState: "ANSWERED", provenance: "client_answered", frameKey: `need:${first.id}`,
+    display: items.map((i) => String(i.need_description)).slice(0, 3).join(", "),
+  }];
+  if (confirmed && fields.has("generic_classification_confirmed")) out.push({ fieldKey: "generic_classification_confirmed", value: true, valueType: "boolean", answerState: "ANSWERED", provenance: "client_confirmed", frameKey: `need:${first.id}`, display: "" });
+  return out;
+}
+
+/** Non-destructive merge of group items: matching items (same description) get only their EMPTY sub-fields filled; new needs are appended. */
+export function mergeGenericItems(current: unknown, derived: unknown): GenericItem[] {
+  const cur: GenericItem[] = Array.isArray(current) ? current.filter((x): x is GenericItem => Boolean(x) && typeof x === "object").map((x) => ({ ...x })) : [];
+  for (const d of Array.isArray(derived) ? (derived as GenericItem[]) : []) {
+    const hit = cur.find((c) => norm(c.need_description) === norm(d.need_description));
+    if (!hit) { cur.push({ ...d }); continue; }
+    for (const [k, v] of Object.entries(d)) if (blank(hit[k])) hit[k] = v;
+  }
+  return cur;
 }
 
 export interface InheritancePlan { writes: InheritedFact[]; ledger: InheritanceLedger; ledgerChanged: boolean; nextFacts: FactMap }
@@ -73,7 +118,16 @@ export function planInheritance(candidates: readonly InheritedFact[], factsNow: 
     const owned = ledger.fields[c.fieldKey];
     const stillOurs = owned !== undefined && cur !== undefined && stamp(cur.value, cur.answerState) === owned.written;
 
-    if (empty(cur) || (stillOurs && owned!.written !== mine)) {
+    if (c.fieldKey === "generic_needs" && !empty(cur) && cur!.answerState === "ANSWERED") {
+      // the client may already have started describing the need in the category: the frame only fills what is still empty, never overwrites
+      const merged = mergeGenericItems(cur!.value, c.value);
+      if (stamp(merged, "ANSWERED") !== stamp(cur!.value, cur!.answerState)) {
+        writes.push({ ...c, value: merged });
+        current = { ...current, [c.fieldKey]: { value: merged, answerState: "ANSWERED", provenance: cur!.provenance ?? c.provenance } };
+        ledger.fields[c.fieldKey] = { frameKey: c.frameKey, written: stamp(merged, "ANSWERED") };
+      }
+      delete ledger.conflicts[c.fieldKey];
+    } else if (empty(cur) || (stillOurs && owned!.written !== mine)) {
       writes.push(c);
       current = { ...current, [c.fieldKey]: { value: c.value, answerState: c.answerState, provenance: c.provenance } };
       ledger.fields[c.fieldKey] = { frameKey: c.frameKey, written: mine };

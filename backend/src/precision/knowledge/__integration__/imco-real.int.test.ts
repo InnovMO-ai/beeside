@@ -84,7 +84,7 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
         expect(h.provenance.authority).toBe("trusted_institutional");
         expect(h.mayGroundObligation).toBe(false);
         expect(wordingClass(h)).toBe("context");
-        expect(citation(h.provenance)).toMatch(/Índice de Competitividad Estatal 2025.*p\. \d+/);
+        expect(citation(h.provenance)).toMatch(/Índice de Competitividad Estatal \(2025\).*p\. \d+/);
       }
     }
   }, 120000);

@@ -6,6 +6,10 @@ import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRe
 import { DEMAND_STATUSES, type DemandStatus, type StoredDemand } from "../precision/knowledge/demand";
 import { assessKSeed, type KSeedAssessment } from "../precision/knowledge/kseed-spec";
 import { renderGapReport } from "../precision/knowledge/kseed-report";
+import { renderV1GapList } from "../precision/knowledge/kseed-gaps";
+import { compareDocuments, listSeries, type EditionComparison, type Series } from "../precision/knowledge/editions";
+import { createPgCandidateStore } from "../precision/knowledge/pg-repo";
+import type { CandidateUpdate } from "../precision/knowledge/agent";
 
 /**
  * Admin side of the Country Resource Library and the Source Registry (read-only view). Destinations are configuration:
@@ -107,12 +111,32 @@ export async function decideKnowledgeDemand(db: Db, id: string, b: Record<string
 }
 
 /** KSeed coverage against the expectation spec, plus the rendered gap report (Spanish). */
-export async function kseedStatus(db: Db, now: Date): Promise<{ assessment: KSeedAssessment[]; report: string }> {
+export async function kseedStatus(db: Db, now: Date): Promise<{ assessment: KSeedAssessment[]; report: string; v1Gaps: string }> {
   const repo = createPgKnowledgeRepository(db);
   const assessment = await assessKSeed(repo);
   const documents: { doc: Awaited<ReturnType<typeof repo.listDocuments>>[number]; source: NonNullable<Awaited<ReturnType<typeof repo.getSource>>> }[] = [];
   for (const doc of await repo.listDocuments({ status: "active" })) { const source = await repo.getSource(doc.sourceId); if (source) documents.push({ doc, source }); }
   const resources = await createPgCountryResources(db).list();
   const demand = await createPgDemandRepository(db).list();
-  return { assessment, report: renderGapReport({ generatedAt: now.toISOString(), assessment, documents, resources, demand }) };
+  return { assessment, report: renderGapReport({ generatedAt: now.toISOString(), assessment, documents, resources, demand }), v1Gaps: renderV1GapList(assessment) };
+}
+
+/** Editions of every publication (the newest active one is what Precision reads; older ones stay as history with their provenance). */
+export async function listKnowledgeEditions(db: Db, q: { sourceId?: unknown }): Promise<{ series: Series[] }> {
+  return { series: await listSeries(createPgKnowledgeRepository(db), typeof q.sourceId === "string" && q.sourceId ? q.sourceId : undefined) };
+}
+
+/** What changed between two editions (read-only): a person decides whether it needs review. */
+export async function compareKnowledgeEditions(db: Db, q: { from?: unknown; to?: unknown }): Promise<EditionComparison> {
+  const from = str(q.from, "from", 300); const to = str(q.to, "to", 300);
+  const repo = createPgKnowledgeRepository(db);
+  if (!(await repo.getDocument(from)) || !(await repo.getDocument(to))) throw new FaError("NOT_FOUND", "document not found");
+  return compareDocuments(repo, from, to);
+}
+
+/** Candidate updates from the Knowledge Agent with the review tier that applied (strong / standard / light). */
+export async function listKnowledgeCandidates(db: Db, q: { status?: unknown }): Promise<{ candidates: CandidateUpdate[] }> {
+  const status = typeof q.status === "string" && q.status ? q.status : undefined;
+  if (status && !["pending_review", "approved", "rejected", "auto_applied", "unchanged"].includes(status)) throw new FaError("INVALID_INPUT", "status is not valid", { fields: ["status"] });
+  return { candidates: await createPgCandidateStore(db).list(status as never) };
 }

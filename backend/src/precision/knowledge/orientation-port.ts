@@ -8,8 +8,8 @@ import { professionalAsk } from "./boundary";
 import { topicDrivers } from "./drivers";
 import { describeComparison, orient } from "./orient";
 import { citation } from "./retrieve";
-import { classifyTopics } from "./topics";
-import type { KnowledgeRepository, Topic } from "./types";
+import { topicsOfQuestion } from "./demand";
+import type { KnowledgeRepository } from "./types";
 import type { Frame } from "../understanding/types";
 
 const clip = (s: string, n: number): string => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`);
@@ -29,7 +29,7 @@ export function createOrientationPort(repo: KnowledgeRepository): OrientationPor
       const j = jurisdictionOf(frame);
       if (!j) return null;
       const drivers = topicDrivers(frame).map((d) => d.topic);
-      const asked = classifyTopics(question) as Topic[];
+      const asked = topicsOfQuestion(question);
       // The offered orientation ("criterios") speaks about what the project weighs; a real question is answered ONLY for the topics it is about.
       const topics = question === "criterios" ? [...new Set([...asked, ...drivers])].slice(0, 4) : asked.slice(0, 4);
       const boundary = question === "criterios" ? null : professionalAsk(question);

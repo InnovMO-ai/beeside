@@ -131,6 +131,14 @@ export function classifySubtopic(question: string, topic: Topic | "unclassified"
   return best?.id ?? "general";
 }
 
+/** Topics a question is about: the topic classifier plus the topic implied by a specific subtopic keyword ("IMMEX" -> customs, "Manzanillo" -> logistics). */
+export function topicsOfQuestion(question: string, max = 4): Topic[] {
+  const t = classifyTopics(question, max) as Topic[];
+  const sub = classifySubtopic(question, "unclassified");
+  const st = sub !== "general" ? topicOfSubtopic.get(sub) : undefined;
+  return st && !t.includes(st) ? [...t, st].slice(0, max) : t;
+}
+
 function countryOf(frame: Frame): string {
   const op = frame.countries.find((c) => c.role === "operation") ?? frame.countries.find((c) => c.role === "sales");
   return op?.code ? String(op.code).toUpperCase().slice(0, 2) : "unknown";

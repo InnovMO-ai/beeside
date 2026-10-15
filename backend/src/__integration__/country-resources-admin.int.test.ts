@@ -5,7 +5,12 @@ import { OidcIdentityProvider } from "../admin/oidc";
 import { createConfigVersioningService } from "../config-versioning/service";
 import { createApp } from "../index";
 import { describeWithDb, useHarness } from "./fa-harness";
-import { createPgDemandRepository } from "../precision/knowledge/pg-repo";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "../precision/knowledge/pg-repo";
+import { ingestDocument } from "../precision/knowledge/ingest";
+import { seedInitialSources } from "../precision/knowledge/registry";
+import { onboardCountryGuide } from "../precision/knowledge/onboard-guide";
 import { describeDemand } from "../precision/knowledge/demand";
 import { emptyFrame } from "../precision/understanding/types";
 
@@ -141,8 +146,38 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     expect(kseed.body.assessment.length).toBeGreaterThanOrEqual(20);
     expect(kseed.body.report).toContain("# KSeed — estado y brechas");
     expect(kseed.body.report).toContain("Demanda de conocimiento observada");
+    expect(kseed.body.v1Gaps).toContain("NO APROBADAS TODAVÍA");
 
     const { rows } = await h.client.query("SELECT action FROM admin_audit_event WHERE action LIKE 'knowledge_demand.%' OR action = 'kseed.viewed'");
     expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(["knowledge_demand.viewed", "knowledge_demand.decided", "kseed.viewed"]));
+  });
+  it("editions, candidates and a country guide dropped in later: all visible in Admin, audited, with the HTTPS destination exposed and no code involved", async () => {
+    const { supervisor } = await people();
+    const k = createPgKnowledgeRepository(h.deps.db);
+    await seedInitialSources(k);
+    const csv = (v: string): Buffer => Buffer.from(`Estado,Indicador,Valor,Lugar,Año\nNuevo León,Mercado de trabajo,${v},3,2025\nSonora,Mercado de trabajo,50,12,2025`);
+    const mk = (title: string, edition: string, data: Buffer) => ingestDocument(k, { sourceId: "imco-ice", title, edition, locator: `https://imco.org.mx/ice-${edition}`, filename: "ice.csv", data, now: "2026-10-15T00:00:00.000Z" });
+    const e25 = await mk("ICE 2025", "2025", csv("68.2"));
+    const e26 = await mk("ICE 2026", "2026", csv("66.0"));
+    if (e25.status !== "ingested" || e26.status !== "ingested") throw new Error("setup");
+
+    const eds = await get(supervisor, "/precision/knowledge/editions?sourceId=imco-ice");
+    expect(eds.status).toBe(200);
+    expect(eds.body.series[0]).toMatchObject({ sourceId: "imco-ice", title: "ICE", current: { edition: "2026", status: "active" } });
+    expect(eds.body.series[0].editions.map((e: { edition: string; status: string }) => `${e.edition}:${e.status}`)).toEqual(["2025:superseded", "2026:active"]);
+    const cmp = await get(supervisor, `/precision/knowledge/editions/compare?from=${encodeURIComponent(e25.document.id)}&to=${encodeURIComponent(e26.document.id)}`);
+    expect(cmp.status).toBe(200);
+    expect(cmp.body).toMatchObject({ changed: 1, unchanged: 1, needsReview: true });
+    expect((await get(supervisor, "/precision/knowledge/editions/compare?from=x&to=y")).status).toBe(404);
+    expect((await get(supervisor, "/precision/knowledge/candidates?status=nope")).status).toBe(400);
+    expect((await get(supervisor, "/precision/knowledge/candidates")).status).toBe(200);
+
+    // the guide arrives later: one operation, and Admin already shows its HTTPS destination
+    await onboardCountryGuide(k, createPgCountryResources(h.deps.db), { countryCode: "MX", title: "Doing business in Mexico", language: "en", edition: "2026", url: "https://guides.example.test/dbm-2026.pdf", file: { filename: "dbm.txt", data: readFileSync(join(__dirname, "..", "precision", "knowledge", "__tests__", "fixtures", "guia-pais-sintetica.txt")) }, now: "2026-10-16T09:00:00.000Z" });
+    const list = await get(supervisor, "/precision/country-resources?countryCode=MX");
+    expect(list.status).toBe(200);
+    expect((list.body.resources ?? list.body).some((r: { title: string; destination: { ref: string }; active: boolean }) => r.title === "Doing business in Mexico" && r.destination.ref === "https://guides.example.test/dbm-2026.pdf" && r.active)).toBe(true);
+    const { rows } = await h.client.query("SELECT action FROM admin_audit_event WHERE action LIKE 'knowledge_editions.%' OR action = 'knowledge_candidates.viewed'");
+    expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(["knowledge_editions.viewed", "knowledge_editions.compared", "knowledge_candidates.viewed"]));
   });
 });

@@ -9,7 +9,7 @@ import type { KnowledgeDocument, KnowledgeSource } from "./types";
 
 /** Editions known to exist but not necessarily ingested (observed by Product; the Knowledge Agent / a person ingests them). */
 export const KNOWN_EDITIONS: { sourceId: string; edition: string; observed: string; note: string }[] = [
-  { sourceId: "imco-ice", edition: "2026", observed: "2026-10-14", note: "El sitio de IMCO ya muestra el ICE 2026; la arquitectura lo incorpora como versión nueva que sustituye a la 2025." },
+  { sourceId: "imco-ice", edition: "2026", observed: "2026-10-14", note: "El sitio de IMCO ya muestra el ICE 2026. No bloquea V1: con la edición 2025 ya queda demostrada la ingesta, el versionado y la recuperación. Cuando llegue, entra como edición nueva de la misma serie: la 2025 pasa a histórica y no se borra nada." },
 ];
 
 export interface KSeedReportInput {
@@ -86,9 +86,9 @@ export function renderGapReport(i: KSeedReportInput): string {
   l.push(`## Qué necesitamos de ti`, ``);
   const asks: string[] = [];
   if (!dbm) asks.push(`El PDF final de «Doing business in Mexico»: la URL pública HTTPS para registrarlo como recurso del país y, si lo autorizas, el archivo para ingerirlo como material curado por beeside y que Precision pueda orientar con su contenido.`);
-  for (const k of KNOWN_EDITIONS) if (!i.documents.some((d) => d.doc.sourceId === k.sourceId && d.doc.edition === k.edition)) asks.push(`Los archivos del ICE ${k.edition} de IMCO (o su enlace descargable) para sustituir la edición 2025.`);
+  for (const k of KNOWN_EDITIONS) if (!i.documents.some((d) => d.doc.sourceId === k.sourceId && d.doc.edition === k.edition)) asks.push(`(No bloquea V1) Los archivos del ICE ${k.edition} de IMCO, cuando los tengas: entran como edición nueva de la serie y la 2025 queda como histórica.`);
   if (requiredOpen.some((x) => x.need.kind === "obligation")) asks.push(`La capa de obligaciones es la brecha mayor. Necesitamos que The Hive confirme las fuentes oficiales a curar (SAT y DOF, STPS e IMSS, Secretaría de Economía, INM, ANAM) y designe a quién de The Hive revisa las unidades curadas por área (legal, fiscal, laboral, aduanas, logística). Con eso preparamos las unidades y las ingerimos como material curado que remite a la fuente oficial.`);
-  asks.push(`Confirmar si V1 se queda solo con México. Para cualquier otro país, Precision hoy reconoce el límite y registra la demanda; la demanda observada dirá qué país conviene sembrar después.`);
+  asks.push(`Nada que decidir sobre el alcance de países: V1 es México primero, no solo México. Para otro destino Precision sigue entendiendo el proyecto, usa el conocimiento aprobado que exista, reconoce el límite y registra la demanda con ese país; la demanda observada dirá qué país sembrar después.`);
   l.push(...asks.map((t, n) => `${n + 1}. ${t}`), ``);
   return l.join("\n");
 }

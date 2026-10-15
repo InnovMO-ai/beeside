@@ -26,8 +26,10 @@ export class InMemoryKnowledgeRepository implements KnowledgeRepository {
   async markSuperseded(oldId: string, newId: string): Promise<void> {
     const o = this.docs.get(oldId); const n = this.docs.get(newId);
     if (!o || !n) throw new Error("unknown document");
-    o.status = "superseded"; o.supersededById = newId; n.supersedesId = oldId;
+    o.status = "superseded"; o.supersededById = newId; if (!n.supersedesId) n.supersedesId = oldId;
   }
+
+  async listPassages(documentId: string): Promise<KnowledgePassage[]> { return (this.passages.get(documentId) ?? []).map((p) => ({ ...p })); }
 
   async getPassage(id: string): Promise<{ passage: KnowledgePassage; doc: KnowledgeDocument } | null> {
     for (const [docId, ps] of this.passages) { const p = ps.find((x) => x.id === id); if (p) return { passage: p, doc: this.docs.get(docId)! }; }

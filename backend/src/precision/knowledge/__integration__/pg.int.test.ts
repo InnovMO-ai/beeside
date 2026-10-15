@@ -70,6 +70,32 @@ describeWithDb("Knowledge Service + frame store (PostgreSQL)", () => {
     expect(unchanged.status).toBe("unchanged");
   });
 
+  it("edition series in PostgreSQL: a new edition under another title supersedes; an older one arriving late is historical; nothing is overwritten", async () => {
+    const repo = createPgKnowledgeRepository(db);
+    await seedInitialSources(repo);
+    const csv = (v: string, y: string): Buffer => Buffer.from(`Estado,Indicador,Valor,Lugar,Año\nNuevo León,Mercado de trabajo,${v},3,${y}\nQuerétaro,Mercado de trabajo,64.9,6,${y}`);
+    const mk = (title: string, edition: string, data: Buffer) => ingestDocument(repo, { sourceId: "imco-ice", title, edition, locator: `https://imco.org.mx/ice-${edition}`, filename: "ice.csv", data, now: NOW });
+    const e26 = await mk("ICE 2026", "2026", csv("66.0", "2026"));
+    const e25 = await mk("ICE 2025", "2025", csv("68.2", "2025"));
+    if (e26.status !== "ingested" || e25.status !== "ingested") throw new Error("setup");
+    expect(e25.historical).toBe(true);
+    const docs = await repo.listDocuments({ sourceId: "imco-ice" });
+    expect(docs.map((d) => `${d.edition}:${d.status}`).sort()).toEqual(["2025:superseded", "2026:active"]);
+    expect((await repo.getDocument(e25.document.id))?.supersededById).toBe(e26.document.id);
+    const e24 = await mk("ICE 2024", "2024", csv("60.0", "2024"));
+    if (e24.status !== "ingested") throw new Error("setup");
+    expect((await repo.getDocument(e24.document.id))?.supersededById).toBe(e25.document.id); // chain: 2024 → 2025 → 2026
+    expect((await repo.getDocument(e26.document.id))?.supersedesId).toBe(e25.document.id);
+    const cur = await retrieve(repo, { text: "mercado de trabajo", topics: ["labor_market"], jurisdiction: "MX" });
+    expect(cur.length).toBeGreaterThan(0);
+    expect(cur.every((h) => h.provenance.edition === "2026")).toBe(true);
+    const e27 = await mk("ICE 2027", "2027", csv("70.0", "2027"));
+    if (e27.status !== "ingested") throw new Error("setup");
+    expect(e27.supersededId).toBe(e26.document.id);
+    expect(await repo.listPassages(e25.document.id)).not.toHaveLength(0);
+    await expect(db.query("UPDATE knowledge_document SET content_hash = 'x' WHERE id = $1", [e25.document.id])).rejects.toThrow();
+  });
+
   it("the agent keeps high-risk candidates out until a person approves them", async () => {
     const repo = createPgKnowledgeRepository(db);
     await seedInitialSources(repo);

@@ -23,7 +23,7 @@ BEGIN
 END
 $t$;
 
-\echo '--- K01-K16 (knowledge: hierarchy, immutability, supersession, search) ---'
+\echo '--- K01-K18 (knowledge: hierarchy, immutability, supersession, editions, search) ---'
 DO $t$
 DECLARE d1 TEXT := 'imco-ice:ice:v1'; d2 TEXT := 'imco-ice:ice:v2'; h TEXT := repeat('a', 64);
 BEGIN
@@ -56,6 +56,13 @@ BEGIN
   PERFORM pg_temp.expect_error('K14', format($q$UPDATE knowledge_document SET status = 'active', superseded_by_id = NULL WHERE id = %L$q$, d1), 'BV409', 'cannot change state');
   PERFORM pg_temp.expect_error('K15', format($q$UPDATE knowledge_document SET status = 'superseded' WHERE id = %L$q$, d2), '23514', 'superseded_consistent');
   PERFORM pg_temp.expect_error('K16', $q$INSERT INTO country_resource (id, country_code, title, language, destination_kind, destination_ref, version, updated_at) VALUES ('r1', 'MX', 'Guide', 'en', 'url', 'http://insecure.example', '1', '2026-10-01')$q$, '23514', 'https');
+
+  -- K17-K18: an OLDER edition that arrives after a newer one (higher version, earlier edition) is stored as historical, superseded by the newer edition
+  INSERT INTO knowledge_document (id, source_id, title, edition, version, retrieved_at, jurisdiction, locator, content_hash, confidence) VALUES (d2 || '-old', 'imco-ice', 'ICE', '2023', 3, now(), 'MX', 'https://imco.org.mx/ice23', repeat('c', 64), 'medium');
+  UPDATE knowledge_document SET status = 'superseded', superseded_by_id = d2 WHERE id = d2 || '-old';
+  PERFORM pg_temp.assert_that('K17', (SELECT status FROM knowledge_document WHERE id = d2 || '-old') = 'superseded' AND (SELECT status FROM knowledge_document WHERE id = d2) = 'active', 'a late-arriving older edition is historical; the newer edition stays active');
+  INSERT INTO knowledge_document (id, source_id, title, edition, version, retrieved_at, jurisdiction, locator, content_hash, confidence) VALUES (d2 || '-other', 'imco-ice', 'Otra publicación', '2030', 9, now(), 'MX', 'https://imco.org.mx/otra', repeat('d', 64), 'medium');
+  PERFORM pg_temp.expect_error('K18', format($q$UPDATE knowledge_document SET status = 'superseded', superseded_by_id = %L WHERE id = %L$q$, d2 || '-other', d2), 'BV409', 'same publication');
 END
 $t$;
 

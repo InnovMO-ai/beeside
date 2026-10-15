@@ -3,7 +3,7 @@ import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
 import { DELIVERY_STATUSES, listPrecisionDeliveries } from "./precision-deliveries";
 import { MANAGED_LOCALES, configOverview, resetConfig, setConfig } from "./precision-config-admin";
-import { createCountryResource, decideKnowledgeDemand, kseedStatus, listCountryResources, listKnowledgeDemand, listKnowledgeSources, setCountryResourceActive, updateCountryResource } from "./precision-knowledge-admin";
+import { compareKnowledgeEditions, createCountryResource, decideKnowledgeDemand, kseedStatus, listKnowledgeCandidates, listKnowledgeEditions, listCountryResources, listKnowledgeDemand, listKnowledgeSources, setCountryResourceActive, updateCountryResource } from "./precision-knowledge-admin";
 import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
@@ -774,6 +774,33 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     handle(async (req, res) => {
       const out = await listKnowledgeDemand(db, req.query);
       await audit(req, "knowledge_demand.viewed", "ALLOWED", { details: { count: out.demand.length } });
+      res.json(out);
+    }),
+  );
+  router.get(
+    "/precision/knowledge/editions",
+    allow("config.read", "knowledge_editions.viewed"),
+    handle(async (req, res) => {
+      const out = await listKnowledgeEditions(db, req.query);
+      await audit(req, "knowledge_editions.viewed", "ALLOWED", { details: { series: out.series.length } });
+      res.json(out);
+    }),
+  );
+  router.get(
+    "/precision/knowledge/editions/compare",
+    allow("config.read", "knowledge_editions.compared"),
+    handle(async (req, res) => {
+      const out = await compareKnowledgeEditions(db, req.query);
+      await audit(req, "knowledge_editions.compared", "ALLOWED", { details: { changed: out.changed, added: out.added, removed: out.removed } });
+      res.json(out);
+    }),
+  );
+  router.get(
+    "/precision/knowledge/candidates",
+    allow("config.read", "knowledge_candidates.viewed"),
+    handle(async (req, res) => {
+      const out = await listKnowledgeCandidates(db, req.query);
+      await audit(req, "knowledge_candidates.viewed", "ALLOWED", { details: { count: out.candidates.length } });
       res.json(out);
     }),
   );

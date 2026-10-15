@@ -147,4 +147,26 @@ d("Knowledge-first, not search-first (PostgreSQL)", () => {
       }
     }
   });
+  it("Mexico-first, not Mexico-only: a destination without prepared knowledge keeps the diagnosis going, states the limit, registers the demand for THAT country and never reaches the web", async () => {
+    const { projectId } = await h.newProject({ context: { ...CONTEXT, project: { ...CONTEXT.project, destinationCountry: "Chile", expansionObjective: "Operar un centro logístico en Chile" } } });
+    const api = h.api(await h.session(projectId), "es");
+    await api.get("/understanding");
+    expect((await api.post("/understanding/turns", { turnKey: key("open"), text: "Somos una empresa logística portuguesa y queremos operar un centro logístico en Chile para mover mercancía hacia Sudamérica." })).status).toBe(200);
+    const docsBefore = await docCount();
+    const r = await api.post("/understanding/turns", { turnKey: key("q"), text: "¿Cómo está el mercado de trabajo del país?" });
+    expect(r.status).toBe(200);
+    const a = lastAssistant(r.body);
+    expect(a.text).toMatch(/todav[ií]a no lo tengo en la informaci[óo]n que beeside ha revisado y aprobado/i);   // the limit is recognised, nothing is invented
+    expect((a.text.match(/\?/g) ?? []).length).toBe(1);                // the diagnosis goes on
+    expect(a.text.trim().endsWith("?")).toBe(true);
+    expect(internalTermsIn(a.text)).toEqual([]);
+    expect(a.text).not.toMatch(/IMCO|SAT|IMSS|M[ée]xico/);             // no knowledge from another country is borrowed
+    const frame = (await createPgFrameStore(h.db).load(projectId))!.frame;
+    expect(frame.notes.some((n) => /fuera de la base de conocimiento aprobada/.test(n.text))).toBe(true); // the specialist hears about it
+    const row = (await demandRows()).find((x) => x.country === "CL");
+    expect(row).toMatchObject({ country: "CL", coverage: "absent", reason: "no_sources", disposition: "candidate_knowledge", status: "open" });
+    const dump = JSON.stringify([await demandRows(), (await h.db.query("SELECT * FROM knowledge_demand_event")).rows]).toLowerCase();
+    for (const leak of ["mercado de trabajo", projectId.toLowerCase()]) expect(dump).not.toContain(leak);
+    expect(await docCount()).toBe(docsBefore);                          // nothing published, nothing invented
+  });
 });

@@ -77,8 +77,12 @@ export function createPgKnowledgeRepository(db: Db): KnowledgeRepository {
     async markSuperseded(oldId, newId) {
       await db.transaction(async (tx) => {
         await tx.query("UPDATE knowledge_document SET status = 'superseded', superseded_by_id = $2 WHERE id = $1", [oldId, newId]);
-        await tx.query("UPDATE knowledge_document SET supersedes_id = $1 WHERE id = $2", [oldId, newId]);
+        await tx.query("UPDATE knowledge_document SET supersedes_id = $1 WHERE id = $2 AND supersedes_id IS NULL", [oldId, newId]);
       });
+    },
+    async listPassages(documentId) {
+      const r = await db.query<PassageRow>("SELECT id, document_id, source_id, ordinal, text, location, topics, units, granularity, indicators FROM knowledge_passage WHERE document_id = $1 ORDER BY ordinal", [documentId]);
+      return r.rows.map(toPassage);
     },
     async getPassage(id) {
       const p = (await db.query<PassageRow>("SELECT id, document_id, source_id, ordinal, text, location, topics, units, granularity, indicators FROM knowledge_passage WHERE id = $1", [id])).rows[0];
