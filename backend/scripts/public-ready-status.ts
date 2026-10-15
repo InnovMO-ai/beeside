@@ -27,6 +27,17 @@ async function main(): Promise<void> {
       : "adapter or acceptance suite missing",
     proof: "TEST_DATABASE_URL=... npx jest -c jest.integration.config.js --runInBand discovery-real   (18 checks: conformance x2, identity/provenance, continuity-not-completion, immutability, Portuguese end to end)",
   });
+  // 1b Entitlement-gated continuity (Discovery -> Core promotion, same project_id)
+  const promo = existsSync(join(__dirname, "../src/continuity/discovery-promotion.ts"));
+  const bridgeProof = existsSync(join(__dirname, "../src/precision/api/__integration__/continuity-bridge.int.test.ts"));
+  rows.push({
+    front: "1b Premium continuity bridge (valid entitlement -> SAME project_id promoted -> Precision)",
+    state: promo && bridgeProof ? "PROVEN" : "WAITING_ON_INPUT",
+    detail: promo && bridgeProof
+      ? "Discovery completion promotes nothing; any governed entitlement source promotes the same UUID in the same transaction (idempotent); Stripe will be one more producer of the same boundary (no provider-specific path)"
+      : "promotion module or acceptance suite missing",
+    proof: "TEST_DATABASE_URL=... npx jest -c jest.integration.config.js --runInBand continuity-bridge   (A no entitlement, B valid entitlement, C replay/concurrency, D revoked/expired, convergence, identity, safety); runtime role: continuity-runtime-role; migrations: npm run db:migrate:check",
+  });
   // 2 Real model / ZDR
   const m = missing(["PRECISION_GATEWAY_PRIMARY_ENDPOINT", "PRECISION_GATEWAY_PRIMARY_MODEL"]);
   rows.push({

@@ -10,6 +10,7 @@ import { questionBankVersion, rulesEngineVersion, snapshotTemplateVersion } from
 // `.references()` below) — Drizzle never evaluates it until both modules have finished
 // loading, which is the standard pattern for cross-file relations in a multi-file schema.
 import { adminUser } from "./ops";
+import { fa4Result } from "./fa4";
 
 export const project = pgTable(
   "project",
@@ -84,5 +85,31 @@ export const projectResponsibilityChange = pgTable(
        OR (${t.actorType} = 'ADMIN_USER' AND ${t.actorAdminUserId} IS NOT NULL AND ${t.actorPersonId} IS NULL)
        OR (${t.actorType} = 'SYSTEM' AND ${t.actorPersonId} IS NULL AND ${t.actorAdminUserId} IS NULL)`,
     ),
+  ],
+);
+
+/**
+ * Where a Core project came from (continuity). A Discovery project is promoted into Core under the SAME UUID when a valid
+ * entitlement is activated; this row keeps the exact sealed Discovery result the promotion was made against (the pin Precision
+ * consumes) and the entitlement source that triggered it. Append-only: a promotion is never rewritten.
+ */
+export const projectOrigin = pgTable(
+  "project_origin",
+  {
+    projectId: uuid("project_id").primaryKey().references(() => project.projectId),
+    origin: text("origin").notNull(),
+    /** The sealed Discovery result (fa4_result.result_id) the project was promoted against. Immutable, delivered, append-only on Discovery's side. */
+    discoveryResultId: uuid("discovery_result_id").notNull().references(() => fa4Result.resultId),
+    /** Contract Precision reads that result through (fa4-precision-context/N). */
+    contractVersion: text("contract_version").notNull(),
+    /** The entitlement source that made the promotion valid (manual, complimentary, partner, ..., paid:<provider>). Never a provider-specific path. */
+    promotedBySource: text("promoted_by_source").notNull(),
+    /** How the person behind the e-mail was verified for this promotion: email_link | payment | operator | new_person. */
+    identityEvidence: text("identity_evidence").notNull(),
+    promotedAt: timestamp("promoted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("project_origin_origin", sql`${t.origin} IN ('DISCOVERY_FA4')`),
+    check("project_origin_evidence", sql`${t.identityEvidence} IN ('email_link','payment','operator','new_person')`),
   ],
 );

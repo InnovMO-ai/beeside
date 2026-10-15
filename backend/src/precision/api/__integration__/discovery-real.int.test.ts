@@ -26,6 +26,7 @@ import { discoveryBridgeConformance } from "../../../__tests__/helpers/discovery
 import { deliverResult } from "../../../fa4/service";
 import { createFaContextService } from "../../domain/fa-context";
 import { deliverDiscovery, portugueseEnergyAnswers, redeliverDiscovery } from "../../../__tests__/helpers/discovery-real";
+import { activateSimulatedEntitlement } from "../../../__tests__/helpers/simulated-entitlement";
 import { setupHarness, TEST_DATABASE_URL, type Harness } from "./harness";
 import { confirmMap, internalTermsIn, key } from "./drive";
 
@@ -51,13 +52,13 @@ const PRIORITY = "Primero la entidad local y la contratación, porque queremos a
 
 d("REAL Discovery -> Precision (canonical contract fa4-precision-context/1)", () => {
   let h: Harness;
-  beforeAll(async () => { h = await setupHarness({ engine: "core", faReader: (db) => new Fa4DiscoveryContextReader(db) }); });
+  beforeAll(async () => { h = await setupHarness({ engine: "core", faReader: (db) => new Fa4DiscoveryContextReader(db), coreEntitlement: {} }); });
   afterAll(async () => { await h.close(); });
 
-  /** Discovery delivers (its own code), then Core promotes the project under the SAME id (test scaffold for TX1) with a fixture Premium entitlement. */
+  /** Discovery delivers (its own code); a valid (simulated, governed) entitlement is activated; Core PROMOTES the same project_id in that transaction. No scaffold. */
   async function realProject(answers = portugueseEnergyAnswers()): Promise<{ projectId: string; resultId: string }> {
     const delivered = await deliverDiscovery(h.db, answers);
-    await h.newProject({ projectId: delivered.projectId, context: null });
+    await activateSimulatedEntitlement(h.db, delivered.projectId);
     return delivered;
   }
   const pins = async (projectId: string): Promise<any[]> =>

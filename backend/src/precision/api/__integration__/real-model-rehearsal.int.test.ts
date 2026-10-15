@@ -28,6 +28,7 @@ import { createPgFrameStore } from "../../understanding/pg-store";
 import { loadFactMap } from "../../domain/facts";
 import { Fa4DiscoveryContextReader } from "../../adapters/fa4-discovery-context-reader";
 import { deliverDiscovery, portugueseEnergyAnswers } from "../../../__tests__/helpers/discovery-real";
+import { activateSimulatedEntitlement } from "../../../__tests__/helpers/simulated-entitlement";
 import { setupHarness, TEST_DATABASE_URL, type Harness } from "./harness";
 import { confirmMap, internalTermsIn, key } from "./drive";
 
@@ -68,6 +69,7 @@ d(`Real-model rehearsal — Portuguese reference company (${MODE})`, () => {
     h = await setupHarness({
       engine: "core",
       faReader: (db) => new Fa4DiscoveryContextReader(db),
+      coreEntitlement: {},
       knowledge: (db) => createPgKnowledgeLayer(db, { seedSources: true }),
       ...(MODE === "gateway" ? { modelFromEnv: true, env: { ...(process.env as Record<string, string>), PRECISION_UNDERSTANDING_ENGINE: "core" } } : {}),
     });
@@ -109,7 +111,7 @@ d(`Real-model rehearsal — Portuguese reference company (${MODE})`, () => {
       // ---- Discovery -> Premium -> Precision (the SAME project id)
       const delivered = await deliverDiscovery(h.db, portugueseEnergyAnswers());
       const projectId = delivered.projectId;
-      await h.newProject({ projectId, context: null });
+      await activateSimulatedEntitlement(h.db, projectId);
       const api = h.api(await h.session(projectId), "es");
       const opening = (await api.get("/understanding")).body;
       const seeded = (await createPgFrameStore(h.db).load(projectId))!.frame;
@@ -227,7 +229,7 @@ d(`Real-model rehearsal — Portuguese reference company (${MODE})`, () => {
 
       // ---- correction handling (a separate Portuguese project: the client corrects a number they gave)
       const c2 = await deliverDiscovery(h.db, portugueseEnergyAnswers());
-      await h.newProject({ projectId: c2.projectId, context: null });
+      await activateSimulatedEntitlement(h.db, c2.projectId);
       const api2 = h.api(await h.session(c2.projectId), "es");
       await api2.get("/understanding");
       let r2: any = await turn(api2, "understanding:correction", "/understanding/turns", { text: NARRATIVE });

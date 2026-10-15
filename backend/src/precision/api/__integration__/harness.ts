@@ -13,6 +13,8 @@ import { syncFieldRegistry } from "../../../fa/admin/field-registry";
 import { ensureDevBootstrapAdmin, publishDevConfiguration } from "../../../fa/admin/publish-config";
 import { SimulatedOperationHub } from "../../adapters/simulator-operation-hub";
 import { FixtureEntitlementProvider } from "../../adapters/fixture-entitlement";
+import { CoreEntitlementProvider } from "../../adapters/core-entitlement";
+import { premiumPolicyFromEnv } from "../../../premium/premium-policy";
 import { FixtureFaContextReader } from "../../adapters/fixture-fa-context";
 import { ScriptedModelProvider, type ScriptedFixture } from "../../conversation";
 import type { RateLimiter } from "../../../security/rate-limit";
@@ -74,7 +76,7 @@ async function ensureFaConfiguration(db: Db): Promise<void> {
   });
 }
 
-export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy"; knowledge?: (db: Db) => Promise<KnowledgeLayer> | KnowledgeLayer; faReader?: (db: Db) => FaContextReader; /** Extra environment for the runtime (e.g. PRECISION_UNDERSTANDING_INTERPRETER). */ env?: Record<string, string>; /** true: the model provider is selected from the environment (PRECISION_MODEL_PROVIDER=gateway) instead of the scripted one. */ modelFromEnv?: boolean } = {}): Promise<Harness> {
+export async function setupHarness(options: { fixture?: ScriptedFixture; limiter?: RateLimiter; internalKey?: string; engine?: "core" | "legacy"; knowledge?: (db: Db) => Promise<KnowledgeLayer> | KnowledgeLayer; faReader?: (db: Db) => FaContextReader; /** Extra environment for the runtime (e.g. PRECISION_UNDERSTANDING_INTERPRETER). */ env?: Record<string, string>; /** true: the model provider is selected from the environment (PRECISION_MODEL_PROVIDER=gateway) instead of the scripted one. */ modelFromEnv?: boolean; /** Precision is gated by the REAL Core entitlement (the permanent provider) instead of the fixture; `now` lets a test move the clock. */ coreEntitlement?: { now?: () => Date } } = {}): Promise<Harness> {
   if (!TEST_DATABASE_URL) throw new Error("TEST_DATABASE_URL is required");
   const pool = new Pool({ connectionString: TEST_DATABASE_URL, max: 10 });
   const db = createPoolDb(pool);
@@ -88,7 +90,7 @@ export async function setupHarness(options: { fixture?: ScriptedFixture; limiter
     pool,
     db,
     log: (level, message, fields) => void logs.push(JSON.stringify({ level, message, ...(fields ?? {}) })),
-    integrations: { operationHub: new SimulatedOperationHub(), entitlement, faContext: options.faReader ? options.faReader(db) : fa },
+    integrations: { operationHub: new SimulatedOperationHub(), entitlement: options.coreEntitlement ? new CoreEntitlementProvider(db, { policy: premiumPolicyFromEnv(), ...(options.coreEntitlement.now ? { now: options.coreEntitlement.now } : {}) }) : entitlement, faContext: options.faReader ? options.faReader(db) : fa },
     ...(options.modelFromEnv ? {} : { provider }),
     publishManifests: true,
     ...(options.knowledge ? { knowledge: await options.knowledge(db) } : {}),
