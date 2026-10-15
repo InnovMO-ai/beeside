@@ -71,7 +71,7 @@ export function openLoginState(secret: string, value: string | undefined, now: D
 
 /** Only same-app relative paths under /admin are accepted as post-login destinations. */
 export function safeReturnTo(value: unknown): string {
-  return typeof value === "string" && /^\/(admin|ops-control)(\/[A-Za-z0-9/_\-.?=&%]*)?$/.test(value) && !value.includes("//") && !value.includes("..") ? value : "/admin";
+  return typeof value === "string" && /^\/admin(\/[A-Za-z0-9/_\-.?=&%]*)?$/.test(value) && !value.includes("//") && !value.includes("..") ? value : "/admin";
 }
 
 export function parseCookies(header: string | undefined): Record<string, string> {

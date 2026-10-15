@@ -238,6 +238,8 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       const links = mail.messages.map((m) => m.ctaUrl).filter(Boolean);
       expect(links.length).toBeGreaterThan(0);
       for (const l of links) expect(l!.startsWith(expected)).toBe(true);
+      const html = mail.messages.map((m) => m.html ?? "").join("\n");                      // the e-mail header logo is hosted under the same public path (never gated)
+      expect(html).toContain(expected.startsWith("https://fa.test/discovery") ? "https://fa.test/discovery/brand/beeside-lockup.png" : "https://fa.test/brand/beeside-lockup.png");
     }
     publicPath = undefined;
   });

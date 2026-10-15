@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { journeyA, journeyB, journeyC, journeyNewBusiness } from '@beeside/fa-public-engine/testing';
 import { UI } from '../src/fa4/copy/ui';
 import { axeViolations, FORBIDDEN, noHorizontalOverflow, open, seed, touchTargetsOk } from './helpers';
+import { API } from "./paths";
 
 const cases = [
   { name: 'A', build: journeyA, h1: /3 a 5 personas en México/ },
@@ -159,7 +160,7 @@ for (const loc of ['es', 'en'] as const) {
     await expect(page.getByRole('button', { name: 'Start Your Expansion' })).toBeVisible();
     await page.getByRole('button', { name: UI.emailResult[loc] }).click();
     await expect(page.getByRole('button', { name: UI.fixSomething[loc] })).toHaveCount(0);
-    expect((await request.put('/api/fa4/session', { headers: { 'X-Fa4-Session': token }, data: { answers: a, step: 'decision' } })).status()).toBe(409);
-    const sealed = await request.get('/api/fa4/session/result', { headers: { 'X-Fa4-Session': token } }); expect(sealed.status()).toBe(200);
+    expect((await request.put(`${API}/session`, { headers: { 'X-Fa4-Session': token }, data: { answers: a, step: 'decision' } })).status()).toBe(409);
+    const sealed = await request.get(`${API}/session/result`, { headers: { 'X-Fa4-Session': token } }); expect(sealed.status()).toBe(200);
   });
 }

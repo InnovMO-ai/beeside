@@ -39,7 +39,13 @@ function fa4LaunchGuard() {
   };
 }
 
+// Production under https://beeside.you/discovery: VITE_BASE_PATH=/discovery/ puts assets, brand files and the API client under that prefix (the hostname is
+// shared with the company website, so a root-built app cannot be served there). Unset = root (local development, internal staging).
+const basePath = process.env.VITE_BASE_PATH ?? "/";
+if (!/^\/([a-z0-9-]+\/)?$/.test(basePath)) throw new Error("VITE_BASE_PATH must be / or look like /discovery/");
+
 export default defineConfig({
+  base: basePath,
   plugins: [react(), fa4LaunchGuard()],
   server: {
     proxy: {

@@ -3,6 +3,7 @@ import { journeyA, journeyB, journeyNortica } from "@beeside/fa-public-engine/te
 import type { Answers } from "@beeside/fa-public-engine";
 import { UI } from "../src/fa4/copy/ui";
 import { noHorizontalOverflow, open, seed } from "./helpers";
+import { API } from "./paths";
 
 /**
  * Release smoke (runs against the local production-built stack; point baseURL / E2E_BASIC_AUTH at staging to run it there):
@@ -66,13 +67,13 @@ test("Start Your Expansion delivers once, locks editing, survives reload; «Corr
   await open(page, token);
   await page.getByRole("button", { name: new RegExp(`^(${UI.next.es}|${UI.seeResult.es})$`) }).click(); await page.getByTestId("result-screen").waitFor();
   await expect(page.getByRole("button", { name: UI.fixSomething.es })).toBeVisible();                 // preview: editable
-  expect((await request.get("/api/fa4/session/result", { headers: { "X-Fa4-Session": token } })).status()).toBe(404);   // …and nothing delivered yet
+  expect((await request.get(`${API}/session/result`, { headers: { "X-Fa4-Session": token } })).status()).toBe(404);   // …and nothing delivered yet
   await page.getByRole("button", { name: "Start Your Expansion" }).click(); await page.getByRole("button", { name: UI.confirmYes.es }).click();
   await expect(page.getByText(/tu beeside Sherpa revisará/i)).toBeVisible();
   await expect(page.getByRole("button", { name: UI.fixSomething.es })).toHaveCount(0);
-  const sealed = await request.get("/api/fa4/session/result", { headers: { "X-Fa4-Session": token } }); expect(sealed.status()).toBe(200); expect((await sealed.json()).delivered).toBe(true);
-  expect((await request.put("/api/fa4/session", { headers: { "X-Fa4-Session": token }, data: { answers: a, step: "decision" } })).status()).toBe(409);
-  expect((await request.post("/api/fa4/session/result", { headers: { "X-Fa4-Session": token }, data: {} })).status()).toBe(409);
+  const sealed = await request.get(`${API}/session/result`, { headers: { "X-Fa4-Session": token } }); expect(sealed.status()).toBe(200); expect((await sealed.json()).delivered).toBe(true);
+  expect((await request.put(`${API}/session`, { headers: { "X-Fa4-Session": token }, data: { answers: a, step: "decision" } })).status()).toBe(409);
+  expect((await request.post(`${API}/session/result`, { headers: { "X-Fa4-Session": token }, data: {} })).status()).toBe(409);
   await page.reload(); await page.getByTestId("result-screen").waitFor(); await expect(page.getByRole("button", { name: UI.fixSomething.es })).toHaveCount(0);
   await expect(page.getByText(UI.deliveredNote.es)).toBeVisible();
 });
@@ -84,5 +85,5 @@ test("email-result delivers once and locks editing as well", async ({ page, requ
   await page.getByRole("button", { name: UI.emailResult.es }).click();
   await expect(page.getByText(/Te enviamos tu Your Expansion View a/)).toBeVisible();
   await expect(page.getByRole("button", { name: UI.fixSomething.es })).toHaveCount(0);
-  expect((await request.put("/api/fa4/session", { headers: { "X-Fa4-Session": token }, data: { answers: a, step: "decision" } })).status()).toBe(409);
+  expect((await request.put(`${API}/session`, { headers: { "X-Fa4-Session": token }, data: { answers: a, step: "decision" } })).status()).toBe(409);
 });

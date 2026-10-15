@@ -1,10 +1,11 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import axeSource from "axe-core";
 import type { Answers } from "@beeside/fa-public-engine";
+import { API } from "./paths";
 
 /** Create a project server-side from fixture answers (as if the identity step were done) and return its working-session token. */
 export async function seed(request: APIRequestContext, answers: Answers, step: string): Promise<string> {
-  const r = await request.post("/api/fa4/sessions", { data: { answers, step } });
+  const r = await request.post(`${API}/sessions`, { data: { answers, step } });
   expect(r.ok(), await r.text()).toBeTruthy();
   return ((await r.json()) as { sessionToken: string }).sessionToken;
 }

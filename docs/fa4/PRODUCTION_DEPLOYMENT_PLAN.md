@@ -1,6 +1,6 @@
 # Discovery Public v1.0 — Production deployment & configuration plan (controlled launch)
 
-Status: **PLAN ONLY. Nothing has been deployed to production and nothing in this plan is executed until the inputs in §7 are supplied.**
+Status: **code preparation DONE (2026-10-15, PR #6); nothing deployed, no production GCP resource created or modified.** §3 lists what was implemented; the deployment itself waits for the inputs in §7. Operational procedures: `deploy/production/RUNBOOK.md`.
 Target: `https://beeside.you/discovery` (public path) · `https://beeside.you/ops-control` (internal administration). Phase 1 = real production, closed/controlled access; opening commercially later = changing the access gate, not the hostname or the build.
 
 ## 1. What exists today (verified, read-only)
@@ -31,7 +31,7 @@ migrate job (Cloud Run job, separate DB role)  ·  Cloud Scheduler: none needed 
 
 Everything lives in a **new production GCP project** (decision in §7, input 2). Dev data and the shared dev Cloud SQL instance are **not** reused for real prospects.
 
-## 3. Work Code must do BEFORE the first production deploy (no external input needed to start)
+## 3. Work Code had to do BEFORE the first production deploy — IMPLEMENTED (C2 changed by decision: `/ops-control` is reserved and blocked, no admin prefix work)
 
 | # | Change | Why |
 |---|---|---|

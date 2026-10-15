@@ -100,8 +100,8 @@ describe("release audit — customer emails", () => {
 
 import { safeReturnTo } from "../admin/admin-session";
 describe("canonical routes", () => {
-  it("safeReturnTo accepts the technical and the canonical admin routes and nothing else", () => {
-    expect(safeReturnTo("/ops-control/audit")).toBe("/ops-control/audit"); expect(safeReturnTo("/admin/audit")).toBe("/admin/audit");
-    for (const bad of ["/discovery", "//evil.test", "/ops-controlx", "https://evil.test/admin", "/ops-control/../x", "/ops-control//x"]) expect(safeReturnTo(bad)).toBe("/admin");
+  it("the legacy admin return path accepts /admin only; /ops-control is reserved and is never an admin return target", () => {
+    expect(safeReturnTo("/admin/audit")).toBe("/admin/audit");
+    for (const bad of ["/ops-control", "/ops-control/audit", "/discovery", "//evil.test", "/adminx", "https://evil.test/admin", "/admin/../x", "/admin//x"]) expect(safeReturnTo(bad)).toBe("/admin");
   });
 });

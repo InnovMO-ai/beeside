@@ -213,8 +213,8 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   const base = deps.config.appBaseUrl.replace(/\/$/, "");
   // Public path of Discovery in links: /discovery in production (FA4_PUBLIC_PATH), /fa4 by default; both are served by the app.
   const publicPath = /^\/[a-z0-9-]+$/.test(deps.config.publicPath ?? "") ? deps.config.publicPath! : "/fa4";
-  // Official full lockup (wordmark + bee) rendered from the brand asset and served by the web app; without a usable https/localhost base the header falls back to the text wordmark.
-  const logoUrl = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/i.test(base) ? `${base}/brand/beeside-lockup.png` : "";
+  // Official full lockup (wordmark + bee) rendered from the brand asset and served by the web app (under the public path in production: /discovery/brand/…, which the access gate never blocks); without a usable https/localhost base the header falls back to the text wordmark.
+  const logoUrl = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/i.test(base) ? `${base}${/^\/[a-z0-9-]+$/.test(deps.config.publicPath ?? "") ? deps.config.publicPath : ""}/brand/beeside-lockup.png` : "";
 
   if (d.template === "fa4_contact_request") {
     const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale; origin_stage: "FA" | "YEV" }>(

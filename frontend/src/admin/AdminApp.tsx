@@ -42,11 +42,9 @@ export function parseAdminRoute(pathname: string): Route {
   return { name: "projects" };
 }
 
-/** The Control Center answers under /admin and under its canonical production route /ops-control; links keep whichever the operator is on. */
-const adminBase = (): string => (window.location.pathname === "/ops-control" || window.location.pathname.startsWith("/ops-control/") ? "/ops-control" : "/admin");
 function pathOf(route: Route): string {
-  if (route.name === "project") return `${adminBase()}/projects/${route.id}/${route.tab}`;
-  return `${adminBase()}/${route.name}`;
+  if (route.name === "project") return `/admin/projects/${route.id}/${route.tab}`;
+  return `/admin/${route.name}`;
 }
 
 const text = (value: unknown): string => (value === null || value === undefined || value === "" ? "—" : typeof value === "object" ? JSON.stringify(value) : String(value));
@@ -224,7 +222,7 @@ function SignIn() {
       <h1 id="signin-title" className="display">Control Center</h1>
       <p className="lead">Sign in with your organization account. Access is limited to provisioned Admins and Supervisors.</p>
       {message && <p className="admin-error" role="alert">{message}</p>}
-      <a className="button button-primary" href={adminApi.loginUrl(/^\/(admin|ops-control)(\/|$)/.test(window.location.pathname) ? window.location.pathname : adminBase())}>
+      <a className="button button-primary" href={adminApi.loginUrl(window.location.pathname.startsWith("/admin") ? window.location.pathname : "/admin")}>
         Sign in
       </a>
     </section>

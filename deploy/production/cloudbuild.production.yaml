@@ -1,0 +1,33 @@
+# Builds the two PRODUCTION images (backend/worker/migration share one image; web is the Discovery-only bundle under /discovery/).
+# Used by deploy-production.sh. Not used by staging.
+substitutions:
+  _REPO: ""            # <region>-docker.pkg.dev/<project>/discovery
+  _TAG: ""             # the commit SHA being released
+  _PRIVACY_URL: ""
+  _PREMIUM_URL: ""     # approved purchase destination (https) — empty = the CTA is not rendered
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_REPO}/discovery-backend:${_TAG}", "."]
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - frontend/Dockerfile
+      - --build-arg
+      - VITE_BASE_PATH=/discovery/
+      - --build-arg
+      - VITE_DISCOVERY_ONLY=true
+      - --build-arg
+      - VITE_FA4_LAUNCH=true
+      - --build-arg
+      - VITE_FA4_PRIVACY_URL=${_PRIVACY_URL}
+      - --build-arg
+      - VITE_FA4_PREMIUM_PURCHASE_URL=${_PREMIUM_URL}
+      - -t
+      - ${_REPO}/discovery-web:${_TAG}
+      - .
+images:
+  - ${_REPO}/discovery-backend:${_TAG}
+  - ${_REPO}/discovery-web:${_TAG}
+options:
+  logging: CLOUD_LOGGING_ONLY
