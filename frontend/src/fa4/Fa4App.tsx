@@ -44,6 +44,9 @@ export function Fa4App() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
+  // Notices never trap the screen: they close by themselves (a failed send with a retry action stays a little longer) and by a click anywhere except their own button.
+  const dismissToast = (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest('button')) return; setToast(null); setToastRetry(null); };
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => { setToast(null); setToastRetry(null); }, toastRetry ? 12000 : 6000); return () => clearTimeout(t); }, [toast, toastRetry]);
   const [booting, setBooting] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -122,7 +125,7 @@ export function Fa4App() {
   // Capability / coverage resolution is server-side (privacy boundary): the browser only receives the coarse facts for THIS project.
   const resSeq = useRef(0);
   useEffect(() => {
-    if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company', 'exit'].includes(step.id)) return;
+    if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company'].includes(step.id)) return;
     const seq = ++resSeq.current;
     const t = setTimeout(() => { api.resolution(a).then((r) => { if (seq === resSeq.current) { setRes(r); setResolveFailed(false); } }).catch((e) => { if (seq !== resSeq.current) return; if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); }); }, 200);
     return () => clearTimeout(t);
@@ -156,7 +159,7 @@ export function Fa4App() {
     if (base !== a) setA(base);
     // The next step depends on the server-side resolution of THESE answers (e.g. the cargo-route question): never navigate on a stale one.
     let ctxFlow = flow;
-    if (hasSession && !['cover', 'identity', 'company', 'exit'].includes(step.id)) {
+    if (hasSession && !['cover', 'identity', 'company'].includes(step.id)) {
       try { const fresh = await api.resolution(base); setRes(fresh); setResolveFailed(false); ctxFlow = { cargoRouteDestinations: fresh.cargoRouteDestinations }; }
       catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); return; }   // stay on this step; the alert offers «Intentar de nuevo»
     }
@@ -231,7 +234,7 @@ export function Fa4App() {
               footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}
-        {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+        {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
     );
   }
@@ -268,10 +271,10 @@ export function Fa4App() {
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button type="button" className="linkbtn nav-save" onClick={saveLater}>{UI.saveLater[locale]}</button>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
-        {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
+        <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>
       </div></div>
       {!wide && <aside className="deco" aria-hidden />}
-      {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+      {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>
   );
@@ -282,7 +285,6 @@ function StepBody({ step, ctx, desktop }: { step: StepRef; ctx: S.StepCtx; deskt
   switch (step.id) {
     case 'identity': return <S.IdentityStep {...ctx} />;
     case 'company': return <S.CompanyStep {...ctx} />;
-    case 'exit': return <S.ExitStep {...ctx} />;
     case 'destinations': return <S.DestinationsStep {...ctx} />;
     case 'activity': return <S.ActivityStep {...ctx} compId={c} />;
     case 'presence': return <S.PresenceStep {...ctx} compId={c} />;

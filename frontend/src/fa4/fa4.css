@@ -694,3 +694,16 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
   .topbar .logo { max-width: 100%; min-width: 0; object-fit: contain; }
   .topbar .linkbtn.ta-save { white-space: normal; text-align: right; line-height: 1.2; min-width: 0; max-width: 118px; }
 }
+
+/* ---------- Discovery v1.0 · header breathing room + non-blocking notices (PO review of staging) ---------- */
+/* Logo row, progress line and the title were packed together at the top: more air between the three, on every question screen. */
+.topbar { padding-top: 20px; padding-bottom: 18px; }
+.progress { padding-bottom: 10px; }
+.main { padding-top: 34px; }
+/* roomy only where the height allows it; a laptop-height window (≤ 820 px) keeps the company screen inside one viewport */
+@media (min-width: 900px) { .topbar { padding-top: 18px; padding-bottom: 16px; } .progress { padding-bottom: 6px; } .main { padding-top: 24px; } }
+@media (min-width: 900px) and (min-height: 821px) { .topbar { padding-top: 28px; padding-bottom: 26px; } .progress { padding-bottom: 14px; } .main { padding-top: 48px; } }
+@media (max-width: 479px) { .topbar { padding-top: 16px; padding-bottom: 14px; } .main { padding-top: 28px; } }
+/* A notice must never sit on top of the action bar (it hid «Continuar» on desktop): it floats above it at every width. */
+.toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+@media (min-width: 900px) { .toast { bottom: calc(96px + env(safe-area-inset-bottom)); } }

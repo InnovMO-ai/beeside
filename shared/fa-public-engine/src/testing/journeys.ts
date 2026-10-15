@@ -109,6 +109,22 @@ export function journeyNortica(locale: 'es' | 'en' = 'es'): Answers {
   return a;
 }
 
+/**
+ * NEW BUSINESS route (Discovery Public v1.0 rule): nobody operates today; the person is creating a new business / operation in another country.
+ * Same journey as every other route: only the current-operation facts (sector, size, countries of activity) are absent — nothing is invented for them.
+ * Fictitious data.
+ */
+export function journeyNewBusiness(locale: 'es' | 'en' = 'es'): Answers {
+  const a = journeyNortica(locale);
+  a.identity = { ...a.identity, name: 'Mateo', company: 'Proyecto Nuevo Taller MX', email: 'mateo@nuevo-taller.example', role: 'Fundador' };
+  a.company = { hasExistingBusiness: false, sector: '', size: null, operatesIn: [] };
+  a.components = a.components.map((c) => ({ ...c, existing: 'nothing', existingNote: '' }));
+  a.reasonText = locale === 'es' ? 'Queremos abrir una operación propia en México.' : 'We want to open our own operation in Mexico.';
+  a.keepWords = '';
+  a.scale = { c1: { proxy: 'people', text: locale === 'es' ? '5 personas' : '5 people', declined: false } };
+  return a;
+}
+
 /** "No lo sé" route (Product Handoff §7): same company, every undecided answer left as "not sure". */
 export function journeyUnknown(locale: 'es' | 'en' = 'es'): Answers {
   const a = journeyNortica(locale);

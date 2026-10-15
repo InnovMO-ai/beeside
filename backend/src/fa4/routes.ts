@@ -209,7 +209,6 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   // PREVIEW (D-156): computes the YEV from the current answers. Nothing historical is stored and the project is NOT delivered. «Corregir algo» + regenerate stay available.
   router.post("/session/result", handle(async (req, res) => {
     const p = await session(req);
-    if (p.answers.company.hasExistingBusiness === false) throw new FaError("NOT_APPLICABLE", "this First Assessment is for existing businesses");
     const done = await latestResult(deps.db, p.projectId);
     if (done) throw new FaError("ALREADY_DELIVERED", "this First Assessment was delivered", { resultId: done.resultId });
     const { model, previewToken } = await previewResult(deps.db, p.projectId, p.answers, deps.config.now());

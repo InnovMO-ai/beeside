@@ -6,7 +6,7 @@ export const STAGES = ['company', 'project', 'whyWhen', 'needs', 'more', 'result
 export type StageId = (typeof STAGES)[number];
 
 export type StepId =
-  | 'cover' | 'identity' | 'company' | 'exit'
+  | 'cover' | 'identity' | 'company'
   | 'destinations' | 'activity' | 'presence'
   | 'reason' | 'decision'
   | 'activators' | 'activators_sell' | 'activators_site'
@@ -16,7 +16,7 @@ export interface StepRef { id: StepId; comp?: string }
 export const stepKey = (s: StepRef) => (s.comp ? `${s.id}:${s.comp}` : s.id);
 
 export const STAGE_OF: Record<StepId, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
-  cover: 0, identity: 0, company: 1, exit: 1,
+  cover: 0, identity: 0, company: 1,
   destinations: 2, activity: 2, presence: 2,
   reason: 3, decision: 3,
   activators: 4, activators_sell: 4, activators_site: 4, fronts_status: 4, fronts_mark: 4, fronts_support: 4, fronts_critical: 4,
@@ -50,7 +50,8 @@ export interface FlowContext { cargoRouteDestinations: string[] }
  */
 export function buildFlow(a: Answers, _catalog?: Catalog | FlowContext): StepRef[] {
   const s: StepRef[] = [{ id: 'cover' }, { id: 'identity' }, { id: 'company' }];
-  if (a.company.hasExistingBusiness === false) { s.push({ id: 'exit' }); return s; }   // eligibility gate (D-038)
+  // No eligibility gate: «no business operating today» is a valid Discovery case (a new business / new operation abroad). It follows the SAME journey;
+  // only the current-operation questions on the company screen (sector, size, countries of activity) are not asked.
   s.push({ id: 'destinations' });
   const comps = a.components.length ? a.components : [];
   for (const c of comps) {
@@ -96,11 +97,12 @@ export function normalizeStepKey(key: string, a: Answers): string {
     case 'existing': return comp ? `presence:${comp}` : stepKey(lastProjectStep(a));
     case 'scale': return 'decision';
     case 'cargo_route': return a.knowsNeeds === true ? 'fronts_mark' : 'fronts_support';
+    case 'exit': return 'destinations';   // the old «only for operating businesses» screen no longer exists
     default: return key;
   }
 }
 
-const STEP_ORDER: StepId[] = ['cover', 'identity', 'company', 'exit', 'destinations', 'activity', 'presence', 'reason', 'decision',
+const STEP_ORDER: StepId[] = ['cover', 'identity', 'company', 'destinations', 'activity', 'presence', 'reason', 'decision',
   'activators', 'activators_sell', 'activators_site', 'fronts_status', 'fronts_mark', 'fronts_support', 'fronts_critical', 'support_values', 'extra', 'result'];
 
 /** Next step. If the current step has just left the flow (an answer made it irrelevant), continue in canonical order instead of jumping back. */

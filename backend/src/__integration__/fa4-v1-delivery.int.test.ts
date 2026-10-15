@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import request from "supertest";
 import { SEED_CATALOG } from "@beeside/fa-public-engine/seed";
-import { journeyA, journeyNortica } from "@beeside/fa-public-engine/testing";
+import { journeyA, journeyNewBusiness, journeyNortica } from "@beeside/fa-public-engine/testing";
 import { Answers, buildSourceSnapshot, canonicalJson } from "@beeside/fa-public-engine";
 import { Db, createPoolDb } from "../db/database";
 import { createApp } from "../index";
@@ -240,6 +240,37 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       for (const l of links) expect(l!.startsWith(expected)).toBe(true);
     }
     publicPath = undefined;
+  });
+
+  describe.each(["es", "en"] as const)("new business without an operating company (%s)", (loc) => {
+    it("same journey end to end: preview → explicit delivery → sealed → Precision context (operatingBusiness=false) → continuation; nothing is rejected as ineligible", async () => {
+      const { token, pid } = await start(journeyNewBusiness(loc));
+      expect((await app().put("/api/fa4/session").set(auth(token)).send({ answers: journeyNewBusiness(loc), step: "company" })).status).toBe(200);
+      expect(await status(pid)).toBe("IN_PROGRESS");                                                         // never INELIGIBLE
+      const preview = await app().post("/api/fa4/session/result").set(auth(token));
+      expect(preview.status).toBe(200); expect(preview.body.preview).toBe(true); expect(preview.body.model.premium.shown).toBe(true);
+      expect(JSON.stringify(preview.body.model)).not.toMatch(/undefined|null null/);
+      const e = await app().post("/api/fa4/session/result/email").set(auth(token)).send({ previewToken: preview.body.previewToken });
+      expect(e.status).toBe(200); expect(await sealedCount(pid)).toBe(1); expect(await status(pid)).toBe("DELIVERED");
+      const ctx = await getFa4PrecisionContext(rtDb, pid, e.body.resultId);
+      expect(ctx.declared.company).toMatchObject({ operatingBusiness: false, sector: "", size: null, operatesIn: [] });      // distinguishable, nothing fabricated
+      expect(ctx.declared.destinations.list.map((d) => d.country)).toEqual(["MX"]);
+      const c = await app().post("/api/fa4/session/continue").set(auth(token));                                  // Precision / Premium continuation is open
+      expect(c.status).toBe(200); expect(c.body.resultId).toBe(e.body.resultId);
+      expect(await q("SELECT result_id FROM fa4_continuation_request WHERE project_id = $1", [pid])).toEqual([{ result_id: e.body.resultId }]);
+      const row = (await q("SELECT source_snapshot FROM fa4_result WHERE project_id = $1", [pid]))[0];
+      expect(row.source_snapshot.company).toEqual({ hasExistingBusiness: false, sector: "", size: null, operatesIn: [] });
+    });
+    it("the Continue-with-beeside path delivers a new-business result as well (delivery via the CTA)", async () => {
+      const { token, pid } = await start(journeyNewBusiness(loc));
+      const c = await app().post("/api/fa4/session/continue").set(auth(token));
+      expect(c.status).toBe(200); expect(await sealedCount(pid)).toBe(1); expect(await status(pid)).toBe("DELIVERED");
+    });
+  });
+  it("an operating-business journey still reports operatingBusiness=true (regression)", async () => {
+    const { token, pid } = await start(journeyNortica());
+    const e = await app().post("/api/fa4/session/result/email").set(auth(token));
+    expect((await getFa4PrecisionContext(rtDb, pid, e.body.resultId)).declared.company.operatingBusiness).toBe(true);
   });
 
   it("journey A also delivers through the explicit action and its envelope is complete", async () => {

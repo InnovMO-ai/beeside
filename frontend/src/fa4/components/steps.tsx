@@ -85,7 +85,6 @@ export function CompanyStep({ a, set, locale }: StepCtx) {
     </div>
   );
 }
-export function ExitStep({ locale }: StepCtx) { return <div className="narrow"><Head title={UI.exitTitle[locale]} lead={UI.exitBody[locale]} /></div>; }
 
 // ---------------- 2. project ----------------
 export function DestinationsStep({ a, set, locale }: StepCtx) {

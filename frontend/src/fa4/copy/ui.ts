@@ -40,10 +40,8 @@ export const UI = {
   size: L('Aproximadamente, ¿cuántas personas trabajan hoy en tu empresa?', 'Roughly how many people work at your company today?'),
   sizes: { '1-10': L('1–10', '1–10'), '11-50': L('11–50', '11–50'), '51-250': L('51–250', '51–250'), '251-1000': L('251–1,000', '251–1,000'), '1000+': L('Más de 1,000', 'More than 1,000') },
   operatesIn: L('¿En qué países tiene hoy actividad tu empresa?', 'In which countries is your company active today?'), operatesInHelp: L('Donde tienes oficinas, plantas o equipo. Si ya vendes en el país al que quieres ir, lo indicarás más adelante.', 'Where you have offices, plants or staff. If you already sell in the country you want to expand to, you will tell us later.'), searchCountry: L('Busca un país', 'Search for a country'), none: L('Sin resultados', 'No results'),
-  exitTitle: L('Por ahora, Discovery es para negocios en marcha', 'For now, Discovery is for operating businesses'),
-  exitBody: L('Discovery está pensado para empresas o negocios que ya operan y quieren expandirse.', 'Discovery is designed for businesses that already operate and want to expand.'),
 
-  destTitle: L('¿A qué país o países quieres expandir tu empresa?', 'Which country or countries do you want to expand your company to?'), destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
+  destTitle: L('¿A qué país o países quieres expandirte?', 'Which country or countries do you want to expand to?')   /* neutral: valid for an operating company and for a new business */, destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
   destLabel: L('Destino', 'Destination'), destOpen: L('Aún no lo tengo decidido', "I haven't decided yet"), region: L('Región o estado (opcional)', 'Region or state (optional)'),
   sameTitle: L('¿Tu proyecto será el mismo en todos estos países?', 'Will your project be the same in all these countries?'), sameLead: L('Por ejemplo, producir en uno y vender en otro', 'For example, produce in one and sell in another'),
   sameYes: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameYesMany: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameNo: L('No, es distinto en cada país', 'No, it differs by country'),
