@@ -4,7 +4,7 @@ import type { AnalyticsRange } from "./metrics";
 
 /**
  * Canonical Precision V1.0 metrics (Product / AI experience / Commercial). One definition each, computed from the `analytics_v1_*` views —
- * the SAME views Tableau reads with the read-only role `beeside_analytics_reader` (migration 0034). This file is the internal operational
+ * the SAME views Tableau reads with the read-only role `beeside_analytics_reader` (migration 0041). This file is the internal operational
  * surface; it is not a second analytics pipeline. Nothing here reads conversation text, answers, e-mail or names.
  *
  * `status`: `live` = the behaviour exists and the event is emitted; `awaiting_product_layer` = the metric is defined and wired to its catalog

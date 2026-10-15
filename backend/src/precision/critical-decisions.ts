@@ -156,7 +156,7 @@ export function referencedFieldKeys(rule: ResolutionRule): string[] {
 
 /** Structural validation only (shape, depth, that every leaf names a non-empty field_key) — never
  * evaluates anything. Suitable to call at manifest-publish time, before a resolution_rule is ever
- * stored as PUBLISHED content (category_manifest_version is immutable once published, §13/0018,
+ * stored as PUBLISHED content (category_manifest_version is immutable once published, §13/0025,
  * so this is the only gate). Returns the first problem found, or null if the rule is well-formed. */
 export function validateResolutionRule(rule: unknown, depth = 0): string | null {
   if (depth > 20) return "resolution_rule nesting exceeds the sanity depth limit (20)";

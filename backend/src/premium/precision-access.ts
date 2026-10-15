@@ -12,7 +12,7 @@ import { PremiumPolicy, addDays } from "./premium-policy";
  *   READ_ONLY — Premium ended; Precision data stays readable for a configurable window.
  *   REVOKED   — the window ended; Precision is closed. Nothing is ever deleted.
  * The database moves a project to FULL (new confirmed payment) and to READ_ONLY (end of Premium) in the same
- * statement that changes the subscription (migration 0022). The sweep below ends periods that ran out, settles
+ * statement that changes the subscription (migration 0029). The sweep below ends periods that ran out, settles
  * the read-only window from the configured policy and closes windows that ran out. Stripe is not involved.
  */
 export type PrecisionAccessMode = "FULL" | "READ_ONLY" | "REVOKED";

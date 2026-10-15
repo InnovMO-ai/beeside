@@ -1,6 +1,6 @@
 /**
  * Idempotent publish of the manifests that ship with the build into `project_manifest_version` and
- * `category_manifest_version` (migrations 0017–0026).
+ * `category_manifest_version` (migrations 0024–0033).
  *
  *  - What is published: the project manifest v2, the 7 authored category manifests, `_generic`, and one
  *    generic-backed row for every catalog category that has no authored manifest yet (same content as `_generic`, its

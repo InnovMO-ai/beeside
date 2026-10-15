@@ -7,7 +7,7 @@ import { project } from "./project";
 /**
  * Premium entitlement foundation. Premium is a VALID BEESIDE ENTITLEMENT, not "a Stripe subscription".
  *
- * An entitlement is derived from ACCESS SOURCES, read through `entitlement_sources_for()` (migration 0028):
+ * An entitlement is derived from ACCESS SOURCES, read through `entitlement_sources_for()` (migration 0035):
  *   - `paid`: the existing `subscription` rows (the provider-agnostic paid lifecycle that Stripe / the dev simulation /
  *     manual injection drive through `processSubscriptionEvent`).
  *   - every other source (`complimentary`, `promotion`, `trial`, `manual`, `partner`, `sponsored`): rows of `entitlement_grant`.

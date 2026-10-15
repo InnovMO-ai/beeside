@@ -4,7 +4,7 @@ import { FaError } from "../fa/services/errors";
 /**
  * Macroblock 4 — Precision persistence repository/service primitives.
  *
- * Thin wrappers over the raw SQL in backend/db/migrations/0017-0018 (same convention as
+ * Thin wrappers over the raw SQL in backend/db/migrations/0024-0025 (same convention as
  * ../premium/premium-service.ts: parametrized queries through the `Db` interface, not the
  * Drizzle query builder at runtime — Drizzle here is schema/migration tooling only).
  *
@@ -120,7 +120,7 @@ export async function getOrCreateCategoryAssessment(
 }
 
 /** Atomic Fact-versioning (§8/§9): one sanctioned write path, superseding the current row for
- * (scope_instance_id, field_key) if any exists, via the fact_record() SQL function (0018). */
+ * (scope_instance_id, field_key) if any exists, via the fact_record() SQL function (0025). */
 export async function recordFact(
   db: Db,
   input: {
@@ -193,7 +193,7 @@ export async function completeCategoryAssessment(db: Db, instanceId: string, con
 }
 
 /** A client-initiated lifecycle move that is NOT a confirm/complete (e.g. not_started ->
- * in_progress, or a reopen). The guard trigger (0018) is what actually enforces which moves are
+ * in_progress, or a reopen). The guard trigger (0025) is what actually enforces which moves are
  * legal; this primitive exists only so callers never hand-write the UPDATE. */
 export async function movePaLifecycle(db: Db, instanceId: string, to: PaStatus): Promise<void> {
   await mapDbErrors(() => db.query("UPDATE precision_assessment SET lifecycle_status = $2 WHERE instance_id = $1", [instanceId, to]));

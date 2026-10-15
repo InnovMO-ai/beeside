@@ -1,4 +1,4 @@
-/** Postgres FrameStore over understanding_frame / understanding_frame_event (migrations 0035/0036). */
+/** Postgres FrameStore over understanding_frame / understanding_frame_event (migrations 0042/0043). */
 import type { Db } from "../../db/database";
 import { FrameConflictError, type FrameEventKind, type FrameStore, type StoredFrame } from "./store";
 import type { Frame } from "./types";

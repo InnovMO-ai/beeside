@@ -57,7 +57,7 @@ export const entitlement = pgTable("entitlement", {
   effectiveUntil: timestamp("effective_until", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   // F5 Track B — Precision access state (Core-owned, contract §G): FULL | READ_ONLY | REVOKED. Driven by the
-  // subscription sync trigger (0022) and the Core sweep; the coherence CHECKs live in 0022 (backfill first).
+  // subscription sync trigger (0029) and the Core sweep; the coherence CHECKs live in 0029 (backfill first).
   precisionAccessMode: text("precision_access_mode").notNull().default("FULL"),
   premiumEndedAt: timestamp("premium_ended_at", { withTimezone: true }),
   readonlyUntil: timestamp("readonly_until", { withTimezone: true }),

@@ -3,7 +3,7 @@ import { emitV1EventSafe } from "../analytics/v1-events";
 import { FaError } from "../fa/services/errors";
 
 /**
- * Privacy erasure (V1.0 Fase 0) — the application side of migration 0033.
+ * Privacy erasure (V1.0 Fase 0) — the application side of migration 0040.
  *
  * The rules live in the database (`privacy_erase_project`): an approved policy, a `blocked` project past the policy's window, no paid
  * subscription still running, one transaction under the project lock, and an append-only run record. This module only asks, shapes the

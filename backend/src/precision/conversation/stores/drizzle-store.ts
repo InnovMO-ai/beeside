@@ -1,5 +1,5 @@
 /**
- * Drizzle-backed ConversationStore over `precision_turn` (migrations 0025/0026).
+ * Drizzle-backed ConversationStore over `precision_turn` (migrations 0032/0033).
  *
  * The table definition below mirrors db/schema/precision.ts (`precisionTurn`) column for column; it is declared
  * here because the backend compiles with rootDir = src and cannot import the schema package directly. The table is

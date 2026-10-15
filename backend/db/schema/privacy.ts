@@ -4,7 +4,7 @@ import { adminUser } from "./ops";
 import { project } from "./project";
 
 /**
- * Privacy erasure (V1.0 Fase 0). The executor, the guards and the registry rows live in migration 0033 (custom SQL); these are the tables.
+ * Privacy erasure (V1.0 Fase 0). The executor, the guards and the registry rows live in migration 0040 (custom SQL); these are the tables.
  *   privacy_policy         — the approved terms under which an erasure may run. There is NO default row: no approved policy, no erasure.
  *   privacy_erasure_registry — every table classified (erase / keep / anonymise / global); the inventory test fails on an unclassified table.
  *   privacy_erasure_run    — append-only evidence of each execution (ids and counts only, never content).

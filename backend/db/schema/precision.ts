@@ -73,7 +73,7 @@ export const precisionAssessment = pgTable("precision_assessment", {
     .notNull()
     .references((): AnyPgColumn => projectManifestVersion.version),
   // Single sanctioned pointer, atomically repointed together with the service_map_snapshot INSERT
-  // by precision_assessment_confirm() (0017 integrity migration) — direct structural echo of
+  // by precision_assessment_confirm() (0024 integrity migration) — direct structural echo of
   // category_assessment.current_pack_id (§11) and of the existing reassign_project_responsibility()
   // pattern. True mutual reference with service_map_snapshot (which does NOT reference this table —
   // only precision_instance, §4) stays one-directional in practice; AnyPgColumn only to satisfy the
@@ -97,10 +97,10 @@ export const categoryAssessment = pgTable(
     // Denormalized from precision_instance.project_id (routine physical-design choice, not a new
     // business rule): §6/§33 item 8 freezes UNIQUE(project_id, category_key) directly on this table,
     // and the frozen entity list never shows category_assessment joining through precision_instance
-    // for that constraint. Kept consistent with the owning instance by the guard trigger (0017).
+    // for that constraint. Kept consistent with the owning instance by the guard trigger (0024).
     projectId: uuid("project_id").notNull().references(() => project.projectId),
     categoryKey: text("category_key").notNull(),
-    // Derived from category_key (0019, M-B): a need that is not in the catalog ("new:<slug>") always
+    // Derived from category_key (0026, M-B): a need that is not in the catalog ("new:<slug>") always
     // uses the generic manifest. Stored + generated => immutable and coherent by construction.
     manifestCategoryKey: text("manifest_category_key").generatedAlwaysAs(
       sql`CASE WHEN category_key LIKE 'new:%' THEN '_generic' ELSE category_key END`,
@@ -114,7 +114,7 @@ export const categoryAssessment = pgTable(
     // anywhere in categoryOriginEnum — structural, not a convention (§7).
     categoryOrigin: categoryOriginEnum("category_origin").notNull(),
     // Single sanctioned pointer (§11), atomically repointed with the new `pack` INSERT by
-    // category_assessment_complete() (0017 integrity migration). True mutual reference with `pack` —
+    // category_assessment_complete() (0024 integrity migration). True mutual reference with `pack` —
     // AnyPgColumn needed on both sides, same pattern already used for adminUser/project (ops.ts/project.ts).
     currentPackId: uuid("current_pack_id").references((): AnyPgColumn => pack.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -147,7 +147,7 @@ export const fact = pgTable(
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     // "Precision's only hard scoping column" (§3A) — kept even though scope_instance_id already
     // implies a project, so every query/index that only cares about project isolation never needs
-    // to join through precision_instance first; also what the cross-project-leak guard (0017) checks
+    // to join through precision_instance first; also what the cross-project-leak guard (0024) checks
     // scope_instance_id's owning project against.
     projectId: uuid("project_id").notNull().references(() => project.projectId),
     // NOT NULL always (Freeze Patch #3 item 5) — always a real precision_instance row: the project's
@@ -176,9 +176,9 @@ export const fact = pgTable(
     confidence: real("confidence"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // No .references() here on purpose, same reason as answer.superseded_by (assessment.ts): Drizzle
-    // cannot express DEFERRABLE INITIALLY DEFERRED. The real FK is added by hand in 0017.
+    // cannot express DEFERRABLE INITIALLY DEFERRED. The real FK is added by hand in 0024.
     supersededBy: uuid("superseded_by"),
-    // Origin of an inherited value (0019, M-D): which FA 4.0 context pin and item it came from.
+    // Origin of an inherited value (0026, M-D): which FA 4.0 context pin and item it came from.
     sourcePinId: uuid("source_pin_id").references((): AnyPgColumn => contextPin.id),
     sourceItemRef: text("source_item_ref"),
   },
@@ -297,7 +297,7 @@ export const serviceMapSnapshot = pgTable(
   "service_map_snapshot",
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    // The PA's own instance id (scope='project') — checked by the 0017 guard trigger, since a plain
+    // The PA's own instance id (scope='project') — checked by the 0024 guard trigger, since a plain
     // FK cannot assert the referenced precision_instance row's `scope` value.
     precisionInstanceId: uuid("precision_instance_id")
       .notNull()
@@ -344,11 +344,11 @@ export const pack = pgTable(
 );
 
 // =====================================================================================
-// F5 additive layer (0019) — F1 additive-migrations spec M-C / M-F
+// F5 additive layer (0026) — F1 additive-migrations spec M-C / M-F
 // =====================================================================================
 
 // Reference to the FA 4.0 result a Precision project was activated from. Stores references and a hash
-// that proves what was read; it never copies the context itself. Append-only (guard trigger, 0019).
+// that proves what was read; it never copies the context itself. Append-only (guard trigger, 0026).
 export const contextPin = pgTable(
   "context_pin",
   {
@@ -383,7 +383,7 @@ export const contextPin = pgTable(
 );
 
 // Append-only delivery ledger toward Operation Hub. Each state change is a new row; the current state
-// of a delivery is the latest row per idempotency key (view oh_delivery_current, 0019).
+// of a delivery is the latest row per idempotency key (view oh_delivery_current, 0026).
 export const ohDelivery = pgTable(
   "oh_delivery",
   {
@@ -398,7 +398,7 @@ export const ohDelivery = pgTable(
     ohReference: text("oh_reference"),
     idempotencyKey: text("idempotency_key").notNull(),
     errorCode: text("error_code"),
-    // 0021: one send attempt = one (queued, delivered|failed) pair sharing the same attempt number, so a user may retry
+    // 0028: one send attempt = one (queued, delivered|failed) pair sharing the same attempt number, so a user may retry
     // a failed delivery of the same idempotency key without violating the ledger's uniqueness.
     attempt: integer("attempt").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -424,7 +424,7 @@ export const ohDelivery = pgTable(
 );
 
 // =====================================================================================
-// F5 Track A additive layer (0025) — product-surface tables (Build Readiness §A, §F, §G, §E)
+// F5 Track A additive layer (0032) — product-surface tables (Build Readiness §A, §F, §G, §E)
 // Working names from Build Readiness are used where the document gave one.
 // =====================================================================================
 
