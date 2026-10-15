@@ -5,6 +5,7 @@ import { tokens } from "./memory-repo";
 import type { CandidateStatus, CandidateStore, CandidateUpdate } from "./agent";
 import type { CountryResource, CountryResourceRepository } from "./country-resources";
 import { validateResource } from "./country-resources";
+import { assertNormalized, demandId, opaqueRef, type DemandRepository, type DemandStatus, type KnowledgeDemand, type StoredDemand } from "./demand";
 import type { KnowledgeDocument, KnowledgePassage, KnowledgeRepository, KnowledgeSource, RetrieveQuery } from "./types";
 
 type Q = Pick<Db, "query">;
@@ -160,6 +161,48 @@ export function createPgCountryResources(db: Q): CountryResourceRepository {
            destination_ref = EXCLUDED.destination_ref, active = EXCLUDED.active, effective_at = EXCLUDED.effective_at, updated_at = EXCLUDED.updated_at, topic = EXCLUDED.topic, section = EXCLUDED.section`,
         [res.id, res.countryCode, res.title, res.language, res.version, res.destination.kind, res.destination.ref, res.active, res.effectiveAt ?? null, res.updatedAt, res.topic ?? null, res.section ?? null],
       );
+    },
+  };
+}
+
+interface DemandRow { id: string; country: string; topic: string; subtopic: string; category_key: string | null; service_key: string | null; info_type: string; coverage: string; disposition: string; reason: string; boundary: string | null; status: string; decision_note: string | null; first_seen_at: Date; last_seen_at: Date; occurrences: string | number; projects: string | number }
+const toDemand = (r: DemandRow): StoredDemand => ({
+  id: r.id, country: r.country, topic: r.topic as StoredDemand["topic"], subtopic: r.subtopic, categoryKey: r.category_key, serviceKey: r.service_key, infoType: r.info_type as StoredDemand["infoType"],
+  coverage: r.coverage as StoredDemand["coverage"], disposition: r.disposition as StoredDemand["disposition"], reason: r.reason as StoredDemand["reason"], boundary: r.boundary as StoredDemand["boundary"],
+  status: r.status as DemandStatus, decisionNote: r.decision_note, occurrences: Number(r.occurrences), projects: Number(r.projects), firstSeenAt: r.first_seen_at.toISOString(), lastSeenAt: r.last_seen_at.toISOString(),
+});
+const DEMAND_SELECT = `SELECT d.*, (SELECT count(*) FROM knowledge_demand_event e WHERE e.demand_id = d.id) AS occurrences, (SELECT count(DISTINCT e.project_ref) FROM knowledge_demand_event e WHERE e.demand_id = d.id) AS projects FROM knowledge_demand d`;
+
+/** Postgres demand registry. Recurrence is derived from the event table; `status` is written only by `decide`. */
+export function createPgDemandRepository(db: Q): DemandRepository {
+  return {
+    async register(d: KnowledgeDemand, ref, now) {
+      assertNormalized(d);
+      const id = demandId(d);
+      await db.query(
+        `INSERT INTO knowledge_demand (id, country, topic, subtopic, category_key, service_key, info_type, coverage, disposition, reason, boundary, first_seen_at, last_seen_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12) ON CONFLICT (id) DO NOTHING`,
+        [id, d.country, d.topic, d.subtopic, d.categoryKey, d.serviceKey, d.infoType, d.coverage, d.disposition, d.reason, d.boundary, now],
+      );
+      const ev = await db.query("INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [id, opaqueRef("p", ref.projectId), opaqueRef("t", ref.turnKey), now]);
+      if ((ev.rowCount ?? 0) > 0) await db.query("UPDATE knowledge_demand SET last_seen_at = GREATEST(last_seen_at, $2) WHERE id = $1", [id, now]);
+      return toDemand((await db.query<DemandRow>(`${DEMAND_SELECT} WHERE d.id = $1`, [id])).rows[0]!);
+    },
+    async list(f) {
+      const r = await db.query<DemandRow>(
+        `${DEMAND_SELECT} WHERE ($1::text IS NULL OR d.country = $1) AND ($2::text IS NULL OR d.topic = $2) AND ($3::text IS NULL OR d.status = $3) ORDER BY 18 DESC, 17 DESC, d.id`,
+        [f?.country ?? null, f?.topic ?? null, f?.status ?? null],
+      );
+      return r.rows.map(toDemand).filter((x) => x.occurrences >= (f?.minOccurrences ?? 0));
+    },
+    async get(id) {
+      const r = (await db.query<DemandRow>(`${DEMAND_SELECT} WHERE d.id = $1`, [id])).rows[0];
+      return r ? toDemand(r) : null;
+    },
+    async decide(id, status, note, now) {
+      const u = await db.query("UPDATE knowledge_demand SET status = $2, decision_note = $3, decided_at = $4 WHERE id = $1", [id, status, note, now]);
+      if ((u.rowCount ?? 0) === 0) throw new Error(`unknown demand ${id}`);
+      return toDemand((await db.query<DemandRow>(`${DEMAND_SELECT} WHERE d.id = $1`, [id])).rows[0]!);
     },
   };
 }

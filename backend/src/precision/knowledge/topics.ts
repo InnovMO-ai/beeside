@@ -9,7 +9,7 @@ const KEYWORDS: Record<Topic, string[]> = {
   economic_diversification: ["diversificacion", "complejidad", "diversification", "concentracion economica"],
   infrastructure: ["infraestructura", "carreteras", "puertos", "aeropuertos", "ferrocarril", "energia electrica", "infrastructure", "conectividad", "internet", "telefonia", "banca movil", "terminales punto de venta", "viviendas con acceso"],
   financial_access: ["credito", "financiamiento", "acceso financiero", "bancarizacion", "financial access", "credit", "sucursales bancarias", "banca", "captacion de ahorro", "cuentas de ahorro"],
-  transportation_logistics: ["transporte", "logistica", "carga", "transportation", "logistics", "autotransporte", "corredor", "pasajeros aereos", "carga aerea", "accidentes de transito"],
+  transportation_logistics: ["transporte", "puerto", "logistica", "carga", "transportation", "logistics", "autotransporte", "corredor", "pasajeros aereos", "carga aerea", "accidentes de transito"],
   labor_market: ["mercado laboral", "empleo", "desempleo", "poblacion ocupada", "trabajadores", "labor market", "employment", "participacion laboral", "contratacion", "talento disponible", "mercado de trabajo", "poblacion ocupada", "jornadas laborales", "puesto de trabajo", "tasa de participacion", "unidades economicas"],
   informality: ["informalidad", "informal", "sin seguridad social"],
   wages: ["salario", "salarios", "ingreso laboral", "remuneracion", "wages", "salary", "salario minimo", "salarial", "ingreso promedio", "ingresos por debajo", "linea de bienestar"],
@@ -26,9 +26,12 @@ const KEYWORDS: Record<Topic, string[]> = {
   energy: ["energia", "electricidad", "petroleo", "hidrocarburos", "energy", "cfe", "pemex", "renovable", "energetica", "energia electrica"],
 };
 
+/** Short keywords (acronyms such as "sat", "iva", "isr") must match as whole words: as substrings they fire inside unrelated words. */
+const matches = (f: string, k: string): boolean => (k.length <= 4 ? new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(f) : f.includes(k));
+
 export function classifyTopics(text: string, max = 4): Topic[] {
   const f = fold(text);
-  const scored = (Object.entries(KEYWORDS) as [Topic, string[]][]).map(([t, ks]) => ({ t, n: ks.reduce((a, k) => a + (f.includes(k) ? 1 : 0), 0) })).filter((x) => x.n > 0);
+  const scored = (Object.entries(KEYWORDS) as [Topic, string[]][]).map(([t, ks]) => ({ t, n: ks.reduce((a, k) => a + (matches(f, k) ? 1 : 0), 0) })).filter((x) => x.n > 0);
   scored.sort((a, b) => b.n - a.n);
   return scored.slice(0, max).map((x) => x.t);
 }

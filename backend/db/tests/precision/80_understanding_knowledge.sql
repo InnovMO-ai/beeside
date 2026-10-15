@@ -64,6 +64,21 @@ DO $t$
 BEGIN
   PERFORM pg_temp.assert_that('U20', (SELECT action FROM privacy_erasure_registry WHERE table_name = 'understanding_frame') = 'erase', 'the frame is erased with the project');
   PERFORM pg_temp.assert_that('U21', (SELECT erase_order FROM privacy_erasure_registry WHERE table_name = 'understanding_frame_event') < (SELECT erase_order FROM privacy_erasure_registry WHERE table_name = 'precision_instance'), 'events are erased before the instance');
-  PERFORM pg_temp.assert_that('U22', (SELECT count(*) FROM privacy_erasure_registry WHERE table_name LIKE 'knowledge_%' AND action = 'global') = 4, 'knowledge tables are global reference data');
+  PERFORM pg_temp.assert_that('U22', (SELECT count(*) FROM privacy_erasure_registry WHERE table_name LIKE 'knowledge_%' AND action = 'global') = 6, 'knowledge tables (incl. the demand registry) are global reference data');
+END
+$t$;
+
+\echo '--- D1-D6 (knowledge demand: controlled vocabulary only) ---'
+DO $t$
+DECLARE ok text := $q$INSERT INTO knowledge_demand (id, country, topic, subtopic, category_key, service_key, info_type, coverage, disposition, reason, boundary, first_seen_at, last_seen_at) VALUES ('d1', 'MX', 'taxes', 'vat', 'tax_accounting_audit', 'CAP_HIVE_FI_TAX', 'tax_treatment', 'absent', 'candidate_knowledge', 'no_hits', NULL, now(), now())$q$;
+BEGIN
+  EXECUTE ok;
+  PERFORM pg_temp.assert_that('D1', (SELECT status FROM knowledge_demand WHERE id = 'd1') = 'open', 'a new demand starts open');
+  PERFORM pg_temp.expect_error('D2', replace(ok, $r$'vat'$r$, $r$'texto libre del cliente'$r$) || '', '23514', 'knowledge_demand_slugs');
+  PERFORM pg_temp.expect_error('D3', replace(replace(ok, $r$'d1'$r$, $r$'d2'$r$), $r$'MX'$r$, $r$'Mexico'$r$), '23514', 'knowledge_demand_country');
+  PERFORM pg_temp.expect_error('D4', $q$UPDATE knowledge_demand SET status = 'published' WHERE id = 'd1'$q$, '23514', 'knowledge_demand_status');
+  PERFORM pg_temp.expect_error('D5', $q$INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ('d1', '8f0e2c1a-0000-0000-0000-000000000000', 'abc', now())$q$, '23514', 'knowledge_demand_event_refs');
+  INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ('d1', repeat('a', 32), repeat('b', 32), now());
+  PERFORM pg_temp.expect_error('D6', $q$INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ('d1', repeat('a', 32), repeat('b', 32), now())$q$, '23505', 'knowledge_demand_event_key');
 END
 $t$;

@@ -186,3 +186,58 @@ export const countryResource = pgTable(
     check("country_resource_active_resolvable", sql`NOT ${t.active} OR ${t.destinationKind} = 'url'`),
   ],
 );
+
+// ------------------------------------------------------------------ Knowledge demand (global, no client text, no identifiers)
+/**
+ * What clients asked that approved knowledge could not answer, normalised from controlled vocabularies only. A row is one distinct
+ * need (country, topic, subtopic, category, information type, coverage); recurrence is DERIVED from the event table. A status changes
+ * only by an explicit decision of a person; recurrence never publishes anything to the Knowledge Layer.
+ */
+export const knowledgeDemand = pgTable(
+  "knowledge_demand",
+  {
+    id: text("id").primaryKey(),
+    country: text("country").notNull(),
+    topic: text("topic").notNull(),
+    subtopic: text("subtopic").notNull(),
+    categoryKey: text("category_key"),
+    serviceKey: text("service_key"),
+    infoType: text("info_type").notNull(),
+    coverage: text("coverage").notNull(),
+    disposition: text("disposition").notNull(),
+    reason: text("reason").notNull(),
+    boundary: text("boundary"),
+    status: text("status").notNull().default("open"),
+    decisionNote: text("decision_note"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index("knowledge_demand_rank").on(t.status, t.lastSeenAt),
+    check("knowledge_demand_country", sql`${t.country} ~ '^([A-Z]{2}|INT|unknown)$'`),
+    check("knowledge_demand_slugs", sql`${t.subtopic} ~ '^[a-z][a-z0-9_]{1,63}$' AND ${t.topic} ~ '^[a-z][a-z0-9_]{1,63}$' AND (${t.categoryKey} IS NULL OR ${t.categoryKey} ~ '^[a-z][a-z0-9_]{1,63}$') AND (${t.serviceKey} IS NULL OR ${t.serviceKey} ~ '^[A-Za-z][A-Za-z0-9_]{1,63}$')`),
+    check("knowledge_demand_info_type", sql`${t.infoType} IN ('regulatory_requirement','tax_treatment','procedure_steps','cost_estimate','timeline','statistics_comparison','local_provider_or_site','market_data','general_context')`),
+    check("knowledge_demand_coverage", sql`${t.coverage} IN ('absent','partial')`),
+    check("knowledge_demand_disposition", sql`${t.disposition} IN ('candidate_knowledge','specialist_service')`),
+    check("knowledge_demand_reason", sql`${t.reason} IN ('no_sources','no_hits','granularity','professional_judgment','unclassified')`),
+    check("knowledge_demand_boundary", sql`${t.boundary} IS NULL OR ${t.boundary} IN ('best_option','tax_conclusion','legal_opinion','labor_advice','logistics_optimization','market_entry_comparison','investment_recommendation')`),
+    check("knowledge_demand_status", sql`${t.status} IN ('open','triaged','accepted_for_curation','kept_as_service','declined')`),
+    check("knowledge_demand_note", sql`${t.decisionNote} IS NULL OR char_length(${t.decisionNote}) <= 500`),
+  ],
+);
+
+/** One row per (demand, project, turn) using opaque hashes: counts occurrences and distinct projects without storing any identifier. */
+export const knowledgeDemandEvent = pgTable(
+  "knowledge_demand_event",
+  {
+    demandId: text("demand_id").notNull().references(() => knowledgeDemand.id),
+    projectRef: text("project_ref").notNull(),
+    turnRef: text("turn_ref").notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("knowledge_demand_event_key").on(t.demandId, t.projectRef, t.turnRef),
+    check("knowledge_demand_event_refs", sql`${t.projectRef} ~ '^[0-9a-f]{32}$' AND ${t.turnRef} ~ '^[0-9a-f]{32}$'`),
+  ],
+);

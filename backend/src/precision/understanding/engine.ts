@@ -34,6 +34,9 @@ import { plan, promptFor, step, type Action, type QuickValue, type StepResult } 
 import { FrameConflictError, type FrameStore, type StoredFrame } from "./store";
 import { emptyFrame, type Frame } from "./types";
 import type { ResourcesPort } from "../knowledge/resources-port";
+import type { DemandPort } from "../knowledge/demand-port";
+import type { DemandOutcome } from "../knowledge/demand";
+import { BOUNDARY_AREA, type BoundaryKind } from "../knowledge/boundary";
 import { projectFacts } from "./facts-projection";
 
 // ------------------------------------------------------------------ ports
@@ -48,8 +51,12 @@ export const rulesInterpreter: UnderstandingInterpreter = {
 export interface OrientationPort {
   /** True when approved sources exist for the project's jurisdiction. */
   available(frame: Frame): Promise<boolean>;
-  /** Text answering the client's question or the offered orientation; null when nothing approved applies. */
-  answer(frame: Frame, question: string, locale: Locale): Promise<{ text: string; sourceRefs: string[]; sherpaNote?: string } | null>;
+  /**
+   * Text answering the client's question or the offered orientation; null when nothing approved applies.
+   * `coverage` (default "full") says how much of the question approved knowledge covered; `boundary` is set when the client asked for a
+   * determination that belongs to a specialist (the engine then states the boundary). An empty `text` with a boundary is valid.
+   */
+  answer(frame: Frame, question: string, locale: Locale): Promise<{ text: string; sourceRefs: string[]; sherpaNote?: string; coverage?: "full" | "partial" | "none"; reason?: DemandOutcome["reason"]; boundary?: BoundaryKind } | null>;
 }
 
 export interface SeedSource { (projectId: string, locale: Locale): Promise<DiscoverySeedInput | null> }
@@ -67,6 +74,8 @@ export interface UnderstandingEngineDeps {
   orientation?: OrientationPort;
   /** Optional Country Resource Library: offers a guide once, in context, never required. */
   resources?: ResourcesPort;
+  /** Registers what approved knowledge could not answer (normalised, no client text). Knowledge-first: never triggers a web search. */
+  demand?: DemandPort;
   /** After the frame is committed: lets the domain carry what was learned into the project's categories (inheritance). Best-effort. */
   afterFrame?: (projectId: string) => Promise<void>;
   clock?: Clock;
@@ -295,20 +304,39 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
       const r = step({ frame, text: freeText, interp, lastAction, quick, now: nowIso(), turnKey });
       frame = r.frame;
 
-      // a question the process pack did not take: Level-2 orientation (approved knowledge), never an invented answer
+      // a question the process pack did not take: Level-2 orientation (approved knowledge ONLY), never an invented answer and never a web search.
+      // When approved knowledge is absent or partial the limit is stated, the diagnosis goes on, the unmet demand is registered and a specialist is flagged.
       let answerLead = "";
       let refs: string[] = [];
       let sherpaNote: string | undefined;
-      if (r.routeQuestion && deps.orientation && (await deps.orientation.available(frame))) {
-        const o = await deps.orientation.answer(frame, r.routeQuestion, locale);
-        if (o) { answerLead = o.text; refs = o.sourceRefs; sherpaNote = o.sherpaNote; }
+      let limitLine = "";
+      if (r.routeQuestion && deps.orientation) {
+        const avail = await deps.orientation.available(frame);
+        const o = avail ? await deps.orientation.answer(frame, r.routeQuestion, locale) : null;
+        const outcome: DemandOutcome = o
+          ? { coverage: o.coverage ?? "full", reason: o.reason ?? "no_hits", ...(o.boundary ? { boundary: o.boundary } : {}) }
+          : { coverage: "none", reason: avail ? "no_hits" : "no_sources" };
+        if (o?.text) { answerLead = o.text; refs = o.sourceRefs; }
+        if (o?.sherpaNote) sherpaNote = o.sherpaNote;
+        if (outcome.boundary) limitLine = copyText(answerLead ? "knowledge_boundary" : "knowledge_boundary_alone", locale, { area: BOUNDARY_AREA[outcome.boundary][locale] }, introduced).text;
+        else if (outcome.coverage === "none") limitLine = copyText("knowledge_limit_none", locale, {}, introduced).text;
+        else if (outcome.coverage === "partial" && outcome.reason !== "granularity") limitLine = copyText("knowledge_limit_partial", locale, {}, introduced).text;
+        if (deps.demand && (outcome.coverage !== "full" || outcome.boundary)) {
+          const d = await deps.demand.register({ projectId, turnKey, frame, question: r.routeQuestion, outcome });
+          if (d) {
+            const note = `Pregunta fuera de la base de conocimiento aprobada (${d.topic}/${d.subtopic}; ${d.infoType}; ${d.coverage === "partial" ? "cobertura parcial" : "sin cobertura"})${d.boundary ? `; requiere criterio de especialista: ${BOUNDARY_AREA[d.boundary].es}` : ""}.`;
+            sherpaNote = sherpaNote ? `${sherpaNote} ${note}` : note;
+          }
+        }
+        // keep the limit sentence even when the context answer is long: the context is the part that yields
+        if (answerLead && limitLine && answerLead.length + limitLine.length + r.prompt.length + 2 > 1300) answerLead = "";
       }
 
       // after the substance is covered, offer the optional orientation once (it never blocks readiness)
       const action = r.action;
       let promptText = r.prompt;
       let p: ReturnType<typeof promptFor> = { text: r.prompt, quick: r.quickReplies, ...(r.card ? { card: r.card } : {}) };
-      let composed = answerLead ? `${answerLead} ${r.prompt}` : r.text;
+      let composed = answerLead || limitLine ? [answerLead, limitLine, r.prompt].filter(Boolean).join(" ") : r.text;
       let nextAction: Pending["action"] = action;
       if (deps.orientation && !r.routeQuestion && (action.kind === "ask_priority" || action.kind === "checkpoint") && (await deps.orientation.available(frame))) {
         const { orientationOffer } = await import("../knowledge/drivers");
@@ -323,7 +351,7 @@ export function createUnderstandingEngine(deps: UnderstandingEngineDeps): Conver
       }
       // a country guide (Admin-managed) offered once when its topic is on the table; never when another offer or an answer already leads
       let resourceOffer: { id: string; title: string } | null = null;
-      if (deps.resources && nextAction.kind !== "offer_orientation" && action.kind !== "ready" && !answerLead) {
+      if (deps.resources && nextAction.kind !== "offer_orientation" && action.kind !== "ready" && !answerLead && !limitLine) {
         const stage = action.kind === "ask_priority" || action.kind === "checkpoint" ? "priority" : "topic";
         const ro = await deps.resources.offer(frame, frame.locale, nowIso(), stage);
         if (ro && composed.length + ro.text.length < 1100) {

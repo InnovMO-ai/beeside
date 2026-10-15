@@ -5,6 +5,9 @@ import { OidcIdentityProvider } from "../admin/oidc";
 import { createConfigVersioningService } from "../config-versioning/service";
 import { createApp } from "../index";
 import { describeWithDb, useHarness } from "./fa-harness";
+import { createPgDemandRepository } from "../precision/knowledge/pg-repo";
+import { describeDemand } from "../precision/knowledge/demand";
+import { emptyFrame } from "../precision/understanding/types";
 
 const ISSUER = "https://idp.test";
 const CLIENT_ID = "beeside-control-center";
@@ -107,5 +110,39 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     const sources = await get(supervisor, "/precision/knowledge/sources");
     expect(sources.status).toBe(200);
     expect(Array.isArray(sources.body.sources)).toBe(true);
+  });
+
+  it("knowledge demand and KSeed status: readable by SUPERVISOR, decided only by ADMIN, audited; recurrence alone never changes the status", async () => {
+    const { admin, supervisor } = await people();
+    const repo = createPgDemandRepository(h.deps.db);
+    const frame = emptyFrame("es");
+    frame.countries.push({ code: "MX", role: "operation", provenance: "client_stated", at: "2026-10-15T10:00:00.000Z" } as never);
+    const d = describeDemand(frame, "¿Qué requisitos tiene el IMMEX para una importación temporal?", { coverage: "none", reason: "no_hits" })!;
+    const now = h.clock.now.toISOString();
+    for (let i = 0; i < 3; i++) await repo.register(d, { projectId: `p${i}`, turnKey: "t1" }, now);
+
+    const listed = await get(supervisor, "/precision/knowledge/demand?topic=customs&minOccurrences=2");
+    expect(listed.status).toBe(200);
+    const row = (listed.body.demand as Array<{ id: string; occurrences: number; projects: number; status: string; subtopic: string }>)[0]!;
+    expect(row).toMatchObject({ occurrences: 3, projects: 3, status: "open", subtopic: "duty_regimes" });
+    expect((await get(supervisor, "/precision/knowledge/demand?status=published")).status).toBe(400);
+
+    expect((await post(supervisor, `/precision/knowledge/demand/${row.id}/decision`, { status: "accepted_for_curation" })).status).toBe(403);
+    expect((await post(admin, `/precision/knowledge/demand/${row.id}/decision`, { status: "published" })).status).toBe(400);
+    expect((await post(admin, `/precision/knowledge/demand/missing/decision`, { status: "declined" })).status).toBe(404);
+    const decided = await post(admin, `/precision/knowledge/demand/${row.id}/decision`, { status: "accepted_for_curation", note: "Prioridad V1: aduanas" });
+    expect(decided.status).toBe(200);
+    expect(decided.body).toMatchObject({ status: "accepted_for_curation", decisionNote: "Prioridad V1: aduanas" });
+    await repo.register(d, { projectId: "p9", turnKey: "t1" }, now);
+    expect((await repo.get(row.id))!.status).toBe("accepted_for_curation");
+
+    const kseed = await get(supervisor, "/precision/knowledge/kseed");
+    expect(kseed.status).toBe(200);
+    expect(kseed.body.assessment.length).toBeGreaterThanOrEqual(20);
+    expect(kseed.body.report).toContain("# KSeed — estado y brechas");
+    expect(kseed.body.report).toContain("Demanda de conocimiento observada");
+
+    const { rows } = await h.client.query("SELECT action FROM admin_audit_event WHERE action LIKE 'knowledge_demand.%' OR action = 'kseed.viewed'");
+    expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(["knowledge_demand.viewed", "knowledge_demand.decided", "kseed.viewed"]));
   });
 });

@@ -57,6 +57,8 @@ export async function orient(repo: KnowledgeRepository, req: OrientRequest): Pro
   let hits = await retrieve(repo, { text: req.text, topics: req.topics, jurisdiction: req.jurisdiction, units: states, limit: (req.limit ?? 6) * 2 });
   // Never present a passage as being about a finer unit than its source supports.
   hits = hits.filter((h) => !(h.passage.granularity === "municipality" && RANK[best] < RANK.municipality));
+  // Knowledge-first means the RIGHT knowledge: a passage that only shares a few words with the question, but is not about the asked topics, is not an answer.
+  if (req.topics.length) hits = hits.filter((h) => h.passage.topics.some((t) => req.topics.includes(t)));
   hits = hits.slice(0, req.limit ?? 6);
 
   let comparison: Comparison | undefined;

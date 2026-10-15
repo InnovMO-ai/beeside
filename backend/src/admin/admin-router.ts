@@ -3,7 +3,7 @@ import express, { NextFunction, Request, Response, Router } from "express";
 import { feedbackComments, feedbackMetrics, friction, funnel, isSegmented, journeyHealth, operationalMetrics, parseRange, parseSegment, segmentBreakdown } from "../analytics/metrics";
 import { DELIVERY_STATUSES, listPrecisionDeliveries } from "./precision-deliveries";
 import { MANAGED_LOCALES, configOverview, resetConfig, setConfig } from "./precision-config-admin";
-import { createCountryResource, listCountryResources, listKnowledgeSources, setCountryResourceActive, updateCountryResource } from "./precision-knowledge-admin";
+import { createCountryResource, decideKnowledgeDemand, kseedStatus, listCountryResources, listKnowledgeDemand, listKnowledgeSources, setCountryResourceActive, updateCountryResource } from "./precision-knowledge-admin";
 import { METRIC_CATALOG, precisionAi, precisionCommercial, precisionFunnel, precisionQuality } from "../analytics/precision-metrics";
 import { listIntegrationDeliveries, retryIntegrationDelivery } from "../integrations/relay";
 import { RATE_LIMITS, RateLimiter, rateLimit } from "../security/rate-limit";
@@ -764,6 +764,33 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
     handle(async (req, res) => {
       const out = await listKnowledgeSources(db);
       await audit(req, "knowledge_sources.viewed", "ALLOWED", { details: { count: out.sources.length } });
+      res.json(out);
+    }),
+  );
+
+  router.get(
+    "/precision/knowledge/demand",
+    allow("config.read", "knowledge_demand.viewed"),
+    handle(async (req, res) => {
+      const out = await listKnowledgeDemand(db, req.query);
+      await audit(req, "knowledge_demand.viewed", "ALLOWED", { details: { count: out.demand.length } });
+      res.json(out);
+    }),
+  );
+  router.post(
+    "/precision/knowledge/demand/:id/decision",
+    allow("config.write", "knowledge_demand.decided"),
+    mutation("knowledge_demand.decided", (req) => ({ targetType: "knowledge_demand", targetId: String(req.params.id) }), async (req) => {
+      const r = await decideKnowledgeDemand(db, String(req.params.id), body(req), now());
+      return { status: 200, body: r, details: { status: r.status } };
+    }),
+  );
+  router.get(
+    "/precision/knowledge/kseed",
+    allow("config.read", "kseed.viewed"),
+    handle(async (_req, res) => {
+      const out = await kseedStatus(db, now());
+      await audit(_req, "kseed.viewed", "ALLOWED", { details: { needs: out.assessment.length } });
       res.json(out);
     }),
   );
