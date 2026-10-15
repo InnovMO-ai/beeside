@@ -101,27 +101,37 @@ d("Category inheritance — the category deepens the project, it does not restar
     expect(hrOpening).toMatch(/personas en el país: 20 directas y 40 por un tercero|personas en el país: 60 personas/);
     expect(opening).not.toMatch(/operaciones entre la entidad|hay operaciones intercompa/i);
     expect((await api.get(`/categories/${taxId}`)).body.progress.progressPct).toBeGreaterThan(0);
+    // "Lo que ya sé de esta parte de tu proyecto": 3-4 short client-language lines, correctable, no technical state
+    const knows = (await api.get(`/categories/${taxId}`)).body.knows;
+    expect(knows.heading).toBe("Lo que ya sé de esta parte de tu proyecto");
+    expect(knows.lines.length).toBeGreaterThanOrEqual(3);
+    expect(knows.lines.length).toBeLessThanOrEqual(4);
+    expect(JSON.stringify(knows)).toMatch(/Portugal/);
+    expect(JSON.stringify(knows)).not.toMatch(/tax_|material:|_status|%/);
+    expect(knows.lines.every((l: any) => /^Corrijo lo de «/.test(l.correctPrompt))).toBe(true);
     expect(internalTermsIn(h.seen)).toEqual([]);
   }, 180000);
 
   it("no category conversation asks what the project already established; every question deepens", async () => {
     const { projectId, api } = await portugueseProject();
     const known = new Set(["tax_has_intercompany_transactions", "tax_intercompany_transactions", "legal_entity_stage", "customs_related_party_transactions"]);
-    const asked: Array<{ category: string; field: string | null; text: string }> = [];
+    const asked: Array<{ category: string; field: string | null; sub: string | null; text: string }> = [];
     for (const categoryKey of ["tax_accounting_audit", "corporate_legal_admin", "people_payroll_employment", "international_trade_customs"]) {
       const id = await categoryIdOf(projectId, categoryKey);
       const th = (await api.get(`/categories/${id}`)).body.thread;
       let last = [...th.turns].reverse().find((t: any) => t.role === "assistant");
       for (let i = 0; i < 4 && last; i++) {
-        const field = (await h.db.query<{ structured: any }>("SELECT structured FROM precision_turn WHERE project_id = $1 AND role = 'assistant' AND scope_instance_id = $2 ORDER BY seq DESC LIMIT 1", [projectId, id])).rows[0]?.structured?.state?.fieldKey ?? null;
-        asked.push({ category: categoryKey, field, text: last.text });
+        const st = (await h.db.query<{ structured: any }>("SELECT structured FROM precision_turn WHERE project_id = $1 AND role = 'assistant' AND scope_instance_id = $2 ORDER BY seq DESC LIMIT 1", [projectId, id])).rows[0]?.structured?.state;
+        const field = st?.fieldKey ?? null;
+        asked.push({ category: categoryKey, field, sub: st?.subKey ?? null, text: last.text });
         const r = await api.post(`/categories/${id}/turns`, { turnKey: key("c"), text: "No lo sé todavía." });
         if (r.status !== 200) break;
         last = [...r.body.turns].reverse().find((t: any) => t.role === "assistant");
       }
     }
     expect(asked.length).toBeGreaterThan(4);
-    for (const q of asked) if (q.field) expect(known.has(q.field)).toBe(false);
+    // an inherited group may be DEEPENED (a missing detail of an item the project already listed), never asked again as a whole
+    for (const q of asked) if (q.field && !q.sub) expect(known.has(q.field)).toBe(false);
     // one question per turn is never the headcount total or "are there intercompany transactions"
     const texts = asked.map((q) => q.text.toLowerCase()).join(" | ");
     expect(texts).not.toMatch(/cuántas personas en total|habrá operaciones entre/);
@@ -159,7 +169,8 @@ d("Category inheritance — the category deepens the project, it does not restar
     await frames.commit(projectId, f2, (await frames.load(projectId))!.version, { turnKey: key("chg"), kind: "correction", payload: { op: "test" } });
     await syncProjectInheritance({ db: h.db, registry: h.runtime.deps.registry } as never, projectId);
     const tax = await loadFactMap(h.db, taxId);
-    expect(tax.tax_intercompany_transactions?.value).toEqual([{ transaction_type: "services", counterparty_country: ["PT"] }]);
+    // the parent loan of the project is an intra-group financing transaction too
+    expect(tax.tax_intercompany_transactions?.value).toEqual([{ transaction_type: "services", counterparty_country: ["PT"] }, { transaction_type: "financing", counterparty_country: ["PT"] }]);
     // idempotent
     const wrote = await syncProjectInheritance({ db: h.db, registry: h.runtime.deps.registry } as never, projectId);
     expect(wrote).toBe(0);
@@ -194,7 +205,11 @@ d("Category inheritance — the category deepens the project, it does not restar
     expect(last.progress.ready).toBe(true);
     expect(asked).not.toEqual(expect.arrayContaining(["tax_has_intercompany_transactions", "tax_intercompany_transactions", "tax_services_in_scope"]));
     expect(asked[0]).toBe("tax_registration_status"); // the first thing the category needs is what the project could not know
-    expect(asked.length).toBeLessThanOrEqual(8);
+    // READINESS = MATERIAL SUFFICIENCY: the Portuguese context (parent, intra-group services, goods and a parent loan) made the
+    // transfer-pricing documentation status and the agreement / value facts material, so Fiscal was not "ready" before they were explored
+    expect(asked).toEqual(expect.arrayContaining(["tax_transfer_pricing_documentation_status", "tax_intercompany_transactions"]));
+    expect(asked.indexOf("tax_transfer_pricing_documentation_status")).toBeGreaterThan(-1);
+    expect(asked.length).toBeLessThanOrEqual(10);
 
     // CRP -> Preview -> send
     expect((await api.post(`/categories/${id}/crp/confirm`, {})).status).toBe(200);

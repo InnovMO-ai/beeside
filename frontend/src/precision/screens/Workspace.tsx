@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { CategoryDto, CategoryProgressDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState } from "../api/dto";
+import type { CategoryDto, CategoryProgressDto, KnowsPanelDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState } from "../api/dto";
 import { useI18n } from "../i18n";
 import { ApiFailure } from "../api/transport";
 import { useSession } from "../state/app";
@@ -75,6 +75,32 @@ function ResourceLink({ offer }: { offer: { id: string; title: string } }) {
   );
 }
 
+/** "Lo que ya sé de esta parte de tu proyecto": what the project already established for this category, in the client's words, correctable in place. */
+function KnowsPanel({ panel, canCorrect, onCorrect }: { panel: KnowsPanelDto; canCorrect: boolean; onCorrect: (prompt: string) => void }) {
+  const wide = (): boolean => { try { return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 900px)").matches; } catch { return true; } };
+  // Desktop shows it open; on mobile it is one quiet line that opens on demand (it never pushes the conversation off the screen).
+  const [open, setOpen] = useState<boolean>(wide);
+  return (
+    <section className="pz-knows" aria-labelledby="pz-knows-h" data-open={open || undefined}>
+      <button type="button" className="pz-knows-head" aria-expanded={open} aria-controls="pz-knows-body" onClick={() => setOpen((o) => !o)}>
+        <h2 id="pz-knows-h" className="pz-knows-title">{panel.heading}</h2>
+        <Icon name="arrow-right" size={16} className="pz-knows-chev" />
+      </button>
+      <div id="pz-knows-body" className="pz-knows-body" hidden={!open}>
+        <ul className="pz-knows-list">
+          {panel.lines.map((l) => (
+            <li key={l.id} className="pz-knows-line">
+              <span className="pz-knows-text">{l.text}</span>
+              {canCorrect ? <button type="button" className="pz-textlink pz-knows-fix" aria-label={`${panel.correctLabel}: ${l.text}`} onClick={() => onCorrect(l.correctPrompt)}>{panel.correctLabel}</button> : null}
+            </li>
+          ))}
+        </ul>
+        <p className="pz-knows-hint">{panel.hint}</p>
+      </div>
+    </section>
+  );
+}
+
 function RetryPanel({ onRetry }: { onRetry: () => void }) {
   const { t } = useI18n();
   return (
@@ -143,6 +169,8 @@ interface WorkspaceProps<M> {
   eyebrowVisible?: boolean;
   footerPanels?: (ctx: { meta: M | null; progress: CategoryProgressDto | null; uState: UnderstandingState | null; canWrite: boolean }) => ReactNode;
   closedNote?: (ctx: { meta: M | null; uState: UnderstandingState | null }) => ReactNode;
+  /** Quiet context above the conversation; `correct` puts a prepared correction in the composer. */
+  topPanel?: (ctx: { meta: M | null; canWrite: boolean; correct: (prompt: string) => void }) => ReactNode;
   unavailableState?: (meta: M) => ReactNode;
 }
 
@@ -186,12 +214,15 @@ export function Workspace<M>(p: WorkspaceProps<M>) {
     window.setTimeout(() => ta.current?.focus(), 0);
   };
 
+  const correct = (prompt: string) => { setDraft(prompt); window.setTimeout(() => { const el = ta.current; if (!el) return; el.focus(); el.setSelectionRange?.(prompt.length, prompt.length); }, 0); };
+
   let body: ReactNode;
   if (th.res.error && !th.res.data) body = <InlineError level={2} onRetry={() => void th.res.reload()} title={t("ws.loadError.title")} body={t("ws.loadError.body")} />;
   else if (!th.res.data) body = <Skeleton lines={6} />;
   else if (p.unavailableState && p.unavailableState(th.res.data.meta)) body = p.unavailableState(th.res.data.meta);
   else body = (
     <>
+      {p.topPanel?.({ meta, canWrite: writable, correct })}
       <div className="pz-thread" role="log" aria-live="polite" aria-relevant="additions" aria-label={t("ws.thread")}>
         {all.length === 0 ? <p className="pz-muted">{t("ws.empty")}</p> : null}
         {all.map((turn, i) => (
@@ -275,6 +306,7 @@ export function CategoryWorkspace({ id }: { id: string }) {
       submit={(r) => client.categoryTurn(id, r)}
       onResult={() => void refreshCenter()}
       icon={(m) => m?.iconKey ?? null}
+      topPanel={({ meta, canWrite, correct }) => (meta?.knows && meta.knows.lines.length > 0 ? <KnowsPanel panel={meta.knows} canCorrect={canWrite} onCorrect={correct} /> : null)}
       headerLead={({ meta, progress }) => {
         const pr = progress ?? meta?.progress ?? null;
         if (!meta || !pr) return null;

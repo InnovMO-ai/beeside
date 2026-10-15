@@ -6,7 +6,7 @@ import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRe
 import { DEMAND_STATUSES, type DemandStatus, type StoredDemand } from "../precision/knowledge/demand";
 import { assessKSeed, type KSeedAssessment } from "../precision/knowledge/kseed-spec";
 import { renderGapReport } from "../precision/knowledge/kseed-report";
-import { renderV1GapList } from "../precision/knowledge/kseed-gaps";
+import { renderSourceRequestPack, renderV1GapList } from "../precision/knowledge/kseed-gaps";
 import { compareDocuments, listSeries, type EditionComparison, type Series } from "../precision/knowledge/editions";
 import { createPgCandidateStore } from "../precision/knowledge/pg-repo";
 import type { CandidateUpdate } from "../precision/knowledge/agent";
@@ -111,14 +111,14 @@ export async function decideKnowledgeDemand(db: Db, id: string, b: Record<string
 }
 
 /** KSeed coverage against the expectation spec, plus the rendered gap report (Spanish). */
-export async function kseedStatus(db: Db, now: Date): Promise<{ assessment: KSeedAssessment[]; report: string; v1Gaps: string }> {
+export async function kseedStatus(db: Db, now: Date): Promise<{ assessment: KSeedAssessment[]; report: string; v1Gaps: string; sourcePack: string }> {
   const repo = createPgKnowledgeRepository(db);
   const assessment = await assessKSeed(repo);
   const documents: { doc: Awaited<ReturnType<typeof repo.listDocuments>>[number]; source: NonNullable<Awaited<ReturnType<typeof repo.getSource>>> }[] = [];
   for (const doc of await repo.listDocuments({ status: "active" })) { const source = await repo.getSource(doc.sourceId); if (source) documents.push({ doc, source }); }
   const resources = await createPgCountryResources(db).list();
   const demand = await createPgDemandRepository(db).list();
-  return { assessment, report: renderGapReport({ generatedAt: now.toISOString(), assessment, documents, resources, demand }), v1Gaps: renderV1GapList(assessment) };
+  return { assessment, report: renderGapReport({ generatedAt: now.toISOString(), assessment, documents, resources, demand }), sourcePack: renderSourceRequestPack(), v1Gaps: renderV1GapList(assessment) };
 }
 
 /** Editions of every publication (the newest active one is what Precision reads; older ones stay as history with their provenance). */

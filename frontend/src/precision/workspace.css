@@ -116,3 +116,23 @@
 }
 
 .pz-resource { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13.5px; }
+
+/* ------------------------------------------------------------ "Lo que ya sé de esta parte de tu proyecto" (category panel) */
+.pz-knows { background: var(--pz-paper-2); border: 1px solid var(--pz-line-soft); border-radius: 12px; padding: 4px 18px 6px; display: grid; }
+.pz-knows-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0; background: none; border: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.pz-knows-title { font: 600 11px/1.4 var(--pz-font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--pz-brand); }
+.pz-knows-chev { flex: none; color: var(--pz-ink-3); transform: rotate(90deg); transition: transform .15s; }
+.pz-knows[data-open] .pz-knows-chev { transform: rotate(-90deg); }
+.pz-knows-body { display: grid; gap: 6px; padding-bottom: 12px; }
+.pz-knows-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.pz-knows-line { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-top: 1px solid var(--pz-line-soft); font-size: 14.5px; line-height: 1.5; color: var(--pz-ink); }
+.pz-knows-line:first-child { border-top: 0; }
+.pz-knows-text { min-width: 0; overflow-wrap: anywhere; }
+.pz-knows-fix { flex: none; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--pz-brand); background: none; border: 0; cursor: pointer; padding: 4px 0; min-height: 32px; }
+.pz-knows-fix:hover { text-decoration: underline; text-underline-offset: 4px; }
+.pz-knows-hint { font-size: 12.5px; line-height: 1.45; color: var(--pz-ink-3); }
+@media (max-width: 899px) {
+  .pz-knows { padding: 2px 14px 4px; }
+  .pz-knows-line { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .pz-knows-fix { min-height: 44px; display: inline-flex; align-items: center; }
+}

@@ -14,6 +14,8 @@ import type { CategoryManifestContent } from "../manifest/effective-fields";
 import type { FactMap } from "../manifest/types";
 import { canonicalJson } from "../ports/operation-hub";
 import { deriveInherited, type InheritedFact } from "../understanding/category-inheritance";
+import { deriveMaterial } from "../understanding/category-materiality";
+import { MATERIAL_OVERLAY_KEY, parseOverlay, type MaterialOverlay } from "../manifest/material";
 import { knownLines } from "../understanding/category-readiness";
 import { createPgFrameStore } from "../understanding/pg-store";
 import type { Frame } from "../understanding/types";
@@ -177,6 +179,12 @@ export async function reconcileCategory(deps: Pick<PrecisionDomainDeps, "registr
     const id = await recordSystemFact(tx, { projectId: ref.projectId, scopeInstanceId: ref.instanceId, source: "category", fieldKey: INHERITED_LEDGER_KEY, value: plan.ledger, valueType: "json" }, current);
     if (id) wrote = true;
   }
+  // readiness = material sufficiency: what the project's signals make material for this category (read by the readiness engine as data)
+  const overlay = deriveMaterial(frame, ref.categoryKey);
+  if (overlayChanged(overlay, current)) {
+    const id = await recordSystemFact(tx, { projectId: ref.projectId, scopeInstanceId: ref.instanceId, source: "category", fieldKey: MATERIAL_OVERLAY_KEY, value: overlay, valueType: "json" }, current);
+    if (id) wrote = true;
+  }
   return wrote;
 }
 
@@ -185,10 +193,14 @@ export async function loadFrame(db: Db, projectId: string): Promise<Frame | null
   return (await createPgFrameStore(db).load(projectId))?.frame ?? null;
 }
 
+/** The overlay changes only when what the project makes material changes (idempotent). */
+const overlayChanged = (next: MaterialOverlay, factsNow: FactMap): boolean => canonicalJson(next) !== canonicalJson(parseOverlay(factsNow[MATERIAL_OVERLAY_KEY]));
+
 /** Cheap pre-check outside any transaction: is the category already in line with the frame? */
 async function inSync(deps: InheritDeps, ref: CategoryRef, frame: Frame): Promise<boolean> {
-  const plan = planInheritance(await inheritedFor(deps, ref, frame), await loadFactMap(deps.db, ref.instanceId));
-  return plan.writes.length === 0 && !plan.ledgerChanged;
+  const facts = await loadFactMap(deps.db, ref.instanceId);
+  const plan = planInheritance(await inheritedFor(deps, ref, frame), facts);
+  return plan.writes.length === 0 && !plan.ledgerChanged && !overlayChanged(deriveMaterial(frame, ref.categoryKey), facts);
 }
 
 /** Applies the latest frame to one category (opening a thread, each category turn). Idempotent; best-effort for callers. */

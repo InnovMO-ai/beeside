@@ -105,6 +105,23 @@ export interface Finding {
 /** A value the client gave that contradicts what Discovery established (or an earlier statement) and has not been settled yet. */
 export interface ConflictRecord { key: string; value: unknown; display: string; quote: string; interpretive: Interpretive; at: string; /** The newer value comes from Discovery (it changed after the client spoke here). */ source?: "discovery" }
 
+/**
+ * A MATERIAL fact the client stated that belongs to no single category (an operating entity that already exists, a local partner, an anchor
+ * contract, a group policy...). It is a cross-cutting dimension of the Project Frame: kept with the client's own words and made available to
+ * every relevant category (and to the specialist), so it is never lost because the taxonomy has no natural owner.
+ */
+export type CrossKind = "existing_presence" | "partners" | "anchor_contract" | "group_policy" | "prior_registration" | "currency_flows" | "regulated_sector" | "audited_group";
+export interface CrossCuttingItem {
+  id: string;
+  kind: CrossKind;
+  /** The client's own sentence (verified to occur in what they wrote). */
+  quote: string;
+  /** Categories it informs; empty = every category. */
+  categories: string[];
+  provenance: Provenance;
+  at: string;
+}
+
 export interface Frame {
   version: number;
   locale: Loc;
@@ -121,6 +138,8 @@ export interface Frame {
   asked: Record<string, number>;
   /** Free notes the client left that match no dimension (kept for the Sherpa; never scored). */
   notes: { text: string; at: string }[];
+  /** Material facts that belong to no single category (see CrossCuttingItem). Optional: frames stored before this existed have none. */
+  crossCutting?: CrossCuttingItem[];
   /** Structured record of what changed since Discovery. */
   changedSinceDiscovery: { key: string; from: string; to: string; at: string }[];
   discoveryPinId?: string | null;

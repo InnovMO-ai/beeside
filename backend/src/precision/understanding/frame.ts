@@ -11,6 +11,7 @@
  *  - Priority is the client's: unprioritized is not "low", and execution dependencies are a different thing.
  */
 import { conceptById } from "./concepts";
+import { captureCrossCutting } from "./cross-cutting";
 import { cleanDisplay } from "./governor";
 import type { Interpretation, Observation } from "./interpreter";
 import { probeByKey } from "./probes";
@@ -203,6 +204,15 @@ export function applyInterpretation(prev: Frame, interp: Interpretation, ctx: Ap
         frame.items[ctx.asked] = { key: ctx.asked, value: null, display, status: st, provenance: "client_stated", interpretive: "observed", quote: cleanDisplay(ctx.text, 160), at: ctx.now, ...(ctx.turnKey ? { turnKey: ctx.turnKey } : {}) };
         changes.push({ kind: "item", key: ctx.asked, display });
       }
+    }
+  }
+
+  // ---- cross-cutting material facts: stated by the client, owned by no single category (kept with their own words, available to all)
+  if (!fromDiscovery && ctx.source === "client") {
+    const fresh = captureCrossCutting(ctx.text, frame.crossCutting ?? [], ctx.now, prov);
+    if (fresh.length > 0) {
+      frame.crossCutting = [...(frame.crossCutting ?? []), ...fresh];
+      for (const x of fresh) changes.push({ kind: "note", key: x.id, display: x.quote });
     }
   }
 

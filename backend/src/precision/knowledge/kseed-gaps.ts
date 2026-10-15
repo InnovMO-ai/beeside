@@ -3,7 +3,7 @@
  * the entries that are still open into the list Product reviews. Everything in `suggestedSource` is a SUGGESTION for Product and The Hive
  * to confirm — none of it is approved, and Precision never researches it live. Product / The Hive supply or approve the material.
  */
-import type { KSeedAssessment } from "./kseed-spec";
+import { KSEED_SPEC, type KSeedAssessment } from "./kseed-spec";
 
 export type GapSupports = "understanding" | "category_depth" | "orientation" | "specialist_handoff";
 export interface V1GapPlan {
@@ -132,6 +132,33 @@ export function renderV1GapList(assessment: KSeedAssessment[]): string {
     l.push(`- Fuente sugerida (NO APROBADA TODAVÍA): ${p.suggestedSource}.`);
     l.push(`- Mínimo necesario para V1: ${p.minimumV1}`);
     l.push(`- Sostiene: ${p.supports.map((s) => ES_SUPPORT[s]).join(", ")}. Revisa: ${p.reviewer}.`, ``);
+  }
+  return l.join("\n");
+}
+
+/**
+ * The source request pack: ONE compact page for Mike / The Hive to supply or approve the right materials for the V1 gaps. Per gap only:
+ * exact topic, minimum V1 knowledge unit, preferred type of official source, suggested source (NOT APPROVED), risk and reviewer profile.
+ * Static (no database, no network): it comes from the plan, so it can be produced any time. Precision never researches these live.
+ */
+export function renderSourceRequestPack(): string {
+  const risk = new Map(KSEED_SPEC.map((n) => [n.id, n.risk]));
+  const plan = [...V1_GAP_PLAN].sort((a, b) => a.priority - b.priority);
+  const l: string[] = [
+    `# Pack de solicitud de fuentes KSeed — V1`,
+    ``,
+    `Doce brechas, en orden de prioridad. Las fuentes sugeridas **no están aprobadas**: son una propuesta para que Producto y The Hive confirmen o sustituyan. Cuando llegue material aprobado se ingiere sin rediseño (fuente → unidad curada → revisión por riesgo → publicada con procedencia y versión).`,
+    ``,
+  ];
+  for (const p of plan) {
+    l.push(`## ${p.priority}. ${p.topic}`);
+    l.push(`| | |`, `|---|---|`);
+    l.push(`| Tema exacto | ${p.topic} (${p.needId}) |`);
+    l.push(`| Unidad mínima V1 | ${p.minimumV1} |`);
+    l.push(`| Tipo de fuente oficial preferida | ${p.idealSourceType} |`);
+    l.push(`| Fuente sugerida | ${p.suggestedSource} — **NO APROBADA TODAVÍA** |`);
+    l.push(`| Riesgo | ${ES_RISK[risk.get(p.needId) ?? "medium"]} |`);
+    l.push(`| Perfil de revisor | ${p.reviewer} |`, ``);
   }
   return l.join("\n");
 }

@@ -5,6 +5,10 @@
  * and they never conclude anything professional: a finding explains the issue, points to what is known and what is missing, and
  * hands the conclusion to the specialist (Level 3 of the knowledge model). Nothing here warns generically: every finding names the
  * client facts that support it (`basis`), and disappears when those facts change.
+ *
+ * FACT vs JUDGMENT (frozen): if Precision can reasonably obtain a missing FACT from the client, it ASKS (Understanding / the category);
+ * a finding never stands in for that. Findings carry only what needs professional judgment, legal/tax/labor interpretation, external
+ * validation, specialist analysis or an execution decision — or a fact the client honestly could not or would not give (`missing_information`).
  */
 import type { Finding, Frame, Specialty } from "./types";
 import { probeByKey } from "./probes";
@@ -76,7 +80,7 @@ export function computeFindings(frame: Frame, now: string, knowledge: FindingKno
     add({
       id: "f:relocation_mobility", kind: "missing_information", specialty: "regulatory",
       title: L("Posible traslado de personal desde el país de origen", "Possible relocation of staff from the home country"),
-      detail: L("Parte del personal se trasladaría desde el origen y no se ha pedido apoyo migratorio. Confirmar con el cliente si hace falta.", "Part of the staff would relocate from the home country and no immigration support has been requested. Confirm with the client whether it is needed."),
+      detail: L("Parte del personal se trasladaría desde el origen y no se ha pedido apoyo migratorio. Activar ese servicio requiere la confirmación del cliente o del Sherpa.", "Part of the staff would relocate from the home country and no immigration support has been requested. Activating that service requires the client's or the Sherpa's confirmation."),
       basis: ["workforce.origin"],
     });
   }
@@ -131,7 +135,7 @@ export function computeFindings(frame: Frame, now: string, knowledge: FindingKno
     add({
       id: "f:equipment_customs", kind: "specialist_review", specialty: "customs",
       title: L("Ingreso al país del equipo del proyecto", "Bringing the project equipment into the country"),
-      detail: L("La operación instalará equipo del proyecto y parte podría provenir del extranjero. Confirmar origen del equipo y si ingresará de forma temporal o definitiva.", "The operation will install project equipment and part of it may come from abroad. Confirm the equipment's origin and whether it will enter temporarily or permanently."),
+      detail: L("La operación instalará equipo del proyecto y parte podría provenir del extranjero. El especialista aduanero determina el régimen de ingreso (temporal o definitivo) y sus condiciones; el origen del equipo lo cuenta el cliente en la categoría de comercio exterior.", "The operation will install project equipment and part of it may come from abroad. The customs specialist determines the import regime (temporary or permanent) and its conditions; the client states the equipment's origin in the trade category."),
       basis: ["concept:equipment_installation"], topics: ["customs_temporary_import"],
     });
   }

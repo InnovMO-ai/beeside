@@ -58,11 +58,16 @@ export function readinessByCategory(frame: Frame): CategoryReadiness[] {
  * Readiness of a category as the project experiences it: what the project conversation established, plus what the client answered
  * IN the category (an answer given in either place resolves the aspect). Aspects that are still open split into:
  *  - `asking`: the category itself asks them (a field of its manifest answers that aspect) — they close as the client answers;
- *  - `forSpecialist`: no field of this category can hold the answer, so they travel to the specialist as pending information
- *    instead of blocking a client who has no way to answer them here.
+ *  - `openInProject`: no field of this category can hold the answer, but it is still a FACT the client can state. It is NOT handed to
+ *    the specialist: it stays open in the Project Frame (Understanding keeps asking it) and counts against the category's readiness.
+ *
+ * Frozen boundary: a fact Precision can reasonably obtain from the client is asked; the specialist receives professional judgment,
+ * interpretation, external validation, analysis or an execution decision — and what the client honestly does not know (`forSpecialist`).
  */
 export interface CategoryUnderstanding extends CategoryReadiness {
   asking: string[];
+  /** Material facts that no field of this category holds and the project has not settled: Understanding still asks them. */
+  openInProject: string[];
   /** Material aspects of this category that the project already settled or the category answered. */
   settled: string[];
 }
@@ -78,9 +83,10 @@ export function categoryUnderstanding(frame: Frame, categoryKey: string, facts: 
     ...base,
     open: asking,
     asking,
-    forSpecialist: [...new Set([...base.forSpecialist, ...uncovered])],
+    openInProject: uncovered,
+    forSpecialist: base.forSpecialist,
     settled: base.material.filter((k) => !base.open.includes(k) || answeredHere(k)),
-    ready: asking.length === 0,
+    ready: asking.length === 0 && uncovered.length === 0,
   };
 }
 

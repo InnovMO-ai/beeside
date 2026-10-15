@@ -25,6 +25,8 @@ import type { PaStatus } from "../repository";
 import { applyConfirmedNeed, classifyForProject } from "./add-service";
 import { loadCategoryState, projectCountries, progressOf, syncProposals } from "./categories";
 import { loadCategoryRef } from "./category-ref";
+import { loadFrame, syncCategoryInheritance } from "./category-inheritance";
+import { knowsPanel } from "../understanding/knows-panel";
 import { CONFIG_KEYS, DEFAULT_RESUME_GAP_MINUTES, configNumber } from "./config";
 import { understandingStateOf } from "./context-reader";
 import type { PrecisionDomainDeps } from "./deps";
@@ -250,6 +252,18 @@ export function createThreadServices(deps: PrecisionDomainDeps, fa: FaContextSer
     return ref;
   }
 
+  /** "Lo que ya sé de esta parte de tu proyecto": best effort (a category without a frame simply has no panel). */
+  async function knowsFor(projectId: string, instanceId: string, categoryKey: string) {
+    try {
+      await syncCategoryInheritance(deps, projectId, instanceId);
+      const frame = await loadFrame(deps.db, projectId);
+      return frame ? knowsPanel(frame, categoryKey) : null;
+    } catch (error) {
+      deps.log("warn", "knows panel could not be built", { error: describeError(error) });
+      return null;
+    }
+  }
+
   const category: ThreadServices["category"] = {
     async get(actor, id) {
       const { projectId, locale } = actor;
@@ -263,7 +277,8 @@ export function createThreadServices(deps: PrecisionDomainDeps, fa: FaContextSer
         progress,
         canWrite: open.status === "ok" && canWrite(actor) && (state.ref.lifecycle === "confirmed" || state.ref.lifecycle === "in_progress"),
       });
-      return { id: ref.instanceId, label: state.label, iconKey: state.iconKey, status: state.status, progress, sendState: state.sendState, thread };
+      const knows = await knowsFor(projectId, ref.instanceId, ref.categoryKey);
+      return { id: ref.instanceId, label: state.label, iconKey: state.iconKey, status: state.status, progress, sendState: state.sendState, thread, knows };
     },
 
     async turn(actor, id, body) {

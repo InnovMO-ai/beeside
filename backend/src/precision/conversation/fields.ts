@@ -156,8 +156,8 @@ export const isGroup = (def: Pick<FieldDefinition, "type">): boolean => def.type
 // ------------------------------------------------------------------ group cursor
 const REQUIRED = new Set(["blocking", "required", "conditional"]);
 
-export function requiredSubs(def: FieldDefinition): FieldDefinition[] {
-  return (def.group_item_schema ?? []).filter((s) => REQUIRED.has(s.requirement_level) && s.derived !== true);
+export function requiredSubs(def: FieldDefinition, materialSubs?: ReadonlySet<string>): FieldDefinition[] {
+  return (def.group_item_schema ?? []).filter((s) => (REQUIRED.has(s.requirement_level) || materialSubs?.has(s.field_key) === true) && s.derived !== true);
 }
 
 function itemEntry(item: Record<string, unknown> | null, sub: string): { has: boolean } {
@@ -170,12 +170,18 @@ function itemEntry(item: Record<string, unknown> | null, sub: string): { has: bo
 export interface GroupCursor { itemIndex: number; sub: FieldDefinition; newItem: boolean }
 
 /** Which sub-field of which item to ask next; null when the group has what it needs. */
-export function groupCursor(def: FieldDefinition, value: unknown): GroupCursor | null {
-  const subs = requiredSubs(def);
+export function groupCursor(def: FieldDefinition, value: unknown, materialSubs?: ReadonlySet<string>): GroupCursor | null {
+  const subs = requiredSubs(def, materialSubs);
   if (subs.length === 0) return null;
   const items = Array.isArray(value) ? (value as Array<Record<string, unknown> | null>) : [];
   for (let i = 0; i < items.length; i++) {
-    for (const s of subs) if (!itemEntry(items[i] ?? null, s.field_key).has) return { itemIndex: i, sub: s, newItem: false };
+    for (const s of subs) {
+      if (itemEntry(items[i] ?? null, s.field_key).has) continue;
+      // a material sub-field (not required by the manifest) is explored once for the group, not once per item
+      const natively = REQUIRED.has(s.requirement_level);
+      if (!natively && (i > 0 || items.some((it, j) => j !== i && itemEntry(it ?? null, s.field_key).has))) continue;
+      return { itemIndex: i, sub: s, newItem: false };
+    }
   }
   const minItems = typeof def.min_items === "number" && def.min_items >= 1 ? def.min_items : 1;
   if (items.length < minItems) return { itemIndex: items.length, sub: subs[0] as FieldDefinition, newItem: true };
@@ -213,9 +219,9 @@ export interface Target {
   specName: string;
 }
 
-export function makeTarget(def: FieldDefinition, groupValue: unknown): Target | null {
+export function makeTarget(def: FieldDefinition, groupValue: unknown, materialSubs?: ReadonlySet<string>): Target | null {
   if (!isGroup(def)) return { def, ask: def, groupKey: null, itemIndex: null, specName: def.field_key };
-  const cur = groupCursor(def, groupValue);
+  const cur = groupCursor(def, groupValue, materialSubs);
   if (!cur) return null;
   return { def, ask: cur.sub, groupKey: def.field_key, itemIndex: cur.itemIndex, specName: `${def.field_key}__${cur.sub.field_key}` };
 }

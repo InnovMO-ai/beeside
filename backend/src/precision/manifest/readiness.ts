@@ -27,6 +27,7 @@
  */
 import { evaluateRule, itemFact, itemFacts, type Rule, type RuleFacts } from "./ast";
 import { effectiveFieldsMulti, normalizeCountries, type FieldDefinition } from "./effective-fields";
+import { activeMaterial } from "./material";
 import type { AnswerState, CategoryEvaluation, CriticalItem, EvaluationInput, FactMap, FactView, RequirementState, RequirementStatus } from "./types";
 
 export const REQUIRED_LEVELS: ReadonlySet<FieldDefinition["requirement_level"]> = new Set(["blocking", "required", "conditional"]);
@@ -125,7 +126,7 @@ function isApplicable(field: FieldDefinition, facts: RuleFacts): boolean {
   return !rule ? true : evaluateRule(rule, facts);
 }
 
-function analyzeGroup(field: FieldDefinition, fact: FactView | undefined): GroupDetail {
+function analyzeGroup(field: FieldDefinition, fact: FactView | undefined, materialSubs: ReadonlySet<string> = new Set()): GroupDetail {
   const items = groupItems(fact);
   const minItems = typeof field.min_items === "number" && field.min_items >= 1 ? field.min_items : 1;
   const subs: SubFieldStatus[] = [];
@@ -134,10 +135,14 @@ function analyzeGroup(field: FieldDefinition, fact: FactView | undefined): Group
     const local = itemFacts(item);
     let itemComplete = true;
     for (const sub of field.group_item_schema ?? []) {
-      if (!REQUIRED_LEVELS.has(sub.requirement_level)) continue;
+      const natively = REQUIRED_LEVELS.has(sub.requirement_level);
+      if (!natively && !materialSubs.has(sub.field_key)) continue;
       const rule = sub.applicability_rule as Rule | null | undefined;
       if (rule && !evaluateRule(rule, local)) continue; // item-scoped applicability
       const st = itemFact(item ? item[sub.field_key] : undefined).answerState;
+      // A MATERIAL sub-field (one the manifest does not itself require) is explored at the level of the group: asking it for one transaction is
+      // exploring it; the other items do not each need their own answer. Items where it was asked keep their state (a pending shows to the specialist).
+      if (!natively && st === "NOT_ASKED" && (idx > 0 || items.some((it, j) => j !== idx && itemFact(it ? it[sub.field_key] : undefined).answerState !== "NOT_ASKED"))) continue;
       const state = subState(st);
       subs.push({ fieldKey: field.field_key, item: idx, sub: sub.field_key, level: sub.requirement_level, state, answerState: st, executionDependency: sub.execution_dependency === true });
       if (state !== "confirmed") itemComplete = false;
@@ -156,12 +161,18 @@ export function evaluateCategoryDetailed(input: EvaluationInput): DetailedEvalua
   const allFields = effectiveFieldsMulti(content, countries);
   const fields = allFields.filter((f) => f.derived !== true);
 
+  // 0. material overlay: what makes a dimension material for THIS project (system fact written by Understanding). An item whose premise the
+  // client's own facts contradict is dropped; only fields that exist in the effective manifest count.
+  const known = new Set(allFields.filter((f) => f.derived !== true).map((f) => f.field_key));
+  const material = new Map<string, Set<string>>();
+  for (const [field, subs] of activeMaterial(input.facts)) if (known.has(field)) material.set(field, subs);
+
   // 1. applicability, in manifest order; inapplicable fields are masked for every later rule (G-C3).
   const masked: Record<string, FactView | undefined> = { ...input.facts };
   const applicable = new Map<string, boolean>();
   for (const f of allFields) {
     if (f.derived === true) continue;
-    const ok = isApplicable(f, masked);
+    const ok = material.has(f.field_key) || isApplicable(f, masked);
     applicable.set(f.field_key, ok);
     if (!ok) masked[f.field_key] = { value: undefined, answerState: "NOT_APPLICABLE" };
   }
@@ -184,7 +195,7 @@ export function evaluateCategoryDetailed(input: EvaluationInput): DetailedEvalua
     const st = stateOf(fact);
     let d: RequirementDetail;
     if (f.type === "repeatable_group") {
-      const g = analyzeGroup(f, fact);
+      const g = analyzeGroup(f, fact, material.get(f.field_key));
       const hasPending = g.subs.some((s) => s.state === "pending" || s.state === "missing");
       const hasAssumed = g.subs.some((s) => s.state === "assumed") || st === "ASSUMED";
       const enough = g.itemCount >= g.minItems;
@@ -211,7 +222,7 @@ export function evaluateCategoryDetailed(input: EvaluationInput): DetailedEvalua
   }
 
   // 3. progress over applicable required requirements
-  const required = requirements.filter((r) => r.applicable && REQUIRED_LEVELS.has(r.level));
+  const required = requirements.filter((r) => r.applicable && (REQUIRED_LEVELS.has(r.level) || material.has(r.fieldKey)));
   const totalRequired = required.length;
   const confirmedRequired = required.filter((r) => r.state === "confirmed").length;
   const progressPct = totalRequired === 0 ? null : Math.floor((100 * confirmedRequired) / totalRequired);
@@ -235,6 +246,10 @@ export function evaluateCategoryDetailed(input: EvaluationInput): DetailedEvalua
     else pushCritical({ itemKey: gap.fieldKey, kind: "field", label: copyLabel((details[gap.fieldKey] as RequirementDetail).field.label) });
   }
   for (const d of unresolvedDecisions) pushCritical({ itemKey: d.decision_key, kind: d.kind, label: copyLabel(d.label) });
+  // material sufficiency: a dimension the project's own context makes material must have been explored with the client. Asked (even answered
+  // "I do not know") is enough — that is honest knowledge and goes to the specialist as pending; never asked is a gap.
+  const materialGaps = required.filter((r) => material.has(r.fieldKey) && (details[r.fieldKey] as RequirementDetail).needsAsk);
+  for (const gap of materialGaps) pushCritical({ itemKey: `material:${gap.fieldKey}`, kind: "field", label: copyLabel((details[gap.fieldKey] as RequirementDetail).field.label) });
 
   const ready = totalRequired > 0 && critical.length === 0;
 
@@ -248,7 +263,8 @@ export function evaluateCategoryDetailed(input: EvaluationInput): DetailedEvalua
   const candidates = required.filter((r) => (details[r.fieldKey] as RequirementDetail).needsAsk);
   const firstBlocking = candidates.find((r) => r.level === "blocking");
   const firstWaited = candidates.find((r) => waitedOn.has(r.fieldKey));
-  const nextReq = firstBlocking ?? firstWaited ?? candidates[0];
+  const firstMaterial = candidates.find((r) => material.has(r.fieldKey));
+  const nextReq = firstBlocking ?? firstMaterial ?? firstWaited ?? candidates[0];
   let nextTarget: NextTarget | null = null;
   if (nextReq) {
     const det = details[nextReq.fieldKey] as RequirementDetail;

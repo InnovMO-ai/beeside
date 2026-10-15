@@ -23,6 +23,7 @@
 import { guard } from "../engine/guard";
 import { extraGuard } from "./guard-extra";
 import { copyText } from "./copy";
+import { activeMaterial } from "../manifest/material";
 import { briefOf, enumValuesOf, helpOf, isGroup, labelOf, makeTarget, mergeGroupItem, resolveFieldDef, assembleValue, specsFor, valueTypeOf, basicRenderer, type FieldDefinition, type Target, type ValueRenderer } from "./fields";
 import { deterministicAnswer, detectAnswerSignal, hasEstimateCue } from "./answer-state";
 import { buildWritePrompt } from "./prompts";
@@ -704,7 +705,7 @@ class Run {
     if (!def) return null;
     if (!isGroup(def)) return { def, ask: def, groupKey: null, itemIndex: null, specName: def.field_key };
     const sub = (def.group_item_schema ?? []).find((s) => s.field_key === state.subKey);
-    if (!sub) return makeTarget(def, this.ctx.evaluation.facts[def.field_key]?.value);
+    if (!sub) return makeTarget(def, this.ctx.evaluation.facts[def.field_key]?.value, activeMaterial(this.ctx.evaluation.facts).get(def.field_key));
     return { def, ask: sub, groupKey: def.field_key, itemIndex: state.itemIndex ?? 0, specName: `${def.field_key}__${sub.field_key}` };
   }
 
@@ -713,7 +714,7 @@ class Run {
     if (!key) return null;
     const def = this.defOf(key);
     if (!def) return null;
-    return makeTarget(def, facts[def.field_key]?.value);
+    return makeTarget(def, facts[def.field_key]?.value, activeMaterial(facts).get(def.field_key));
   }
 
   private makeFact(args: {

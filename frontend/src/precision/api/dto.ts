@@ -232,6 +232,20 @@ export interface CrpViewDto {
   canRequestChanges: boolean;
   canStartNewVersion: boolean;
 }
+/** One line of "what I already know about this part of your project" (client language, derived from canonical known facts). */
+export interface KnowsLineDto {
+  id: string;
+  text: string;
+  /** Prefilled into the composer when the client chooses to correct this line; the category conversation applies it as a correction. */
+  correctPrompt: string;
+}
+/** The compact category panel: three or four lines, never a summary or a checklist. Absent when the project has nothing to say for the category. */
+export interface KnowsPanelDto {
+  heading: string;
+  hint: string;
+  correctLabel: string;
+  lines: KnowsLineDto[];
+}
 export interface CategoryDto {
   id: string;
   label: string;
@@ -240,6 +254,8 @@ export interface CategoryDto {
   progress: CategoryProgressDto;
   sendState: SendStateDto;
   thread: ThreadDto;
+  /** "Lo que ya sé de esta parte de tu proyecto": the project's own context carried into the category (editable by correction in the thread). */
+  knows?: KnowsPanelDto | null;
 }
 export interface ConfirmCrpRequest { requestKey: string }
 

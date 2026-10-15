@@ -52,6 +52,9 @@ export function buildBriefing(frame: Frame, now: string, knowledge: FindingKnowl
   if (places.length > 1) context.push(clean(places.map((c) => `${countryName(c.code, loc)} (${ROLE[c.role]?.[loc] ?? c.role})`).join(", ")));
   if (frame.phases.length > 0) context.push(clean(frame.phases.map((p) => p.label).join(" → ")));
 
+  // material facts the client stated that no category owns travel with the project, in the client's own words
+  for (const x of (frame.crossCutting ?? []).slice(0, 4)) context.push(clean(x.quote));
+
   const facts: BriefingFact[] = [];
   const pending: string[] = [];
   for (const p of [...PROBES].sort((a, b) => a.order - b.order)) {

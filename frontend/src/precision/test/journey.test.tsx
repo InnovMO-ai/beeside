@@ -199,3 +199,21 @@ describe("conversation", () => {
     expect(bodyHits()).toEqual([]);
   }, 30000);
 });
+
+describe("what I already know panel", () => {
+  it.each(["es", "en"] as const)("a category opens as the continuation of the project, with lines the client can correct in place (%s)", async (locale) => {
+    boot("/precision/category/logistics", { mock: "preset:logisticsReady", locale });
+    const head = await screen.findByRole("button", { name: /Lo que ya sé de esta parte de tu proyecto|What I already know about this part of your project/ }, WAIT);
+    // compact: three short lines, nothing technical
+    if (head.getAttribute("aria-expanded") !== "true") await userEvent.click(head);
+    const panel = head.closest("section")!;
+    const lines = within(panel).getAllByRole("listitem");
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    expect(lines.length).toBeLessThanOrEqual(4);
+    expect(bodyHits()).toEqual([]);
+    // correcting puts a prepared correction in the composer (the thread applies it with the existing correction machinery)
+    await userEvent.click(within(lines[0]!).getByRole("button", { name: new RegExp(locale === "es" ? "Corregir" : "Correct") }));
+    const box = (await screen.findByRole("textbox")) as HTMLTextAreaElement;
+    await waitFor(() => expect(box.value).toMatch(locale === "es" ? /^Corrijo lo de «/ : /^Correction on «/));
+  });
+});

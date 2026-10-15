@@ -250,5 +250,26 @@ export function deriveInherited(frame: Frame, categoryKey: string, fields: Field
       out.push({ fieldKey: rule.field, value: null, valueType: def.type, answerState: stateOf(item), provenance: src.provenance, frameKey: src.frameKey, ...(src.sourcePinId ? { sourcePinId: src.sourcePinId, sourceItemRef: src.sourceItemRef } : {}), display: item.display });
     }
   }
+  // a loan from the parent is an intra-group financing transaction even when the client has not listed it among the intercompany ones
+  if (categoryKey === "tax_accounting_audit" && fields.has("tax_intercompany_transactions")) {
+    const st = frame.items["entity.funding_structure"];
+    const src = settled(st) && st.status === "known" ? sourceOf(frame, st) : null;
+    if (st && src && (st.value === "loan" || st.value === "mixed")) {
+      const parent = counterpartyCountries(frame);
+      const fin: Record<string, unknown> = { transaction_type: "financing", ...(parent.length === 1 ? { counterparty_country: parent } : {}) };
+      const def = fields.get("tax_intercompany_transactions")!;
+      const at = out.findIndex((f) => f.fieldKey === "tax_intercompany_transactions");
+      if (at >= 0) {
+        const cur = out[at]!;
+        const items = Array.isArray(cur.value) ? (cur.value as Array<Record<string, unknown>>) : [];
+        if (!items.some((x) => x.transaction_type === "financing")) out[at] = { ...cur, value: [...items, fin] };
+      } else {
+        out.push({ fieldKey: "tax_intercompany_transactions", value: [fin], valueType: def.type, answerState: "ANSWERED", provenance: src.provenance, frameKey: src.frameKey, ...(src.sourcePinId ? { sourcePinId: src.sourcePinId, sourceItemRef: src.sourceItemRef } : {}), display: st.display });
+      }
+      if (fields.has("tax_has_intercompany_transactions") && !out.some((f) => f.fieldKey === "tax_has_intercompany_transactions")) {
+        out.push({ fieldKey: "tax_has_intercompany_transactions", value: true, valueType: fields.get("tax_has_intercompany_transactions")!.type, answerState: "ANSWERED", provenance: src.provenance, frameKey: src.frameKey, display: st.display });
+      }
+    }
+  }
   return out;
 }

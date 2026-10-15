@@ -7,7 +7,7 @@
  * It is never part of a live build. Failure injection (window.__PRECISION_MOCK__ and the ?mock= switches) exists only here.
  */
 import type {
-  AccessDto, AccessMode, AddServiceThreadDto, CategoryCardDto, CategoryDto, CategoryProgressDto, CategoryStatus, CenterDto, CoverDto, CrpRequirementDto, CrpSectionDto, CrpViewDto,
+  AccessDto, AccessMode, AddServiceThreadDto, CategoryCardDto, CategoryDto, CategoryProgressDto, KnowsPanelDto, CategoryStatus, CenterDto, CoverDto, CrpRequirementDto, CrpSectionDto, CrpViewDto,
   EntryDto, HelpDto, ItemState, Locale, PreviewDto, SendResultDto, SendStateDto, ServiceMapCorrectionResponse, ServiceMapDto, ServiceMapGroupDto, ServiceMapViewDto, ThreadDto, TurnDto, TurnResultDto, UnderstandingState,
 } from "../api/dto";
 import { ApiFailure, type Transport, type TransportRequest, type TransportResponse } from "../api/transport";
@@ -183,6 +183,20 @@ export function createMockServer(opts: MockOptions = {}) {
     const p = progressOf(c.iv, fx.questions);
     return { progressPct: c.iv.started ? p.progressPct : p.progressPct, criticalOpen: p.criticalOpen, pendingCount: p.pendingCount, ready: p.ready, status: catStatus(id) };
   }
+  /** "Lo que ya sé de esta parte de tu proyecto": the same compact shape the server derives from the project frame. */
+  function knowsFor(id: string, l: Locale): KnowsPanelDto | null {
+    if (id !== "logistics") return null;
+    const rows = l === "es"
+      ? ["Origen de la carga: Monterrey", "Volumen: unos 40 contenedores al mes", "Temperatura: carga seca"]
+      : ["Cargo origin: Monterrey", "Volume: about 40 containers a month", "Temperature: dry cargo"];
+    return {
+      heading: l === "es" ? "Lo que ya sé de esta parte de tu proyecto" : "What I already know about this part of your project",
+      hint: l === "es" ? "Si algo no es así, corrígelo y lo ajusto." : "If something is not right, correct it and I will adjust.",
+      correctLabel: l === "es" ? "Corregir" : "Correct",
+      lines: rows.map((text, i) => ({ id: `known:${i}`, text, correctPrompt: `${l === "es" ? "Corrijo lo de" : "Correction on"} «${text}»: ` })),
+    };
+  }
+
   function sendStateOf(id: string): SendStateDto {
     const s = st.sends[id]; const c = st.cats[id];
     return s && c && s.packVersion === c.packVersion ? s.state : "not_sent";
@@ -543,6 +557,7 @@ export function createMockServer(opts: MockOptions = {}) {
         const fx = mapOf(id)!;
         return {
           id, label: loc(fx.label, l), iconKey: fx.iconKey, status: catStatus(id), progress: progressDto(id), sendState: sendStateOf(id),
+          knows: knowsFor(id, l),
           thread: { surface: "category", scopeId: id, title: loc(fx.label, l), turns: c.iv.turns.map((t) => ser(t, l)), progress: progressDto(id), understandingState: null, aiDisclosureShown: true, canWrite: canWrite() && c.lifecycle !== "completed" },
         } satisfies CategoryDto;
       }
