@@ -40,7 +40,7 @@ export function validateRuntimeConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
   const error = (message: string) => issues.push({ level: "error", message });
   const warning = (message: string) => issues.push({ level: "warning", message });
   const production = env.NODE_ENV === "production";
-  const publicSurface = env.FA_API_ENABLED === "true" || env.ADMIN_API_ENABLED === "true" || env.BILLING_EVENTS_ENABLED === "true";
+  const publicSurface = env.FA_API_ENABLED === "true" || env.ADMIN_API_ENABLED === "true" || env.BILLING_EVENTS_ENABLED === "true" || env.FA4_API_ENABLED === "true";
 
   if (env.SECURITY_HASH_SECRET !== undefined && env.SECURITY_HASH_SECRET.length < 32) error("SECURITY_HASH_SECRET must be at least 32 characters");
   if (env.TRUST_PROXY_HOPS !== undefined && env.TRUST_PROXY_HOPS !== "" && String(trustProxyHops(env)) !== env.TRUST_PROXY_HOPS) error("TRUST_PROXY_HOPS must be an integer between 0 and 5");

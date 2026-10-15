@@ -86,3 +86,39 @@ export function journeyC(locale: 'es' | 'en' = 'es', cargoRoute?: 'within' | 'in
   a.context.success = 'llegar, montar lo necesario, cumplir el contrato y no construir una estructura permanente';
   return a;
 }
+
+/** Presentation route — Nórtica Envases (Spain → Mexico), sell + hire, own premises, permanent (Product Handoff §6). Fictitious data. */
+export function journeyNortica(locale: 'es' | 'en' = 'es'): Answers {
+  const a = emptyAnswers(locale);
+  a.identity = { name: 'Lucía', company: 'Nórtica Envases', email: 'lucia@nortica.example', role: 'Directora de Desarrollo de Negocio', decider: 'shared', termsAccepted: true, privacyAcknowledged: true, marketingConsent: false };
+  a.company = { hasExistingBusiness: true, sector: 'Fabricación de envases sostenibles para alimentación', size: '51-250', operatesIn: ['ES', 'PT'] };
+  a.destinations = { list: [{ iso: 'MX' }], open: false, sameInAll: null };
+  a.components = [comp({ id: 'c1', destinations: ['MX'], activities: ['sell', 'hire'], withWhat: ['goods'], presence: 'own_physical', permanence: 'permanent',
+    existing: 'commercial_traction', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes', location: 'region_only', locationText: 'Bajío', carries: ['nothing'] })];
+  a.projectConfirmed = true; a.knowsNeeds = false;
+  a.reasons = ['follow_clients', 'growth'];
+  a.reasonText = 'Nuestros clientes en México nos piden servicio local y entregas más rápidas.';
+  a.decision = 'decided'; a.startWhen = '6m'; a.externalDate = { has: false };
+  a.scale = { c1: { proxy: 'people', text: locale === 'es' ? '8 personas' : '8 people', declined: false } };
+  a.regulated = 'no';
+  for (const f of ['FR_LEGAL_TAX', 'FR_EMPLOYMENT', 'FR_TRADE', 'FR_BANKING', 'FR_INSURANCE', 'FR_SITE', 'FR_RECRUITMENT', 'FR_BRAND', 'FR_LOGISTICS', 'FR_GTM'])
+    a.fronts[`MX|${f}`] = { status: f === 'FR_GTM' ? 'in_progress' : 'pending', support: 'yes' };
+  a.cargoRoute = { MX: 'both' };
+  a.supportValues = ['single_contact', 'speed'];
+  a.keepWords = 'La relación comercial con nuestros clientes';
+  return a;
+}
+
+/** "No lo sé" route (Product Handoff §7): same company, every undecided answer left as "not sure". */
+export function journeyUnknown(locale: 'es' | 'en' = 'es'): Answers {
+  const a = journeyNortica(locale);
+  a.components = [comp({ id: 'c1', destinations: ['MX'], activities: ['sell'], withWhat: ['goods'], presence: 'open', permanence: 'open',
+    existing: 'commercial_traction', existingNote: 'Exportamos a dos clientes en México', sellsTo: 'companies', ownBrand: 'yes' })];
+  a.decision = 'exploring'; a.startWhen = 'unknown';
+  a.scale = { c1: { proxy: 'products', text: '', declined: false } };
+  a.regulated = 'unknown'; a.reasons = ['follow_clients', 'growth'];
+  a.fronts = {};
+  for (const f of ['FR_LEGAL_TAX', 'FR_TRADE', 'FR_BANKING', 'FR_INSURANCE', 'FR_BRAND', 'FR_LOGISTICS', 'FR_GTM']) a.fronts[`MX|${f}`] = { status: 'unknown', support: 'unknown' };
+  a.cargoRoute = { MX: 'unknown' };
+  return a;
+}

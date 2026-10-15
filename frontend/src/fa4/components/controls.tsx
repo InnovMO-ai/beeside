@@ -21,14 +21,15 @@ export function TextField({ label, value, onChange, type = 'text', placeholder, 
 }
 
 /** Single choice (radio group) */
-export function RadioGroup<T extends string>({ legend, value, options, onChange, two }: {
-  legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean;
+export function RadioGroup<T extends string>({ legend, value, options, onChange, two, three, help }: {
+  help?: ReactNode; legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean; three?: boolean;
 }) {
   const name = useId();
   return (
     <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
-      <div className={`choices ${two ? 'two' : ''}`}>
+      {help && <p className="help">{help}</p>}
+      <div className={`choices ${two ? 'two' : ''} ${three ? 'three' : ''}`}>
         {options.map((o) => (
           <label key={o.value} className={`choice ${value === o.value ? 'on' : ''}`}>
             <input type="radio" name={name} checked={value === o.value} onChange={() => onChange(o.value)} />
@@ -116,7 +117,7 @@ export function CountryPicker({ locale, selected, onChange, single, disabledOpen
         {selected.map((iso) => (
           <span key={iso} className="chip on" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {name(iso)}
-            <button type="button" aria-label={`${UI.remove[locale]} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 28, minHeight: 28 }}>×</button>
+            <button type="button" aria-label={`${UI.remove[locale]} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 44, minHeight: 44, margin: '-10px -14px -10px -6px' }}>×</button>
           </span>
         ))}
       </div>

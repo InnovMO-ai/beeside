@@ -12,7 +12,7 @@ const component = z.object({
   presence: z.enum(['remote', 'third_parties', 'own_physical', 'own_onsite', 'acquisition', 'open']).nullable(),
   permanence: z.enum(['permanent', 'temporary', 'open']).nullable(),
   durationMonths: z.number().int().min(1).max(600).optional(),
-  existing: z.enum(['nothing', 'via_third', 'own']).nullable(), existingNote: s(500).optional(),
+  existing: z.enum(['nothing', 'commercial_traction', 'via_third', 'own']).nullable(), existingNote: s(500).optional(),
   sellsTo: z.enum(['companies', 'government', 'consumers', 'mixed']).nullable(),
   ownBrand: z.enum(['yes', 'no', 'unknown']).nullable(),
   location: z.enum(['defined', 'region_only', 'undecided']).nullable(), locationText: s(300).optional(),
@@ -21,7 +21,7 @@ const component = z.object({
 /** Strict server-side validation of everything the client saves (no prototype pollution, bounded sizes). */
 export const answersSchema: z.ZodType<Answers> = z.object({
   locale: z.enum(['es', 'en']),
-  identity: z.object({ name: s(200), company: s(200), email: s(254), role: s(200), decider: z.enum(['me', 'other', 'shared']).nullable(), termsAccepted: z.boolean(), privacyAcknowledged: z.boolean() }).strict(),
+  identity: z.object({ name: s(200), company: s(200), email: s(254), role: s(200), decider: z.enum(['me', 'other', 'shared']).nullable(), termsAccepted: z.boolean(), privacyAcknowledged: z.boolean(), marketingConsent: z.boolean().optional() }).strict(),
   company: z.object({ hasExistingBusiness: z.boolean().nullable(), sector: s(200), size: z.enum(['1-10', '11-50', '51-250', '251-1000', '1000+']).nullable(), operatesIn: z.array(iso).max(60) }).strict(),
   destinations: z.object({ list: z.array(z.object({ iso, region: s(120).optional() }).strict()).max(30), open: z.boolean(), sameInAll: z.boolean().nullable() }).strict(),
   components: z.array(component.strict()).max(30),

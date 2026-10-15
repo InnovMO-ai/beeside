@@ -1,0 +1,22 @@
+Subject: Talk to beeside — Lucía
+
+REQUEST FROM FIRST ASSESSMENT
+
+Lucía would like to talk to beeside about their project.
+
+Hi beeside team,
+
+A new contact request was submitted from First Assessment.
+
+Topic: Talk to beeside
+Message: Hola,
+quisiera hablar con alguien de beeside sobre la logística.
+
+Gracias.
+Name: Lucía
+Company: 
+Email: lucia@nortica.example
+Stage: First Assessment
+FA language: English
+
+Replying to this email must address the person who submitted the request through Reply-To.

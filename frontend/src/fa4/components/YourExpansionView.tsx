@@ -2,6 +2,7 @@ import type { Locale } from '@beeside/fa-public-engine';
 import { Logo } from './Logo';
 import { COUNTRY_MESSAGES, STATE_MESSAGES, numberWord, type L10n } from '@beeside/fa-public-engine';
 import { UI, fill } from '../copy/ui';
+import { BRAND } from '../brand';
 import type { YevDestination, YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /**
@@ -20,7 +21,11 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
 
   return (
     <article aria-labelledby="yev-title">
-      <section className="res-hero">
+      <section className="res-hero photo">
+        <picture className="hero-photo" aria-hidden="true">
+          <source media="(max-width: 767px)" srcSet={BRAND.heroImage.mobile} />
+          <img src={BRAND.heroImage.src} alt="" />
+        </picture>
         <div className="in">
           <div>
             <Logo onDark />
@@ -67,17 +72,15 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
             {m.shortcut ? (
               <div className="stats"><div className="stat strong"><b>{m.whereYouAre.marked}</b>{t(UI.marked)}</div><div className="stat"><b>{m.whereYouAre.notIndicated}</b>{t(UI.notIndicated)}</div></div>
             ) : (
-              <div className="stats">
-                <div className="stat"><b>{m.whereYouAre.resolved}</b>{t(UI.resolved)}</div>
-                <div className="stat"><b>{m.whereYouAre.inProgress}</b>{t(UI.underWay)}</div>
-                <div className="stat strong"><b>{m.whereYouAre.pending}</b>{t(UI.pendingL)}</div>
-              </div>
+              <StatusTiles m={m} locale={locale} />
             )}
             {m.whereYouAre.sentences.map((s, i) => <p key={i} style={{ marginTop: 10, color: 'var(--ink-2)' }}>{t(s)}</p>)}
           </div>
           {m.whereYouAre.alreadyHave.length > 0 && <div className="box"><h3>{t(UI.alreadyHave)}</h3><ul>{m.whereYouAre.alreadyHave.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
         </div>
       </section>
+
+      <figure className="editorial-photo" aria-hidden="true"><img src={BRAND.editorialImage.src} alt="" loading="lazy" /></figure>
 
       <section className="band" aria-labelledby="yev-value">
         <div className="sec">
@@ -178,9 +181,21 @@ function ValueBlock({ d, locale }: { d: YevDestination; locale: Locale }) {
               </section>
             ))}
           </div>
-          {d.valueFootnotes.map((f, i) => <p className="footnote" key={i}>{t(f)}</p>)}
+          {d.valueFootnotes.length > 0 && <details className="conditions"><summary>{t(UI.conditions)}</summary>{d.valueFootnotes.map((f, i) => <p className="footnote" key={i}>{t(f)}</p>)}</details>}
         </>
       )}
     </div>
   );
+}
+
+/** Presentation RC: four declared states, including «No lo sé» as a legitimate answer; the largest count is emphasised, zeros are muted. */
+function StatusTiles({ m, locale }: { m: YourExpansionViewModel; locale: Locale }) {
+  const w = m.whereYouAre;
+  const notSure = Math.max(0, m.counts.applies - w.resolved - w.inProgress - w.pending - w.unanswered);
+  const tiles = [
+    { n: w.resolved, l: UI.resolved[locale] }, { n: w.inProgress, l: UI.underWay[locale] },
+    { n: w.pending, l: UI.pendingL[locale] }, { n: notSure, l: UI.statuses.unknown[locale] },
+  ];
+  const max = Math.max(...tiles.map((x) => x.n));
+  return <div className="stats four">{tiles.map((x) => <div key={x.l} className={`stat ${x.n === max && max > 0 ? 'strong' : ''} ${x.n === 0 ? 'zero' : ''}`}><b>{x.n}</b>{x.l}</div>)}</div>;
 }

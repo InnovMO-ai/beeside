@@ -4,7 +4,8 @@ import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
-import { LogEmailTransport } from "./fa/email/email-adapter";
+import { EmailTransport, LogEmailTransport } from "./fa/email/email-adapter";
+import { SmtpEmailTransport, smtpConfigFromEnv } from "./fa/email/smtp-transport";
 import { createFaRouter } from "./fa/routes";
 import { FA4_RATE_LIMITS, Fa4Deps, createFa4Router } from "./fa4/routes";
 import { LegalConfig } from "./fa4/repository";
@@ -136,23 +137,64 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
 export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): Fa4Deps | undefined {
   if (env.FA4_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
+  const staging = fa4IsInternalStaging(env);
   const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
   return {
     db,
-    email: new LogEmailTransport(env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"),
+    email: fa4EmailTransportFromEnv(env, staging),
     config: {
       appBaseUrl: env.APP_BASE_URL,
+      publicPath: env.FA4_PUBLIC_PATH || undefined,
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
       resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
       emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
       emailRecipientDailyQuota: Number(env.FA4_EMAIL_RECIPIENT_DAILY_QUOTA ?? 6),
       resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
+      contactAddress: env.FA4_CONTACT_ADDRESS ?? FA4_CONTACT_ADDRESS,
+      premiumResourceUrl: { es: env.FA4_PREMIUM_RESOURCE_URL_ES || undefined, en: env.FA4_PREMIUM_RESOURCE_URL_EN || undefined },
+      premiumCommercialContentAllowed: env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true",
+      yevLinkDays: Number(env.FA4_YEV_LINK_DAYS ?? 14),
+      emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
-    emailDispatch: "deferred",
+    // Internal staging delivers inline (no worker needed); everywhere else the FA4 worker delivers the outbox. FA4_EMAIL_DISPATCH=inline
+    // forces inline delivery (local end-to-end runs / smoke checks); the answer to the person is truthful either way (sent / pending / failed).
+    emailDispatch: staging || env.FA4_EMAIL_DISPATCH === "inline" ? "inline" : "deferred",
   };
+}
+
+/** The single operational mailbox of FA4: sender, Reply-To and the recipient of "Hablar con beeside". */
+export const FA4_CONTACT_ADDRESS = "contact@beeside.you";
+
+/**
+ * FA4_EMAIL_TRANSPORT=log|smtp. Production must use smtp (a log-only transport would report emails as sent that nobody received), so it
+ * refuses to start otherwise. Internal staging defaults to log (links visible to testers) and may be switched to smtp for verification.
+ * SMTP_PASSWORD comes from Secret Manager; it is read here and never logged.
+ */
+export function fa4EmailTransportFromEnv(env: NodeJS.ProcessEnv, staging: boolean): EmailTransport {
+  const mode = env.FA4_EMAIL_TRANSPORT ?? (staging ? "log" : env.NODE_ENV === "production" ? "smtp" : "log");
+  if (mode === "smtp") {
+    const { config, missing } = smtpConfigFromEnv({ ...env, MAIL_FROM: env.MAIL_FROM ?? FA4_CONTACT_ADDRESS, SMTP_USER: env.SMTP_USER ?? FA4_CONTACT_ADDRESS });
+    if (!config) throw new Error(`FA4_EMAIL_TRANSPORT=smtp requires ${missing.join(", ")}`);
+    return new SmtpEmailTransport({ ...config, replyTo: env.MAIL_REPLY_TO ?? FA4_CONTACT_ADDRESS });
+  }
+  if (mode !== "log") throw new Error("FA4_EMAIL_TRANSPORT must be log or smtp");
+  if (env.NODE_ENV === "production" && !staging) throw new Error("FA4_EMAIL_TRANSPORT=log is refused in production: use smtp");
+  return new LogEmailTransport(staging || (env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"));
+}
+
+/**
+ * INTERNAL STAGING (not a public launch): explicit opt-in FA4_ENV=staging. It is refused for the public beeside.you hosts and it enables
+ * only TEST legal placeholders, log-only email and inline delivery. Public production (FA4_ENV unset) keeps every guard.
+ */
+export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.FA4_ENV !== "staging") return false;
+  let host = "";
+  try { host = new URL(env.APP_BASE_URL ?? "").hostname.toLowerCase(); } catch { /* validated by the caller */ }
+  if (host === "beeside.you" || host === "www.beeside.you") throw new Error("FA4_ENV=staging is refused for the public host (" + host + "): staging must run on its own internal host");
+  return true;
 }
 
 /**
@@ -160,14 +202,31 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
  * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
  * is recorded so no environment silently stores a plausible-looking version.
  */
+const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://beeside.you/termsandconditions" } as const;
+/** Canonical Privacy page. Its document VERSION is not supplied: it stays an explicit launch configuration (FA4_PRIVACY_VERSION), never defaulted. */
+const OFFICIAL_PRIVACY_URL = "https://www.beeside.you/privacy";
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
-  const names = ["FA4_TERMS_VERSION", "FA4_TERMS_URL_ES", "FA4_TERMS_URL_EN", "FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
-  const missing = names.filter((n) => !env[n]);
+  // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
+  // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
+  // FA4_TERMS_URL / FA4_PRIVACY_URL set one document for both languages (FA4_*_URL_ES|EN still override per language).
+  const privacyEs = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL; const privacyEn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL;
+  // INTERNAL STAGING only: an explicit, visibly non-legal TEST value is recorded as the acceptance evidence for Privacy.
+  if (fa4IsInternalStaging(env) && !env.FA4_PRIVACY_VERSION) {
+    const base = (env.APP_BASE_URL ?? "").replace(/\/$/, "");
+    const test = `${base}/staging/privacy-test`;
+    return {
+      termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+      termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+      privacyVersion: "STAGING-TEST-NOT-LEGAL", privacyUrl: { es: test, en: test },
+    };
+  }
+  const missing = [!env.FA4_PRIVACY_VERSION && "FA4_PRIVACY_VERSION", !privacyEs && "FA4_PRIVACY_URL_ES (or FA4_PRIVACY_URL)", !privacyEn && "FA4_PRIVACY_URL_EN (or FA4_PRIVACY_URL)"].filter(Boolean);
   if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
   const ph = "UNSET-LEGAL-1";
   return {
-    termsVersion: env.FA4_TERMS_VERSION ?? ph, termsUrl: { es: env.FA4_TERMS_URL_ES ?? ph, en: env.FA4_TERMS_URL_EN ?? ph },
-    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: env.FA4_PRIVACY_URL_ES ?? ph, en: env.FA4_PRIVACY_URL_EN ?? ph },
+    termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+    termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: privacyEs ?? ph, en: privacyEn ?? ph },
   };
 }
 

@@ -17,7 +17,7 @@ import { FaError } from "../fa/services/errors";
  * file specifically once node_modules installs cleanly.
  */
 
-// Postgres SQLSTATEs this module's callers care about (see 0018_precision_persistence_integrity.sql).
+// Postgres SQLSTATEs this module's callers care about (see 0025_precision_persistence_integrity.sql).
 const BUSINESS_RULE_VIOLATION = "BV409";
 const NOT_FOUND_SQLSTATE = "BV404";
 

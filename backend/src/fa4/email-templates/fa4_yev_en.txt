@@ -1,0 +1,36 @@
+YOUR EXPANSION VIEW
+
+Your expansion has a starting point. Now, give it direction.
+
+<!--IF:has_first_name-->Hi {{first_name}},<!--ENDIF:has_first_name--><!--IFNOT:has_first_name-->Hi,<!--ENDIFNOT:has_first_name-->
+
+You've completed your Discovery and now have an initial view of what taking your business into a new market could mean.
+
+We prepared Your Expansion View from the information you shared. It brings together the key elements of your project, what is already defined, and what still needs attention.
+
+<!--IF:show_focus_block-->YOUR NEXT MARKET, IN FOCUS
+<!--IF:has_destination-->Target market: {{destination}}
+<!--ENDIF:has_destination--><!--IF:has_objective-->Declared objective: {{declared_objective}}
+<!--ENDIF:has_objective--><!--ENDIF:show_focus_block-->
+View Your Expansion View:
+{{yev_url}}
+
+Identifying an opportunity is only the beginning. Turning it into a well-coordinated expansion means understanding what you need, how to move forward, and which capabilities to activate.
+
+<!--IF:premium_enabled-->If you decide to continue with beeside Premium, we can help you move from perspective to execution:
+
+- More precision: go deeper into your project's real needs and define the services and capabilities required.
+- A connected ecosystem: access selected specialists and service providers for your expansion.
+- Coordination: bring activities, owners, deliverables, and next steps together with your Sherpa and Operation Hub.
+
+Because expanding shouldn't mean figuring everything out on your own.
+
+Explore beeside Premium:
+{{premium_url}}
+
+<!--ENDIF:premium_enabled-->Questions about your result? Talk to beeside: {{talk_to_beeside_url}}
+
+The information you shared with us is not shared with providers at this stage. If you decide to continue, we’ll ask for your authorization before sharing it.
+
+Terms and Conditions: https://beeside.you/termsandconditions
+Privacy Policy: https://www.beeside.you/privacy
