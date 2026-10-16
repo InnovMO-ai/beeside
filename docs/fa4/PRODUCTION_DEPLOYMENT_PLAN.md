@@ -79,3 +79,21 @@ Data and operations: new Cloud SQL instance (REGIONAL/HA, automated backups + PI
 | 9 | **Premium purchase destination** (`VITE_FA4_PREMIUM_PURCHASE_URL`) and, if wanted, the Premium resource URLs | Product | Without it the Start Your Expansion CTA is not rendered. |
 | 10 | **Product/Legal sign-off on the commercial comparison** and on the EN subtitle translation | Product/Legal | Content shown to prospects. |
 | 11 | Database sizing/HA/retention choices (default proposal: REGIONAL HA, PITR 7 days, daily backups 14 days) | Platform | Cost/risk decision. |
+
+---
+
+## 8. Routing with Wix — findings and options (2026-10-15)
+
+**Facts (checked):** the authoritative DNS of `beeside.you` is **Wix** (`ns2/ns3.wixdns.net`); the apex (`185.230.63.x`) 301-redirects to **`www.beeside.you`**, which is a CNAME to Wix's CDN; mail is Google Workspace (MX + SPF). Wix has **no feature to serve an external web app under a sub-path** of a connected domain. A Cloudflare-style reverse proxy in front of Wix is *possible* but **not supported by Wix** (a forum answer says only Enterprise plans) and Wix's own domain-connection guidance requires DNS-only (un-proxied) records. "Wix Harmony" returned no documentation. Sources: [Wix forum — serving a custom app as a sub-directory](https://forum.wixstudio.com/t/serve-custom-web-app-as-website-sub-directory/75486) · [Wix help — Cloudflare settings for connecting a domain](https://support.wix.com/en/article/verifying-your-cloudflare-settings-for-connecting-a-domain-to-wix).
+
+| Option | Result | What it needs from you | Risk |
+|---|---|---|---|
+| **A. Dedicated subdomain + redirect (recommended)** | Discovery lives at `https://discovery.beeside.you/`; `beeside.you/discovery` (and `www…/discovery`) is a **Wix 301 redirect** to it. Wix keeps the rest of the site untouched. Opening commercially later changes nothing (same host). | In Wix: add **one DNS record** (`discovery` A → the reserved IP) and **one 301 redirect** (`/discovery`). No credentials needed by Code. | Low. The visitor's address bar shows the subdomain after the redirect. |
+| B. Exact `beeside.you/discovery` via Cloudflare in front of Wix | The URL stays on the main host. | Move the zone's DNS to Cloudflare (nameserver change at the registrar/Wix), re-create every record (Google MX/SPF/DKIM/verification…), a Cloudflare account + a Worker route; confirm Wix tolerates a proxied zone. | **High** for the company website: unsupported by Wix, TLS renewal/connection risk, email-DNS migration, single point of failure in front of the whole site. |
+| C. Wix page that embeds Discovery in an iframe | `/discovery` is a Wix page. | A Wix page + an app host. | Breaks the private `#r=` links (fragments do not reach the iframe), third-party cookie limits, and the app forbids framing (`frame-ancestors 'none'`). Not recommended. |
+
+The code supports **both mounts without rework**: `PUBLIC_PATH=/discovery` (shared host) and `PUBLIC_PATH=/` (dedicated host owning the root). With option A the production values are `PUBLIC_BASE_URL=https://discovery.beeside.you`, `PUBLIC_PATH=/`, `VITE_BASE_PATH=/`.
+
+## 9. Production infrastructure created (project `beeside-discovery-prod`, org `beeside.you`)
+
+Created 2026-10-15 by `deploy/production/provision-infra.sh` (no customer data; nothing public): project + billing link + APIs · Artifact Registry `discovery` · service accounts `discovery-{backend,web,worker,migrate,build}` (no keys) · Cloud SQL `discovery-db` (Postgres 16, **regional HA**, `db-custom-1-3840`, daily backups ×14, **PITR 7 d**, deletion protection, TLS only, no authorized networks) · database `discovery` · roles `discovery_migrate`, `discovery_runtime` · secrets (values only in Secret Manager): `discovery-db-url`, `discovery-migration-db-url`, `discovery-hash-secret`, `discovery-access-gate-credentials`, `discovery-postgres-root-password` · reserved global IP `discovery-lb-ip` (136.81.123.19) · **not created:** load balancer, certificate, DNS, any Cloud Run service, `discovery-smtp-password`.

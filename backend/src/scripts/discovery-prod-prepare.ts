@@ -10,6 +10,7 @@ import { Pool } from "pg";
  * Input: MIGRATION_DATABASE_URL (owner credential). No secret is printed.
  */
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
+const literal = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 export interface PrepareReport { login: string; checks: Array<{ check: string; ok: boolean }> }
 
@@ -19,6 +20,12 @@ export async function prepareRuntimeLogin(pool: Pool, login: string): Promise<Pr
   const group = await pool.query("SELECT 1 FROM pg_roles WHERE rolname = 'beeside_runtime_role'");
   if (!group.rowCount) throw new Error("beeside_runtime_role does not exist: run the migrations first");
   await pool.query(`GRANT beeside_runtime_role TO ${ident(login)}`);
+  // Cloud SQL users created through the API arrive with cloudsqlsuperuser membership, CREATEROLE and CREATEDB, and PUBLIC may create objects in `public`:
+  // the runtime login must have none of that.
+  await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cloudsqlsuperuser') AND pg_has_role(${literal(login)}, 'cloudsqlsuperuser', 'MEMBER') THEN EXECUTE 'REVOKE cloudsqlsuperuser FROM ' || quote_ident(${literal(login)}); END IF; END $$`);
+  await pool.query(`ALTER ROLE ${ident(login)} NOSUPERUSER NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS`);
+  await pool.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
+  await pool.query(`REVOKE CREATE ON SCHEMA public FROM ${ident(login)}`);
   const priv = async (table: string, p: string) => (await pool.query("SELECT has_table_privilege($1, $2, $3) AS ok", [login, `public.${table}`, p])).rows[0]!.ok as boolean;
   const flags = (await pool.query("SELECT rolsuper, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname = $1", [login])).rows[0] as { rolsuper: boolean; rolcreaterole: boolean; rolcreatedb: boolean };
   const checks = [

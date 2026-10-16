@@ -11,9 +11,13 @@ d("production preparation: the runtime login contract (real migrated database)",
     expect(r.checks.filter((c) => !c.ok)).toEqual([]);
     await expect(prepareRuntimeLogin(admin, "no_such_login")).rejects.toThrow(/does not exist/);
   });
-  it("detects a login that is too powerful", async () => {
-    await admin.query("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='too_powerful') THEN CREATE ROLE too_powerful LOGIN CREATEROLE; END IF; END $$");
-    const r = await prepareRuntimeLogin(admin, "too_powerful");
-    expect(r.checks.find((c) => c.check.startsWith("not superuser"))!.ok).toBe(false);
+  it("removes excess powers it can remove (CREATEROLE/CREATEDB/schema CREATE) and DETECTS powers it must not touch (a direct DELETE grant)", async () => {
+    await admin.query("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='too_powerful') THEN CREATE ROLE too_powerful LOGIN CREATEROLE CREATEDB; END IF; END $$");
+    const fixed = await prepareRuntimeLogin(admin, "too_powerful");
+    expect(fixed.checks.filter((c) => !c.ok)).toEqual([]);                                   // CREATEROLE / CREATEDB were revoked by the preparation
+    await admin.query("GRANT DELETE ON fa4_project TO too_powerful");
+    const bad = await prepareRuntimeLogin(admin, "too_powerful");
+    expect(bad.checks.find((c) => c.check === "cannot DELETE fa4_project")!.ok).toBe(false);
+    await admin.query("REVOKE DELETE ON fa4_project FROM too_powerful");
   });
 });
