@@ -697,3 +697,11 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
 /* A notice must never sit on top of the action bar (it hid «Continuar» on desktop): it floats above it at every width. */
 .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
 @media (min-width: 900px) { .toast { bottom: calc(96px + env(safe-area-inset-bottom)); } }
+
+/* ---------- Stabilization notice + personal e-mail warning (dialogs on the existing «sheet» pattern) ---------- */
+dialog.stab-notice .sheet-body p, dialog.personal-email .sheet-body p { margin: 0 0 12px; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+dialog.stab-notice .sheet-body p.stab-confirm { font-weight: 600; color: var(--ink); }
+dialog.stab-notice .sheet-head h2, dialog.personal-email .sheet-head h2 { font-size: 22px; line-height: 1.2; }
+dialog.stab-notice, dialog.personal-email { max-height: calc(100dvh - 32px); overflow: auto; }
+dialog.personal-email .sheet-actions { flex-wrap: wrap; }
+dialog.personal-email .sheet-actions .btn { flex: 1 1 200px; }

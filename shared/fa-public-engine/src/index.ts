@@ -12,6 +12,7 @@ export * from "./engine/resolve";
 export * from "./engine/textIndex";
 export * from "./engine/publicView";
 export * from "./engine/yev";
+export { emailDomain, isLikelyPersonalEmail } from "./engine/personalEmail";
 export * from "./engine/demand";
 export * from "./engine/flow";
 export { proxyFor } from "./engine/scale";

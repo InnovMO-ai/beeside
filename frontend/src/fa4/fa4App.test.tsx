@@ -7,6 +7,7 @@ import { clientResolution, toPublicCatalog } from "@beeside/fa-public-engine";
 import { journeyA } from "@beeside/fa-public-engine/testing";
 import { Fa4App } from "./Fa4App";
 import { modelFor } from "./fa4.test-helpers";
+import { resetRuntimeConfigForTests } from "./runtimeConfig";
 
 type Call = { url: string; method: string; body?: unknown; auth?: string };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -30,7 +31,7 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
   return calls;
 }
 
-beforeEach(() => { vi.spyOn(window, "scrollTo").mockImplementation(() => undefined); sessionStorage.clear(); window.history.replaceState({}, "", "/fa4"); });
+beforeEach(() => { resetRuntimeConfigForTests(); vi.spyOn(window, "scrollTo").mockImplementation(() => undefined); sessionStorage.clear(); window.history.replaceState({}, "", "/fa4"); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("Fa4App (Vite/React) against the API contract", () => {

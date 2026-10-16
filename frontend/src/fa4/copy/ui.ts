@@ -219,6 +219,18 @@ export const UI = {
   emailSending: L('Enviando…', 'Sending…'),
   emailSent: L('Te enviamos tu Your Expansion View a {email}. Si no lo ves en unos minutos, revisa la carpeta de correo no deseado.', "We've sent your Your Expansion View to {email}. If you don't see it in a few minutes, check your spam folder."),
   emailFailed: L('No pudimos enviarlo ahora. Tu resultado sigue aquí; inténtalo de nuevo en un momento.', "We couldn't send it right now. Your result is still here; please try again in a moment."),
+  // Stabilization notice (closed test only; PO copy, 2026-10-16)
+  stabTitle: L('Discovery está en etapa de Estabilización', 'Discovery is in the Stabilization phase'),
+  stabP1: L('Esta versión está siendo utilizada para validar su funcionamiento antes de su apertura comercial.', 'This version is being used to validate the platform before its commercial launch.'),
+  stabP2: L('Por favor, utiliza únicamente información ficticia o de prueba. No ingreses datos reales, confidenciales, personales o comerciales.', 'Please use only fictitious or test information. Do not enter real, confidential, personal, or commercial data.'),
+  stabP3: L('La información que ingreses será procesada únicamente para generar tu Your Expansion View (YEV) durante esta prueba. No será utilizada para procesos internos, comerciales ni operativos de beeside.', 'The information you enter will be processed solely to generate your Your Expansion View (YEV) during this test. It will not be used for beeside\u2019s internal, commercial, or operational processes.'),
+  stabP4: L('Toda la información registrada durante esta etapa será eliminada antes de pasar a Producción.', 'All information recorded during this stage will be deleted before the platform moves to Production.'),
+  stabP5: L('Al continuar, confirmas que utilizarás únicamente datos ficticios o de prueba.', 'By continuing, you confirm that you will use only fictitious or test data.'),
+  stabConfirm: L('Entendido, continuar', 'I understand, continue'),
+  // Personal e-mail warning (advisory; PO copy, 2026-10-16)
+  personalEmailTitle: L('Parece que estás usando un correo personal.', "It looks like you're using a personal email address."),
+  personalEmailBody: L('Recomendamos utilizar tu correo corporativo para identificar mejor tu proyecto y facilitar la continuidad con beeside.', 'We recommend using your work email so we can better identify your project and support continuity with beeside.'),
+  personalEmailOther: L('Usar otro correo', 'Use another email'), personalEmailKeep: L('Continuar con este correo', 'Continue with this email'),
   tryAgain: L('Intentar de nuevo', 'Try again'),
   savedOk: L('Guardado. Te enviamos a {email} un enlace para continuar donde lo dejaste.', "Saved. We've sent {email} a link to continue where you left off."),
   linkSending: L('Guardando tu avance y enviando tu enlace…', 'Saving your progress and sending your link…'),

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildFlow, emptyAnswers, isStepComplete, lastProjectStep, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
-  type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
-} from '@beeside/fa-public-engine';
+  type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel, isLikelyPersonalEmail } from '@beeside/fa-public-engine';
 import { api, ApiError, confirmSend, sessionStore, track } from './api';
 import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
+import { PersonalEmailDialog } from './components/PersonalEmailDialog';
+import { StabilizationNotice } from './components/StabilizationNotice';
+import { loadRuntimeConfig } from './runtimeConfig';
 import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
@@ -42,6 +44,14 @@ export function Fa4App() {
   const [previewToken, setPreviewToken] = useState<string | null>(null);
   const [delivered, setDelivered] = useState(false);          // D-156: a delivered YEV is final (no «Corregir algo», no regeneration)
   const [busy, setBusy] = useState(false);
+  // Stabilization (closed test): the deployment says so at runtime; the visitor must confirm the notice once per browser session before entering project information.
+  const [closedTest, setClosedTest] = useState(false);
+  const [stabAck, setStabAck] = useState(() => { try { return sessionStorage.getItem('beeside.fa4.stabilization-ack') === '1'; } catch { return false; } });
+  useEffect(() => { let live = true; void loadRuntimeConfig().then((c) => { if (live) setClosedTest(c.closedTest); }); return () => { live = false; }; }, []);
+  const confirmStabilization = () => { try { sessionStorage.setItem('beeside.fa4.stabilization-ack', '1'); } catch { /* the notice simply shows again */ } setStabAck(true); };
+  // Personal e-mail: advisory warning once per address (never a blocker).
+  const [personalWarn, setPersonalWarn] = useState(false);
+  const personalOk = useRef('');
   const [toast, setToast] = useState<string | null>(null);
   const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
   // Notices never trap the screen: they close by themselves (a failed send with a retry action stays a little longer) and by a click anywhere except their own button.
@@ -152,7 +162,11 @@ export function Fa4App() {
 
   async function onNext() {
     if (!catalog) return;
-    if (step.id === 'identity' && !(await ensureSession())) return;
+    if (step.id === 'identity') {
+      const email = a.identity.email.trim().toLowerCase();
+      if (isLikelyPersonalEmail(email) && personalOk.current !== email) { setPersonalWarn(true); return; }
+      if (!(await ensureSession())) return;
+    }
     // leaving the LAST project screen confirms the project; an unanswered clarity question behaves as NO (what confirming the old checkpoint did)
     const lp = lastProjectStep(a);
     const base = stepKey(step) === stepKey(lp) && !a.projectConfirmed ? { ...a, projectConfirmed: true, knowsNeeds: a.knowsNeeds ?? false } : a;
@@ -190,6 +204,14 @@ export function Fa4App() {
     try { await confirmSend(api.contact({ ...p, stage: step.id === 'result' ? 'YEV' : 'FA' }), null); return true; } catch { return false; }
   };
   const contactPrefill = { name: a.identity.name, company: a.identity.company, email: a.identity.email };
+
+  const focusEmailField = () => (document.querySelector('input[type=email]') as HTMLInputElement | null)?.focus();
+  const stabNotice = closedTest && !stabAck ? <StabilizationNotice locale={locale} onConfirm={confirmStabilization} /> : null;
+  const personalDialog = personalWarn ? (
+    <PersonalEmailDialog locale={locale}
+      onUseAnother={() => { setPersonalWarn(false); setTimeout(focusEmailField, 0); }}
+      onContinue={() => { personalOk.current = a.identity.email.trim().toLowerCase(); setPersonalWarn(false); void onNext(); }} />
+  ) : null;
 
   if (pendingResume) {
     const loc: Locale = typeof navigator !== 'undefined' && /^en/i.test(navigator.language) ? 'en' : 'es';
@@ -234,6 +256,7 @@ export function Fa4App() {
               footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}
+        {stabNotice}
         {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
     );
@@ -275,6 +298,7 @@ export function Fa4App() {
       </div></div>
       {!wide && <aside className="deco" aria-hidden />}
       {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+      {stabNotice}{personalDialog}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>
   );
