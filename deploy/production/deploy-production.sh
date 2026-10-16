@@ -47,7 +47,7 @@ SECRETS_COMMON="DATABASE_URL=${SECRET_DATABASE_URL}:latest,SECURITY_HASH_SECRET=
 
 want images && {
 echo "== 2. images"
-run gcloud --project "$PROJECT_ID" builds submit --config deploy/production/cloudbuild.production.yaml \
+run gcloud --project "$PROJECT_ID" builds submit --config deploy/production/cloudbuild.production.yaml --service-account "projects/${PROJECT_ID}/serviceAccounts/$(SA build)" \
   --substitutions "_REPO=${REPO},_TAG=${IMAGE_TAG},_PRIVACY_URL=${FA4_PRIVACY_URL:-https://www.beeside.you/privacy},_PREMIUM_URL=${VITE_FA4_PREMIUM_PURCHASE_URL:-}" .
 }
 want database && {
