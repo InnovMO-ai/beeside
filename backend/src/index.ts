@@ -133,6 +133,7 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       yevLinkDays: Number(env.FA4_YEV_LINK_DAYS ?? 14),
       emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
+      ...(env.FA4_EDGE_DIAGNOSTIC === "true" ? (fa4ClosedTestFromEnv(env) || env.NODE_ENV !== "production" ? { edgeDiagnostic: true } : (() => { throw new Error("FA4_EDGE_DIAGNOSTIC is only allowed in CLOSED TEST mode (or outside production)"); })()) : {}),
       ...(fa4ClosedTestFromEnv(env) ? { closedTest: fa4ClosedTestFromEnv(env), legalMode: "closed-test" as const } : { legalMode: "final" as const }),
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),

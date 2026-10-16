@@ -29,9 +29,10 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   const mail = new CaptureEmailTransport();
   let publicPath: string | undefined;
   let closedTest: { emailDomains: string[] } | undefined;
+  let edgeDiagnostic: boolean | undefined;
   const deps = (): Fa4Deps => ({
     db: rtDb, email: mail, emailDispatch: "inline",
-    config: { appBaseUrl: "https://fa.test", publicPath, closedTest, legalMode: closedTest ? "closed-test" : "final", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal: closedTest ? legalClosed : legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
+    config: { appBaseUrl: "https://fa.test", publicPath, closedTest, edgeDiagnostic, legalMode: closedTest ? "closed-test" : "final", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal: closedTest ? legalClosed : legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
   });
   const app = () => request(createApp({ fa4: deps() }));
   const q = async (sql: string, v: unknown[] = []) => (await admin.query(sql, v)).rows;
@@ -296,6 +297,14 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       const mailed = await app().post("/api/fa4/session/result/email").set(auth(inside.body.sessionToken as string));
       expect(mailed.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
     });
+  });
+  it("edge-check (TRUST_PROXY_HOPS measurement aid) exists only when enabled and returns just the caller's own address and the X-Forwarded-For entry count", async () => {
+    expect((await app().get("/api/fa4/edge-check")).status).toBe(404);
+    edgeDiagnostic = true;
+    try {
+      const r = await app().get("/api/fa4/edge-check").set("X-Forwarded-For", "203.0.113.7, 10.0.0.1"); expect(r.status).toBe(200);
+      expect(r.body.xffEntries).toBe(2); expect(Object.keys(r.body).sort()).toEqual(["ip", "trustProxy", "xffEntries"]);
+    } finally { edgeDiagnostic = undefined; }
   });
   it("outside test mode the legal regime is final and e-mail is unrestricted", async () => {
     expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "final" });

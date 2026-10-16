@@ -84,3 +84,12 @@ describe("CLOSED TEST mode (closed production, fictitious data, no final Privacy
     expect(closedTestRecipientAllowed("anyone@gmail.com", undefined)).toBe(true);
   });
 });
+
+describe("FA4_EDGE_DIAGNOSTIC (TRUST_PROXY_HOPS measurement aid)", () => {
+  const base = { DATABASE_URL: "postgres://x@127.0.0.1:1/x", APP_BASE_URL: "https://x.example", FA4_API_ENABLED: "true", NODE_ENV: "production", FA4_EMAIL_TRANSPORT: "smtp", SMTP_HOST: "h", SMTP_PASSWORD: "p" };
+  it("is allowed in CLOSED TEST production and refused in final production", () => {
+    expect(fa4DepsFromEnv({ ...base, FA4_CLOSED_TEST_MODE: "true", FA4_EDGE_DIAGNOSTIC: "true" } as never)?.config.edgeDiagnostic).toBe(true);
+    expect(() => fa4DepsFromEnv({ ...base, FA4_PRIVACY_VERSION: "v", FA4_EDGE_DIAGNOSTIC: "true" } as never)).toThrow(/only allowed in CLOSED TEST/);
+    expect(fa4DepsFromEnv({ ...base, FA4_CLOSED_TEST_MODE: "true" } as never)?.config.edgeDiagnostic).toBeUndefined();
+  });
+});

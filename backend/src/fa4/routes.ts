@@ -40,6 +40,8 @@ export interface Fa4Deps {
     /** CLOSED TEST mode: no final Privacy version, non-commercial, fictitious data only, e-mail restricted to these domains. */
     closedTest?: { emailDomains: string[] };
     legalMode?: "final" | "closed-test";
+    /** Temporary measurement aid for TRUST_PROXY_HOPS (closed test only): GET /api/fa4/edge-check answers the caller's own address as the server sees it. */
+    edgeDiagnostic?: boolean;
     /** Validity (days) of the YEV email's private link. */
     yevLinkDays?: number;
     /** How long an interactive request waits for the provider's answer before it reports `pending` (the UI then polls). */
@@ -131,6 +133,13 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   // Which legal regime this deployment runs under (non-sensitive). The web tier reads it before it will ever open access: an open deployment must be "final".
   router.get("/legal-mode", (_req, res) => { res.set("Cache-Control", "no-store").json({ legalMode: deps.config.legalMode ?? "final" }); });
+
+  // Measurement of the real edge: N such that req.ip is the REAL client = the number of X-Forwarded-For entries (the client is entry 0). Returns only the caller's own address.
+  router.get("/edge-check", (req, res) => {
+    if (!deps.config.edgeDiagnostic) { res.status(404).json({ error: "NOT_FOUND" }); return; }
+    const entries = String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    res.set("Cache-Control", "no-store").json({ ip: req.ip ?? null, xffEntries: entries.length, trustProxy: req.app.get("trust proxy") });
+  });
 
   router.get("/catalog", handle(async (_req, res) => {
     res.set("Cache-Control", "no-store").json(toPublicCatalog(await loadPublishedCatalog(deps.db)));

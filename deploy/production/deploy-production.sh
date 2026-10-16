@@ -41,6 +41,7 @@ REPO="${REGION}-docker.pkg.dev/${PROJECT_ID}/discovery"
 SA() { echo "discovery-$1@${PROJECT_ID}.iam.gserviceaccount.com"; }
 ENV_COMMON="NODE_ENV=production,FA4_API_ENABLED=true,APP_BASE_URL=${APP_BASE_URL},FA4_PUBLIC_PATH=${FA4_PUBLIC_PATH},ALLOWED_ORIGINS=${ALLOWED_ORIGINS},TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS},FA4_EMAIL_TRANSPORT=smtp,SMTP_HOST=${SMTP_HOST},SMTP_PORT=${SMTP_PORT:-587},SMTP_USER=${SMTP_USER},MAIL_FROM=${MAIL_FROM},MAIL_REPLY_TO=${MAIL_REPLY_TO},FA4_PRIVACY_URL=${FA4_PRIVACY_URL:-https://www.beeside.you/privacy},FA4_TERMS_URL=${FA4_TERMS_URL:-https://beeside.you/termsandconditions}"
 [ "${FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED:-}" = "true" ] && ENV_COMMON="${ENV_COMMON},FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED=true"
+[ "${FA4_EDGE_DIAGNOSTIC:-}" = "true" ] && ENV_COMMON="${ENV_COMMON},FA4_EDGE_DIAGNOSTIC=true"   # temporary TRUST_PROXY_HOPS measurement (closed test only; remove after measuring)
 # CLOSED TEST: no final Privacy version yet → fictitious data only, non-commercial, e-mail restricted to the test domains (backend records the marker CLOSED-TEST-NOT-LEGAL)
 if [ "${FA4_CLOSED_TEST_MODE:-}" = "true" ]; then ENV_COMMON="${ENV_COMMON},FA4_CLOSED_TEST_MODE=true,FA4_CLOSED_TEST_EMAIL_DOMAINS=${FA4_CLOSED_TEST_EMAIL_DOMAINS:-beeside.you}"; else ENV_COMMON="${ENV_COMMON},FA4_PRIVACY_VERSION=${FA4_PRIVACY_VERSION}"; fi
 SECRETS_COMMON="DATABASE_URL=${SECRET_DATABASE_URL}:latest,SECURITY_HASH_SECRET=${SECRET_HASH}:latest,SMTP_PASSWORD=${SECRET_SMTP_PASSWORD}:latest"
