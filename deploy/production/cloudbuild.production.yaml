@@ -5,6 +5,7 @@ substitutions:
   _TAG: ""             # the commit SHA being released
   _PRIVACY_URL: ""
   _PREMIUM_URL: ""     # approved purchase destination (https) — empty = the CTA is not rendered
+  _BASE_PATH: "/"      # "/" on a dedicated host (discovery.beeside.you) · "/discovery/" under a shared host — MUST equal PUBLIC_PATH + "/" (the preflight checks it)
 steps:
   - name: gcr.io/cloud-builders/docker
     args: ["build", "-f", "backend/Dockerfile", "-t", "${_REPO}/discovery-backend:${_TAG}", "."]
@@ -14,7 +15,7 @@ steps:
       - -f
       - frontend/Dockerfile
       - --build-arg
-      - VITE_BASE_PATH=/discovery/
+      - VITE_BASE_PATH=${_BASE_PATH}
       - --build-arg
       - VITE_DISCOVERY_ONLY=true
       - --build-arg

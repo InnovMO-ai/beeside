@@ -14,7 +14,7 @@ test.describe("edge: certificate, redirects, gate, reserved routes (no backend n
     expect(cert.subjectaltname ?? "").toContain(`DNS:${host}`); expect(new Date(cert.valid_to).getTime()).toBeGreaterThan(Date.now() + 7 * 86400_000);
   });
   test("http redirects to https; the Wix redirect from the main site points here", async ({ request }) => {
-    const r = await request.get(`http://${host}/`, { maxRedirects: 0 }); expect([301, 308]).toContain(r.status()); expect(r.headers().location).toBe(`https://${host}/`);
+    const r = await request.get(`http://${host}/`, { maxRedirects: 0 }); expect([301, 308]).toContain(r.status()); expect(r.headers().location).toMatch(new RegExp(`^https://${host.replace(/\./g, "\\.")}(:443)?/$`));
     const w = await request.get("https://beeside.you/discovery", { maxRedirects: 0 }); expect([301, 308]).toContain(w.status()); expect(w.headers().location).toMatch(new RegExp(`^https://${host.replace(/\./g, "\\.")}/?$`));
   });
   test("the app is CLOSED: pages and API answer 401 without credentials (no popup for the API); health, robots, config and brand files are public", async () => {
@@ -37,7 +37,8 @@ test.describe("edge: certificate, redirects, gate, reserved routes (no backend n
     for (const creds of [undefined, auth]) {
       const ctx = await pwRequest.newContext({ baseURL: URL_, ...(creds ? { httpCredentials: creds } : {}) });
       for (const p of ["/ops-control", "/ops-control/", "/ops-control/projects/1"]) { const r = await ctx.get(p, { maxRedirects: 0 }); expect(r.status(), p).toBe(404); expect(r.headers()["x-robots-tag"]).toMatch(/noindex/); expect(r.headers().location).toBeUndefined(); expect(await r.text()).not.toMatch(/Control Center/i); }
-      for (const p of ["/admin", "/admin/projects", "/resume/x", "/api/fa/links/continue", "/api/admin/auth/login", "/api/billing/x"]) expect((await ctx.get(p, { maxRedirects: 0 })).status(), p).toBe(creds ? 404 : 404);
+      // closed: an unauthenticated visitor learns nothing (401 everywhere on the app host); with the gate open to the team these routes do not exist (404)
+      for (const p of ["/admin", "/admin/projects", "/resume/x", "/api/fa/links/continue", "/api/admin/auth/login", "/api/billing/x"]) expect((await ctx.get(p, { maxRedirects: 0 })).status(), p).toBe(creds ? 404 : 401);
       const f = await ctx.get("/fa4", { maxRedirects: 0 }); expect(f.status()).toBe(308); expect(f.headers().location).toBe("/");
       await ctx.dispose();
     }
@@ -48,7 +49,11 @@ test.describe("closed app behind the gate", () => {
   test.use({ httpCredentials: auth });
   test("cover loads for the team with the closed-test ribbon, the official logo and no administration link", async ({ page }) => {
     test.skip(!USER, "no gate credentials supplied");
-    await page.goto("/"); await expect(page.getByRole("note")).toContainText("PRUEBA CONTROLADA"); await expect(page.getByRole("button", { name: /Comenzar|Start/ })).toBeVisible();
+    await page.goto("/");
+    // every asset must load from the real public path (a base-path mistake shows up here as a blank page)
+    const failed: string[] = []; page.on("response", (r) => { if (r.status() >= 400 && /\/assets\//.test(r.url())) failed.push(`${r.status()} ${r.url()}`); });
+    await page.reload(); expect(failed).toEqual([]);
+    await expect(page.getByRole("note")).toContainText("PRUEBA CONTROLADA"); await expect(page.getByRole("button", { name: /Comenzar|Start/ })).toBeVisible();
     expect(await page.content()).not.toMatch(/ops-control|\/admin\b|Control Center/i);
     const logo = page.locator("img[alt='beeside']").first(); await expect(logo).toBeVisible(); expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
