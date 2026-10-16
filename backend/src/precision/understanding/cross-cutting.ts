@@ -13,7 +13,7 @@ const LEGAL_TAX_HR = ["corporate_legal_admin", "tax_accounting_audit", "people_p
 /** Patterns over FOLDED text (no accents, lower case). Conservative: a marker needs an explicit statement, not a topic word. */
 const MARKERS: readonly Marker[] = [
   { kind: "existing_presence", categories: LEGAL_TAX_HR,
-    re: /\bya (?:tenemos|contamos con|operamos con|tiene|tienen|existe|hay) (?:una |un )?(?:filial|subsidiaria|sociedad|empresa|entidad|oficina|sucursal)[^.;]{0,60}(?:en|de) (?:mexico|el pais|alli|ahi)|\b(?:already (?:have|operate)|we already have) (?:a |an )?(?:subsidiary|local entity|office|branch)\b/ },
+    re: /\bya (?:constituimos|establecimos|abrimos|creamos|tenemos constituid[ao]|tenemos establecid[ao])\b[^.;]{0,40}\b(?:filial|subsidiaria|sociedad|empresa|entidad|oficina|sucursal)\b|\bya (?:tenemos|contamos con|operamos con|tiene|tienen|existe|hay) (?:una |un )?(?:filial|subsidiaria|sociedad|empresa|entidad|oficina|sucursal)[^.;]{0,60}(?:en|de) (?:mexico|el pais|alli|ahi)|\b(?:we (?:have )?already (?:incorporated|set up|established|opened))\b[^.;]{0,40}\b(?:subsidiary|entity|company|office|branch)\b|\b(?:already (?:have|operate)|we already have) (?:a |an )?(?:subsidiary|local entity|office|branch)\b/ },
   { kind: "partners", categories: ["corporate_legal_admin", "tax_accounting_audit"],
     re: /\b(?:(?:tenemos|contamos con|trabajamos con|trabajaremos con|nos asociamos con|nos asociaremos con|asociarnos con|vamos a asociarnos con) (?:un |una |el |la )?(?:socio|socia|aliado|aliada|partner)[a-z ]{0,20}|joint venture|coinversion|we (?:have|will work with) a local partner)\b/ },
   { kind: "anchor_contract", categories: ["corporate_legal_admin", "tax_accounting_audit", "procurement_supply_chain"],

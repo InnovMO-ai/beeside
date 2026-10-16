@@ -32,7 +32,7 @@ La señal de demanda no guarda stage/idioma/candidato propuesto (sin cambio de e
 - `knowledge-layer/vocabulary.ts` (nuevo, puro): `readQuestion`, `readGeography`, `normalizedQuery`, `BOUNDARY_AREA`.
 - `demand.ts`/`pg-repo.ts`: `DemandRefs` + `assertOpaqueRefs`; el repositorio rechaza ids crudos. `service.ts`/`orient.ts`: sin interpretar texto.
 - `precision/knowledge-client/adapters.ts` + `demand-refs.ts` (nuevo): clasificación local, solicitud estructurada, referencias HMAC. `precision/api/wiring.ts`: secreto exigido en producción y guard de semilla.
-- `readiness.ts`, `scripts/kl-seed.ts`, fase `seed` y smoke S6 en `precision-private-candidate.sh`.
+- `readiness.ts`, `scripts/kl-seed.ts`, fase `seed` y smoke S6 en `precision-stabilization.sh`.
 
 ## 3. Regresión (resultados reales)
 - Unitarias backend: **88 suites / 1.885 pruebas verdes** (antes 85 / 1.856). `tsc --noEmit`, `eslint --max-warnings=0` y `npm run build`: limpios.
@@ -49,7 +49,7 @@ La señal de demanda no guarda stage/idioma/candidato propuesto (sin cambio de e
   9. *Semilla* — `readiness.test`: capa con fuentes sin conocimiento **no** está lista; lista solo con la semilla publicada; manifiesto válido/ inválido.
 
 ## 4. Identidad de Admin: **A — REUTILIZAR la identidad Google/IAP existente**
-El inicio de sesión de Admin es OIDC estándar (`admin/oidc.ts`), agnóstico de proveedor, con lista de dominios permitidos; la autorización es la tabla `admin_user` aprovisionada + RBAC (no entra quien no esté aprovisionado). Google es un proveedor OIDC estándar (emisor `https://accounts.google.com`, PKCE S256, `hd`/dominio verificado). Prueba `admin-google-identity.test` (3): solicitud de autorización (code + PKCE + state + nonce), cuenta `beeside.you` con token con forma Google aceptada, y rechazo de todo lo que no sea una cuenta `beeside.you` verificada. **No hay nada que un IdP separado aporte** para el candidato privado (IAP ya limita al dominio; Admin añade su RBAC). No se introduce ningún IdP.
+El inicio de sesión de Admin es OIDC estándar (`admin/oidc.ts`), agnóstico de proveedor, con lista de dominios permitidos; la autorización es la tabla `admin_user` aprovisionada + RBAC (no entra quien no esté aprovisionado). Google es un proveedor OIDC estándar (emisor `https://accounts.google.com`, PKCE S256, `hd`/dominio verificado). Prueba `admin-google-identity.test` (3): solicitud de autorización (code + PKCE + state + nonce), cuenta `beeside.you` con token con forma Google aceptada, y rechazo de todo lo que no sea una cuenta `beeside.you` verificada. **No hay nada que un IdP separado aporte** para ESTABILIZACIÓN (IAP ya limita al dominio; Admin añade su RBAC). No se introduce ningún IdP.
 
 Es solo configuración (fase `admin` del script, con aprobación): ADMIN_API_ENABLED, ADMIN_APP_ORIGIN, ADMIN_OIDC_ISSUER/CLIENT_ID/REDIRECT_URI, ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you, secretos `ADMIN_OIDC_CLIENT_SECRET` (creado por el operador en Secret Manager) y `ADMIN_SESSION_SECRET` (generado, nunca impreso). **Primer administrador:** `provision-admin` es solo de desarrollo; añadí `scripts/admin-bootstrap.ts`, job de un solo uso y auditado que crea **un** SUPER_ADMIN (dominio permitido, se niega si ya existe uno, no crea credencial; la persona entra con su Google). 3 pruebas (dominio, creación+auditoría+rechazo del segundo, dominio ajeno).
 
@@ -57,6 +57,6 @@ Es solo configuración (fase `admin` del script, con aprobación): ADMIN_API_ENA
 1. **Proyecto GCP de producción y acceso** (proyecto + facturación; sesión `gcloud` autenticada). Sin eso no corre ni el `check` de solo lectura.
 2. **Contenido de la semilla inicial** de KL en un bucket privado con `manifest.json` (el mecanismo y el guard están listos y probados con los PDF reales de IMCO).
 3. **Cliente OAuth Web (Internal, `beeside.you`)** creado en la consola, su secreto en Secret Manager y el correo del primer SUPER_ADMIN.
-4. Aprobación del gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL**. (Destino de migraciones: **50/50**, por la 0049 `resource_type`, ya señalada.)
+4. Aprobación del gate **STABILIZATION DEPLOYMENT APPROVAL**. (Destino de migraciones: **50/50**, por la 0049 `resource_type`, ya señalada.)
 
-**PRIVATE PRODUCTION CANDIDATE DEPLOYMENT READY: NO** — solo por los bloqueos externos 1–4; no queda trabajo de ingeniería pendiente sin credenciales.
+**ESTABILIZACIÓN DEPLOYMENT READY: NO** — solo por los bloqueos externos 1–4; no queda trabajo de ingeniería pendiente sin credenciales.

@@ -89,6 +89,16 @@ export const CONCEPTS: readonly ConceptDef[] = [
     terms: { es: ["contabilidad", "contable*", "contador*", "teneduria de libros", "estados financieros", "reportes financieros", "cierre contable"], en: ["accounting", "accountant*", "bookkeeping", "financial statements", "financial reporting", "month-end close"] },
   }),
   c({
+    id: "electronic_invoicing", kind: "need", category: "tax_accounting_audit", services: [], specialty: "tax",
+    label: { es: "Facturación electrónica", en: "Electronic invoicing" }, phrase: { es: "la facturación electrónica", en: "electronic invoicing" },
+    terms: { es: ["facturacion electronica", "cfdi", "emision de facturas", "emitir facturas", "timbrado de facturas"], en: ["e-?invoicing", "electronic invoic*", "issue invoices", "invoice issuance", "invoicing compliance"] },
+  }),
+  c({
+    id: "accounts_payable", kind: "need", category: "tax_accounting_audit", services: [], specialty: "finance",
+    label: { es: "Cuentas por pagar", en: "Accounts payable" }, phrase: { es: "la administración de cuentas por pagar", en: "accounts payable administration" },
+    terms: { es: ["cuentas por pagar", "pago a proveedores", "pagos a proveedores", "administracion de pagos"], en: ["accounts payable", "vendor payments", "supplier payments", "payables administration"] },
+  }),
+  c({
     id: "audit", kind: "need", category: "tax_accounting_audit", services: ["financial_statements_audit", "internal_audit"],
     label: { es: "Auditoría", en: "Audit" }, phrase: { es: "la auditoría", en: "audit" },
     terms: { es: ["auditoria*", "auditor*", "dictamen"], en: ["audit", "audits", "auditor*"] },
@@ -102,7 +112,7 @@ export const CONCEPTS: readonly ConceptDef[] = [
     id: "intercompany_funding", kind: "need", category: "tax_accounting_audit", services: ["transfer_pricing_advisory"], specialty: "tax",
     label: { es: "Financiamiento intercompañía", en: "Intra-group funding" }, phrase: { es: "el financiamiento desde la casa matriz", en: "funding from the parent company" },
     terms: {
-      es: ["financiamiento (?:desde|de|por parte de|con) (?:la )?(?:casa )?matriz", "financiamiento intercompania", "fondeo", "fondear", "prestamo intercompania", "prestamo de la matriz", "prestamo de la casa matriz", "capital de la matriz", "capitalizar", "capitalizacion", "aportacion de capital", "aportaciones de capital", "financiar* (?:desde|con|por) (?:la )?(?:casa )?matriz", "matriz (?:va a|vaya a|vamos a|nos) financi*", "empresa matriz", "casa matriz", "financiamiento intragrupo", "financiado por (?:la )?(?:empresa|casa) matriz"],
+      es: ["financiamiento (?:desde|de|por parte de|con) (?:la )?(?:casa )?matriz", "financiamiento intercompania", "fondeo", "fondear", "prestamo intercompania", "prestamo de la matriz", "prestamo de la casa matriz", "capital de la matriz", "capitalizar", "capitalizacion", "aportacion de capital", "aportaciones de capital", "financiar* (?:desde|con|por) (?:la )?(?:casa )?matriz", "matriz (?:va a|vaya a|vamos a|nos) financi*", "(?:la )?(?:casa )?matriz(?: \\w+){0,4} (?:va a|vaya a|vamos a|nos|se encargara de) (?:financi\\w*|fondear|capitalizar)", "financiamiento intragrupo", "financiado por (?:la )?(?:empresa|casa) matriz"],
       en: ["intercompany loan", "intra-?group (?:loan|funding|financing)", "parent (?:company )?(?:will )?(?:fund|financ)\\w*", "funded by (?:the )?parent", "financed by (?:the )?parent", "capital injection", "capitalize", "capitalization", "funding from (?:the )?parent"],
     },
   }),

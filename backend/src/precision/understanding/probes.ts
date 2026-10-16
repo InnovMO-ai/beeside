@@ -10,6 +10,7 @@
  */
 import { countryName } from "./countries";
 import { LOCATION_CRITERIA } from "./criteria";
+import { ENTERPRISE_PROBES } from "./enterprise-services";
 import { answerKind, describeMoney, money, ranges } from "./signals";
 import type { Range } from "./signals";
 import { fold, hasTerm, parseDuration, describeMonths, parseQuantity, quantities, quantityNear, spanAround, termRegex, NUMBER_SOURCE } from "./text";
@@ -125,6 +126,8 @@ function bareCount(f: string): { min: number; max: number } | null {
   return q ? { min: q.value, max: q.value } : null;
 }
 
+/** Own payroll mentioned alongside own employees: "35 empleados con nómina quincenal". */
+const PAYROLL_OWN = /nomina|payroll|sueldos|salarios/;
 const hasDirect = (f: string): string | null => DIRECT.find((t) => hasTerm(f, t)) ?? null;
 const hasOutsourced = (f: string): string | null => OUTSOURCED.find((t) => hasTerm(f, t)) ?? null;
 
@@ -136,11 +139,11 @@ const FORM_NAMED = new RegExp(
 
 // ------------------------------------------------------------------ definitions
 const WORKFORCE_CONCEPTS = ["hiring", "workforce_presence", "payroll", "social_security", "outsourced_workforce", "eor", "benefits", "labor_legal"] as const;
-const FINANCE_SCOPE = ["entity_setup", "accounting", "tax_compliance", "tax_services", "audit", "transfer_pricing"] as const;
+const FINANCE_SCOPE = ["entity_setup", "accounting", "tax_compliance", "tax_services", "audit", "transfer_pricing", "electronic_invoicing", "accounts_payable"] as const;
 const MOVES_GOODS = ["customs_trade", "logistics_transport", "warehousing", "temperature_control"] as const;
 
 
-export const PROBES: readonly ProbeDef[] = [
+const BASE_PROBES: readonly ProbeDef[] = [
   // ---------------------------------------------------------------- project
   {
     key: "project.duration", dimension: "project", order: 10,
@@ -371,6 +374,8 @@ export const PROBES: readonly ProbeDef[] = [
       const hireSome = /alguno[s]? (?:directamente|directos|de forma directa)|una parte (?:directamente|directa)|parte (?:de ellos|del personal)[^.]{0,30}(?:directo|directamente)|some (?:of them )?(?:directly|direct)|part of (?:them|the staff)[^.]{0,30}direct/.test(ctx.f);
       const both = (d || hireSome) && o;
       if (both) return mk(ctx, (d ?? "directamente"), "mixed", ctx.locale === "es" ? "Parte directos y parte por un tercero" : "Part direct, part through a third party");
+      const ownStaff = /(?:tenemos|contamos con|tiene|tienen|emplea(?:mos|n)?|we (?:have|employ)|has) (?:\d+|\w+) (?:empleados|trabajadores|colaboradores|personas en nomina|employees|people on (?:our )?payroll)/.exec(ctx.f)?.[0];
+      if (!d && !o && ownStaff && PAYROLL_OWN.test(ctx.f)) return mk(ctx, ownStaff, "direct", ctx.locale === "es" ? "Personal propio en nómina" : "Own staff on payroll", { interpretive: "understood" });
       if (d && !o && !/no (?:vamos a|queremos|contratar\w*) (?:contratar )?directamente|no directamente/.test(ctx.f)) return mk(ctx, d, "direct", ctx.locale === "es" ? "Contratación directa" : "Direct hiring");
       if (o && !d) return mk(ctx, o, "outsourced", ctx.locale === "es" ? "A través de un tercero" : "Through a third party");
       if (/ambos|combinacion|mixto|las dos|both|a mix|combination/.test(ctx.f) && ctx.asked) return mk(ctx, "combinacion|ambos|both", "mixed", ctx.locale === "es" ? "Combinación de directos y por un tercero" : "A combination of direct and third party");
@@ -545,7 +550,7 @@ export const PROBES: readonly ProbeDef[] = [
     extract: (ctx) => {
       const kinds: string[] = [];
       const add = (re: RegExp, es: string, en: string): void => { if (re.test(ctx.f)) kinds.push(ctx.locale === "es" ? es : en); };
-      add(/servicios (?:intragrupo|intercompan\w*|de la matriz|corporativos|de administracion|compartidos)|servicios? (?:\w+\s+){0,3}(?:de|desde|con|por) la matriz|management fee|cuotas? de administracion|shared services|intercompany services|intra-?group services/, "servicios entre empresas del grupo", "intra-group services");
+      add(/servicios (?:intragrupo|intercompan\w*|de la matriz|corporativos|de administracion|compartidos)|servicios? (?:\w+\s+){0,4}(?:de|desde|con|por|a|para) (?:una |un |la |el |otra |otro )?(?:empresa|compania|entidad|sociedad|parte|filial)s? (?:relacionad\w+|afiliad\w+|del grupo|hermana)|services? (?:\w+\s+){0,4}(?:from|to|with) (?:a |an |the )?(?:related|affiliated|group) (?:company|entity|party)|servicios? (?:\w+\s+){0,3}(?:de|desde|con|por) la matriz|management fee|cuotas? de administracion|shared services|intercompany services|intra-?group services/, "servicios entre empresas del grupo", "intra-group services");
       add(/(?:venta|compra|suministro|transferencia|arrendamiento)\s+de\s+(?:el\s+)?(?:equipo|material|mercancia|bienes|maquinaria)[^.]{0,40}(?:filial|matriz|grupo|subsidiaria)|equipment (?:sales|purchases|transfers?)|goods (?:from|to) the (?:parent|group)/, "compraventa de equipo o materiales", "equipment or goods");
       add(/prestamo(?:s)? (?:entre|a la|de la) (?:filial|subsidiaria|empresas del grupo)|intercompany loans?|loans? to the (?:subsidiary|affiliate)/, "préstamos entre empresas del grupo", "intra-group loans");
       add(/regalias|royalt|licencia de uso|licence fee|license fee/, "regalías o licencias", "royalties or licences");
@@ -567,9 +572,13 @@ export const PROBES: readonly ProbeDef[] = [
     applies: (v) => v.has("accounting"),
     tier: () => "valuable",
     extract: (ctx) => {
-      if (/consolid|reporte (?:a|para) la matriz|reportar a la matriz|ifrs|niif|group reporting|report to the parent/.test(ctx.f)) {
-        const m = /consolid\w*|reporte (?:a|para) la matriz|reportar a la matriz|ifrs|niif|group reporting|report to the parent/.exec(ctx.f)![0];
-        return mk(ctx, m, ctx.text.trim().slice(0, 140), spanAround(ctx.text, m, 120));
+      const group = /consolid\w*|reporte (?:a|para) la matriz|reportar a la matriz|ifrs|niif|group reporting|report to the parent/.exec(ctx.f)?.[0];
+      // who keeps the books today (an external provider, an in-house team, nobody yet): volunteered, so it is not asked again
+      const keeper = /(?:contabilidad|contable|bookkeeping|accounting)[^.;]{0,60}(?:otro proveedor|despacho|contador externo|un externo|tercero|proveedor externo|equipo interno|area interna|internamente|in-?house|external (?:provider|accountant|firm)|another provider|outsourced)|(?:otro proveedor|despacho|contador externo|proveedor externo|equipo interno|internamente|external (?:provider|accountant|firm)|another provider)[^.;]{0,60}(?:contabilidad|contable|bookkeeping|accounting)|(?:lleva|llevan|llevamos|maneja|manejan|hace|hacen)\s+(?:la |nuestra )?contabilidad/.exec(ctx.f)?.[0];
+      if (group || keeper) {
+        const spans = [group ? spanAround(ctx.text, group, 120) : "", keeper ? spanAround(ctx.text, keeper, 120) : ""].filter(Boolean);
+        const joined = [...new Set(spans)].join(" ").slice(0, 200);
+        return mk(ctx, (group ?? keeper)!, joined, joined.slice(0, 140));
       }
       if (ctx.asked && ctx.f.length > 12 && ctx.f.length <= 300 && !answerKind(ctx.f)) return { value: ctx.text.trim().slice(0, 200), display: ctx.text.trim().slice(0, 120), quote: ctx.text.trim().slice(0, 160) };
       return null;
@@ -594,6 +603,9 @@ export const PROBES: readonly ProbeDef[] = [
     merge: (prev, inc) => [...new Set([...(Array.isArray(prev) ? (prev as string[]) : []), ...(Array.isArray(inc) ? (inc as string[]) : [])])],
   },
 ];
+
+/** Base probes + the Enterprise Services diagnostic dimensions (prepared RAM; see enterprise-services.ts). */
+export const PROBES: readonly ProbeDef[] = [...BASE_PROBES, ...ENTERPRISE_PROBES].sort((a, b) => a.order - b.order);
 
 const PROBE_BY_KEY = new Map(PROBES.map((p) => [p.key, p]));
 export const probeByKey = (key: string): ProbeDef | undefined => PROBE_BY_KEY.get(key);

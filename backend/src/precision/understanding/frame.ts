@@ -10,6 +10,7 @@
  *  - Nothing the client did not say is recorded as said: every item carries the client's quote (verified by the governor).
  *  - Priority is the client's: unprioritized is not "low", and execution dependencies are a different thing.
  */
+import { ENTERPRISE_ADDITIVE, enterpriseDisplay } from "./enterprise-services";
 import { conceptById } from "./concepts";
 import { captureCrossCutting } from "./cross-cutting";
 import { cleanDisplay } from "./governor";
@@ -66,6 +67,8 @@ function displayFor(key: string, merged: unknown, fallback: string, loc: Loc): s
   }
   if (key === "tax.intercompany" && Array.isArray(m?.kinds)) return (m!.kinds as string[]).filter((k) => k !== "unspecified").join(", ") || fallback;
   if (key === "workforce.benefits" && Array.isArray(m?.items) && (m!.items as string[]).length > 0) return (m!.items as string[]).join(", ");
+  const ent = enterpriseDisplay(key, merged, loc);
+  if (ent !== null) return ent || fallback;
   if (key === "workforce.split" && m) {
     const parts: string[] = [];
     if (typeof m.direct === "number") parts.push(loc === "es" ? `${m.direct} directas` : `${m.direct} direct`);
@@ -165,7 +168,7 @@ export function applyInterpretation(prev: Frame, interp: Interpretation, ctx: Ap
       if (STRENGTH[base.provenance] > STRENGTH[prevItem.provenance]) prevItem.provenance = base.provenance;
       continue;
     }
-    const additive = ["workforce.split", "entity.funding", "tax.intercompany", "workforce.benefits"].includes(o.key) && !interp.correction;
+    const additive = ["workforce.split", "entity.funding", "tax.intercompany", "workforce.benefits", ...ENTERPRISE_ADDITIVE].includes(o.key) && !interp.correction;
     if (additive) {
       frame.items[o.key] = { ...prevItem, value: mergedValue, display: cleanDisplay(displayFor(o.key, mergedValue, o.display, loc)), at: ctx.now, quote: o.quote, status: "known", provenance: prevItem.provenance === "discovery" ? "client_stated" : prevItem.provenance };
       changes.push({ kind: "item", key: o.key, display: frame.items[o.key]!.display, updated: true });

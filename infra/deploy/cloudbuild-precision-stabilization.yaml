@@ -1,4 +1,4 @@
-# Builds the two images of the Private Production Candidate with Cloud Build (no local Docker). Used by precision-private-candidate.sh `build`.
+# Builds the two images of the ESTABILIZACIÓN with Cloud Build (no local Docker). Used by precision-stabilization.sh `build`.
 # Creates images only: it touches no database, no service and no secret.
 substitutions:
   _REPO: northamerica-south1-docker.pkg.dev/PROJECT/beeside-production

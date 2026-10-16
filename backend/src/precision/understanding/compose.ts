@@ -43,10 +43,10 @@ export const needPhrase = (n: NeedItem, loc: Loc): string => {
 };
 
 // ------------------------------------------------------------------ fact phrases
-const SALIENCE = ["project.duration", "entity.form", "entity.activity", "entity.funding", "entity.funding_structure", "workforce.headcount", "workforce.model", "workforce.split", "workforce.origin", "workforce.benefits", "tax.intercompany", "scale.revenue", "scale.volume", "scale.suppliers", "scale.inventory", "product.what", "trade.volume", "trade.temperature", "project.phases", "accounting.setup", "project.why"];
+const SALIENCE = ["project.duration", "entity.form", "entity.activity", "entity.funding", "entity.funding_structure", "workforce.headcount", "workforce.model", "workforce.split", "workforce.origin", "workforce.benefits", "workforce.payroll_cadence", "tax.intercompany", "scale.revenue", "scale.volume", "scale.suppliers", "scale.inventory", "product.what", "trade.volume", "trade.temperature", "project.phases", "accounting.setup", "reporting.group", "scale.currencies", "scale.foreign_vendors", "accounting.systems", "compliance.status", "project.why"];
 
 /** Valuable (non-blocking) questions: "I don't know" is not worth an acknowledgement. */
-const QUIET_WHEN_PENDING = new Set(["project.why", "project.phases", "workforce.origin", "accounting.setup"]);
+const QUIET_WHEN_PENDING = new Set(["project.why", "project.phases", "workforce.origin", "accounting.setup", "accounting.systems", "scale.currencies", "scale.foreign_vendors"]);
 function pending(item: FrameItem, loc: Loc): string | null {
   const label = probeByKey(item.key)?.label[loc];
   if (!label || QUIET_WHEN_PENDING.has(item.key)) return null;
@@ -88,6 +88,12 @@ export function factPhrase(item: FrameItem, loc: Loc): string | null {
     "trade.temperature": `temperatura: ${d}`,
     "project.phases": lc(d),
     "accounting.setup": `contabilidad: ${lc(d)}`,
+    "workforce.payroll_cadence": lc(d),
+    "reporting.group": lc(d),
+    "accounting.systems": `sistema contable: ${d}`,
+    "compliance.status": `obligaciones: ${lc(d)}`,
+    "scale.currencies": lc(d),
+    "scale.foreign_vendors": lc(d),
     "project.why": "",
   };
   const en: Record<string, string> = {
@@ -111,6 +117,12 @@ export function factPhrase(item: FrameItem, loc: Loc): string | null {
     "trade.temperature": `temperature: ${d}`,
     "project.phases": lc(d),
     "accounting.setup": `accounting: ${lc(d)}`,
+    "workforce.payroll_cadence": lc(d),
+    "reporting.group": lc(d),
+    "accounting.systems": `accounting system: ${d}`,
+    "compliance.status": `obligations: ${lc(d)}`,
+    "scale.currencies": lc(d),
+    "scale.foreign_vendors": lc(d),
     "project.why": "",
   };
   const t = (loc === "es" ? es : en)[item.key];

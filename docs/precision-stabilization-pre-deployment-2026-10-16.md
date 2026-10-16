@@ -1,8 +1,8 @@
-# PRECISION — Candidato Privado de Producción · Checkpoint de pre-despliegue
+# PRECISION — ESTABILIZACIÓN · Checkpoint de pre-despliegue
 
 Fecha: 2026-10-16 · Rama `feature/precision-continuity-foundation` · **Nada se desplegó. Ninguna base de datos fue modificada** (las pruebas de migración corrieron en una base local descartable).
 
-**Veredicto.** La ingeniería está lista para el Candidato Privado de Producción: puente de continuidad aceptado, guard de migración probado en el camino real (estado Discovery-RC → 49/49), y los dos puntos UX pendientes están implementados y probados. **Hay un solo bloqueo real y es tuyo**: confirmar/crear el proyecto GCP de producción (§1–§3). Todo lo demás lo ejecuto yo tras la aprobación del gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL**.
+**Veredicto.** La ingeniería está lista para ESTABILIZACIÓN: puente de continuidad aceptado, guard de migración probado en el camino real (estado Discovery-RC → 49/49), y los dos puntos UX pendientes están implementados y probados. **Hay un solo bloqueo real y es tuyo**: confirmar/crear el proyecto GCP de producción (§1–§3). Todo lo demás lo ejecuto yo tras la aprobación del gate **STABILIZATION DEPLOYMENT APPROVAL**.
 
 > Alcance de la verificación: esta sesión no tiene credenciales de `gcloud` ni de GitHub (el token está inválido), así que lo “vivo” de GCP no se pudo leer. “FOUND” significa **encontrado en repo, workflows, IaC, scripts de despliegue y documentos del Proyecto**; el estado vivo se marca **no verificable desde aquí** y se confirma con un solo comando de lectura (§4 y §8, paso 1).
 
@@ -18,10 +18,10 @@ Fecha: 2026-10-16 · Rama `feature/precision-continuity-foundation` · **Nada se
 | Cloud SQL | **FOUND** | Instancia `beeside-dev-canonical-db` (dev: `db-g1-small`, ZONAL, sin protección de borrado). BDs: `beeside` (Core/legado) y `fa4_staging` (Discovery staging, datos de prueba). Producción (scaffold): `db-custom-2-7680`, REGIONAL, 35 días de backup, protección de borrado ON. |
 | Identidad de migración vs runtime | **FOUND** | Migración: `beeside-dev-migration-runner@…` ejecuta el job “prepare”/migrate con `MIGRATION_DATABASE_URL`. Runtime: rol de login sin DDL, miembro de `beeside_runtime_role` (migración 0014); el servicio **no** recibe `MIGRATION_DATABASE_URL`; arranque en producción exige `DB_PRIVILEGE_CHECK`. Cuenta de build dedicada `fa4-staging-build`; CI: `beeside-dev-ci-deployer` + Workload Identity Federation (`beeside-dev-github-pool`, restringido al repo; en producción solo `refs/heads/main`). |
 | Secretos (solo nombres) | **FOUND** | Patrón `<env>-db-runtime-password`, `<env>-hash-secret`, `<env>-database-url`, `beeside-dev-migration-database-url`; SMTP opcional por nombre de secreto. Sin valores en repo ni en este documento. |
-| Dominio / ruteo | **PARCIAL** | Solo URLs `*.run.app` deterministas. Dominio de IAP: `domain:beeside.you`. **No hay dominio personalizado mapeado** a ningún servicio → hostname de producción: **REQUIERE MIKE** (solo para abrir la puerta; el candidato privado no lo necesita). |
+| Dominio / ruteo | **PARCIAL** | Solo URLs `*.run.app` deterministas. Dominio de IAP: `domain:beeside.you`. **No hay dominio personalizado mapeado** a ningún servicio → hostname de producción: **REQUIERE MIKE** (solo para abrir la puerta; ESTABILIZACIÓN no lo necesita). |
 | Puerta actual | **FOUND** | IAP sobre el servicio web de Discovery staging (`roles/iap.httpsResourceAccessor` a `domain:beeside.you`), `ROBOTS_NOINDEX=true`, web→backend con ID token de Google (`UPSTREAM_AUTH_AUDIENCE`). Los servicios públicos de dev usan `--no-invoker-iam-check` (la política de organización bloquea `allUsers`). |
 | Red | **FOUND** | VPC/subred por entorno (módulo `network`, dev `10.10.0.0/20`); Cloud Run ↔ Cloud SQL por conector (`--add-cloudsql-instances`), sin conexión directa desde internet a la BD. |
-| Recursos compatibles con producción-candidato | **FOUND (en el scaffold de producción)** | Módulos `cloud-run`, `database` (REGIONAL), `secrets`, `artifact-registry`, `migration-job`; patrón completo de despliegue en `staging/fa4-internal/deploy-gcp.sh`; imágenes backend/web ya construibles (`backend/Dockerfile`, `frontend/Dockerfile`; el mismo servidor estático sirve `/precision` y proxea `/api/*`, incluido `/api/precision`). |
+| Recursos compatibles con ESTABILIZACIÓN | **FOUND (en el scaffold de producción)** | Módulos `cloud-run`, `database` (REGIONAL), `secrets`, `artifact-registry`, `migration-job`; patrón completo de despliegue en `staging/fa4-internal/deploy-gcp.sh`; imágenes backend/web ya construibles (`backend/Dockerfile`, `frontend/Dockerfile`; el mismo servidor estático sirve `/precision` y proxea `/api/*`, incluido `/api/precision`). |
 
 ## 2. Qué requiere realmente a Mike
 
@@ -29,7 +29,7 @@ Solo lo que no se puede derivar ni crear con las credenciales de esta sesión:
 
 1. **Confirmar el destino** (una línea): “producción = el entorno `production` ya diseñado, en un proyecto GCP propio” (recomendado, §3) — o indicar que `beeside-dev-508220` es el hogar definitivo.
 2. **Si es proyecto nuevo**: crear el proyecto y vincular facturación (o darme el ID de uno existente) y el bucket de estado de Terraform; se asignan las variables de GitHub (`GCP_PROJECT_ID`, etc.).
-3. **Credenciales de despliegue**: una sesión con `gcloud` autenticado (o WIF listo) para ejecutar los pasos de §8; **los valores de secretos los genero yo con `openssl` dentro de Secret Manager, sin imprimirlos** (no necesitas pasarme ninguno para este candidato).
+3. **Credenciales de despliegue**: una sesión con `gcloud` autenticado (o WIF listo) para ejecutar los pasos de §8; **los valores de secretos los genero yo con `openssl` dentro de Secret Manager, sin imprimirlos** (no necesitas pasarme ninguno para ESTABILIZACIÓN).
 4. **Consentimiento OAuth/IAP** del proyecto (pantalla de marca) si el proyecto es nuevo.
 5. **Hostname público** (p. ej. un subdominio de `beeside.you`) — solo al abrir la puerta.
 
@@ -96,7 +96,7 @@ Precision vive en su ubicación final y **no es pública**: servicio web de Clou
 
 ## 9. Irreversible / requiere aprobación
 
-- **Aprobación del gate PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL** (único gate; sin términos adicionales).
+- **Aprobación del gate STABILIZATION DEPLOYMENT APPROVAL** (único gate; sin términos adicionales).
 - Crear el proyecto/facturación y aplicar Terraform (crea recursos facturables; la instancia con protección de borrado queda difícil de retirar).
 - Primera aplicación de migraciones sobre la BD de destino (aditivas, pero las migraciones no se “des-aplican”; se mitiga con el `--check` previo y copia de seguridad antes del paso 5).
 - Cualquier recreación o borrado de una BD/instancia compartida: **no se hace sin aprobación explícita**.
@@ -104,7 +104,7 @@ Precision vive en su ubicación final y **no es pública**: servicio web de Clou
 
 ## Estado del Knowledge Layer
 
-Sin cambios: ni rediseño ni rutas nuevas. La guía país usa la ruta ya aceptada (`openResource`), sin tocar contrato ni esquema. Queda lista la **reconciliación del contrato canónico final de KL** antes del despliegue (revisión del contrato publicado vs. el cliente de Precision; sin nuevas rutas de conocimiento) y no bloquea este candidato.
+Sin cambios: ni rediseño ni rutas nuevas. La guía país usa la ruta ya aceptada (`openResource`), sin tocar contrato ni esquema. Queda lista la **reconciliación del contrato canónico final de KL** antes del despliegue (revisión del contrato publicado vs. el cliente de Precision; sin nuevas rutas de conocimiento) y no bloquea ESTABILIZACIÓN.
 
 ## Evidencia de este bloque
 

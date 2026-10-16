@@ -180,6 +180,19 @@ const RULES: Readonly<Record<string, readonly Rule[]>> = {
         return v && valid(def, v) ? { value: v } : null;
       },
     },
+    // Enterprise Services RAM: the group's reporting expectation, read once, feeds the same fields (no second question in the category)
+    {
+      field: "tax_parent_reporting_required", from: "reporting.group",
+      convert: (i) => (i.status === "known" && (i.value as { toGroup?: unknown } | null)?.toGroup === true ? { value: true } : null),
+    },
+    {
+      field: "tax_parent_reporting_framework", from: "reporting.group",
+      convert: (i, _f, _l, def) => {
+        if (i.status !== "known") return null;
+        const fw = ((i.value as { frameworks?: string[] } | null)?.frameworks ?? []).filter((x) => x === "ifrs" || x === "us_gaap");
+        return fw.length === 1 && valid(def, fw[0]!) ? { value: fw[0] } : null;
+      },
+    },
   ],
   international_trade_customs: [
     {
@@ -201,6 +214,7 @@ export const PROBE_COVERAGE: Readonly<Record<string, readonly string[]>> = {
   "workforce.model": ["hr_employment_model"],
   "tax.intercompany": ["tax_has_intercompany_transactions", "tax_intercompany_transactions"],
   "accounting.setup": ["tax_parent_reporting_required", "tax_accounting_framework"],
+  "reporting.group": ["tax_parent_reporting_required", "tax_parent_reporting_framework"],
 };
 
 /** The probes whose answers this category inherits (they come first when the thread says what it already knows). */
@@ -241,6 +255,7 @@ export function deriveInherited(frame: Frame, categoryKey: string, fields: Field
     const def = fields.get(rule.field);
     const item = frame.items[rule.from];
     if (!def || !settled(item)) continue;
+    if (out.some((f) => f.fieldKey === rule.field)) continue; // one fact per field: the first reading wins
     const src = sourceOf(frame, item);
     if (!src) continue;
     const r = rule.convert(item, frame, loc, def);

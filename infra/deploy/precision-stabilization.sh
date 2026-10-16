@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# PRECISION — PRIVATE PRODUCTION CANDIDATE: gated, phase-by-phase deployment into the production environment (Terraform `envs/production`).
+# PRECISION — ESTABILIZACIÓN (STABILIZATION): gated, phase-by-phase deployment into the production environment (Terraform `envs/production`).
 # NOTHING here has been executed against GCP. Pattern proven in staging/fa4-internal/deploy-gcp.sh; names follow the Terraform modules.
 #
-#   PROJECT=<prod project id> ./infra/deploy/precision-private-candidate.sh <phase>
-#   phases, in order:  check  build  backup  migrate  prepare  seed  deploy  admin  smoke
+#   PROJECT=<prod project id> ./infra/deploy/precision-stabilization.sh <phase>
+#   phases, in order:  check  build  backup  migrate  prepare  seed  deploy  admin  baseline  smoke
+#   transition (ESTABILIZACIÓN -> PRODUCCIÓN):  audit [REQUIRE_CLEAN=1]  — read-only verification that no fictitious customer/project data remains
 #
-# Read-only / non-destructive without approval: check, build, smoke.
-# Everything that writes to the database or changes a service (backup, migrate, prepare, seed, deploy, admin) refuses to run unless
-#   APPROVAL=PRIVATE_PRODUCTION_CANDIDATE_DEPLOYMENT_APPROVAL
+# Read-only / non-destructive without approval: check, build, smoke, audit.
+# Everything that writes to the database or changes a service (backup, migrate, prepare, seed, deploy, admin, baseline) refuses to run unless
+#   APPROVAL=STABILIZATION_DEPLOYMENT_APPROVAL
 # NOTE: `deploy` replaces the backend's env vars/secrets; run `admin` AFTER every `deploy` (it re-applies the Control Center sign-in configuration).
 # DRY_RUN=1 prints every gcloud command instead of running it. Secret VALUES are generated inside Secret Manager and never printed.
 set -euo pipefail
@@ -17,7 +18,7 @@ PHASE=${1:-}
 REGION=${REGION:-northamerica-south1}
 ENVN=${ENVN:-production}
 TAG=${TAG:-$(git rev-parse --short HEAD)}
-ACCESS_MEMBER=${ACCESS_MEMBER:-domain:beeside.you}              # who may open the private candidate through IAP
+ACCESS_MEMBER=${ACCESS_MEMBER:-domain:beeside.you}              # who may open ESTABILIZACIÓN through IAP
 SQL_INSTANCE=${SQL_INSTANCE:-beeside-${ENVN}-canonical-db}
 DB_NAME=${DB_NAME:-beeside}
 AR_REPO=${AR_REPO:-beeside-${ENVN}}
@@ -37,6 +38,7 @@ ADMIN_DOMAINS=${ADMIN_DOMAINS:-beeside.you}
 S_ADMIN_OIDC_SECRET=${S_ADMIN_OIDC_SECRET:-precision-${ENVN}-admin-oidc-client-secret}  # created by the operator in Secret Manager (never printed, never in this repo)
 S_ADMIN_SESSION=precision-${ENVN}-admin-session-secret
 ADMIN_JOB=${ADMIN_JOB:-beeside-${ENVN}-admin-bootstrap}
+AUDIT_JOB=${AUDIT_JOB:-beeside-${ENVN}-stabilization-audit}
 MIG_SA=${MIG_SA:-beeside-${ENVN}-migration-runner@${PROJECT}.iam.gserviceaccount.com}
 MIG_SECRET=${MIG_SECRET:-beeside-${ENVN}-migration-database-url}
 RT_SA=${RT_SA:-beeside-${ENVN}-runtime@${PROJECT}.iam.gserviceaccount.com}   # dedicated runtime identity (created below, least privilege)
@@ -47,7 +49,7 @@ RT_USER=${RT_USER:-beeside_runtime}
 DRY_RUN=${DRY_RUN:-0}
 
 g() { if [ "$DRY_RUN" = 1 ]; then echo "+ gcloud --project $PROJECT $*"; else gcloud --project "$PROJECT" "$@"; fi; }
-need_approval() { [ "${APPROVAL:-}" = "PRIVATE_PRODUCTION_CANDIDATE_DEPLOYMENT_APPROVAL" ] || { echo "REFUSED: phase '$PHASE' changes the production environment; set APPROVAL=PRIVATE_PRODUCTION_CANDIDATE_DEPLOYMENT_APPROVAL after the gate is approved." >&2; exit 3; }; }
+need_approval() { [ "${APPROVAL:-}" = "STABILIZATION_DEPLOYMENT_APPROVAL" ] || { echo "REFUSED: phase '$PHASE' changes the production environment; set APPROVAL=STABILIZATION_DEPLOYMENT_APPROVAL after the gate is approved." >&2; exit 3; }; }
 secret_exists() { gcloud --project "$PROJECT" secrets describe "$1" >/dev/null 2>&1; }
 ensure_secret() {
   if [ "$DRY_RUN" = 1 ]; then echo "+ ensure secret $1 (generated value, never printed)"; return 0; fi
@@ -83,11 +85,11 @@ sys.exit("NOT production-grade: " + ", ".join(bad)) if bad else print("instance 
 build)
   # idempotent API enablement (Terraform's list does not include these two); changes no data
   g services enable cloudbuild.googleapis.com iap.googleapis.com
-  g builds submit --config infra/deploy/cloudbuild-precision-candidate.yaml --substitutions "_REPO=${REPO},_TAG=${TAG}" .
+  g builds submit --config infra/deploy/cloudbuild-precision-stabilization.yaml --substitutions "_REPO=${REPO},_TAG=${TAG}" .
   ;;
 backup)
   need_approval
-  g sql backups create --instance "$SQL_INSTANCE" --description "pre-precision-candidate-${TAG}"
+  g sql backups create --instance "$SQL_INSTANCE" --description "pre-precision-stabilization-${TAG}"
   g sql backups list --instance "$SQL_INSTANCE" --limit 1 --format='table(id,type,status,windowStartTime)'
   echo "Proceed only if the newest backup status is SUCCESSFUL."
   ;;
@@ -102,7 +104,7 @@ migrate)
 prepare)
   need_approval
   echo "== dedicated runtime service account (least privilege)"
-  gcloud --project "$PROJECT" iam service-accounts describe "$RT_SA" >/dev/null 2>&1 || g iam service-accounts create "beeside-${ENVN}-runtime" --display-name "beeside ${ENVN} runtime (Precision candidate)"
+  gcloud --project "$PROJECT" iam service-accounts describe "$RT_SA" >/dev/null 2>&1 || g iam service-accounts create "beeside-${ENVN}-runtime" --display-name "beeside ${ENVN} runtime (Precision ESTABILIZACIÓN)"
   echo "== secrets (values generated here, never printed)"
   RT_PW=$(openssl rand -hex 24)
   ensure_secret "$S_PW" "$RT_PW"
@@ -146,7 +148,7 @@ deploy)
   g beta run services update "$WEB" --region "$REGION" --iap
   g beta run services add-iam-policy-binding "$WEB" --region "$REGION" --member "serviceAccount:service-${PNUM}@gcp-sa-iap.iam.gserviceaccount.com" --role roles/run.invoker >/dev/null
   g iap web add-iam-policy-binding --resource-type=cloud-run --service "$WEB" --region "$REGION" --member "$ACCESS_MEMBER" --role roles/iap.httpsResourceAccessor >/dev/null
-  echo "Private candidate: ${WEB_URL}/precision  (internal Google accounts only; do NOT distribute the URL)"
+  echo "ESTABILIZACIÓN: ${WEB_URL}/precision  (internal Google accounts only; do NOT distribute the URL)"
   ;;
 admin)
   need_approval
@@ -168,6 +170,22 @@ admin)
   g run jobs execute "$ADMIN_JOB" --region "$REGION" --wait
   echo "Register ${WEB_URL}/api/admin/auth/callback as the authorized redirect URI of the OAuth client (console). Control Center: ${WEB_URL}/ops-control (IAP + Google sign-in)."
   ;;
+baseline)
+  need_approval
+  echo "== clean baseline: run AFTER seed+admin and BEFORE any fictitious data is entered. It is the cheapest way back to a clean database at the PRODUCCIÓN transition."
+  g sql backups create --instance "$SQL_INSTANCE" --description "precision-stabilization-clean-baseline-${TAG}"
+  g sql backups list --instance "$SQL_INSTANCE" --limit 1 --format='table(id,type,status,windowStartTime,description)'
+  echo "Record the backup id. Restoring it (or a gated, registry-driven purge) is decided and approved separately at the PRODUCCIÓN transition."
+  ;;
+audit)
+  echo "== read-only: classifies every table with the privacy erasure registry; counts only, no row content"
+  AUDIT_ARGS=dist/scripts/stabilization-audit.js
+  [ "${REQUIRE_CLEAN:-0}" = 1 ] && AUDIT_ARGS=dist/scripts/stabilization-audit.js,--require-clean
+  g run jobs deploy "$AUDIT_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args "$AUDIT_ARGS" \
+    --set-secrets "DATABASE_URL=${MIG_SECRET}:latest" --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 120
+  g run jobs execute "$AUDIT_JOB" --region "$REGION" --wait
+  echo "REQUIRE_CLEAN=1 fails the job (exit 1) while any customer/project test data or unclassified table remains. The job log is the evidence."
+  ;;
 smoke)
   PNUM=$(gcloud --project "$PROJECT" projects describe "$PROJECT" --format='value(projectNumber)')
   WEB_URL=https://${WEB}-${PNUM}.${REGION}.run.app; BACKEND_URL=https://${BACKEND}-${PNUM}.${REGION}.run.app
@@ -181,7 +199,7 @@ smoke)
   echo "S6 knowledge layer is not empty (read-only):"
   g run jobs update "$SEED_JOB" --region "$REGION" --args dist/scripts/kl-seed.js,--check,--countries,"$REQUIRED_COUNTRIES"
   g run jobs execute "$SEED_JOB" --region "$REGION" --wait
-  echo "S7+ product checks through IAP: see docs/precision-private-production-candidate-go-no-go-2026-10-16.md section 7"
+  echo "S7+ product checks through IAP: see docs/precision-stabilization-go-no-go-2026-10-16.md section 7"
   ;;
-*) echo "usage: PROJECT=<id> $0 {check|build|backup|migrate|prepare|seed|deploy|admin|smoke}"; exit 2 ;;
+*) echo "usage: PROJECT=<id> $0 {check|build|backup|migrate|prepare|seed|deploy|admin|baseline|audit|smoke}"; exit 2 ;;
 esac

@@ -1,17 +1,17 @@
-# PRECISION — Candidato Privado de Producción · Paquete Go / No-Go de pre-despliegue
+# PRECISION — ESTABILIZACIÓN · Paquete Go / No-Go de pre-despliegue
 
 Fecha: 2026-10-16 · Rama `feature/precision-continuity-foundation` · **No se desplegó nada. Ninguna base de datos real fue tocada.** Pruebas de migración y de arranque: solo en bases locales descartables.
 
 ## RESPUESTA FINAL
 
-**PRIVATE PRODUCTION CANDIDATE DEPLOYMENT READY: NO.** (actualizado tras el cierre de KL e identidad de Admin)
+**ESTABILIZACIÓN DEPLOYMENT READY: NO.** (actualizado tras el cierre de KL e identidad de Admin)
 
 La ingeniería está lista y probada (KL limpio, semilla obligatoria, identidad de Admin = Google/IAP existente, migración 50/50, "beeside Doing Business México"). Quedan **solo bloqueos externos**:
 
 1. **Proyecto GCP de producción y acceso** (proyecto + facturación; `gcloud` autenticado). → *REQUIERE DECISIÓN DE MIKE / ACCESO*.
 2. **Contenido de la semilla inicial de KL** en un bucket privado con `manifest.json`.
 3. **Cliente OAuth Web (Internal, `beeside.you`)**, su secreto en Secret Manager y el correo del primer SUPER_ADMIN.
-4. Aprobación del gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL**.
+4. Aprobación del gate **STABILIZATION DEPLOYMENT APPROVAL**.
 
 No bloquean el despliegue (sí la validación integral): PDF final, Stripe/ClickUp, modelo real/ZDR, ICE 2026.
 
@@ -56,11 +56,11 @@ Hallazgos de la lectura de Terraform/workflows de producción (la razón del scr
 **Decisión del dueño**
 - Crear (o indicar) el proyecto GCP de producción y su ID.
 - Entregar la **semilla inicial de conocimiento** (bucket privado + `manifest.json`); el handoff de KL ya fue reconciliado.
-- Aprobar el gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL** al final.
+- Aprobar el gate **STABILIZATION DEPLOYMENT APPROVAL** al final.
 - Confirmar 50/50 como destino (o pedir 49/49 con el hack).
 
 **Hostname / dominio público (futuro, al abrir la puerta)**
-- Subdominio de `beeside.you`, URL legal de privacidad/términos reales, SMTP real y URL de compra: son configuración/build del mismo despliegue, no se necesitan para el candidato privado. Nota: las variables `VITE_*` se hornean en la imagen del web, así que abrir la puerta implica una **nueva revisión** del mismo servicio (mismo entorno, sin migrar datos).
+- Subdominio de `beeside.you`, URL legal de privacidad/términos reales, SMTP real y URL de compra: son configuración/build del mismo despliegue, no se necesitan para ESTABILIZACIÓN. Nota: las variables `VITE_*` se hornean en la imagen del web, así que abrir la puerta implica una **nueva revisión** del mismo servicio (mismo entorno, sin migrar datos).
 
 ## 5. Seguridad de migración
 
@@ -73,7 +73,7 @@ Hallazgos de la lectura de Terraform/workflows de producción (la razón del scr
 
 ## 6. Orden de despliegue (exacto y seguro)
 
-Script: `infra/deploy/precision-private-candidate.sh` (+ `cloudbuild-precision-candidate.yaml`). **Probado solo en `DRY_RUN`** (imprime cada comando; sintaxis verificada; los pasos que escriben se niegan a ejecutarse sin `APPROVAL=PRIVATE_PRODUCTION_CANDIDATE_DEPLOYMENT_APPROVAL`). No se ha ejecutado contra GCP; la primera ejecución real puede requerir ajustes menores (p. ej. permisos de Cloud Build en un proyecto nuevo).
+Script: `infra/deploy/precision-stabilization.sh` (+ `cloudbuild-precision-stabilization.yaml`). **Probado solo en `DRY_RUN`** (imprime cada comando; sintaxis verificada; los pasos que escriben se niegan a ejecutarse sin `APPROVAL=STABILIZATION_DEPLOYMENT_APPROVAL`). No se ha ejecutado contra GCP; la primera ejecución real puede requerir ajustes menores (p. ej. permisos de Cloud Build en un proyecto nuevo).
 
 0. *(Mike)* Proyecto creado + `terraform apply` de `envs/production` (red, Artifact Registry, Cloud SQL REGIONAL con protección, módulos de Cloud Run, job de migración, WIF) — **crea recursos facturables**.
 1. `build` — imágenes `backend-api` y `frontend-app` con etiqueta = commit (no toca datos ni servicios).
@@ -86,7 +86,7 @@ Script: `infra/deploy/precision-private-candidate.sh` (+ `cloudbuild-precision-c
 8. `smoke` — pruebas §7.
 9. Registrar el recurso `beeside Doing Business México` por Admin/script cuando llegue el PDF (no bloquea).
 10. Entregar la URL **solo por canal interno**.
-- Orden efectivo: `build → check → backup → migrate → prepare → seed → deploy → admin → smoke`. `seed` — carga la semilla inicial de KL (job con el bucket montado de solo lectura; falla si algún país requerido queda sin conocimiento). El backend arranca con `PRECISION_REQUIRE_KNOWLEDGE_SEED=true`: **no existe el estado "KL vacío" en producción**.
+- Orden efectivo: `build → check → backup → migrate → prepare → seed → deploy → admin → baseline → smoke`. `baseline` — respaldo etiquetado *clean baseline* después de seed+admin y antes de cualquier dato ficticio; `audit` (solo lectura, `REQUIRE_CLEAN=1` para el tránsito a PRODUCCIÓN) verifica que no queden datos ficticios de clientes/proyectos. `seed` — carga la semilla inicial de KL (job con el bucket montado de solo lectura; falla si algún país requerido queda sin conocimiento). El backend arranca con `PRECISION_REQUIRE_KNOWLEDGE_SEED=true`: **no existe el estado "KL vacío" en producción**.
 `admin` (después de `deploy`) — configura el inicio de sesión del Control Center con Google (OIDC), secretos en Secret Manager y el job de primer SUPER_ADMIN (único, auditado). Debe ejecutarse **después de cada `deploy`** (que reemplaza variables). Smoke S6 = `kl-seed --check`.
 
 ## 7. Smoke test post-despliegue
@@ -118,7 +118,7 @@ Script: `infra/deploy/precision-private-candidate.sh` (+ `cloudbuild-precision-c
 
 ## 9. Acciones irreversibles o de alto riesgo (requieren aprobación explícita)
 
-- Gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL** (el script se niega a ejecutar `backup`/`migrate`/`prepare`/`deploy` sin él).
+- Gate **STABILIZATION DEPLOYMENT APPROVAL** (el script se niega a ejecutar `backup`/`migrate`/`prepare`/`deploy` sin él).
 - Crear el proyecto/facturación y `terraform apply` de producción.
 - Primera aplicación de migraciones sobre la BD de destino (forward-only; mitigada por `check` + respaldo + clonado).
 - Cualquier recreación o borrado de una BD/instancia compartida: **no se hace sin aprobación explícita**; una BD local descartable no equivale a aprobación.
@@ -127,5 +127,5 @@ Script: `infra/deploy/precision-private-candidate.sh` (+ `cloudbuild-precision-c
 ## Evidencia de este bloque
 
 - Commits locales (sin push): `c4563c3` (nombre exacto, tipo PDF gobernado, migración 0049, job de rol de runtime) y el de tooling/documento de este paquete.
-- Cambios de código: 0049 + esquema/repositorio/contrato/Admin/router del recurso; texto de oferta sin "guía"; etiquetas Ver/Descargar PDF; `runtime-role-prepare` (verificado localmente: crea el rol, es idempotente, rechaza nombres reservados, el rol no puede crear objetos); `precision-private-candidate.sh` y su cloudbuild; la etiqueta de "Fase 15" en el workflow de producción reemplazada por el nombre del gate.
+- Cambios de código: 0049 + esquema/repositorio/contrato/Admin/router del recurso; texto de oferta sin "guía"; etiquetas Ver/Descargar PDF; `runtime-role-prepare` (verificado localmente: crea el rol, es idempotente, rechaza nombres reservados, el rol no puede crear objetos); `precision-stabilization.sh` y su cloudbuild; la etiqueta de "Fase 15" en el workflow de producción reemplazada por el nombre del gate.
 - Pruebas: backend 85 suites verdes; integración de recurso (tipo gobernado, URL firmada sin extensión ⇒ PDF; `.pdf` declarado web ⇒ web); Admin valida `resourceType`; arranque local en modo producción como rol de mínimo privilegio con Precision montado (401 sin sesión) y `/health/ready` = `ready`.

@@ -4,7 +4,7 @@ import { createPoolDb } from "../db/database";
 import { recordAudit } from "../operations/audit";
 
 /**
- * One-time FIRST SUPER_ADMIN of the Control Center for an environment that has none yet (the private production candidate).
+ * One-time FIRST SUPER_ADMIN of the Control Center for an environment that has none yet (ESTABILIZACIÓN).
  * It is the approved path that `provision-admin.ts` (development only) refuses to be: it runs as a gated Cloud Run job.
  *
  *   ADMIN_BOOTSTRAP_EMAIL=<work email on an allowed domain>  ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you  DATABASE_URL=...  node dist/scripts/admin-bootstrap.js

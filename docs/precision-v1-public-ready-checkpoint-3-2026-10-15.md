@@ -2,7 +2,7 @@
 
 Fecha: 2026-10-15 · Rama `feature/precision-continuity-foundation` · Documento de seguimiento único: `precision-public-ready-evidence-pack-2026-10-15.md` (este checkpoint lo complementa).
 
-**Veredicto.** El puente de continuidad **es real y está probado**: Discovery completado no activa nada; un entitlement válido, de **cualquier** fuente gobernada, promueve el **mismo `project_id`** a Core en la **misma transacción**, de forma idempotente, y Precision se abre solo porque Core lo dice. El andamiaje de pruebas (`h.newProject`) ya no se usa en el camino Discovery → Precision. **Estado para el Candidato Privado de Producción: LISTO por ingeniería; falta el destino** (ver §7).
+**Veredicto.** El puente de continuidad **es real y está probado**: Discovery completado no activa nada; un entitlement válido, de **cualquier** fuente gobernada, promueve el **mismo `project_id`** a Core en la **misma transacción**, de forma idempotente, y Precision se abre solo porque Core lo dice. El andamiaje de pruebas (`h.newProject`) ya no se usa en el camino Discovery → Precision. **Estado para ESTABILIZACIÓN: LISTO por ingeniería; falta el destino** (ver §7).
 
 ## 1. Regla congelada, tal como quedó implementada
 
@@ -63,7 +63,7 @@ Evidencia estructural: el diario de Discovery RC (`pr6` / `feat/fa4-launch-confi
 - Fuentes con programa (`promotion`, `sponsored`) usan la misma activación con `programId` (gobernanza existente); no se re-probó cada programa aquí.
 - El correo de bienvenida y Operation Hub consumen `project.promoted_from_discovery` desde el outbox (asíncrono); sus consumidores reales pertenecen a sus frentes.
 
-## 7. ¿Podemos pasar al despliegue del Candidato Privado de Producción?
+## 7. ¿Podemos pasar al despliegue dESTABILIZACIÓN?
 
 **Ingeniería: sí.** Contrato de Discovery conectado, promoción gobernada por entitlement real, estado de migraciones seguro (y con guarda para evitar que un mal estado se aplique en silencio), regresión verde, rol de runtime probado.
 
