@@ -34,10 +34,11 @@ describe("production preflight (refuses a deployment while configuration is miss
     ["a development project", { PROJECT_ID: "beeside-dev-508220" }, "PROJECT_ID is a production project"],
     ["the shared dev Cloud SQL instance", { SQL_CONNECTION_NAME: "beeside-prod-1:northamerica-south1:beeside-dev-canonical-db" }, "Cloud SQL instance is not the dev instance"],
     ["an unpinned image", { IMAGE_TAG: "latest" }, "IMAGE_TAG"],
-    ["the technical /fa4 as the public path", { PUBLIC_PATH: "/fa4", FA4_PUBLIC_PATH: "/fa4" }, "PUBLIC_PATH = /discovery"],
+    ["the technical /fa4 as the public path", { PUBLIC_PATH: "/fa4", FA4_PUBLIC_PATH: "/fa4" }, "PUBLIC_PATH is /discovery (shared host) or / (dedicated host)"],
     ["e-mailed links not pointing at the public path", { FA4_PUBLIC_PATH: "/fa4" }, "FA4_PUBLIC_PATH matches PUBLIC_PATH (e-mailed links)"],
     ["an http origin", { PUBLIC_BASE_URL: "http://beeside.you", APP_BASE_URL: "http://beeside.you", ALLOWED_ORIGINS: "http://beeside.you" }, "PUBLIC_BASE_URL = https host without path"],
-    ["a root-built web bundle", { VITE_BASE_PATH: "/" }, "VITE_BASE_PATH = /discovery/"],
+    ["a root-built web bundle for a path deployment", { VITE_BASE_PATH: "/" }, "VITE_BASE_PATH matches PUBLIC_PATH"],
+    ["taking over the company site root", { PUBLIC_PATH: "/", FA4_PUBLIC_PATH: "/", VITE_BASE_PATH: "/" }, "PUBLIC_PATH is /discovery (shared host) or / (dedicated host)"],
     ["a bundle that still contains the legacy apps", { VITE_DISCOVERY_ONLY: "" }, "VITE_DISCOVERY_ONLY = true"],
     ["an admin surface wired before it exists", { OPS_CONTROL_MODE: "admin" }, "/ops-control reserved (no admin surface wired)"],
     ["internal-staging mode left on", { FA4_ENV: "staging" }, "no internal-staging mode"],
@@ -70,6 +71,11 @@ describe("production preflight (refuses a deployment while configuration is miss
     for (const id of ["LEGAL-1 final validation", "VITE_FA4_PREMIUM_PURCHASE_URL", "opening commercially is an explicit confirmation", "open phase: Premium comparison approved"]) expect(b).toContain(id);
     expect(evaluate({ ...open, LEGAL1_CONFIRMED: "true", OPEN_COMMERCIAL_CONFIRMED: "true", COMPARISON_APPROVED: "true", VITE_FA4_PREMIUM_PURCHASE_URL: "https://pay.example/x", PREMIUM_PURCHASE_DEFERRED_ACK: "" }).blocked).toBe(0);
   });
+  it("a dedicated host owning / is accepted when everything agrees, and its build must be root-relative", () => {
+    const d = { ...OK, PUBLIC_BASE_URL: "https://discovery.beeside.you", APP_BASE_URL: "https://discovery.beeside.you", ALLOWED_ORIGINS: "https://discovery.beeside.you", PUBLIC_PATH: "/", FA4_PUBLIC_PATH: "/", VITE_BASE_PATH: "/" };
+    expect(evaluate(d).blocked).toBe(0);
+    expect(blockedIds({ ...d, VITE_BASE_PATH: "/discovery/" })).toContain("VITE_BASE_PATH matches PUBLIC_PATH");
+  });
   it("never prints a secret value or an inlined credential", () => {
     const out = JSON.stringify(evaluate({ ...OK, DATABASE_URL: "postgres://user:SuperSecret123@h/db" }).rows);
     expect(out).not.toContain("SuperSecret123");
@@ -78,7 +84,7 @@ describe("production preflight (refuses a deployment while configuration is miss
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-dist-"));
     try {
       fs.writeFileSync(path.join(dir, "index.html"), '<script src="/assets/app.js"></script>');
-      expect(evaluate(OK, { dist: dir }).rows.find((r: { id: string }) => r.id === "built index.html references only /discovery/ assets")!.status).toBe("INVALID");
+      expect(evaluate(OK, { dist: dir }).rows.find((r: { id: string }) => r.id === "built index.html references only assets under the public path")!.status).toBe("INVALID");
       fs.writeFileSync(path.join(dir, "index.html"), '<script src="/discovery/assets/app.js"></script><link href="/discovery/assets/a.css">');
       expect(evaluate(OK, { dist: dir }).blocked).toBe(0);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }

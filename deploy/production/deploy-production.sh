@@ -42,14 +42,8 @@ echo "== 2. images"
 run gcloud --project "$PROJECT_ID" builds submit --config deploy/production/cloudbuild.production.yaml \
   --substitutions "_REPO=${REPO},_TAG=${IMAGE_TAG},_PRIVACY_URL=${FA4_PRIVACY_URL:-https://www.beeside.you/privacy},_PREMIUM_URL=${VITE_FA4_PREMIUM_PURCHASE_URL:-}" .
 
-echo "== 3. migrations + catalog seed (own job, own database role; the runtime services never see this credential)"
-for J in migrate seed; do
-  CMD=dist/scripts/migrate.js; [ "$J" = "seed" ] && CMD=dist/scripts/seed-fa4-catalog.js
-  EXTRA="MIGRATION_DATABASE_URL=${SECRET_MIGRATION_DATABASE_URL}:latest"; [ "$J" = "seed" ] && EXTRA="DATABASE_URL=${SECRET_MIGRATION_DATABASE_URL}:latest"
-  run g run jobs deploy "discovery-${J}" --region "$REGION" --image "${REPO}/discovery-backend:${IMAGE_TAG}" --command node --args "$CMD" \
-    --set-cloudsql-instances "$SQL_CONNECTION_NAME" --service-account "$(SA migrate)" --set-secrets "$EXTRA" --set-env-vars NODE_ENV=production --max-retries 0 --task-timeout 600
-  run g run jobs execute "discovery-${J}" --region "$REGION" --wait
-done
+echo "== 3. migrations + least-privilege verification + catalog seed (own jobs, own database role; the runtime services never see this credential)"
+run env PROJECT_ID="$PROJECT_ID" REGION="$REGION" IMAGE_TAG="$IMAGE_TAG" SKIP_BUILD=1 DRY_RUN="$DRY_RUN" SECRET_MIGRATION_DATABASE_URL="$SECRET_MIGRATION_DATABASE_URL" bash deploy/production/prepare-database.sh
 
 echo "== 4. backend (private: IAM-only invoker; reachable only by the web and worker identities)"
 run g run deploy discovery-backend --region "$REGION" --image "${REPO}/discovery-backend:${IMAGE_TAG}" --service-account "$(SA backend)" \
@@ -58,12 +52,14 @@ run g run deploy discovery-backend --region "$REGION" --image "${REPO}/discovery
 BACKEND_URL=$(url_of discovery-backend)
 run g run services add-iam-policy-binding discovery-backend --region "$REGION" --member "serviceAccount:$(SA web)" --role roles/run.invoker
 
+# --no-invoker-iam-check: the organization forbids granting allUsers (Domain Restricted Sharing), so the load balancer cannot hold an invoker binding. Reachability is
+# restricted by INGRESS (load balancer only) and every request is gated by the application (ACCESS_GATE_MODE) — never by "public Cloud Run".
 echo "== 5. web (Discovery-only static server + /discovery/api/fa4 proxy; controlled-access gate is RUNTIME configuration)"
 WEB_ENV="NODE_ENV=production,SERVE_MODE=discovery,PUBLIC_PATH=${PUBLIC_PATH},ACCESS_GATE_MODE=${ACCESS_GATE_MODE},ROBOTS_NOINDEX=${ROBOTS_NOINDEX:-false},API_UPSTREAM_URL=${BACKEND_URL},UPSTREAM_AUTH_AUDIENCE=${BACKEND_URL}"
 WEB_SECRETS=()
 [ "$ACCESS_GATE_MODE" = "basic" ] && WEB_SECRETS=(--set-secrets "ACCESS_GATE_CREDENTIALS=${SECRET_ACCESS_GATE_CREDENTIALS}:latest")
 run g run deploy discovery-web --region "$REGION" --image "${REPO}/discovery-web:${IMAGE_TAG}" --service-account "$(SA web)" \
-  --no-allow-unauthenticated --ingress internal-and-cloud-load-balancing --min-instances 1 --max-instances 5 --cpu 1 --memory 256Mi \
+  --no-allow-unauthenticated --no-invoker-iam-check --ingress internal-and-cloud-load-balancing --min-instances 1 --max-instances 5 --cpu 1 --memory 256Mi \
   --set-env-vars "$WEB_ENV" "${WEB_SECRETS[@]}"
 
 echo "== 6. e-mail outbox worker (always on; several replicas are safe — rows are leased)"

@@ -47,11 +47,14 @@ function evaluate(env, opts = {}) {
 
   // ---- public identity and routes
   must('PUBLIC_BASE_URL = https host without path', /^https:\/\/[a-z0-9.-]+$/.test(env.PUBLIC_BASE_URL ?? ''), 'must look like https://beeside.you');
-  must('PUBLIC_PATH = /discovery', env.PUBLIC_PATH === '/discovery', 'the customer-facing production path is /discovery (never /fa4)');
+  // Two supported public shapes: the shared company host under /discovery, or a DEDICATED host that owns "/" (e.g. https://discovery.beeside.you). Never the technical /fa4.
+  const host = (/^https:\/\/([a-z0-9.-]+)$/.exec(env.PUBLIC_BASE_URL ?? '') ?? [])[1] ?? '';
+  const shared = host === 'beeside.you' || host === 'www.beeside.you';
+  must('PUBLIC_PATH is /discovery (shared host) or / (dedicated host)', env.PUBLIC_PATH === '/discovery' || (env.PUBLIC_PATH === '/' && !shared), env.PUBLIC_PATH === '/' ? 'PUBLIC_PATH=/ would take over the company site root: use a dedicated host (e.g. discovery.beeside.you)' : 'the customer-facing production path is /discovery, or / on a dedicated host (never /fa4)');
   must('FA4_PUBLIC_PATH matches PUBLIC_PATH (e-mailed links)', env.FA4_PUBLIC_PATH === env.PUBLIC_PATH, 'e-mailed links would not point at the public path');
   must('APP_BASE_URL = PUBLIC_BASE_URL', env.APP_BASE_URL === env.PUBLIC_BASE_URL, 'APP_BASE_URL must equal the public origin (also hosts the e-mail logo)');
   must('ALLOWED_ORIGINS = public origin', env.ALLOWED_ORIGINS === env.PUBLIC_BASE_URL, 'the API origin guard must allow exactly the public origin');
-  must('VITE_BASE_PATH = /discovery/', env.VITE_BASE_PATH === '/discovery/', 'the web build must use the path prefix');
+  must('VITE_BASE_PATH matches PUBLIC_PATH', env.VITE_BASE_PATH === (env.PUBLIC_PATH === '/' ? '/' : `${env.PUBLIC_PATH}/`), 'the web build must be built for the same public path it is served at');
   must('VITE_DISCOVERY_ONLY = true', env.VITE_DISCOVERY_ONLY === 'true', 'the production bundle must contain nothing but Discovery');
   must('/ops-control reserved (no admin surface wired)', env.OPS_CONTROL_MODE === 'reserved', 'OPS_CONTROL_MODE must be "reserved" until the Discovery administration surface is connected');
   must('node environment', env.NODE_ENV === 'production', 'NODE_ENV must be production');
@@ -114,7 +117,7 @@ function evaluate(env, opts = {}) {
     else {
       const html = fs.readFileSync(index, 'utf8');
       const refs = [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map((m) => m[1]);
-      must('built index.html references only /discovery/ assets', refs.length > 0 && refs.every((r) => r.startsWith('/discovery/')), `root-relative references found: ${refs.filter((r) => !r.startsWith('/discovery/')).join(', ') || '(none at all)'}`);
+      must('built index.html references only assets under the public path', refs.length > 0 && refs.every((r) => (env.PUBLIC_PATH === '/' ? r.startsWith('/assets/') || r.startsWith('/brand/') : r.startsWith(`${env.PUBLIC_PATH}/`))), `unexpected references: ${refs.filter((r) => !(env.PUBLIC_PATH === '/' ? /^\/(assets|brand)\//.test(r) : r.startsWith(`${env.PUBLIC_PATH}/`))).join(', ') || '(none at all)'}`);
     }
   }
   const blocked = rows.filter((r) => ['MISSING', 'INVALID', 'EXTERNAL'].includes(r.status)).length;

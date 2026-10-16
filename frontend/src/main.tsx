@@ -10,7 +10,7 @@ import ReactDOM from "react-dom/client";
 // "not available", so neither the legacy First Assessment nor the legacy Control Center can ever render under the Discovery identity.
 const path = window.location.pathname;
 const discoveryOnly = import.meta.env.VITE_DISCOVERY_ONLY === "true";
-const isFa4 = /^\/(fa4|discovery)(\/|$)/.test(path);
+const isFa4 = /^\/(fa4|discovery)(\/|$)/.test(path) || (discoveryOnly && !/^\/ops-control(\/|$)/.test(path));   // a dedicated-host build owns "/"
 const isReserved = /^\/ops-control(\/|$)/.test(path);
 const isControlCenter = path === "/admin" || path.startsWith("/admin/");
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);

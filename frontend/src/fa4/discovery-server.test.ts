@@ -138,3 +138,21 @@ describe('discovery mode — controlled-access gate (runtime switch)', () => {
     for (const mode of ['off', 'edge']) { const s = await boot({ ACCESS_GATE_MODE: mode }); closer = s.close; expect((await s.get('/discovery/')).status, mode).toBe(200); expect((await s.get('/discovery/api/fa4/catalog')).status, mode).toBe(200); expect((await s.get('/health')).body).toContain(`"gate":"${mode}"`); await s.close(); closer = null; }
   });
 });
+
+describe('discovery mode — dedicated host (PUBLIC_PATH=/): the app owns the host root', () => {
+  it('serves the shell only at "/", files under /assets and /brand, forwards only /api/fa4/*, redirects /fa4, reserves /ops-control, 404 for everything else', async () => {
+    const s = await boot({ ACCESS_GATE_MODE: 'off', PUBLIC_PATH: '/' }); closer = s.close;
+    expect((await s.get('/')).body).toContain('Discovery shell');
+    expect((await s.get('/assets/app.js')).status).toBe(200); expect((await s.get('/brand/beeside-lockup.png')).status).toBe(200);
+    for (const p of ['/some/route', '/admin', '/resume/x', '/api/fa/links', '/api/admin/x', '/discovery/', '/assets/missing.js']) expect((await s.get(p)).status, p).toBe(404);
+    expect((await s.post('/api/fa4/session/result/email?x=1')).status).toBe(200); expect(seen.at(-1)).toEqual({ method: 'POST', url: '/api/fa4/session/result/email?x=1' });
+    expect((await s.get('/fa4')).headers.location).toBe('/'); expect((await s.get('/fa4/step?a=1')).headers.location).toBe('/step?a=1');
+    for (const p of ['/ops-control', '/ops-control/x']) { const r = await s.get(p); expect(r.status).toBe(404); expect(r.headers['x-robots-tag']).toMatch(/noindex/); }
+    expect((await s.get('/health')).status).toBe(200);
+  });
+  it('the gate works the same on a dedicated host, with the brand files still public', async () => {
+    const s = await boot({ ACCESS_GATE_MODE: 'basic', ACCESS_GATE_CREDENTIALS: `tester:${PW}`, PUBLIC_PATH: '/' }); closer = s.close;
+    expect((await s.get('/')).status).toBe(401); expect((await s.get('/api/fa4/catalog')).status).toBe(401);
+    expect((await s.get('/brand/beeside-lockup.png')).status).toBe(200); expect((await s.get('/', basic('tester', PW))).status).toBe(200);
+  });
+});

@@ -146,7 +146,7 @@ const GATE_TTL_MS = Number(process.env.ACCESS_GATE_COOKIE_TTL_HOURS ?? 12) * 3_6
 const GATE_CREDENTIALS = (process.env.ACCESS_GATE_CREDENTIALS ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 if (DISCOVERY) {
   const fail = (why) => { throw new Error(`discovery mode refuses to start: ${why}`); };
-  if (!/^\/[a-z0-9-]+$/.test(PUBLIC_PATH)) fail("PUBLIC_PATH must look like /discovery");
+  if (PUBLIC_PATH !== "/" && !/^\/[a-z0-9-]+$/.test(PUBLIC_PATH)) fail("PUBLIC_PATH must be / (dedicated host) or look like /discovery");
   if (!["off", "basic", "edge"].includes(GATE_MODE)) fail("ACCESS_GATE_MODE must be set explicitly to off | basic | edge (no implicit default)");
   if (!(GATE_TTL_MS >= 3_600_000 && GATE_TTL_MS <= 7 * 86_400_000)) fail("ACCESS_GATE_COOKIE_TTL_HOURS must be between 1 and 168");
   if (GATE_MODE === "basic") {
@@ -156,6 +156,7 @@ if (DISCOVERY) {
   if (PRODUCTION && !UPSTREAM) fail("API_UPSTREAM_URL is required in production");
   if (BASIC_AUTH || process.env.STAGING_TEST_LEGAL === "true" || ROOT_REDIRECT) fail("the staging switches (STAGING_BASIC_AUTH, STAGING_TEST_LEGAL, ROOT_REDIRECT) are not valid in discovery mode");
 }
+const PREFIX = PUBLIC_PATH === "/" ? "" : PUBLIC_PATH;   // "" = the app owns the whole (dedicated) host; "/discovery" = it shares the host under that path
 const GATE_KEY = createHash("sha256").update(GATE_CREDENTIALS.join("\n")).digest();
 const GATE_COOKIE = "discovery_gate";
 const gateCookieValue = (expires) => `${expires}.${createHmac("sha256", GATE_KEY).update(String(expires)).digest("hex")}`;
@@ -191,10 +192,10 @@ async function handleDiscovery(request, response) {
   // Administration is RESERVED: blocked until the Discovery administration surface is connected. Never a redirect to /admin, never the legacy console.
   if (/^\/ops-control(\/|$)/.test(pathname)) { notAvailable(); return; }
   // technical alias → canonical public path (the fragment of private links survives a redirect)
-  if (/^\/fa4(\/|$)/.test(pathname)) { send(308, { Location: PUBLIC_PATH + pathname.slice(4) + (pathname === "/fa4" ? "/" : "") + url.search, "Cache-Control": "no-store" }); return; }
-  if (pathname === PUBLIC_PATH) { send(308, { Location: `${PUBLIC_PATH}/${url.search}`, "Cache-Control": "no-store" }); return; }
-  if (!pathname.startsWith(PUBLIC_PATH + "/")) { notAvailable(); return; }
-  const inner = pathname.slice(PUBLIC_PATH.length);          // always starts with "/"
+  if (/^\/fa4(\/|$)/.test(pathname)) { send(308, { Location: (PREFIX + pathname.slice(4) || "/") + (pathname === "/fa4" && PREFIX ? "/" : "") + url.search, "Cache-Control": "no-store" }); return; }
+  if (PREFIX && pathname === PREFIX) { send(308, { Location: `${PREFIX}/${url.search}`, "Cache-Control": "no-store" }); return; }
+  if (PREFIX && !pathname.startsWith(PREFIX + "/")) { notAvailable(); return; }
+  const inner = PREFIX ? pathname.slice(PREFIX.length) : pathname;          // always starts with "/"
   const isApi = inner.startsWith("/api/");
   const exempt = inner.startsWith("/brand/");
   if (GATE_MODE === "basic" && !exempt) {
@@ -223,6 +224,7 @@ async function handleDiscovery(request, response) {
   if (candidate.startsWith(ROOT + path.sep) && path.extname(candidate) !== "") {
     try { await serve(candidate, response); return; } catch { notAvailable(); return; }   // a missing file is a 404, never the app shell
   }
+  if (!PREFIX && inner !== "/") { notAvailable(); return; }                  // dedicated host: the only page is "/" (state lives in the URL fragment); nothing else falls back to the shell
   try { await serve(path.join(ROOT, "index.html"), response); }
   catch { send(500, { "Content-Type": "application/json" }, JSON.stringify({ error: "INTERNAL" })); }
 }

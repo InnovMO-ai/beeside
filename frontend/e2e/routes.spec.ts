@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { UI } from "../src/fa4/copy/ui";
-import { PREFIX } from "./paths";
+import { DISCOVERY_MODE, PREFIX, ROOT_MOUNT } from "./paths";
 
 /**
  * Canonical routes: /discovery = public Discovery; /ops-control = RESERVED for the Discovery administration surface (blocked, never the legacy Control Center,
@@ -9,16 +9,16 @@ import { PREFIX } from "./paths";
  */
 test.describe("canonical routes", () => {
   test.beforeEach(async ({ page: _p }, info) => { test.skip(info.project.name !== "desktop-1440", "run once"); });
-  for (const p of ["/discovery", "/discovery/", "/fa4"]) {
+  for (const p of ROOT_MOUNT ? ["/", "/fa4"] : ["/discovery", "/discovery/", "/fa4"]) {
     test(`${p} serves Discovery`, async ({ page }) => {
       await page.goto(p);
       await expect(page.getByRole("button", { name: UI.coverCta.es })).toBeVisible();
       await expect(page.getByText("Discovery", { exact: true }).first()).toBeVisible();
-      if (PREFIX) expect(new URL(page.url()).pathname, "canonical public path").toBe("/discovery/");
+      if (DISCOVERY_MODE) expect(new URL(page.url()).pathname, "canonical public path").toBe(ROOT_MOUNT ? "/" : "/discovery/");
     });
   }
   test("Discovery never links to or mentions the administration routes (cover and identity)", async ({ page }) => {
-    await page.goto("/discovery");
+    await page.goto(ROOT_MOUNT ? "/" : "/discovery");
     for (const step of ["cover", "identity"]) {
       if (step === "identity") await page.getByRole("button", { name: UI.coverCta.es }).click();
       expect(await page.content()).not.toMatch(/ops-control|\/admin\b|Control Center/i);
@@ -35,10 +35,10 @@ test.describe("canonical routes", () => {
     });
   }
   test("the legacy technical routes do not exist under the Discovery identity (production-style build)", async ({ request }) => {
-    test.skip(!PREFIX, "root-built runs keep the legacy routes for internal staging");
-    for (const p of ["/", "/admin", "/admin/projects", "/resume/x", "/api/fa/links/continue", "/api/admin/auth/login"]) expect((await request.get(p, { maxRedirects: 0 })).status(), p).toBe(404);
+    test.skip(!DISCOVERY_MODE, "root-built runs keep the legacy routes for internal staging");
+    for (const p of [...(ROOT_MOUNT ? [] : ["/"]), "/admin", "/admin/projects", "/resume/x", "/api/fa/links/continue", "/api/admin/auth/login"]) expect((await request.get(p, { maxRedirects: 0 })).status(), p).toBe(404);
   });
   test("the public Discovery page is not marked noindex by the app itself when opened", async ({ request }) => {
-    const r = await request.get("/discovery/", { maxRedirects: 0 }); expect(r.status()).toBe(200); expect(r.headers()["x-robots-tag"]).toBeUndefined();
+    const r = await request.get(ROOT_MOUNT ? "/" : "/discovery/", { maxRedirects: 0 }); expect(r.status()).toBe(200); expect(r.headers()["x-robots-tag"]).toBeUndefined();
   });
 });
