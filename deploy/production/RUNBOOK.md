@@ -65,3 +65,11 @@ Blocked (404, noindex) until the Discovery administration surface is connected. 
 
 `STEPS="images database backend web worker alerts" bash deploy/production/deploy-production.sh …` runs any subset. Closed web tier first (`STEPS="images web alerts"`): the web needs only the deterministic backend URL, so it can be deployed and routed before the backend can start. The backend and worker start once the SMTP secret has a version (loaded by its owner directly into Secret Manager: `printf '%s' '<password>' | gcloud secrets versions add discovery-smtp-password --data-file=- --project beeside-discovery-prod`; never pasted in chat or logs).
 Edge: `HOSTNAME=discovery.beeside.you DRY_RUN=0 bash deploy/production/provision-edge.sh`, then in Wix DNS: `discovery  A  136.81.123.19`; the Google-managed certificate turns ACTIVE after that record resolves. In Wix: SEO → URL redirect manager: `/discovery` → `https://discovery.beeside.you/` (301). Measure `TRUST_PROXY_HOPS` once the load balancer serves traffic (the provisional value is 2).
+
+## 9. Reviewer access during Stabilization
+
+- The gate secret `discovery-access-gate-credentials` holds one `user:password` per line: `team`, `reviewer-hive-1`, `reviewer-hive-2` (passwords generated, never printed). Retrieve ONE line to hand it over individually, without showing the others:
+  `gcloud secrets versions access latest --secret discovery-access-gate-credentials --project beeside-discovery-prod | grep '^reviewer-hive-1:'`
+- Changing the secret needs a new `discovery-web` revision (`gcloud run services update discovery-web … --update-env-vars RESTART_AT=$(date -u +%s)`).
+- Backend session creation is limited to 10 per 10 minutes per address (429, WARNING level). Repeated smoke runs from one IP can exhaust it: wait 10 minutes between full runs.
+- The production smoke never provokes a 5xx: the "outside the allowed test domains is not mailed" case (502) lives in integration/staging only.

@@ -97,11 +97,7 @@ test.describe("closed app behind the gate", () => {
       const st = await request.get("/api/fa4/session/email-status?kind=result", { headers: H }); expect((await st.json()).state).toBe("sent");
       expect((await request.put("/api/fa4/session", { headers: H, data: { answers: a, step: "decision" } })).status(), name).toBe(409);   // delivered = closed
     }
-    // a destination outside the allowed test domains is never mailed (closed test)
-    const out = JSON.parse(JSON.stringify(journeyNortica("es"))); out.identity.email = `prospect.${Date.now()}@example.com`;
-    const so = await request.post("/api/fa4/sessions", { data: { answers: out, step: "extra" } }); const ho = { "X-Fa4-Session": (await so.json()).sessionToken as string };
-    const pvo = await request.post("/api/fa4/session/result", { headers: ho, data: {} }); const mo = await request.post("/api/fa4/session/result/email", { headers: ho, data: { previewToken: (await pvo.json()).previewToken } });
-    expect(mo.status(), "outside the test domains: not sent").not.toBe(200);
+    // NOTE: "a destination outside the allowed test domains is never mailed" (502 EMAIL_NOT_SENT) is covered by integration/staging only: against the real environment it would raise a false 5xx alert on every run.
     const mode = await request.get("/api/fa4/legal-mode"); expect(await mode.json()).toEqual({ legalMode: "closed-test" });
   });
 });
