@@ -6,14 +6,13 @@
  * offers the state-level context clearly labelled as such (or another approved source if one exists), and flags it for the specialist.
  */
 import { fold } from "./text";
-import { findPlaces, findStates } from "./geo";
 import { retrieve } from "./retrieve";
 import type { Granularity, Hit, Indicator, KnowledgeRepository, Topic } from "./types";
 
 const RANK: Record<Granularity, number> = { none: 0, country: 1, sector: 1, state: 2, municipality: 3, city: 3 };
 
 export interface GranularityLimit {
-  place: string;
+  /** The state the client's request is scoped to, when exactly one is known (the layer never receives the place the client named). */
   state: string;
   /** The finest level the available sources cover for the requested topics. */
   availableLevel: Granularity;
@@ -31,25 +30,31 @@ export interface Orientation {
   recommends: false;
 }
 
-export interface OrientRequest { text: string; jurisdiction: string; topics: Topic[]; candidates?: string[]; limit?: number }
+/**
+ * `text` is the consumer's NORMALISED query (vocabulary terms), used only to order results. Geography arrives already resolved by the consumer:
+ * `states` (controlled gazetteer names) and whether the ask is finer than a state. The layer never sees a place the client named.
+ */
+export interface OrientRequest { text: string; jurisdiction: string; topics: Topic[]; states?: string[]; finerThanState?: boolean; limit?: number }
+
+/** Token the consumer replaces with the place(s) the client named; the layer's wording keeps the slot, never the name. */
+export const PLACE_SLOT = "{place}";
 
 export async function orient(repo: KnowledgeRepository, req: OrientRequest): Promise<Orientation> {
-  const places = findPlaces(req.text);
-  const states = [...new Set([...(req.candidates ?? []).flatMap((c) => findStates(c)), ...findStates(req.text), ...places.map((p) => p.state).filter(Boolean)])];
+  const states = [...new Set(req.states ?? [])];
 
   const sources = await repo.listSources({ active: true, jurisdiction: req.jurisdiction });
   const best = sources.filter((s) => s.topics.some((t) => req.topics.includes(t))).reduce<Granularity>((a, s) => (RANK[s.granularity] > RANK[a] ? s.granularity : a), "none");
 
   const limits: GranularityLimit[] = [];
-  for (const p of places) {
-    if (RANK[best] >= RANK.municipality) continue;
+  if (req.finerThanState && RANK[best] < RANK.municipality) {
     const lvl = best === "state" ? "estatal" : "nacional";
     const lvlEn = best === "state" ? "state-level" : "national";
+    const state = states.length === 1 ? states[0]! : "";
     limits.push({
-      place: p.name, state: p.state, availableLevel: best,
+      state, availableLevel: best,
       message: {
-        es: `Las fuentes que tengo cubren el nivel ${lvl}, no ${p.name} como municipio o ciudad; por eso no te daré una lectura de ${p.name} en sí.${p.state ? ` Sí puedo darte contexto de ${p.state} como estado, señalando que es del estado y no de ${p.name}.` : ""}`,
-        en: `The sources I have cover the ${lvlEn} level, not ${p.name} as a municipality or city, so I will not give you a reading of ${p.name} itself.${p.state ? ` I can give you ${p.state} context as a state, making clear it is state-level and not about ${p.name}.` : ""}`,
+        es: `Las fuentes que tengo cubren el nivel ${lvl}, no ${PLACE_SLOT} como municipio o ciudad; por eso no te daré una lectura de ${PLACE_SLOT} en sí.${state ? ` Sí puedo darte contexto de ${state} como estado, señalando que es del estado y no de ${PLACE_SLOT}.` : ""}`,
+        en: `The sources I have cover the ${lvlEn} level, not ${PLACE_SLOT} as a municipality or city, so I will not give you a reading of ${PLACE_SLOT} itself.${state ? ` I can give you ${state} context as a state, making clear it is state-level and not about ${PLACE_SLOT}.` : ""}`,
       },
     });
   }
@@ -65,7 +70,7 @@ export async function orient(repo: KnowledgeRepository, req: OrientRequest): Pro
   if (states.length >= 2) comparison = compare(await indicatorHits(repo, req, states), states, req.topics);
 
   const res: Orientation = { hits, limits, ...(comparison && comparison.rows.length ? { comparison } : {}), recommends: false };
-  if (limits.length) res.sherpaFlag = { reason: `Pregunta sobre ${limits.map((l) => l.place).join(", ")} a nivel municipal/ciudad; las fuentes aprobadas cubren hasta nivel ${best === "state" ? "estatal" : "nacional"}.`, basis: limits.map((l) => l.place) };
+  if (limits.length) res.sherpaFlag = { reason: `Pregunta sobre ${PLACE_SLOT} a nivel municipal/ciudad; las fuentes aprobadas cubren hasta nivel ${best === "state" ? "estatal" : "nacional"}.`, basis: [PLACE_SLOT] };
   else if (hits.length === 0) res.sherpaFlag = { reason: "Sin fuentes aprobadas que cubran la pregunta de orientación.", basis: req.topics };
   return res;
 }

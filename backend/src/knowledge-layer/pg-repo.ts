@@ -5,7 +5,7 @@ import { tokens } from "./memory-repo";
 import type { CandidateStatus, CandidateStore, CandidateUpdate } from "./agent";
 import type { CountryResource, CountryResourceRepository } from "./country-resources";
 import { validateResource } from "./country-resources";
-import { assertNormalized, demandId, opaqueRef, type DemandRepository, type DemandStatus, type KnowledgeDemand, type StoredDemand } from "./demand";
+import { assertNormalized, assertOpaqueRefs, demandId, type DemandRepository, type DemandStatus, type KnowledgeDemand, type StoredDemand } from "./demand";
 import type { KnowledgeDocument, KnowledgePassage, KnowledgeRepository, KnowledgeSource, RetrieveQuery } from "./types";
 
 type Q = Pick<Db, "query">;
@@ -182,13 +182,14 @@ export function createPgDemandRepository(db: Q): DemandRepository {
   return {
     async register(d: KnowledgeDemand, ref, now) {
       assertNormalized(d);
+      assertOpaqueRefs(ref);
       const id = demandId(d);
       await db.query(
         `INSERT INTO knowledge_demand (id, country, topic, subtopic, category_key, service_key, info_type, coverage, disposition, reason, boundary, first_seen_at, last_seen_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12) ON CONFLICT (id) DO NOTHING`,
         [id, d.country, d.topic, d.subtopic, d.categoryKey, d.serviceKey, d.infoType, d.coverage, d.disposition, d.reason, d.boundary, now],
       );
-      const ev = await db.query("INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [id, opaqueRef("p", ref.projectId), opaqueRef("t", ref.turnKey), now]);
+      const ev = await db.query("INSERT INTO knowledge_demand_event (demand_id, project_ref, turn_ref, seen_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [id, ref.projectRef, ref.eventRef, now]);
       if ((ev.rowCount ?? 0) > 0) await db.query("UPDATE knowledge_demand SET last_seen_at = GREATEST(last_seen_at, $2) WHERE id = $1", [id, now]);
       return toDemand((await db.query<DemandRow>(`${DEMAND_SELECT} WHERE d.id = $1`, [id])).rows[0]!);
     },

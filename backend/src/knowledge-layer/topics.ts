@@ -26,6 +26,9 @@ const KEYWORDS: Record<Topic, string[]> = {
   energy: ["energia", "electricidad", "petroleo", "hidrocarburos", "energy", "cfe", "pemex", "renovable", "energetica", "energia electrica"],
 };
 
+/** Vocabulary terms of a controlled topic (never client words). */
+export function topicTerms(topic: Topic): string[] { return KEYWORDS[topic] ?? []; }
+
 /** Short keywords (acronyms such as "sat", "iva", "isr") must match as whole words: as substrings they fire inside unrelated words. */
 const matches = (f: string, k: string): boolean => (k.length <= 4 ? new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(f) : f.includes(k));
 

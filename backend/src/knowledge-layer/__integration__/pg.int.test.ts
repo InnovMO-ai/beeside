@@ -42,9 +42,9 @@ describeWithDb("Knowledge Service + frame store (PostgreSQL)", () => {
     expect(labor[0]!.mayGroundObligation).toBe(false);
     const accents = await retrieve(repo, { text: "participacion laboral", jurisdiction: "MX" });
     expect(accents.length).toBeGreaterThan(0);
-    const o = await orient(repo, { text: "Entre Nuevo León y Querétaro", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], candidates: ["Nuevo León", "Querétaro"] });
+    const o = await orient(repo, { text: "Entre Nuevo León y Querétaro", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], states: ["Nuevo León", "Querétaro"] });
     expect(o.comparison?.rows.find((r) => r.criterion === "Mercado de trabajo")?.leader).toBe("Nuevo León");
-    const g = await orient(repo, { text: "La planta iría en San Pedro Garza García", jurisdiction: "MX", topics: ["labor_market"] });
+    const g = await orient(repo, { text: "mercado laboral", jurisdiction: "MX", topics: ["labor_market"], states: ["Nuevo León"], finerThanState: true });
     expect(g.limits[0]?.availableLevel).toBe("state");
     expect(g.sherpaFlag).toBeDefined();
     const official = await retrieve(repo, { text: "cuotas obrero-patronales trabajadores", topics: ["social_security"], jurisdiction: "MX", authorities: ["official_primary"] });

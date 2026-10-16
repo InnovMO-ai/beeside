@@ -42,7 +42,7 @@ interface Call { method: string; args: any[]; result: any }
 function recorded(real: KnowledgeLayer, calls: Call[]): KnowledgeLayer {
   const wrap = <K extends keyof KnowledgeLayer>(m: K): KnowledgeLayer[K] =>
     (async (...args: any[]) => { const result = await (real[m] as any)(...args); calls.push({ method: m, args, result }); return result; }) as KnowledgeLayer[K];
-  return { coverage: wrap("coverage"), interpret: wrap("interpret"), request: wrap("request"), recordDemand: wrap("recordDemand"), resources: wrap("resources"), openResource: wrap("openResource") };
+  return { coverage: wrap("coverage"), request: wrap("request"), recordDemand: wrap("recordDemand"), resources: wrap("resources"), openResource: wrap("openResource") };
 }
 
 d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
@@ -125,7 +125,11 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
       // the request went through the contract: coverage probe, then a request for the project's jurisdiction
       expect(of("coverage").map((c) => c.args[0])).toContain("MX");
       const req = of("request")[0]!;
-      expect(req.args[0]).toMatchObject({ jurisdiction: "MX", intent: "answer_question", language: "es" });
+      expect(req.args[0]).toMatchObject({ jurisdiction: "MX", stage: "understanding", intent: "answer_question", language: "es" });
+      // frozen privacy boundary: the request is structured dimensions; the client's question and the real project id never reach the layer
+      expect(req.args[0]).not.toHaveProperty("question");
+      expect(JSON.stringify(calls.map((c) => c.args))).not.toContain(projectId);
+      expect(JSON.stringify(calls.map((c) => c.args)).toLowerCase()).not.toContain("qué dice el imco");
       expect(req.result.availability).toBe("sufficient");
       const unit = req.result.units[0];
       expect(unit.source).toMatchObject({ sourceId: "imco-ice", edition: "2025", version: 1, authority: "trusted_institutional", status: "active", jurisdiction: "MX" });
@@ -159,16 +163,18 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
       const r = await api.post("/understanding/turns", { turnKey: key("q"), text: question });
       const a = lastAssistant(r.body);
       const res = of("request")[0]!.result;
-      expect(res).toMatchObject({ availability: "partial", reason: "professional_judgment", recommends: false, boundary: { kind: "best_option" } });
+      // the layer answers the context (it knows nothing of the client's ask for a determination); Precision applies the professional boundary it read locally
+      expect(res).toMatchObject({ recommends: false });
+      expect(res).not.toHaveProperty("boundary");
       expect(res.units.length).toBeGreaterThan(0);
-      expect(res.unresolved).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "professional_judgment" })]));
       expect(a.text).toMatch(/IMCO/);
       expect(a.text).toMatch(/especialista de beeside/);                    // the boundary metadata, worded by Precision
       expect(a.text).not.toMatch(/el mejor estado es/i);
 
       // the unmet part goes back to the layer as a normalised signal: controlled values only, never the question
       const sig = of("recordDemand")[0]!;
-      expect(sig.args[0]).toMatchObject({ turnKey: expect.any(String) });
+      expect(sig.args[0]).toMatchObject({ projectRef: expect.stringMatching(/^[0-9a-f]{32}$/), eventRef: expect.stringMatching(/^[0-9a-f]{32}$/) });
+      expect(Object.keys(sig.args[0]).sort()).toEqual(["eventRef", "projectRef"]);
       expect(sig.args[1]).toMatchObject({ country: "MX", topic: "labor_market", outcome: { coverage: "partial", boundary: "best_option" } });
       expect(JSON.stringify(sig.args[1]).toLowerCase()).not.toMatch(/mercado de trabajo|mi operaci|estado para/);
       expect(sig.result).toMatchObject({ coverage: "partial", disposition: "specialist_service", boundary: { kind: "best_option" } });
@@ -194,7 +200,7 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
     const sig = of("recordDemand")[0]!;
     expect(sig.args[1]).toMatchObject({ country: "CL", outcome: { coverage: "none", reason: "no_sources" } });
     expect((await demandRows()).find((x) => x.country === "CL")).toMatchObject({ coverage: "absent", reason: "no_sources", status: "open" });
-    expect(JSON.stringify(sig.args[1])).not.toContain(projectId.toLowerCase());   // the signal carries no project identity (the layer hashes the context reference)
+    expect(JSON.stringify(sig.args[1])).not.toContain(projectId.toLowerCase());   // the signal carries no project identity (only the keyed opaque reference)
     expect(Number((await h.db.query<{ n: number }>("SELECT count(*)::int AS n FROM knowledge_document")).rows[0]?.n)).toBe(docsBefore); // no web, no invention
   }, 120000);
 

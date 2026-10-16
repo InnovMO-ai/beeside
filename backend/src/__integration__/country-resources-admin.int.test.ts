@@ -12,6 +12,8 @@ import { ingestDocument } from "../knowledge-layer/ingest";
 import { seedInitialSources } from "../knowledge-layer/registry";
 import { onboardCountryGuide } from "../knowledge-layer/onboard-guide";
 import { createKnowledgeLayer } from "../knowledge-layer";
+import { readQuestion } from "../knowledge-layer/vocabulary";
+import { refsOf } from "../knowledge-layer/__tests__/local-consumer";
 
 const ISSUER = "https://idp.test";
 const CLIENT_ID = "beeside-control-center";
@@ -124,8 +126,8 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     const { admin, supervisor } = await people();
     // Precision's signals reach the layer's registry through the contract (the layer aggregates; recurrence only informs)
     const kl = createKnowledgeLayer({ knowledge: createPgKnowledgeRepository(h.deps.db), demand: createPgDemandRepository(h.deps.db), resources: createPgCountryResources(h.deps.db), now: () => h.clock.now });
-    const reading = await kl.interpret("¿Qué requisitos tiene el IMMEX para una importación temporal?");
-    for (let i = 0; i < 3; i++) await kl.recordDemand({ projectId: `p${i}`, turnKey: "t1" }, { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
+    const reading = readQuestion("¿Qué requisitos tiene el IMMEX para una importación temporal?");
+    for (let i = 0; i < 3; i++) await kl.recordDemand(refsOf(`p${i}`, "t1"), { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
     const repo = createPgDemandRepository(h.deps.db);
 
     const listed = await get(supervisor, "/precision/knowledge/demand?topic=customs&minOccurrences=2");
@@ -140,7 +142,7 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
     const decided = await post(admin, `/precision/knowledge/demand/${row.id}/decision`, { status: "accepted_for_curation", note: "Prioridad V1: aduanas" });
     expect(decided.status).toBe(200);
     expect(decided.body).toMatchObject({ status: "accepted_for_curation", decisionNote: "Prioridad V1: aduanas" });
-    await kl.recordDemand({ projectId: "p9", turnKey: "t1" }, { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
+    await kl.recordDemand(refsOf("p9", "t1"), { country: "MX", topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey: null, serviceKey: null, outcome: { coverage: "none", reason: "no_hits" } });
     expect((await repo.get(row.id))!.status).toBe("accepted_for_curation");
 
     const kseed = await get(supervisor, "/precision/knowledge/kseed");

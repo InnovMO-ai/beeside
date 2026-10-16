@@ -12,6 +12,8 @@ import { ingestDocument } from "../ingest";
 import { InMemoryKnowledgeRepository } from "../memory-repo";
 import { seedInitialSources } from "../registry";
 import { createKnowledgeLayer } from "../service";
+import { readQuestion } from "../vocabulary";
+import { askLocally, refsOf } from "./local-consumer";
 
 const NOW = "2026-10-15T10:00:00.000Z";
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "fixtures", n));
@@ -25,7 +27,7 @@ async function layer(opts: { ice?: boolean; onError?: (e: unknown) => void } = {
   const kl: KnowledgeLayer = createKnowledgeLayer({ knowledge, demand, resources, now: () => new Date(NOW), ...(opts.onError ? { onError: opts.onError } : {}) });
   return { kl, knowledge, demand, resources };
 }
-const ask = (kl: KnowledgeLayer, question: string, jurisdiction: string | null = "MX") => kl.request({ jurisdiction, intent: "answer_question", question, language: "es" });
+const ask = (kl: KnowledgeLayer, question: string, jurisdiction: string | null = "MX") => askLocally(kl, question, jurisdiction);
 
 describe("availability states", () => {
   it("SUFFICIENT: approved knowledge answers; every unit carries source, edition/version, jurisdiction, dates, authority class, risk, confidence and status", async () => {
@@ -34,7 +36,6 @@ describe("availability states", () => {
     expect(r.availability).toBe("sufficient");
     expect(r.reason).toBeUndefined();
     expect(r.recommends).toBe(false);
-    expect(r.boundary).toBeNull();
     const u = r.units[0]!;
     expect(u.source).toMatchObject({
       sourceId: "imco-ice", institution: expect.stringMatching(/IMCO|Instituto/), documentTitle: "ICE (fixture)", edition: "2025", version: 1, jurisdiction: "MX",
@@ -43,7 +44,7 @@ describe("availability states", () => {
     expect(u.source.roles).not.toContain("obligation");
     expect(u.wording).toBe("context");                      // an analytical institution never states a requirement
     expect(u.citation).toMatch(/ICE \(fixture\) \(2025\), /);
-    expect(r.interpretation.topics.length).toBeGreaterThan(0);
+    expect(readQuestion("¿Cómo está el mercado laboral y la informalidad?").topics.length).toBeGreaterThan(0);
   });
 
   it("PARTIAL (granularity): the state-level source speaks, the municipality is declared unknown, and the specialist is flagged", async () => {
@@ -52,21 +53,22 @@ describe("availability states", () => {
     expect(r.availability).toBe("partial");
     expect(r.reason).toBe("granularity");
     expect(r.units.length).toBeGreaterThan(0);
-    expect(r.limits[0]).toMatchObject({ kind: "granularity", place: expect.stringMatching(/San Pedro/) });
+    expect(r.limits[0]).toMatchObject({ kind: "granularity", availableLevel: "state" });
+    // the layer never saw the place: its wording keeps a slot for the consumer to fill
+    expect(r.limits[0]!.message.es).toContain("{place}");
+    expect(JSON.stringify(r)).not.toMatch(/San Pedro/);
     expect(r.unresolved).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "granularity" })]));
     expect(r.specialistNote).toBeTruthy();
     expect(r.units.every((u) => u.granularity !== "municipality")).toBe(true);
   });
 
-  it("PARTIAL (professional boundary): context is given AND the boundary metadata names the specialist area; never a verdict", async () => {
+  it("a determination request still gets general context, never a verdict (the boundary itself is the consumer's reading, applied on top)", async () => {
     const { kl } = await layer();
-    const r = await ask(kl, "¿Cuál es la mejor opción de estado para mi operación según el mercado laboral?");
-    expect(r.availability).toBe("partial");
-    expect(r.reason).toBe("professional_judgment");
+    const q = "¿Cuál es la mejor opción de estado para mi operación según el mercado laboral?";
+    const r = await ask(kl, q);
     expect(r.units.length).toBeGreaterThan(0);
-    expect(r.boundary).toMatchObject({ kind: "best_option", area: { es: expect.any(String), en: expect.any(String) }, specialistCategoryKey: null });
-    expect(r.unresolved).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "professional_judgment" })]));
     expect(r.recommends).toBe(false);
+    expect(readQuestion(q).boundary).toBe("best_option");
   });
 
   it("UNAVAILABLE (no sources for the jurisdiction): nothing is guessed, no web", async () => {
@@ -88,19 +90,23 @@ describe("availability states", () => {
 
   it("UNAVAILABLE (sources exist, nothing approved applies to the question)", async () => {
     const { kl } = await layer();
-    expect(await ask(kl, "¿Cuánto cuesta el IVA?")).toMatchObject({ availability: "unavailable", reason: "no_hits", units: [], interpretation: { topic: "taxes" } });
-    expect(await ask(kl, "¿Y si llueve ese día?")).toMatchObject({ availability: "unavailable", reason: "no_hits", interpretation: { topic: "unclassified" } });
+    expect(await ask(kl, "¿Cuánto cuesta el IVA?")).toMatchObject({ availability: "unavailable", reason: "no_hits", units: [] });
+    expect(readQuestion("¿Cuánto cuesta el IVA?").topic).toBe("taxes");
+    expect(await ask(kl, "¿Y si llueve ese día?")).toMatchObject({ availability: "unavailable", reason: "no_hits" });
+    expect(readQuestion("¿Y si llueve ese día?").topic).toBe("unclassified");
   });
 
-  it("UNAVAILABLE keeps the professional boundary: a determination with no context still names its specialist area", async () => {
+  it("the professional boundary is the CONSUMER's reading of its own question: the layer returns no verdict about the client's ask", async () => {
     const { kl } = await layer();
     const r = await ask(kl, "¿Cuánto ISR voy a pagar este año?");
-    expect(r).toMatchObject({ availability: "unavailable", reason: "professional_judgment", boundary: { kind: "tax_conclusion", specialistCategoryKey: "tax_accounting_audit" } });
+    expect(r).toMatchObject({ availability: "unavailable", reason: "no_hits" });
+    expect(r).not.toHaveProperty("boundary");
+    expect(readQuestion("¿Cuánto ISR voy a pagar este año?").boundary).toBe("tax_conclusion");   // read locally, where the words live
   });
 
   it("project context (no question) uses the topics the consumer names", async () => {
     const { kl } = await layer();
-    const r = await kl.request({ jurisdiction: "MX", intent: "project_context", topics: ["labor_market", "infrastructure"], language: "es" });
+    const r = await kl.request({ jurisdiction: "MX", stage: "understanding", intent: "project_context", topics: ["labor_market", "infrastructure"], language: "es" });
     expect(r.availability).toBe("sufficient");
     expect(r.units.every((u) => u.topics.some((t) => ["labor_market", "infrastructure"].includes(t)))).toBe(true);
   });
@@ -126,7 +132,7 @@ describe("sufficiency is judged against the information intent (neighbouring kno
   it("BROAD ask: the labour-market picture is answered collectively by its family (informality is a component) -> sufficient", async () => {
     const { kl } = await withDoc("La informalidad laboral es alta en varias entidades: una parte importante de la población ocupada trabaja sin seguridad social.");
     const r = await ask(kl, "Cuéntame sobre el mercado laboral");
-    expect(r.interpretation.topic).toBe("labor_market");
+    expect(readQuestion("Cuéntame sobre el mercado laboral").topic).toBe("labor_market");
     expect(r.availability).toBe("sufficient");
     expect(r.units.length).toBeGreaterThan(0);
     expect(r.units.every((u) => u.support === "direct")).toBe(true);
@@ -136,7 +142,7 @@ describe("sufficiency is judged against the information intent (neighbouring kno
   it("SPECIFIC ask (mandatory employee benefits): general labour-market/informality knowledge does NOT make it sufficient -> partial, and it is only context", async () => {
     const { kl } = await withDoc(LABOR_PICTURE);
     const r = await ask(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?");
-    expect(r.interpretation).toMatchObject({ topic: "wages", subtopic: "mandatory_benefits" });
+    expect(readQuestion("¿Cuáles son las prestaciones obligatorias de los empleados en México?")).toMatchObject({ topic: "wages", subtopic: "mandatory_benefits" });
     expect(r.availability).toBe("partial");
     expect(r.reason).toBe("no_hits");
     expect(r.units.length).toBeGreaterThan(0);
@@ -147,7 +153,7 @@ describe("sufficiency is judged against the information intent (neighbouring kno
   it("a RULE ask is never answered by analytical or curated context, however closely it talks about the topic (authority fit)", async () => {
     const { kl } = await withDoc(`Prestaciones obligatorias: el aguinaldo equivale a quince días de salario y la prima vacacional es de al menos el veinticinco por ciento.`);
     const r = await ask(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?");
-    expect(r.interpretation.infoType).toBe("regulatory_requirement");
+    expect(readQuestion("¿Cuáles son las prestaciones obligatorias de los empleados en México?").infoType).toBe("regulatory_requirement");
     expect(r.availability).toBe("partial");
     expect(r.units.every((u) => u.support === "contextual" && u.wording === "context")).toBe(true);
   });
@@ -163,7 +169,7 @@ describe("sufficiency is judged against the information intent (neighbouring kno
   it("SPECIFIC ask met only by a sibling topic in the same family (customs asked, exports known) -> partial, never sufficient", async () => {
     const { kl } = await withDoc("Las exportaciones manufactureras explican parte de la diferencia entre estados y el comercio exterior se concentra en pocas entidades.");
     const r = await ask(kl, "¿Qué requisitos tiene el IMMEX para una importación temporal?");
-    expect(r.interpretation).toMatchObject({ topic: "customs", subtopic: "duty_regimes" });
+    expect(readQuestion("¿Qué requisitos tiene el IMMEX para una importación temporal?")).toMatchObject({ topic: "customs", subtopic: "duty_regimes" });
     expect(r.availability).toBe("partial");
     expect(r.units.every((u) => u.support === "contextual")).toBe(true);
   });
@@ -187,12 +193,20 @@ describe("sufficiency is judged against the information intent (neighbouring kno
   });
 });
 
-describe("interpretation", () => {
-  it("reads a question in the layer's vocabularies, including the professional boundary, without storing it", async () => {
-    const { kl, demand } = await layer();
-    const i = await kl.interpret("¿Puedo deducir los gastos de la matriz del ISR?");
-    expect(i).toMatchObject({ topic: "taxes", boundary: { kind: "tax_conclusion" } });
+describe("the layer has no free-text entrance (frozen privacy boundary)", () => {
+  it("a question is read by the consumer in the controlled vocabularies, including the professional boundary; the layer stores nothing", async () => {
+    const { demand } = await layer();
+    expect(readQuestion("¿Puedo deducir los gastos de la matriz del ISR?")).toMatchObject({ topic: "taxes", boundary: "tax_conclusion" });
     expect(await demand.list({})).toEqual([]);
+  });
+
+  it("the contract has no 'interpret' and its request carries no question, context candidates or project id", async () => {
+    const { kl } = await layer();
+    expect((kl as unknown as Record<string, unknown>)["interpret"]).toBeUndefined();
+    const src = readFileSync(join(__dirname, "..", "contract.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const req = src.slice(src.indexOf("export interface KnowledgeRequest"), src.indexOf("// ---", src.indexOf("export interface KnowledgeRequest")));
+    expect(req).not.toMatch(/\bquestion\b|\bcandidates\b|\bprojectId\b|\bproject_id\b|\bcontext\??:/);
+    expect(src).not.toMatch(/\bprojectId\b/);
   });
 });
 
@@ -201,25 +215,25 @@ describe("demand signals", () => {
 
   it("the layer aggregates normalised signals; a covered question registers nothing", async () => {
     const { kl, demand } = await layer();
-    const a = await kl.recordDemand({ projectId: "p1", turnKey: "t1" }, signal);
+    const a = await kl.recordDemand(refsOf("p1", "t1"), signal);
     expect(a).toMatchObject({ topic: "customs", subtopic: "duty_regimes", coverage: "absent", disposition: "candidate_knowledge", reason: "no_hits", boundary: null });
-    await kl.recordDemand({ projectId: "p2", turnKey: "t1" }, signal);
+    await kl.recordDemand(refsOf("p2", "t1"), signal);
     const rows = await demand.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ occurrences: 2, projects: 2, status: "open" });
-    expect(await kl.recordDemand({ projectId: "p3", turnKey: "t1" }, { ...signal, outcome: { coverage: "full", reason: "no_hits" } })).toBeNull();
+    expect(await kl.recordDemand(refsOf("p3", "t1"), { ...signal, outcome: { coverage: "full", reason: "no_hits" } })).toBeNull();
   });
 
   it("a professional-boundary signal is specialist work and carries the boundary back as metadata", async () => {
     const { kl } = await layer();
-    const r = await kl.recordDemand({ projectId: "p1", turnKey: "t1" }, { ...signal, topic: "taxes", subtopic: "income_tax", infoType: "tax_treatment", outcome: { coverage: "none", reason: "no_hits", boundary: "tax_conclusion" } });
+    const r = await kl.recordDemand(refsOf("p1", "t1"), { ...signal, topic: "taxes", subtopic: "income_tax", infoType: "tax_treatment", outcome: { coverage: "none", reason: "no_hits", boundary: "tax_conclusion" } });
     expect(r).toMatchObject({ disposition: "specialist_service", reason: "professional_judgment", boundary: { kind: "tax_conclusion" } });
   });
 
   it("is best-effort: a failing store never throws into the consumer's turn, and a free-form signal is refused", async () => {
     const errs: unknown[] = [];
     const { kl, demand } = await layer({ onError: (e) => errs.push(e) });
-    await expect(kl.recordDemand({ projectId: "p", turnKey: "t" }, { ...signal, subtopic: "texto libre del cliente" } as never)).resolves.toBeDefined();
+    await expect(kl.recordDemand(refsOf("p", "t"), { ...signal, subtopic: "texto libre del cliente" } as never)).resolves.toBeDefined();
     expect(errs).toHaveLength(1);
     expect(await demand.list({})).toEqual([]);
   });

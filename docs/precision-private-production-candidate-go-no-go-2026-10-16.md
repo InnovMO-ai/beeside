@@ -4,30 +4,22 @@ Fecha: 2026-10-16 · Rama `feature/precision-continuity-foundation` · **No se d
 
 ## RESPUESTA FINAL
 
-**PRIVATE PRODUCTION CANDIDATE DEPLOYMENT READY: NO.**
+**PRIVATE PRODUCTION CANDIDATE DEPLOYMENT READY: NO.** (actualizado tras el cierre de KL e identidad de Admin)
 
-La ingeniería, el guard de migración, la identidad Premium, "beeside Doing Business México" y el tooling de despliegue están listos y probados. Lo que impide desplegar hoy son **dos bloqueos genuinos, ambos fuera del código**:
+La ingeniería está lista y probada (KL limpio, semilla obligatoria, identidad de Admin = Google/IAP existente, migración 50/50, "beeside Doing Business México"). Quedan **solo bloqueos externos**:
 
-1. **No existe el entorno de destino ni acceso a él.** No hay ID de proyecto GCP de producción (Terraform sin aplicar; `GCP_PROJECT_ID` vacío) y esta sesión no tiene `gcloud` autenticado. Sin eso no se puede ejecutar el check de migración de solo lectura contra el objetivo, el primer paso obligatorio. → *REQUIERE DECISIÓN DE MIKE* (proyecto + facturación) y *REQUIERE ACCESO* (sesión autenticada).
-2. **Reconciliación final de KL pendiente.** El handoff canónico final no está en el Proyecto ni lo recibí; la reconciliación se hace una sola vez contra él. La auditoría previa ya encontró desajustes concretos con los principios A–E (§1). → *REQUIERE a Mike: el documento.*
+1. **Proyecto GCP de producción y acceso** (proyecto + facturación; `gcloud` autenticado). → *REQUIERE DECISIÓN DE MIKE / ACCESO*.
+2. **Contenido de la semilla inicial de KL** en un bucket privado con `manifest.json`.
+3. **Cliente OAuth Web (Internal, `beeside.you`)**, su secreto en Secret Manager y el correo del primer SUPER_ADMIN.
+4. Aprobación del gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL**.
 
-No bloquean el despliegue (sí la validación integral): la semilla inicial de KL, el proveedor de identidad de Admin, el PDF final, Stripe/ClickUp, modelo real/ZDR, ICE 2026.
+No bloquean el despliegue (sí la validación integral): PDF final, Stripe/ClickUp, modelo real/ZDR, ICE 2026.
 
-> Una desviación a tu número esperado: **el destino canónico ahora es 50 / 50, no 49 / 49.** Tu corrección §5 exige que el tipo PDF salga de metadato gobernado; la tabla `country_resource` no tenía ningún campo de tipo (solo `destination_kind`, `topic`, `section`). La alternativa sin migración era sobrecargar `section`, que es un hack. Agregué la migración **0049**: una columna `resource_type` nula, con CHECK `pdf|web`, aditiva, sin tocar datos. Si prefieres 49/49, es revertirla y aceptar el hack; no lo recomiendo.
+> Destino de migraciones **50 / 50, no 49 / 49**: la 0049 agrega `country_resource.resource_type` (nulo, CHECK `pdf|web`, aditiva) para que el tipo PDF salga de metadato gobernado y no de un hack sobre `section`.
 
-## 1. Reconciliación final de KL
+## 1. Reconciliación final de KL — **CLEAN** (actualizado)
 
-**¿Limpia? NO determinable todavía — y hay desajustes concretos ya visibles.** Auditoría previa del código actual contra los principios A–E de tu mensaje (el handoff final es la fuente de verdad; esto NO impone supuestos antiguos, solo muestra dónde chocan):
-
-| Principio | Estado | Detalle exacto |
-|---|---|---|
-| **A. Rol de KL** | Parcial | KL ya no importa nada de Precision y es un paquete independiente. Pero conoce el `projectId` (ver B) y recibe la categoría/servicio del Service Map de *ese* proyecto (`category`, `service` en `KnowledgeRequest` y en la señal de demanda). |
-| **B. Privacidad / minimización** | **DESAJUSTE** | (1) `KnowledgeRequest.question` y `kl.interpret(question)` envían **las palabras literales del cliente** a KL (`adapters.ts`: `request({ intent:"answer_question", question })` y `interpret(i.question)`). (2) `recordDemand({ projectId, turnKey }, …)` envía el **`project_id`** (KL lo reduce a una referencia opaca, pero el valor real cruza). (3) `context.candidates` lleva los estados que el cliente compara (dato de proyecto). Hoy es una llamada en proceso y KL no guarda ni repite el texto, por eso no hay fuga real; **sí contradice el principio** en cuanto KL sea un servicio. |
-| **C. Frontera web** | **Limpio** | Precision no hace ninguna llamada de red; el único `fetch` de KL es `agent.ts` (puerto inyectado, solo fuentes aprobadas, no alcanzable desde la conversación). Hay pruebas de frontera. |
-| **D. Conocimiento inicial** | **Brecha de despliegue** | El arranque solo siembra el *registro de fuentes*, no contenido. Con la capa vacía Precision queda honesto ("no disponible") pero esa **no debe ser la integración prevista**. El paso de carga de la semilla inicial está en el orden de despliegue (§6, paso 11) y en el smoke test. |
-| **E. Equivalencias en RAM** | **No evaluable** | No hay ninguna implementación de equivalencias en el límite KL (las coincidencias en el código son de FA y de manifiestos, no de KL). Necesito el handoff para saber qué es "RAM" y su frontera con la memoria de proyecto. |
-
-**Corrección mínima recomendada** (se aplica en la única reconciliación, ajustada a las dimensiones del contrato final): Precision clasifica **localmente** (su intérprete ya produce tema/subtema/tipo) y llama a KL **solo con dimensiones estructuradas**; se elimina `question` del cruce y se retira `interpret(question)` del camino; la señal de demanda lleva solo dimensiones controladas y un token opaco de recurrencia generado por Precision (no el `project_id`). No la implemento antes del handoff porque qué dimensiones son válidas las define ese documento.
+Contrastado contra el handoff canónico final y corregido en código: Precision ya no envía texto literal, `project_id` ni `context.candidates` a KL; la demanda usa referencias opacas HMAC irreversibles; sin ruta web; la semilla inicial es obligatoria en producción (guard de arranque + fase `seed` + smoke S6). Detalle, cambios exactos y pruebas: `docs/precision-kl-boundary-reconciliation-2026-10-16.md`.
 
 ## 2. Producto / UX
 
@@ -38,7 +30,7 @@ No bloquean el despliegue (sí la validación integral): la semilla inicial de K
 | Tipo PDF por metadato | **READY** | El tipo gobernado (`resource_type`, Admin) decide; una URL firmada, proxied o de CDN sin extensión funciona (probado). Solo un recurso sin tipo declarado cae al inferido por `.pdf` como respaldo. Si el navegador abre su visor en vez de descargar: aceptado. |
 | Registro del PDF final | **READY sin código** | Admin (`POST/PUT /precision/country-resources`, `resourceType`) o el script `onboard-country-guide` (`--title "beeside Doing Business México" --type pdf`). El nombre exacto se fija al registrar; el código no lo hardcodea. |
 
-Verificado: backend 85 suites / 1.856 pruebas, integración (admin, KL, acceso, recorrido), frontend 54 + e2e de identidad, `tsc` y `eslint` limpios.
+Verificado (actualizado): backend 88 suites / 1.885 pruebas unitarias y 40 suites / 347 de integración en BD limpia; antes 85 / 1.856, integración (admin, KL, acceso, recorrido), frontend 54 + e2e de identidad, `tsc` y `eslint` limpios.
 
 ## 3. Infraestructura de destino
 
@@ -59,11 +51,11 @@ Hallazgos de la lectura de Terraform/workflows de producción (la razón del scr
 
 **Acceso / credenciales**
 - Sesión con `gcloud` autenticado sobre el proyecto de producción (o WIF listo) y, si el proyecto es nuevo, permiso para vincular facturación.
-- *(Para validar, no para desplegar)* cliente OAuth del proveedor de identidad de Admin (recomendado: Google Workspace, restringido a `beeside.you`), entregado por canal seguro; yo lo guardo en Secret Manager. Sin Admin no se pueden emitir entitlements/enlaces de prueba ni registrar el PDF por Admin.
+- Cliente OAuth Web **Internal** de Google (`beeside.you`) para Admin (no hay IdP separado: se reutiliza la identidad Google), con su secreto creado por el operador en Secret Manager (`precision-production-admin-oidc-client-secret`) y el correo del primer SUPER_ADMIN. Lo consume la fase `admin`.
 
 **Decisión del dueño**
 - Crear (o indicar) el proyecto GCP de producción y su ID.
-- Entregar el **handoff final de KL** y la **semilla inicial de conocimiento** (D).
+- Entregar la **semilla inicial de conocimiento** (bucket privado + `manifest.json`); el handoff de KL ya fue reconciliado.
 - Aprobar el gate **PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL** al final.
 - Confirmar 50/50 como destino (o pedir 49/49 con el hack).
 
@@ -94,7 +86,8 @@ Script: `infra/deploy/precision-private-candidate.sh` (+ `cloudbuild-precision-c
 8. `smoke` — pruebas §7.
 9. Registrar el recurso `beeside Doing Business México` por Admin/script cuando llegue el PDF (no bloquea).
 10. Entregar la URL **solo por canal interno**.
-11. **Cargar la semilla inicial de KL** (`ingest-knowledge`) y comprobar cobertura de México > 0 *(requiere la semilla; sin ella, el candidato queda en estado honesto "KL sin contenido", no en el estado previsto)*.
+- Orden efectivo: `build → check → backup → migrate → prepare → seed → deploy → admin → smoke`. `seed` — carga la semilla inicial de KL (job con el bucket montado de solo lectura; falla si algún país requerido queda sin conocimiento). El backend arranca con `PRECISION_REQUIRE_KNOWLEDGE_SEED=true`: **no existe el estado "KL vacío" en producción**.
+`admin` (después de `deploy`) — configura el inicio de sesión del Control Center con Google (OIDC), secretos en Secret Manager y el job de primer SUPER_ADMIN (único, auditado). Debe ejecutarse **después de cada `deploy`** (que reemplaza variables). Smoke S6 = `kl-seed --check`.
 
 ## 7. Smoke test post-despliegue
 

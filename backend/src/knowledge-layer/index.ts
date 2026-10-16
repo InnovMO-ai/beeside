@@ -8,6 +8,7 @@
  */
 import type { Db } from "../db/database";
 import { createPgCountryResources, createPgDemandRepository, createPgKnowledgeRepository } from "./pg-repo";
+import { knowledgeReadiness } from "./readiness";
 import { seedInitialSources } from "./registry";
 import { createKnowledgeLayer } from "./service";
 import type { KnowledgeLayer } from "./contract";
@@ -31,3 +32,17 @@ export async function createPgKnowledgeLayer(db: Db, opts: PgKnowledgeLayerOptio
     ...(opts.now ? { now: opts.now } : {}), ...(opts.onError ? { onError: opts.onError } : {}),
   });
 }
+
+/**
+ * Fail-closed start guard for a production connection: refuses to proceed while the layer holds no published knowledge for the required
+ * jurisdictions (an empty layer is never the intended production state; the initial seed is loaded first, see scripts/kl-seed).
+ */
+export async function assertKnowledgeReady(db: Db, jurisdictions: string[]): Promise<void> {
+  const r = await knowledgeReadiness(createPgKnowledgeRepository(db), jurisdictions);
+  if (!r.ready) {
+    const gaps = r.jurisdictions.filter((x) => !x.ready).map((x) => `${x.jurisdiction} (${x.activeDocuments} active documents)`).join(", ");
+    throw new Error(`the Knowledge Layer has no published knowledge for ${gaps || jurisdictions.join(", ")}: load the initial seed before connecting Precision (scripts/kl-seed)`);
+  }
+}
+export { knowledgeReadiness } from "./readiness";
+export type { KnowledgeReadiness, JurisdictionReadiness } from "./readiness";

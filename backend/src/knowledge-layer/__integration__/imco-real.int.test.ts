@@ -13,6 +13,8 @@ import { orient } from "../orient";
 import { createPgKnowledgeRepository } from "../pg-repo";
 import { MX_STATES } from "../geo";
 import { createKnowledgeLayer } from "../service";
+import { readQuestion } from "../vocabulary";
+import { askLocally, refsOf } from "../__tests__/local-consumer";
 import { createPgCountryResources, createPgDemandRepository } from "../pg-repo";
 
 const LIBRO = process.env.IMCO_ICE_LIBRO ?? "";
@@ -97,7 +99,7 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     const cell = hits.flatMap((h) => h.passage.indicators).find((i) => i.unit === "Campeche" && /^Informalidad laboral$/.test(i.name));
     expect(cell).toMatchObject({ value: 60, rank: 21, unitKind: "state" });
 
-    const o = await orient(repo, { text: "Estoy entre Nuevo León y Querétaro", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], candidates: ["Nuevo León", "Querétaro"] });
+    const o = await orient(repo, { text: "Estoy entre Nuevo León y Querétaro", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], states: ["Nuevo León", "Querétaro"] });
     expect(o.recommends).toBe(false);
     expect(o.comparison?.rows.length).toBeGreaterThan(3);
     for (const r of o.comparison!.rows) {
@@ -114,7 +116,7 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     const kl = createKnowledgeLayer({ knowledge: repo, demand: createPgDemandRepository(db), resources: createPgCountryResources(db), now: () => new Date(NOW) });
 
     // SUFFICIENT: labor market, with IMCO's edition/version/publication date/authority class/risk/confidence and a checkable citation
-    const labor = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Qué dice IMCO sobre el mercado de trabajo y la informalidad laboral?", language: "es" });
+    const labor = await askLocally(kl, "¿Qué dice IMCO sobre el mercado de trabajo y la informalidad laboral?", "MX");
     expect(labor.availability).toBe("sufficient");
     expect(labor.units.length).toBeGreaterThan(0);
     for (const u of labor.units) {
@@ -127,48 +129,51 @@ const LOCATOR = "https://imco.org.mx/indices/indice-de-competitividad-estatal-20
     }
 
     // SUFFICIENT with a comparison: two candidate states, ranked by the published position, never a recommendation
-    const cmp = await kl.request({ jurisdiction: "MX", intent: "project_context", topics: ["labor_market", "infrastructure"], context: { candidates: ["Nuevo León", "Querétaro"] }, language: "es" });
+    const cmp = await kl.request({ jurisdiction: "MX", stage: "understanding", intent: "project_context", topics: ["labor_market", "infrastructure"], regions: ["Nuevo León", "Querétaro"], language: "es" });
     expect(cmp.recommends).toBe(false);
     expect(cmp.comparison?.rows.length).toBeGreaterThan(3);
     expect(cmp.comparison?.summary.es).toMatch(/no una recomendación/);
 
     // PARTIAL: a municipality is outside the state-level source -> the limit is declared, state context is labelled, specialist flagged
-    const city = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cómo está el mercado laboral en Apodaca?", language: "es" });
+    const city = await askLocally(kl, "¿Cómo está el mercado laboral en Apodaca?", "MX");
     expect(city).toMatchObject({ availability: "partial", reason: "granularity" });
-    expect(city.limits[0]).toMatchObject({ kind: "granularity", place: "Apodaca" });
+    expect(city.limits[0]).toMatchObject({ kind: "granularity", availableLevel: "state" });
+    expect(JSON.stringify(city)).not.toContain("Apodaca");   // the layer never saw the place
     expect(city.units.every((u) => u.granularity !== "municipality")).toBe(true);
 
     // PARTIAL: a determination -> context plus the professional boundary
-    const best = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuál es la mejor opción de estado para mi operación según el mercado de trabajo?", language: "es" });
-    expect(best).toMatchObject({ availability: "partial", reason: "professional_judgment", boundary: { kind: "best_option" }, recommends: false });
+    const best = await askLocally(kl, "¿Cuál es la mejor opción de estado para mi operación según el mercado de trabajo?", "MX");
+    expect(best).toMatchObject({ recommends: false });
+    expect(readQuestion("¿Cuál es la mejor opción de estado para mi operación según el mercado de trabajo?").boundary).toBe("best_option");   // read locally by the consumer
     expect(best.units.length).toBeGreaterThan(0);
 
     // intent-based sufficiency on real data: the broad labour-market picture is answered by IMCO; mandatory employee benefits are NOT (IMCO says nothing about them)
-    const broad = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "Cuéntame sobre el mercado laboral en Nuevo León", language: "es" });
+    const broad = await askLocally(kl, "Cuéntame sobre el mercado laboral en Nuevo León", "MX");
     expect(broad.availability).toBe("sufficient");
-    const benefits = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuáles son las prestaciones obligatorias de los empleados en México?", language: "es" });
+    const benefits = await askLocally(kl, "¿Cuáles son las prestaciones obligatorias de los empleados en México?", "MX");
     expect(benefits.availability).not.toBe("sufficient");
     expect(benefits.units.every((u) => u.support === "contextual")).toBe(true);
     expect(benefits.unresolved).toEqual(expect.arrayContaining([{ kind: "topic_not_covered", topic: "wages" }]));
 
     // a tax DETERMINATION is never answered by IMCO: whatever context exists is worded as context, never as an obligation, and the specialist area is named
-    const tax = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Cuánto ISR voy a pagar este año?", language: "es" });
+    const tax = await askLocally(kl, "¿Cuánto ISR voy a pagar este año?", "MX");
     expect(tax.availability).not.toBe("sufficient");
-    expect(tax.boundary).toMatchObject({ kind: "tax_conclusion", specialistCategoryKey: "tax_accounting_audit" });
+    expect(readQuestion("¿Cuánto ISR voy a pagar este año?")).toMatchObject({ boundary: "tax_conclusion" });
     expect(tax.units.every((u) => u.wording === "context" && u.source.authority === "trusted_institutional")).toBe(true);
 
     // UNAVAILABLE: a country without approved sources has nothing — nothing is borrowed from another country
-    expect(await kl.request({ jurisdiction: "CL", intent: "answer_question", question: "¿Cómo está el mercado laboral?", language: "es" })).toMatchObject({ availability: "unavailable", reason: "no_sources", units: [] });
+    expect(await askLocally(kl, "¿Cómo está el mercado laboral?", "CL")).toMatchObject({ availability: "unavailable", reason: "no_sources", units: [] });
 
     // the unmet part comes back as a normalised demand signal, aggregated by the layer
-    const receipt = await kl.recordDemand({ projectId: "p-real", turnKey: "t-real" }, { country: "MX", topic: tax.interpretation.topic, subtopic: tax.interpretation.subtopic, infoType: tax.interpretation.infoType, categoryKey: "tax_accounting_audit", serviceKey: null, outcome: { coverage: "none", reason: "no_hits", boundary: "tax_conclusion" } });
+    const taxReading = readQuestion("¿Cuánto ISR voy a pagar este año?");
+    const receipt = await kl.recordDemand(refsOf("p-real", "t-real"), { country: "MX", topic: taxReading.topic, subtopic: taxReading.subtopic, infoType: taxReading.infoType, categoryKey: "tax_accounting_audit", serviceKey: null, outcome: { coverage: "none", reason: "no_hits", boundary: "tax_conclusion" } });
     expect(receipt).toMatchObject({ disposition: "specialist_service", reason: "professional_judgment", boundary: { kind: "tax_conclusion" } });
   }, 120000);
 
   it("granularity and authority guards hold on the real data: state level only, never a legal or tax authority", async () => {
     const { repo } = await ingestBoth();
-    const city = await orient(repo, { text: "El parque industrial estaría en Apodaca", jurisdiction: "MX", topics: ["labor_market", "infrastructure"] });
-    expect(city.limits[0]).toMatchObject({ place: "Apodaca", state: "Nuevo León", availableLevel: "state" });
+    const city = await orient(repo, { text: "parque industrial infraestructura", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], states: ["Nuevo León"], finerThanState: true });
+    expect(city.limits[0]).toMatchObject({ state: "Nuevo León", availableLevel: "state" });
     expect(city.sherpaFlag).toBeDefined();
     expect(city.hits.every((h) => h.passage.granularity !== "municipality")).toBe(true);
 

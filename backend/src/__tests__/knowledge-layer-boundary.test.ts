@@ -42,7 +42,8 @@ describe("Knowledge Layer boundary", () => {
       for (const spec of importsOf(f)) {
         const r = resolved(f, spec);
         if (!r || !r.startsWith("knowledge-layer")) continue;
-        const ok = r === "knowledge-layer/contract" || (rel(f) === "precision/api/wiring.ts" && r === "knowledge-layer");
+        // the vocabulary pack is the one pure, in-process piece of the layer a consumer may run: it classifies the consumer's OWN text locally
+        const ok = r === "knowledge-layer/contract" || (rel(f) === "precision/knowledge-client/adapters.ts" && r === "knowledge-layer/vocabulary") || (rel(f) === "precision/api/wiring.ts" && r === "knowledge-layer");
         if (!ok) offenders.push(`${rel(f)} -> ${r}`);
       }
     }
@@ -75,7 +76,7 @@ describe("Knowledge Layer boundary", () => {
   });
 
   it("only the layer's own admin surface (Admin routes and ingestion scripts) uses its internals", () => {
-    const allowedOutside = /^(admin\/knowledge-layer-admin\.ts|scripts\/(ingest-knowledge|onboard-country-guide|kseed-report)\.ts|precision\/api\/wiring\.ts)$/;
+    const allowedOutside = /^(admin\/knowledge-layer-admin\.ts|scripts\/(ingest-knowledge|onboard-country-guide|kseed-report|kl-seed)\.ts|precision\/api\/wiring\.ts|precision\/knowledge-client\/adapters\.ts)$/;
     const offenders: string[] = [];
     for (const f of allFiles.filter((x) => !rel(x).startsWith("knowledge-layer/"))) {
       for (const spec of importsOf(f)) {
@@ -84,6 +85,14 @@ describe("Knowledge Layer boundary", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("the vocabulary pack is pure: it imports only the layer's vocabulary modules (no store, no database, no network) and keeps no state", () => {
+    const file = join(SRC, "knowledge-layer", "vocabulary.ts");
+    for (const spec of importsOf(file)) expect(spec).toMatch(/^\.\/(boundary|demand|geo|topics|types)$/);
+    const src = strip(readFileSync(file, "utf8"));
+    expect(src).not.toMatch(/\b(Pool|query|fetch|readFile|writeFile|process\.env)\b/);
+    expect(src).not.toMatch(/^(?:export )?let /m);
   });
 
   it("the contract is types only: a consumer cannot get behaviour or a store from it", () => {

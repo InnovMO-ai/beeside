@@ -60,7 +60,7 @@ describe("IMCO ingestion proof (A–G) through the permanent pattern, with a syn
   });
   it("D. state-level data comes back structured and comparable", async () => {
     const repo = await world();
-    const o = await orient(repo, { text: "Estoy entre Nuevo León y Querétaro", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], candidates: ["Nuevo León", "Querétaro"] });
+    const o = await orient(repo, { text: "mercado laboral infraestructura", jurisdiction: "MX", topics: ["labor_market", "infrastructure"], states: ["Nuevo León", "Querétaro"] });
     expect(o.comparison?.rows.length).toBeGreaterThan(0);
     const row = o.comparison!.rows.find((r) => r.criterion === "Mercado de trabajo")!;
     expect(row.entries.map((e) => e.unit).sort()).toEqual(["Nuevo León", "Querétaro"]);
@@ -83,11 +83,12 @@ describe("IMCO ingestion proof (A–G) through the permanent pattern, with a syn
     expect(citation(p)).toMatch(/IMCO.*2025/);
   });
   it("F. rejects municipality-level inference: a state-level source cannot speak about a city", async () => {
-    const o = await orient(await world(), { text: "Quiero poner la planta en San Pedro Garza García por el talento", jurisdiction: "MX", topics: ["labor_market", "education_talent"] });
+    const o = await orient(await world(), { text: "talento mercado laboral", jurisdiction: "MX", topics: ["labor_market", "education_talent"], states: ["Nuevo León"], finerThanState: true });
     expect(o.limits).toHaveLength(1);
-    expect(o.limits[0]!.place).toBe("San Pedro Garza García");
     expect(o.limits[0]!.availableLevel).toBe("state");
-    expect(o.limits[0]!.message.es).toMatch(/no te daré una lectura de San Pedro Garza García/);
+    // the layer never saw the place: the wording keeps a slot the consumer fills with the place the client named
+    expect(o.limits[0]!.message.es).toMatch(/no te daré una lectura de \{place\} en sí/);
+    expect(o.limits[0]!.message.es).toMatch(/Nuevo León/);
     expect(o.sherpaFlag?.reason).toMatch(/municipal/);
     expect(o.hits.every((h) => h.passage.granularity !== "municipality")).toBe(true);
   });

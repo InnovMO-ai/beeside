@@ -87,6 +87,8 @@ export function textAddressesSubtopic(text: string, subtopic: string): boolean {
   const f = ` ${fold(text)} `;
   return SUBTOPICS.some((s) => s.id === subtopic && s.keywords.some((k) => f.includes(fold(k))));
 }
+/** Vocabulary terms of a controlled subtopic (never client words): the material a normalised query is written from. */
+export function subtopicTerms(id: string): string[] { return SUBTOPICS.find((s) => s.id === id)?.keywords ?? []; }
 const topicOfSubtopic = new Map(SUBTOPICS.map((s) => [s.id, s.topic] as const));
 
 const INFO_RULES: { type: InfoType; any: string[] }[] = [
@@ -208,8 +210,17 @@ export function demandId(d: KnowledgeDemand): string {
   return createHash("sha256").update([d.country, d.topic, d.subtopic, d.categoryKey ?? "-", d.infoType, d.coverage].join("|")).digest("hex").slice(0, 24);
 }
 
-/** Opaque, non-reversible reference used to count distinct projects/turns without storing identifiers. */
-export const opaqueRef = (scope: string, value: string): string => createHash("sha256").update(`${scope}:${value}`).digest("hex").slice(0, 32);
+/**
+ * The ONLY reference to a project the layer ever sees: an opaque, keyed (HMAC) reference computed by the consumer with a secret the layer
+ * does not have, so the layer can count DISTINCT projects but can neither recover the project id nor link it to anything else.
+ * `eventRef` only makes a retried turn count once (idempotency); it is opaque for the same reason.
+ */
+export interface DemandRefs { projectRef: string; eventRef: string }
+const OPAQUE_REF = /^[0-9a-f]{32}$/;
+/** Throws unless both references are opaque 128-bit hex values (a raw project id or turn key can never pass). */
+export function assertOpaqueRefs(r: DemandRefs): void {
+  if (!OPAQUE_REF.test(r.projectRef) || !OPAQUE_REF.test(r.eventRef)) throw new Error("knowledge demand references must be opaque (32 hex characters)");
+}
 
 // ------------------------------------------------------------------ repository port
 export interface StoredDemand extends KnowledgeDemand {
@@ -222,8 +233,8 @@ export interface StoredDemand extends KnowledgeDemand {
   decisionNote: string | null;
 }
 export interface DemandRepository {
-  /** Idempotent per (demand, project, turn): a retried turn counts once. Never changes `status`. */
-  register(d: KnowledgeDemand, ref: { projectId: string; turnKey: string }, now: string): Promise<StoredDemand>;
+  /** Idempotent per (demand, project reference, event reference): a retried turn counts once. Never changes `status`. */
+  register(d: KnowledgeDemand, ref: DemandRefs, now: string): Promise<StoredDemand>;
   list(filter?: { country?: string; topic?: string; status?: DemandStatus; minOccurrences?: number }): Promise<StoredDemand[]>;
   get(id: string): Promise<StoredDemand | null>;
   /** The ONLY way a status changes: an explicit decision by a person (Admin). */
@@ -235,15 +246,16 @@ export class InMemoryDemandRepository implements DemandRepository {
   private events = new Set<string>();
   private projectRefs = new Map<string, Set<string>>();
 
-  async register(d: KnowledgeDemand, ref: { projectId: string; turnKey: string }, now: string): Promise<StoredDemand> {
+  async register(d: KnowledgeDemand, ref: DemandRefs, now: string): Promise<StoredDemand> {
     assertNormalized(d);
+    assertOpaqueRefs(ref);
     const id = demandId(d);
-    const ev = `${id}:${opaqueRef("p", ref.projectId)}:${opaqueRef("t", ref.turnKey)}`;
+    const ev = `${id}:${ref.projectRef}:${ref.eventRef}`;
     const cur = this.rows.get(id) ?? { ...d, id, status: "open" as DemandStatus, occurrences: 0, projects: 0, firstSeenAt: now, lastSeenAt: now, decisionNote: null };
     if (!this.events.has(ev)) {
       this.events.add(ev);
       const set = this.projectRefs.get(id) ?? new Set<string>();
-      set.add(opaqueRef("p", ref.projectId));
+      set.add(ref.projectRef);
       this.projectRefs.set(id, set);
       cur.occurrences += 1;
       cur.projects = set.size;

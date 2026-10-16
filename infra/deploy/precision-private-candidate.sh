@@ -3,11 +3,12 @@
 # NOTHING here has been executed against GCP. Pattern proven in staging/fa4-internal/deploy-gcp.sh; names follow the Terraform modules.
 #
 #   PROJECT=<prod project id> ./infra/deploy/precision-private-candidate.sh <phase>
-#   phases, in order:  check  build  backup  migrate  prepare  deploy  smoke
+#   phases, in order:  check  build  backup  migrate  prepare  seed  deploy  admin  smoke
 #
 # Read-only / non-destructive without approval: check, build, smoke.
-# Everything that writes to the database or changes a service (backup, migrate, prepare, deploy) refuses to run unless
+# Everything that writes to the database or changes a service (backup, migrate, prepare, seed, deploy, admin) refuses to run unless
 #   APPROVAL=PRIVATE_PRODUCTION_CANDIDATE_DEPLOYMENT_APPROVAL
+# NOTE: `deploy` replaces the backend's env vars/secrets; run `admin` AFTER every `deploy` (it re-applies the Control Center sign-in configuration).
 # DRY_RUN=1 prints every gcloud command instead of running it. Secret VALUES are generated inside Secret Manager and never printed.
 set -euo pipefail
 
@@ -27,6 +28,15 @@ WEB=${WEB:-beeside-${ENVN}-frontend-app}
 MIGRATE_JOB=${MIGRATE_JOB:-beeside-${ENVN}-migrate}            # created by Terraform (modules/migration-job), runs as the migration runner
 CHECK_JOB=${CHECK_JOB:-beeside-${ENVN}-migrate-check}
 ROLE_JOB=${ROLE_JOB:-beeside-${ENVN}-runtime-role}
+SEED_JOB=${SEED_JOB:-beeside-${ENVN}-kl-seed}                   # loads the INITIAL Knowledge Layer seed (never an empty layer in production)
+SEED_BUCKET=${SEED_BUCKET:-}                                     # private bucket holding manifest.json + the seed files (read-only mount); required by `seed`
+REQUIRED_COUNTRIES=${REQUIRED_COUNTRIES:-MX}
+ADMIN_OIDC_CLIENT_ID=${ADMIN_OIDC_CLIENT_ID:-}                    # the Google OAuth Web client (Internal, beeside.you) created in the console; required by `admin`
+ADMIN_BOOTSTRAP_EMAIL=${ADMIN_BOOTSTRAP_EMAIL:-}                  # the first SUPER_ADMIN (a beeside.you account); required by `admin`
+ADMIN_DOMAINS=${ADMIN_DOMAINS:-beeside.you}
+S_ADMIN_OIDC_SECRET=${S_ADMIN_OIDC_SECRET:-precision-${ENVN}-admin-oidc-client-secret}  # created by the operator in Secret Manager (never printed, never in this repo)
+S_ADMIN_SESSION=precision-${ENVN}-admin-session-secret
+ADMIN_JOB=${ADMIN_JOB:-beeside-${ENVN}-admin-bootstrap}
 MIG_SA=${MIG_SA:-beeside-${ENVN}-migration-runner@${PROJECT}.iam.gserviceaccount.com}
 MIG_SECRET=${MIG_SECRET:-beeside-${ENVN}-migration-database-url}
 RT_SA=${RT_SA:-beeside-${ENVN}-runtime@${PROJECT}.iam.gserviceaccount.com}   # dedicated runtime identity (created below, least privilege)
@@ -105,6 +115,16 @@ prepare)
   echo "== runtime login role (outside the migrations), verified by the job itself"
   run_job "$ROLE_JOB" "${REPO}/backend-api:${TAG}" dist/scripts/runtime-role-prepare.js "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest,RUNTIME_DB_PASSWORD=${S_PW}:latest" "RUNTIME_DB_USER=${RT_USER}" "$MIG_SA"
   ;;
+seed)
+  need_approval
+  : "${SEED_BUCKET:?SEED_BUCKET (private bucket with manifest.json and the initial Knowledge Layer files) is required}"
+  echo "== initial Knowledge Layer seed: the first connection is NEVER an empty layer (idempotent; unchanged files are skipped, changed ones become new versions)"
+  g run jobs deploy "$SEED_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/kl-seed.js,--manifest,/seed/manifest.json,--countries,"$REQUIRED_COUNTRIES" \
+    --set-secrets "DATABASE_URL=${MIG_SECRET}:latest" --add-volume "name=seed,type=cloud-storage,bucket=${SEED_BUCKET},readonly=true" --add-volume-mount "volume=seed,mount-path=/seed" \
+    --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 900
+  g run jobs execute "$SEED_JOB" --region "$REGION" --wait
+  echo 'The job fails (exit 1) unless every required country has published knowledge. `deploy` then starts the backend with PRECISION_REQUIRE_KNOWLEDGE_SEED=true.'
+  ;;
 deploy)
   need_approval
   PNUM=$(gcloud --project "$PROJECT" projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || echo PNUM)
@@ -113,7 +133,7 @@ deploy)
   COMMON=(--region "$REGION" --service-account "$RT_SA" --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1)
   echo "== backend: private (no unauthenticated access, no public invoker), runtime identity only, NO migration credential"
   g run deploy "$BACKEND" "${COMMON[@]}" --image "${REPO}/backend-api:${TAG}" --no-allow-unauthenticated --add-cloudsql-instances "$SQL_CONN" \
-    --set-env-vars "NODE_ENV=production,APP_BASE_URL=${WEB_URL},TRUST_PROXY_HOPS=2,PRECISION_API_ENABLED=true,PRECISION_ENTITLEMENT_PROVIDER=core,PRECISION_FA_CONTEXT_PROVIDER=discovery,PRECISION_UNDERSTANDING_INTERPRETER=rules,PRECISION_MODEL_PROVIDER=scripted,PRECISION_OH_PROVIDER=simulator,PRECISION_PUBLISH_MANIFESTS_ON_BOOT=true,PRECISION_KNOWLEDGE_SEED_ON_BOOT=true,FA4_API_ENABLED=true,FA4_ENV=staging,FA4_EMAIL_TRANSPORT=log" \
+    --set-env-vars "NODE_ENV=production,APP_BASE_URL=${WEB_URL},TRUST_PROXY_HOPS=2,PRECISION_API_ENABLED=true,PRECISION_ENTITLEMENT_PROVIDER=core,PRECISION_FA_CONTEXT_PROVIDER=discovery,PRECISION_UNDERSTANDING_INTERPRETER=rules,PRECISION_MODEL_PROVIDER=scripted,PRECISION_OH_PROVIDER=simulator,PRECISION_PUBLISH_MANIFESTS_ON_BOOT=true,PRECISION_KNOWLEDGE_SEED_ON_BOOT=true,PRECISION_REQUIRE_KNOWLEDGE_SEED=true,PRECISION_REQUIRED_KNOWLEDGE_COUNTRIES=${REQUIRED_COUNTRIES},FA4_API_ENABLED=true,FA4_ENV=staging,FA4_EMAIL_TRANSPORT=log" \
     --set-secrets "DATABASE_URL=${S_URL}:latest,SECURITY_HASH_SECRET=${S_HASH}:latest"
   echo "== web: private, calls the backend with a Google ID token, never indexed"
   g run deploy "$WEB" "${COMMON[@]}" --image "${REPO}/frontend-app:${TAG}" --no-allow-unauthenticated \
@@ -128,6 +148,26 @@ deploy)
   g iap web add-iam-policy-binding --resource-type=cloud-run --service "$WEB" --region "$REGION" --member "$ACCESS_MEMBER" --role roles/iap.httpsResourceAccessor >/dev/null
   echo "Private candidate: ${WEB_URL}/precision  (internal Google accounts only; do NOT distribute the URL)"
   ;;
+admin)
+  need_approval
+  : "${ADMIN_OIDC_CLIENT_ID:?ADMIN_OIDC_CLIENT_ID (Google OAuth Web client, Internal) is required}"
+  : "${ADMIN_BOOTSTRAP_EMAIL:?ADMIN_BOOTSTRAP_EMAIL (first SUPER_ADMIN, a ${ADMIN_DOMAINS} account) is required}"
+  PNUM=$(gcloud --project "$PROJECT" projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || echo PNUM)
+  WEB_URL=https://${WEB}-${PNUM}.${REGION}.run.app
+  echo "== Control Center sign-in reuses the organization's Google identity (standard OIDC; no separate identity provider)"
+  if [ "$DRY_RUN" != 1 ]; then secret_exists "$S_ADMIN_OIDC_SECRET" || { echo "STOP: create secret $S_ADMIN_OIDC_SECRET from the OAuth client secret first (Secret Manager; never paste it in chat)." >&2; exit 4; }; fi
+  ensure_secret "$S_ADMIN_SESSION" "$(openssl rand -hex 32)"
+  for s in "$S_ADMIN_OIDC_SECRET" "$S_ADMIN_SESSION"; do g secrets add-iam-policy-binding "$s" --member "serviceAccount:${RT_SA}" --role roles/secretmanager.secretAccessor >/dev/null; done
+  g run services update "$BACKEND" --region "$REGION" \
+    --update-env-vars "ADMIN_API_ENABLED=true,ADMIN_APP_ORIGIN=${WEB_URL},ADMIN_OIDC_ISSUER=https://accounts.google.com,ADMIN_OIDC_CLIENT_ID=${ADMIN_OIDC_CLIENT_ID},ADMIN_OIDC_REDIRECT_URI=${WEB_URL}/api/admin/auth/callback,ADMIN_ALLOWED_EMAIL_DOMAINS=${ADMIN_DOMAINS}" \
+    --update-secrets "ADMIN_OIDC_CLIENT_SECRET=${S_ADMIN_OIDC_SECRET}:latest,ADMIN_SESSION_SECRET=${S_ADMIN_SESSION}:latest"
+  echo "== first SUPER_ADMIN (one-time, audited; refuses if one already exists; creates no credential)"
+  g run jobs deploy "$ADMIN_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/admin-bootstrap.js \
+    --set-secrets "DATABASE_URL=${MIG_SECRET}:latest" --set-env-vars "ADMIN_BOOTSTRAP_EMAIL=${ADMIN_BOOTSTRAP_EMAIL},ADMIN_ALLOWED_EMAIL_DOMAINS=${ADMIN_DOMAINS}" \
+    --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 120
+  g run jobs execute "$ADMIN_JOB" --region "$REGION" --wait
+  echo "Register ${WEB_URL}/api/admin/auth/callback as the authorized redirect URI of the OAuth client (console). Control Center: ${WEB_URL}/ops-control (IAP + Google sign-in)."
+  ;;
 smoke)
   PNUM=$(gcloud --project "$PROJECT" projects describe "$PROJECT" --format='value(projectNumber)')
   WEB_URL=https://${WEB}-${PNUM}.${REGION}.run.app; BACKEND_URL=https://${BACKEND}-${PNUM}.${REGION}.run.app
@@ -138,7 +178,10 @@ smoke)
   echo "S4 backend ready (authenticated as the invoker): $(curl -s --max-time 20 -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences="$BACKEND_URL")" "$BACKEND_URL/health/ready")  (expect {\"status\":\"ready\"})"
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
   echo "S5 migration state must read: applied=50 pending=[] safe=true (see the job log)"
-  echo "S6+ product checks through IAP: see docs/precision-private-production-candidate-go-no-go-2026-10-16.md section 7"
+  echo "S6 knowledge layer is not empty (read-only):"
+  g run jobs update "$SEED_JOB" --region "$REGION" --args dist/scripts/kl-seed.js,--check,--countries,"$REQUIRED_COUNTRIES"
+  g run jobs execute "$SEED_JOB" --region "$REGION" --wait
+  echo "S7+ product checks through IAP: see docs/precision-private-production-candidate-go-no-go-2026-10-16.md section 7"
   ;;
-*) echo "usage: PROJECT=<id> $0 {check|build|backup|migrate|prepare|deploy|smoke}"; exit 2 ;;
+*) echo "usage: PROJECT=<id> $0 {check|build|backup|migrate|prepare|seed|deploy|admin|smoke}"; exit 2 ;;
 esac

@@ -5,10 +5,10 @@
  */
 import { BOUNDARY_AREA, type BoundaryKind } from "./boundary";
 import type {
-  Boundary, ComparisonSummary, DemandContext, DemandReceipt, Interpretation, JurisdictionCoverage, KnowledgeLayer, KnowledgeRequest,
+  Boundary, ComparisonSummary, DemandReceipt, DemandRefs, JurisdictionCoverage, KnowledgeLayer, KnowledgeRequest,
   KnowledgeResponse, KnowledgeUnit, Limit, ResourceDescriptor, Unresolved,
 } from "./contract";
-import { assertNormalized, demandFromSignal, readQuestion, type DemandRepository, type DemandSignal } from "./demand";
+import { assertNormalized, assertOpaqueRefs, demandFromSignal, type DemandRepository, type DemandSignal, type InfoType } from "./demand";
 import { isOpenable, resolveResources, type CountryResourceRepository } from "./country-resources";
 import { describeComparison, orient } from "./orient";
 import { citation, wordingClass } from "./retrieve";
@@ -45,11 +45,13 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
   const { knowledge, demand, resources } = deps;
   const now = (): Date => (deps.now ? deps.now() : new Date());
 
-  const readingOf = (question: string): Interpretation => {
-    const r = readQuestion(question);
-    return { topics: r.topics, topic: r.topic, subtopic: r.subtopic, infoType: r.infoType, boundary: boundaryOf(r.boundary) };
+  /** What a request is about, in the layer's own vocabularies, taken from the dimensions the consumer sent (the layer never reads a question). */
+  interface Asked { topics: Topic[]; topic: Topic | "unclassified"; subtopic: string; infoType: InfoType }
+  const askedOf = (req: KnowledgeRequest): Asked => {
+    const topics = (req.topics ?? []).filter((t) => (TOPICS as readonly string[]).includes(t));
+    const topic = req.topic && (req.topic === "unclassified" || (TOPICS as readonly string[]).includes(req.topic)) ? req.topic : (topics[0] ?? "unclassified");
+    return { topics: topic !== "unclassified" && !topics.includes(topic) ? [topic, ...topics] : topics, topic, subtopic: req.subtopic ?? "general", infoType: req.infoType ?? "general_context" };
   };
-  const emptyInterpretation: Interpretation = { topics: [], topic: "unclassified", subtopic: "general", infoType: "general_context", boundary: null };
 
   const coverage = async (jurisdiction: string | null): Promise<JurisdictionCoverage> => {
     if (!jurisdiction) return { jurisdiction: "unknown", available: false, sourceCount: 0, topics: [] };
@@ -60,17 +62,10 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
   return {
     coverage,
 
-    async interpret(question) { return readingOf(question); },
-
     async request(req: KnowledgeRequest): Promise<KnowledgeResponse> {
-      const question = req.intent === "answer_question" ? (req.question ?? "") : "";
-      const interpretation = question ? readingOf(question) : emptyInterpretation;
-      const boundary = req.intent === "answer_question" ? interpretation.boundary : null;
-      const base = { jurisdiction: req.jurisdiction, units: [] as KnowledgeUnit[], limits: [] as Limit[], unresolved: [] as Unresolved[], boundary, interpretation, recommends: false as const };
-      const unavailable = (reason: NonNullable<KnowledgeResponse["reason"]>, extra: Partial<KnowledgeResponse> = {}): KnowledgeResponse => ({
-        ...base, availability: "unavailable", reason, ...extra,
-        unresolved: boundary ? [{ kind: "professional_judgment", detail: boundary.area }] : [],
-      });
+      const interpretation = askedOf(req);
+      const base = { jurisdiction: req.jurisdiction, units: [] as KnowledgeUnit[], limits: [] as Limit[], unresolved: [] as Unresolved[], recommends: false as const };
+      const unavailable = (reason: NonNullable<KnowledgeResponse["reason"]>, extra: Partial<KnowledgeResponse> = {}): KnowledgeResponse => ({ ...base, availability: "unavailable", reason, ...extra });
 
       const j = req.jurisdiction;
       if (!j) return unavailable("no_sources");
@@ -84,11 +79,11 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
       // (related units of the asked theme are retrieved either way; whether they ANSWER or only give context is decided by the sufficiency judgement)
       const askedFamilies = new Set((req.intent === "answer_question" ? [...(primaryTopic ? [primaryTopic] : []), ...interpretation.topics] : []).map((t) => TOPIC_FAMILY[t]));
       const topics: Topic[] = askedFamilies.size > 0 ? [...new Set([...base4, ...TOPICS.filter((t) => askedFamilies.has(TOPIC_FAMILY[t]))])] : base4;
-      if (topics.length === 0) return unavailable(boundary ? "professional_judgment" : "no_hits");
+      if (topics.length === 0) return unavailable("no_hits");
 
-      const res = await orient(knowledge, { text: question, jurisdiction: j, topics, ...(req.context?.candidates ? { candidates: req.context.candidates } : {}), limit: req.limit ?? 3 });
+      const res = await orient(knowledge, { text: req.query ?? "", jurisdiction: j, topics, states: req.regions ?? [], finerThanState: req.finerThanState === true, limit: req.limit ?? 3 });
       const units = res.hits.map(unitOf);
-      const limits: Limit[] = res.limits.map((l) => ({ kind: "granularity", place: l.place, message: l.message }));
+      const limits: Limit[] = res.limits.map((l) => ({ kind: "granularity", availableLevel: l.availableLevel, message: l.message }));
       const comparison: ComparisonSummary | undefined = res.comparison
         ? {
           units: res.comparison.units,
@@ -99,7 +94,7 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
       const specialistNote = res.sherpaFlag?.reason;
 
       // nothing usable: no passage and no comparison
-      if (units.length === 0 && !comparison) return unavailable(boundary ? "professional_judgment" : "no_hits", specialistNote ? { specialistNote } : {});
+      if (units.length === 0 && !comparison) return unavailable("no_hits", specialistNote ? { specialistNote } : {});
 
       // sufficiency is judged against the information intent asked, not against any unit that happens to share a topic
       const judged = req.intent === "answer_question"
@@ -111,30 +106,31 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
       // lead with what addresses the asked thing itself, then the rest of its theme; retrieval order (relevance) holds within each rank
       const rank = (u: KnowledgeUnit): number => (u.support === "direct" ? (primaryTopic && u.topics.includes(primaryTopic) ? 2 : 1) : 0);
       units.sort((a, b) => rank(b) - rank(a));
-      if (useful.length === 0 && !comparison) return unavailable(boundary ? "professional_judgment" : "no_hits", specialistNote ? { specialistNote } : {});
+      if (useful.length === 0 && !comparison) return unavailable("no_hits", specialistNote ? { specialistNote } : {});
       const shown = units.filter((u) => useful.includes(u));
 
-      // a granularity limit, a professional-judgment ask or an unanswered part of the request means approved knowledge covers only part of what was asked
+      // a granularity limit or an unanswered part of the request means approved knowledge covers only part of what was asked
+      // (a professional-judgment ask is the consumer's own reading: it applies it on top of this answer)
       const granular = limits.length > 0;
       const unresolved: Unresolved[] = [
         ...limits.map((l): Unresolved => ({ kind: "granularity", detail: l.message })),
-        ...(boundary ? [{ kind: "professional_judgment", detail: boundary.area } as Unresolved] : []),
         ...judged.missing.map((t): Unresolved => ({ kind: "topic_not_covered", topic: t })),
       ];
-      const availability = granular || boundary || !judged.sufficient ? "partial" : "sufficient";
+      const availability = granular || !judged.sufficient ? "partial" : "sufficient";
       return {
         ...base, availability, units: shown, limits, unresolved,
-        ...(availability === "partial" ? { reason: granular ? ("granularity" as const) : boundary ? ("professional_judgment" as const) : ("no_hits" as const) } : {}),
+        ...(availability === "partial" ? { reason: granular ? ("granularity" as const) : ("no_hits" as const) } : {}),
         ...(comparison ? { comparison } : {}), ...(specialistNote ? { specialistNote } : {}),
       };
     },
 
-    async recordDemand(ctx: DemandContext, signal: DemandSignal): Promise<DemandReceipt | null> {
+    async recordDemand(refs: DemandRefs, signal: DemandSignal): Promise<DemandReceipt | null> {
       const d = demandFromSignal(signal);
       if (!d) return null;
       try {
         assertNormalized(d);
-        await demand.register(d, { projectId: ctx.projectId, turnKey: ctx.turnKey }, now().toISOString());
+        assertOpaqueRefs(refs);
+        await demand.register(d, refs, now().toISOString());
       } catch (err) {
         deps.onError?.(err);
       }

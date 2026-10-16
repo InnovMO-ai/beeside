@@ -14,6 +14,9 @@ import { onboardCountryGuide } from "../../../knowledge-layer/onboard-guide";
 import { seedInitialSources } from "../../../knowledge-layer/registry";
 import { emptyFrame, type Frame, type NeedItem } from "../../understanding/types";
 import { createDemandPort, createOrientationPort, createResourcesPort } from "../adapters";
+import { createDemandRefs } from "../demand-refs";
+
+const refs = createDemandRefs("unit-test-secret-unit-test-secret-0123456789");
 
 const NOW = "2026-10-15T10:00:00.000Z";
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "..", "..", "..", "knowledge-layer", "__tests__", "fixtures", n));
@@ -89,7 +92,7 @@ describe("orientation adapter — the layer's availability states, worded for th
 describe("demand adapter — a normalised signal to the layer; the project supplies category and service, the question never reaches the registry", () => {
   it("files the unmet question under the PROJECT's own category/service", async () => {
     const { kl, demand } = await world();
-    const port = createDemandPort(kl);
+    const port = createDemandPort(kl, { refs });
     const d = await port.register({ projectId: "p1", turnKey: "t1", frame: frame({ categories: ["logistics"] }), question: "¿Cuál es la mejor opción de puerto para mi operación, Manzanillo o Lázaro Cárdenas?", outcome: { coverage: "none", reason: "no_hits" } });
     expect(d).toMatchObject({ topic: "transportation_logistics", subtopic: "ports_and_borders", coverage: "absent", boundary: { kind: "best_option" } });
     const [row] = await demand.list({});
@@ -98,7 +101,7 @@ describe("demand adapter — a normalised signal to the layer; the project suppl
 
   it("a topic default applies only when the project has the category; otherwise the specialist area of the boundary, else the topic's default", async () => {
     const { kl, demand } = await world();
-    const port = createDemandPort(kl);
+    const port = createDemandPort(kl, { refs });
     await port.register({ projectId: "p1", turnKey: "t1", frame: frame({ categories: ["tax_accounting_audit"] }), question: "¿Cuánto ISR voy a pagar por mi nómina?", outcome: { coverage: "none", reason: "no_hits" } });
     await port.register({ projectId: "p1", turnKey: "t2", frame: frame(), question: "¿Qué requisitos tiene el IMMEX para una importación temporal?", outcome: { coverage: "none", reason: "no_hits" } });
     const rows = await demand.list({});
@@ -108,7 +111,7 @@ describe("demand adapter — a normalised signal to the layer; the project suppl
 
   it("nothing is registered when knowledge covered the question; the registry never holds the question's words", async () => {
     const { kl, demand } = await world();
-    const port = createDemandPort(kl);
+    const port = createDemandPort(kl, { refs });
     expect(await port.register({ projectId: "p", turnKey: "t", frame: frame(), question: "¿Qué es el IMMEX?", outcome: { coverage: "full", reason: "no_hits" } })).toBeNull();
     const q = "Soy Juan Pérez de Acme SA, mi correo es juan.perez@acme.com; ¿cuánto ISR voy a pagar por 1,250,000 pesos de nómina en Monterrey?";
     await port.register({ projectId: "p", turnKey: "t2", frame: frame({ categories: ["tax_accounting_audit"] }), question: q, outcome: { coverage: "none", reason: "no_hits" } });
@@ -120,7 +123,7 @@ describe("demand adapter — a normalised signal to the layer; the project suppl
     const errs: unknown[] = [];
     const { kl, demand } = await world({ onError: (e) => errs.push(e) });
     demand.register = async () => { throw new Error("db down"); };
-    const d = await createDemandPort(kl).register({ projectId: "p", turnKey: "t", frame: frame(), question: "¿Qué requisitos tiene el IMMEX?", outcome: { coverage: "none", reason: "no_hits" } });
+    const d = await createDemandPort(kl, { refs }).register({ projectId: "p", turnKey: "t", frame: frame(), question: "¿Qué requisitos tiene el IMMEX?", outcome: { coverage: "none", reason: "no_hits" } });
     expect(d?.topic).toBe("customs");
     expect(errs).toHaveLength(1);
   });

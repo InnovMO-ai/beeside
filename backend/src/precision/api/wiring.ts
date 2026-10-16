@@ -10,7 +10,10 @@
  *   PRECISION_INTERNAL_KEY                enables GET /api/precision/internal/status (absent -> 404)
  *   PRECISION_UNDERSTANDING_ENGINE        core (default) | legacy — the Understanding surface runs on the Understanding Core, or on the generic manifest-driven engine (rollback lever)
  *   PRECISION_UNDERSTANDING_INTERPRETER   rules (default) | model — the model reads the client's words (governed, with the rule baseline as fallback); stays off until the real-model privacy approval (zero data retention) is in place
- *   PRECISION_KNOWLEDGE_SEED_ON_BOOT      true|false (default true) -> idempotent registration of the initial Knowledge Source Registry entries
+ *   PRECISION_KNOWLEDGE_SEED_ON_BOOT      true|false (default true) -> idempotent registration of the initial Knowledge Source Registry entries (sources only, not content)
+ *   PRECISION_REQUIRE_KNOWLEDGE_SEED      true|false (default false) -> fail closed at boot unless the layer already holds PUBLISHED knowledge for the required countries
+ *                                         (the first production connection is never an empty layer; set true in production after scripts/kl-seed)
+ *   PRECISION_REQUIRED_KNOWLEDGE_COUNTRIES  comma-separated ISO codes checked by the guard above (default MX)
  *   PRECISION_PUBLISH_MANIFESTS_ON_BOOT   true|false (default: true outside production) -> idempotent publish of the bundled manifests
  *   PRECISION_FIXTURE_PROJECT=true        register the synthetic seeded project with the fixture providers (no effect with real providers)
  */
@@ -47,9 +50,9 @@ import { syncProjectInheritance } from "../domain/category-inheritance";
 import { createModelInterpreter } from "../understanding/model-interpreter";
 import { createPgFrameStore } from "../understanding/pg-store";
 import { seedFromFaContext } from "../understanding/seed-source";
-import { createPgKnowledgeLayer } from "../../knowledge-layer";
+import { assertKnowledgeReady, createPgKnowledgeLayer } from "../../knowledge-layer";
 import type { KnowledgeLayer } from "../../knowledge-layer/contract";
-import { createDemandPort, createOrientationPort, createResourcesPort } from "../knowledge-client";
+import { createDemandPort, createDemandRefs, createOrientationPort, createResourcesPort, DEVELOPMENT_DEMAND_SECRET } from "../knowledge-client";
 
 export interface PrecisionRuntimeOptions {
   env?: NodeJS.ProcessEnv;
@@ -110,9 +113,14 @@ export async function createPrecisionRuntime(options: PrecisionRuntimeOptions): 
     seedSources: (env.PRECISION_KNOWLEDGE_SEED_ON_BOOT ?? "true") === "true", now,
     onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }),
   });
+  if (!options.knowledge && env.PRECISION_REQUIRE_KNOWLEDGE_SEED === "true") await assertKnowledgeReady(db, (env.PRECISION_REQUIRED_KNOWLEDGE_COUNTRIES ?? "MX").split(","));
+  // The Knowledge Layer never receives the real project id: demand signals carry a keyed (HMAC) reference only Precision can compute.
+  // Fail closed in production: an unkeyed or default-keyed reference would be guessable from a project id.
+  if (env.NODE_ENV === "production" && (env.SECURITY_HASH_SECRET ?? "").length < 32) throw new Error("SECURITY_HASH_SECRET (at least 32 characters) is required to key the knowledge demand references");
+  const demandRefs = createDemandRefs(env.SECURITY_HASH_SECRET && env.SECURITY_HASH_SECRET.length >= 32 ? env.SECURITY_HASH_SECRET : DEVELOPMENT_DEMAND_SECRET);
   const conversation = (env.PRECISION_UNDERSTANDING_ENGINE ?? "core") === "legacy"
     ? genericEngine
-    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledge), demand: createDemandPort(knowledge, { onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }) }), resources: createResourcesPort(knowledge), afterFrame: async (projectId) => { await syncProjectInheritance(core, projectId); }, clock: systemClock, now });
+    : createUnderstandingEngine({ base: genericEngine, store, frames: createPgFrameStore(db), context, seed: seedFromFaContext(db, fa), facts, ...((env.PRECISION_UNDERSTANDING_INTERPRETER ?? "rules") === "model" ? { interpreter: createModelInterpreter({ provider, onFallback: (reason) => log("warn", "understanding interpreter fell back to rules", { reason }) }) } : {}), orientation: createOrientationPort(knowledge), demand: createDemandPort(knowledge, { refs: demandRefs, onError: (err) => log("warn", "knowledge demand registration failed", { error: err instanceof Error ? err.message : String(err) }) }), resources: createResourcesPort(knowledge), afterFrame: async (projectId) => { await syncProjectInheritance(core, projectId); }, clock: systemClock, now });
   const deps: PrecisionDomainDeps = { ...core, conversation };
   const domain = createPrecisionDomain(deps, { fa, store });
 

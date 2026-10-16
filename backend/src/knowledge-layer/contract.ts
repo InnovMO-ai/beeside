@@ -5,17 +5,20 @@
  * reaches the web: the layer returns APPROVED, versioned, provenance-aware knowledge (or says plainly that it has none), and it owns the
  * Knowledge Demand registry that aggregates what clients could not be answered. KSeed is only the first CONTENT published through it.
  *
- *   consumer ──request──▶  KnowledgeLayer ──▶ units + provenance + availability + professional boundary
- *   consumer ──demand signal (normalised, no client text)──▶ KnowledgeLayer (aggregates, triages, decides)
+ *   consumer ──request (structured dimensions only)──▶  KnowledgeLayer ──▶ units + provenance + availability
+ *   consumer ──demand signal (normalised, opaque keyed project reference)──▶ KnowledgeLayer (aggregates, triages, decides)
+ *
+ * PRIVACY BY DESIGN (frozen, kl.v1): the layer never receives the client's words, names, project figures, documents or the real project id.
+ * The consumer interprets the question LOCALLY (see ./vocabulary) and sends only the reusable dimensions below.
  *
  * Everything a consumer needs is in this file; importing anything else from the layer is an architecture violation (see the boundary test).
  * The interface is async and data-only on purpose: the layer can later run as a separate service without changing a consumer.
  */
 import type { AuthorityLevel, Granularity, Indicator, RiskClass, SourceRole, Topic } from "./types";
 import type { BoundaryKind } from "./boundary";
-import type { DemandOutcome, DemandReason, DemandSignal, InfoType } from "./demand";
+import type { DemandOutcome, DemandReason, DemandRefs, DemandSignal, InfoType } from "./demand";
 
-export type { AuthorityLevel, Granularity, Indicator, RiskClass, SourceRole, Topic, BoundaryKind, DemandOutcome, DemandReason, DemandSignal, InfoType };
+export type { AuthorityLevel, Granularity, Indicator, RiskClass, SourceRole, Topic, BoundaryKind, DemandOutcome, DemandReason, DemandRefs, DemandSignal, InfoType };
 export type Locale = "es" | "en";
 export interface L10n { es: string; en: string }
 
@@ -35,24 +38,40 @@ export type RequestIntent =
   /** Context for what the project weighs (location criteria, headcount...): the consumer names the topics, there is no question. */
   | "project_context";
 
+/** Product stage the request is made in. One contract for both: only the stage (and the intent) change. */
+export type Stage = "understanding" | "precision_by_category";
+
+/**
+ * A request is made of REUSABLE DIMENSIONS ONLY. There is no free text of the client here: the consumer classifies the question itself and
+ * sends the result. The layer never stores a request and never echoes one.
+ */
 export interface KnowledgeRequest {
   /** ISO-2 country of the operation (or "INT"); null when the project has none yet. */
   jurisdiction: string | null;
+  /** Country the client comes from, when it matters for equivalences. */
+  originCountry?: string | null;
+  /** Industry code, when the consumer has one. */
+  industry?: string | null;
+  stage: Stage;
   intent: RequestIntent;
-  /**
-   * The client's words. Read for retrieval and interpretation only: the layer never stores them and never echoes them.
-   * (An in-process call today; if the layer becomes a service this is the only free text that crosses.)
-   */
-  question?: string;
-  /** Topics the consumer already knows are relevant (required for `project_context`; optional hint for a question). */
+  /** Topics (controlled vocabulary) the request is about; required for `project_context`. */
   topics?: Topic[];
-  /** Subtopic hint from the consumer's own context, when it has one. */
+  /** The primary topic, subtopic and information type the consumer read in the question (controlled vocabularies, never the words). */
+  topic?: Topic | "unclassified";
   subtopic?: string;
+  infoType?: InfoType;
+  /** Regions of the jurisdiction (states from the controlled gazetteer) the request is scoped to. Retrieval parameter only: never stored. */
+  regions?: string[];
+  /** True when the question points at something finer than a state (a city, a municipality): the layer states its granularity limit. */
+  finerThanState?: boolean;
   /** The consumer's service-map category / service the question belongs to; carried for routing and demand, never used to filter knowledge. */
   category?: string | null;
   service?: string | null;
-  /** Project context needed for retrieval (e.g. the states a client is comparing). Controlled, non-identifying. */
-  context?: { candidates?: string[] };
+  /**
+   * Optional normalised query, WRITTEN by the consumer from vocabulary terms (see `normalizedQuery`): no client, company or project data.
+   * Processed in memory to order results; never persisted.
+   */
+  query?: string;
   language: Locale;
   limit?: number;
 }
@@ -101,7 +120,8 @@ export interface KnowledgeUnit {
   support: "direct" | "contextual";
 }
 
-export interface Limit { kind: "granularity"; place: string; message: L10n }
+/** A granularity limit. `message` and any note may contain the token {place}: the consumer fills in the place the client named (the layer never sees it). */
+export interface Limit { kind: "granularity"; availableLevel: Granularity; message: L10n }
 
 export interface ComparisonSummary {
   units: string[];
@@ -116,22 +136,13 @@ export type Unresolved =
   | { kind: "professional_judgment"; detail: L10n }
   | { kind: "topic_not_covered"; topic: Topic };
 
-/** Professional-boundary metadata: the client asked for a DETERMINATION that belongs to a specialist. */
+/** Professional-boundary metadata: the client asked for a DETERMINATION that belongs to a specialist. Determined by the consumer, in its own reading of the question. */
 export interface Boundary {
   kind: BoundaryKind;
   /** The area a specialist owns ("la conclusión fiscal de tu caso"). */
   area: L10n;
   /** Where the specialist need routes in the consumer's service map, when there is one. */
   specialistCategoryKey: string | null;
-}
-
-/** What the layer understood the question to be about, in its own controlled vocabularies. */
-export interface Interpretation {
-  topics: Topic[];
-  topic: Topic | "unclassified";
-  subtopic: string;
-  infoType: InfoType;
-  boundary: Boundary | null;
 }
 
 export interface KnowledgeResponse {
@@ -143,8 +154,6 @@ export interface KnowledgeResponse {
   limits: Limit[];
   comparison?: ComparisonSummary;
   unresolved: Unresolved[];
-  boundary: Boundary | null;
-  interpretation: Interpretation;
   /** Raised when the real question cannot be answered from approved sources: the specialist takes it. */
   specialistNote?: string;
   /** Always false: knowledge orients, it never recommends. */
@@ -172,7 +181,6 @@ export interface DemandReceipt {
   boundary: Boundary | null;
 }
 
-export interface DemandContext { projectId: string; turnKey: string }
 
 // ------------------------------------------------------------------ country resources
 /** A country resource (e.g. "beeside Doing Business México") published through the layer. The destination is never exposed here: it is opened through `openResource`. */
@@ -190,12 +198,13 @@ export interface ResourceDescriptor {
 export interface KnowledgeLayer {
   /** Is there approved knowledge for this jurisdiction at all? */
   coverage(jurisdiction: string | null): Promise<JurisdictionCoverage>;
-  /** Reads a question in the layer's vocabularies (topic, subtopic, information type, professional boundary). Not stored. */
-  interpret(question: string): Promise<Interpretation>;
   /** Approved, versioned, provenance-aware knowledge for a request, with its availability state. Never a live search. */
   request(req: KnowledgeRequest): Promise<KnowledgeResponse>;
-  /** Sends a normalised demand signal for something the layer could not (fully) answer. Best-effort: never throws into the consumer's turn. */
-  recordDemand(ctx: DemandContext, signal: DemandSignal): Promise<DemandReceipt | null>;
+  /**
+   * Sends a normalised demand signal for something the layer could not (fully) answer. The only reference to a project is the opaque keyed
+   * pair in `refs` (never the project id). Best-effort: never throws into the consumer's turn.
+   */
+  recordDemand(refs: DemandRefs, signal: DemandSignal): Promise<DemandReceipt | null>;
   /** Country guides available for a country (newest active version, in the client's language first). */
   resources(q: { country: string; language: string; topic?: string; now?: string }): Promise<ResourceDescriptor[]>;
   /** Where a guide opens (an https URL); null when it is not active or not openable. */

@@ -6,8 +6,10 @@
  * recommendation). Everything knowledge-related — what is known, from which source, edition and version, how well it covers a
  * question, where the professional boundary lies, what counts as a demand — is the layer's, reached ONLY through `KnowledgeLayer`.
  */
-import type { KnowledgeLayer, Topic } from "../../knowledge-layer/contract";
+import type { Boundary, KnowledgeLayer, KnowledgeRequest, Topic } from "../../knowledge-layer/contract";
+import { BOUNDARY_AREA, normalizedQuery, readGeography, readQuestion } from "../../knowledge-layer/vocabulary";
 import type { Frame } from "../understanding/types";
+import type { DemandRefFactory } from "./demand-refs";
 import { topicDrivers } from "./drivers";
 import type { DemandPort, OrientationAnswer, OrientationPort, ResourcesPort } from "./ports";
 
@@ -22,8 +24,19 @@ const countryOf = (frame: Frame): string => {
   const j = jurisdictionOf(frame);
   return j ? String(j).toUpperCase().slice(0, 2) : "unknown";
 };
+/** The client's country of origin, only when the frame has one (an ISO code: the layer uses it for equivalences). */
+const originOf = (frame: Frame): string | null => {
+  const c = frame.countries.find((x) => x.role === "origin") ?? frame.countries.find((x) => x.role === "headquarters");
+  return c ? String(c.code).toUpperCase().slice(0, 2) : null;
+};
+const boundaryOf = (kind: keyof typeof BOUNDARY_AREA | null): Boundary | null => (kind ? { kind, area: { es: BOUNDARY_AREA[kind].es, en: BOUNDARY_AREA[kind].en }, specialistCategoryKey: BOUNDARY_AREA[kind].categoryKey } : null);
+const joinPlaces = (places: string[], locale: "es" | "en"): string => (places.length <= 1 ? (places[0] ?? "") : `${places.slice(0, -1).join(", ")} ${locale === "es" ? "y" : "and"} ${places[places.length - 1]}`);
 
 // ------------------------------------------------------------------ orientation
+/**
+ * The question is read HERE, in the layer's controlled vocabularies (topic, subtopic, information type, professional boundary, geography),
+ * and only the structured result crosses to the layer. The client's words, the places it named and the real project never leave Precision.
+ */
 export function createOrientationPort(kl: KnowledgeLayer): OrientationPort {
   return {
     async available(frame) {
@@ -33,19 +46,38 @@ export function createOrientationPort(kl: KnowledgeLayer): OrientationPort {
       const j = jurisdictionOf(frame);
       if (!j) return null;
       const criteria = question === "criterios";
-      const states = frame.items["location.candidates"]?.value as string[] | undefined;
-      const res = await kl.request({
-        jurisdiction: j, language: locale, limit: 3,
-        ...(criteria ? { intent: "project_context" as const, topics: topicDrivers(frame).map((d) => d.topic as Topic) } : { intent: "answer_question" as const, question }),
-        ...(states ? { context: { candidates: states } } : {}),
-      });
-      const boundary = res.boundary ? { kind: res.boundary.kind, area: res.boundary.area } : undefined;
+      const candidates = (frame.items["location.candidates"]?.value as string[] | undefined) ?? [];
+      const origin = originOf(frame);
+      const common = { jurisdiction: j, stage: "understanding" as const, language: locale, limit: 3, ...(origin ? { originCountry: origin } : {}) };
+
+      let req: KnowledgeRequest;
+      let boundary: Boundary | null = null;
+      let places: string[] = [];
+      if (criteria) {
+        // what the project weighs: topics come from the project's own criteria; the states are the ones the client is comparing (controlled names)
+        req = { ...common, intent: "project_context", topics: topicDrivers(frame).map((d) => d.topic as Topic), ...(candidates.length ? { regions: readGeography(candidates.join(", ")).states } : {}) };
+      } else {
+        const reading = readQuestion(question);
+        const geo = readGeography(question);
+        const regions = [...new Set([...readGeography(candidates.join(", ")).states, ...geo.states])];
+        boundary = boundaryOf(reading.boundary);
+        places = geo.places;
+        req = {
+          ...common, intent: "answer_question", topics: reading.topics, topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType,
+          ...(regions.length ? { regions } : {}), ...(geo.finerThanState ? { finerThanState: true } : {}),
+          query: normalizedQuery(reading),
+        };
+      }
+      const res = await kl.request(req);
+      // the places the client named come back as a slot in the layer's wording: filled in here, where the client's words live
+      const named = joinPlaces(places, locale);
+      const fill = (m: string): string => m.split("{place}").join(named);
       if (res.units.length === 0 && !res.comparison) {
-        return boundary ? { text: "", sourceRefs: [], coverage: "none", reason: "professional_judgment", boundary } : null;
+        return boundary ? { text: "", sourceRefs: [], coverage: "none", reason: "professional_judgment", boundary: { kind: boundary.kind, area: boundary.area } } : null;
       }
       const parts: string[] = [];
       // the granularity note only introduces context that exists: with nothing to give, the engine states the plain limit instead
-      for (const l of res.limits.slice(0, 1)) parts.push(l.message[locale]);
+      for (const l of res.limits.slice(0, 1)) parts.push(fill(l.message[locale]));
       if (res.comparison) parts.push(res.comparison.summary[locale]);
       else {
         const u = res.units[0]!;
@@ -60,10 +92,11 @@ export function createOrientationPort(kl: KnowledgeLayer): OrientationPort {
       return {
         text: clip(parts.join(" "), 900),
         sourceRefs: res.units.map((u) => u.id),
-        coverage: res.availability === "sufficient" ? "full" : "partial",
+        // approved knowledge that answers is only FULL when the client did not also ask for a determination that belongs to a specialist
+        coverage: res.availability === "sufficient" && !boundary ? "full" : "partial",
         ...(granular ? { reason: "granularity" as const } : boundary ? { reason: "professional_judgment" as const } : {}),
-        ...(boundary ? { boundary } : {}),
-        ...(res.specialistNote ? { sherpaNote: res.specialistNote } : {}),
+        ...(boundary ? { boundary: { kind: boundary.kind, area: boundary.area } } : {}),
+        ...(res.specialistNote ? { sherpaNote: fill(res.specialistNote) } : {}),
       };
     },
   };
@@ -88,17 +121,20 @@ function categoryFor(frame: Frame, topic: Topic | "unclassified", boundaryCatego
   return preferred ?? boundaryCategory;
 }
 
-export function createDemandPort(kl: KnowledgeLayer, opts: { onError?: (err: unknown) => void } = {}): DemandPort {
+/**
+ * `refs` derives the opaque keyed references (see ./demand-refs): the real project id is hashed HERE and never sent. The question is read
+ * locally for classification only; what crosses to the layer's registry is the normalised signal.
+ */
+export function createDemandPort(kl: KnowledgeLayer, opts: { refs: DemandRefFactory; onError?: (err: unknown) => void }): DemandPort {
   return {
     async register(i) {
       if (i.outcome.coverage === "full" && !i.outcome.boundary) return null;
       try {
-        // the question is read for classification only; what crosses to the layer's registry is the normalised signal
-        const reading = await kl.interpret(i.question);
-        const boundary = i.outcome.boundary ?? reading.boundary?.kind;
-        const categoryKey = categoryFor(i.frame, reading.topic, reading.boundary?.specialistCategoryKey ?? null);
+        const reading = readQuestion(i.question);
+        const boundary = i.outcome.boundary ?? reading.boundary ?? undefined;
+        const categoryKey = categoryFor(i.frame, reading.topic, reading.boundary ? BOUNDARY_AREA[reading.boundary].categoryKey : null);
         const serviceKey = categoryKey ? (i.frame.needs.find((n) => n.status !== "removed" && n.categoryKey === categoryKey)?.serviceKeys[0] ?? null) : null;
-        const receipt = await kl.recordDemand({ projectId: i.projectId, turnKey: i.turnKey }, {
+        const receipt = await kl.recordDemand(opts.refs(i.projectId, i.turnKey), {
           country: countryOf(i.frame), topic: reading.topic, subtopic: reading.subtopic, infoType: reading.infoType, categoryKey, serviceKey,
           outcome: { coverage: i.outcome.coverage, reason: i.outcome.reason, ...(boundary ? { boundary } : {}) },
         });

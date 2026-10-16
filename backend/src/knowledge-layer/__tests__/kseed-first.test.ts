@@ -5,6 +5,7 @@
  *  - recurrence never publishes anything.
  * (Availability states and the Precision-side behaviour live in contract.test.ts and precision/knowledge-client/__tests__.)
  */
+import { refsOf } from "./local-consumer";
 import { BOUNDARY_KINDS, professionalAsk } from "../boundary";
 import { InMemoryDemandRepository, assertNormalized, classifyInfoType, classifySubtopic, demandFromSignal, demandId, readQuestion, type DemandOutcome, type KnowledgeDemand } from "../demand";
 
@@ -96,26 +97,33 @@ describe("recurrence informs people; it never publishes", () => {
   it("counts occurrences and distinct projects, idempotent per turn, status untouched", async () => {
     const repo = new InMemoryDemandRepository();
     const d = describeDemand("¿Qué requisitos tiene el IMMEX?", { coverage: "none", reason: "no_hits" })!;
-    await repo.register(d, { projectId: "p1", turnKey: "t1" }, NOW);
-    await repo.register(d, { projectId: "p1", turnKey: "t1" }, NOW); // retry of the same turn
-    await repo.register(d, { projectId: "p1", turnKey: "t2" }, NOW);
-    const r = await repo.register(d, { projectId: "p2", turnKey: "t1" }, "2026-10-16T10:00:00.000Z");
+    await repo.register(d, refsOf("p1", "t1"), NOW);
+    await repo.register(d, refsOf("p1", "t1"), NOW); // retry of the same turn
+    await repo.register(d, refsOf("p1", "t2"), NOW);
+    const r = await repo.register(d, refsOf("p2", "t1"), "2026-10-16T10:00:00.000Z");
     expect(r).toMatchObject({ occurrences: 3, projects: 2, status: "open", lastSeenAt: "2026-10-16T10:00:00.000Z" });
     // a hundred more occurrences do not move the workflow
-    for (let i = 0; i < 100; i++) await repo.register(d, { projectId: `q${i}`, turnKey: "t" }, NOW);
+    for (let i = 0; i < 100; i++) await repo.register(d, refsOf(`q${i}`, "t"), NOW);
     expect((await repo.get(r.id))!.status).toBe("open");
   });
   it("only an explicit decision changes the status", async () => {
     const repo = new InMemoryDemandRepository();
     const d = describeDemand("¿Qué requisitos tiene el IMMEX?", { coverage: "none", reason: "no_hits" })!;
-    const { id } = await repo.register(d, { projectId: "p1", turnKey: "t1" }, NOW);
+    const { id } = await repo.register(d, refsOf("p1", "t1"), NOW);
     expect((await repo.decide(id, "accepted_for_curation", "Prioridad V1", NOW)).status).toBe("accepted_for_curation");
-    await repo.register(d, { projectId: "p9", turnKey: "t1" }, NOW);
+    await repo.register(d, refsOf("p9", "t1"), NOW);
     expect((await repo.get(id))!.status).toBe("accepted_for_curation");
+  });
+  it("the registry refuses a raw project id or turn key: only opaque references are accepted", async () => {
+    const repo = new InMemoryDemandRepository();
+    const d = describeDemand("¿Qué requisitos tiene el IMMEX?", { coverage: "none", reason: "no_hits" })!;
+    await expect(repo.register(d, { projectRef: "3f6c0d1e-9a52-4a1b-8d1e-0b6a2f6c9d11", eventRef: refsOf("p", "t").eventRef }, NOW)).rejects.toThrow(/opaque/);
+    await expect(repo.register(d, { projectRef: refsOf("p", "t").projectRef, eventRef: "turn-7" }, NOW)).rejects.toThrow(/opaque/);
+    expect(await repo.list({})).toEqual([]);
   });
   it("the registry cannot store a record that is not normalised", async () => {
     const repo = new InMemoryDemandRepository();
     const d = describeDemand("¿Qué requisitos tiene el IMMEX?", { coverage: "none", reason: "no_hits" })!;
-    await expect(repo.register({ ...d, subtopic: "texto libre del cliente" }, { projectId: "p", turnKey: "t" }, NOW)).rejects.toThrow(/not normalised/);
+    await expect(repo.register({ ...d, subtopic: "texto libre del cliente" }, refsOf("p", "t"), NOW)).rejects.toThrow(/not normalised/);
   });
 });

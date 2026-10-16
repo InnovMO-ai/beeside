@@ -7,6 +7,7 @@ import { assessKSeed } from "../kseed-spec";
 import { retrieve } from "../retrieve";
 import { createKnowledgeLayer } from "../service";
 import { InMemoryDemandRepository } from "../demand";
+import { askLocally } from "./local-consumer";
 
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "fixtures", n));
 const URL1 = "https://guides.beeside.example/doing-business-in-mexico-2026.pdf";
@@ -64,7 +65,7 @@ describe("country resource onboarding — the document drops in without code cha
     const k = new InMemoryKnowledgeRepository(); const r = new InMemoryCountryResources();
     await onboardCountryGuide(k, r, { ...base, language: "es", title: "Hacer negocios en México" });
     const kl = createKnowledgeLayer({ knowledge: k, demand: new InMemoryDemandRepository(), resources: r });
-    const res = await kl.request({ jurisdiction: "MX", intent: "answer_question", question: "¿Qué es el IMMEX?", language: "es" });
+    const res = await askLocally(kl, "¿Qué es el IMMEX?");
     expect(res.availability).toBe("sufficient");
     expect(res.units[0]).toMatchObject({ wording: "context", source: { sourceId: guideSourceId("MX"), documentTitle: "Hacer negocios en México", edition: "2026", version: 1, authority: "beeside_curated", status: "active", locator: URL1 } });
     expect((await kl.resources({ country: "MX", language: "es" })).map((x) => x.title)).toEqual(["Hacer negocios en México"]);
