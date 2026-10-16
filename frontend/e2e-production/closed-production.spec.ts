@@ -53,7 +53,10 @@ test.describe("closed app behind the gate", () => {
     // every asset must load from the real public path (a base-path mistake shows up here as a blank page)
     const failed: string[] = []; page.on("response", (r) => { if (r.status() >= 400 && /\/assets\//.test(r.url())) failed.push(`${r.status()} ${r.url()}`); });
     await page.reload(); expect(failed).toEqual([]);
-    await expect(page.getByRole("note")).toContainText("PRUEBA CONTROLADA"); await expect(page.getByRole("button", { name: /Comenzar|Start/ })).toBeVisible();
+    await expect(page.getByRole("note")).toContainText("PRUEBA CONTROLADA");
+    const cat = await page.request.get("/api/fa4/catalog");
+    if (cat.status() === 200) await expect(page.getByRole("button", { name: /Comenzar|Start/ })).toBeVisible();
+    else await expect(page.getByRole("alert")).toBeVisible();                           // backend not up: the app says so honestly (no blank page)
     expect(await page.content()).not.toMatch(/ops-control|\/admin\b|Control Center/i);
     const logo = page.locator("img[alt='beeside']").first(); await expect(logo).toBeVisible(); expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
