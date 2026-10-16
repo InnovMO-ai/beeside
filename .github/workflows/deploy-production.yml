@@ -8,7 +8,7 @@ name: Deploy — production
 # Vendor: GCP, via Workload Identity Federation — see deploy-dev.yml's header
 # for the mechanism. Real steps only run once this Environment's GCP_*
 # variables are set (README.md), and per Mike's instruction this environment
-# is not to be created/applied until explicitly approved and until Phase 15.
+# is not to be created/applied until explicitly approved (PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL).
 # Order is always: build -> migrate (migration database user) -> deploy.
 
 on:
@@ -34,7 +34,7 @@ jobs:
       - name: Not yet configured
         if: vars.GCP_PROJECT_ID == ''
         run: |
-          echo "Live deployment to production is blocked pending GCP setup and Phase 15's go/no-go sign-off. See README.md and docs/deployment/README.md."
+          echo "Live deployment to production is blocked pending GCP setup and the PRIVATE PRODUCTION CANDIDATE DEPLOYMENT APPROVAL. See README.md and docs/deployment/README.md."
 
       - uses: actions/setup-node@v4
         if: vars.GCP_PROJECT_ID != ''

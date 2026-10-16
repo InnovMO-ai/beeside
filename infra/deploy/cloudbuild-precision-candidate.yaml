@@ -1,0 +1,16 @@
+# Builds the two images of the Private Production Candidate with Cloud Build (no local Docker). Used by precision-private-candidate.sh `build`.
+# Creates images only: it touches no database, no service and no secret.
+substitutions:
+  _REPO: northamerica-south1-docker.pkg.dev/PROJECT/beeside-production
+  _TAG: dev
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_REPO}/backend-api:${_TAG}", "."]
+  - name: gcr.io/cloud-builders/docker
+    # No staging ribbon, no purchase fallback: the web image carries only what a production build carries.
+    args: ["build", "-f", "frontend/Dockerfile", "-t", "${_REPO}/frontend-app:${_TAG}", "."]
+images:
+  - ${_REPO}/backend-api:${_TAG}
+  - ${_REPO}/frontend-app:${_TAG}
+options:
+  logging: CLOUD_LOGGING_ONLY
