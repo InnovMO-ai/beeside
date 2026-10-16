@@ -46,7 +46,7 @@ Verificación: no existe ningún botón, popup, tour, animación ni máquina de 
 
 ## 4. Terminología de ciclo de vida — **CAMBIADA POR COMPLETO**
 
-CODE → **ESTABILIZACIÓN** → **PRODUCCIÓN**. "Private Production Candidate" eliminado de código, scripts, workflow y documentos del repo. La puerta ahora es `STABILIZATION_DEPLOYMENT_APPROVAL` (solo nombre; arquitectura de despliegue sin cambios). Archivos renombrados: `infra/deploy/precision-stabilization.sh`, `cloudbuild-precision-stabilization.yaml`, `docs/precision-stabilization-*.md`.
+CODE → **ESTABILIZACIÓN** → **PRODUCCIÓN**. El término anterior del ciclo de vida fue eliminado de código, scripts, workflow y documentos del repo. La puerta ahora es `STABILIZATION_DEPLOYMENT_APPROVAL` (solo nombre; arquitectura de despliegue sin cambios). Archivos renombrados: `infra/deploy/precision-stabilization.sh`, `cloudbuild-precision-stabilization.yaml`, `docs/precision-stabilization-*.md`.
 
 **Tránsito ESTABILIZACIÓN → PRODUCCIÓN (herramientas ya listas):**
 1. Fase `baseline` (con aprobación): respaldo *clean baseline* tras seed + admin y antes de cualquier dato ficticio.
