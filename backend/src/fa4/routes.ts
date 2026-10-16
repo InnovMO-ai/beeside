@@ -37,6 +37,9 @@ export interface Fa4Deps {
     premiumResourceUrl?: { es?: string; en?: string };
     /** Commercial-content policy gate of the YEV email's Premium block (LEGAL-1, external; fail-closed). */
     premiumCommercialContentAllowed?: boolean;
+    /** CLOSED TEST mode: no final Privacy version, non-commercial, fictitious data only, e-mail restricted to these domains. */
+    closedTest?: { emailDomains: string[] };
+    legalMode?: "final" | "closed-test";
     /** Validity (days) of the YEV email's private link. */
     yevLinkDays?: number;
     /** How long an interactive request waits for the provider's answer before it reports `pending` (the UI then polls). */
@@ -90,7 +93,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   const emailDeps: Fa4EmailDeps = {
     db: deps.db, email: deps.email,
-    config: { appBaseUrl: deps.config.appBaseUrl, publicPath: deps.config.publicPath, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
+    config: { appBaseUrl: deps.config.appBaseUrl, publicPath: deps.config.publicPath, closedTest: deps.config.closedTest, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
   };
   const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };
@@ -125,6 +128,9 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (!project) throw new FaError("UNAUTHENTICATED", "a valid working session is required");
     return project;
   };
+
+  // Which legal regime this deployment runs under (non-sensitive). The web tier reads it before it will ever open access: an open deployment must be "final".
+  router.get("/legal-mode", (_req, res) => { res.set("Cache-Control", "no-store").json({ legalMode: deps.config.legalMode ?? "final" }); });
 
   router.get("/catalog", handle(async (_req, res) => {
     res.set("Cache-Control", "no-store").json(toPublicCatalog(await loadPublishedCatalog(deps.db)));

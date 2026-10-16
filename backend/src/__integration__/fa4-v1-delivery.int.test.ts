@@ -18,6 +18,7 @@ const adminUrl = process.env.TEST_RUNTIME_ADMIN_DATABASE_URL;
 const runtimeUrl = process.env.TEST_RUNTIME_DATABASE_URL;
 const describeRt = adminUrl && runtimeUrl ? describe : describe.skip;
 const legal = { termsVersion: "T", termsUrl: { es: "https://t", en: "https://t" }, privacyVersion: "P", privacyUrl: { es: "https://p", en: "https://p" } };
+const legalClosed = { ...legal, privacyVersion: "CLOSED-TEST-NOT-LEGAL" };
 let n = 0;
 const uniq = () => `${Date.now().toString(36)}${(n++).toString(36)}`;
 
@@ -27,9 +28,10 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   const adminDb: Db = createPoolDb(admin); const rtDb: Db = createPoolDb(rt);
   const mail = new CaptureEmailTransport();
   let publicPath: string | undefined;
+  let closedTest: { emailDomains: string[] } | undefined;
   const deps = (): Fa4Deps => ({
     db: rtDb, email: mail, emailDispatch: "inline",
-    config: { appBaseUrl: "https://fa.test", publicPath, sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
+    config: { appBaseUrl: "https://fa.test", publicPath, closedTest, legalMode: closedTest ? "closed-test" : "final", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal: closedTest ? legalClosed : legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
   });
   const app = () => request(createApp({ fa4: deps() }));
   const q = async (sql: string, v: unknown[] = []) => (await admin.query(sql, v)).rows;
@@ -273,6 +275,30 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
     const { token, pid } = await start(journeyNortica());
     const e = await app().post("/api/fa4/session/result/email").set(auth(token));
     expect((await getFa4PrecisionContext(rtDb, pid, e.body.resultId)).declared.company.operatingBusiness).toBe(true);
+  });
+
+  describe("CLOSED TEST mode (no final Privacy version): identifiable, e-mail restricted to test domains", () => {
+    beforeAll(() => { closedTest = { emailDomains: ["beeside.you"] }; });
+    afterAll(() => { closedTest = undefined; });
+    it("reports its legal regime, records the non-legal marker as the acceptance evidence, and keeps everything else working", async () => {
+      expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "closed-test" });
+      const { pid } = await start();
+      expect(await q("SELECT DISTINCT document_version FROM fa4_legal_acceptance WHERE project_id = $1 AND document = 'PRIVACY'", [pid])).toEqual([{ document_version: "CLOSED-TEST-NOT-LEGAL" }]);
+    });
+    it("never mails an address outside the allowed test domains: the delivery is CANCELLED and the person is told it was not sent; the result is still delivered", async () => {
+      const outside = await start(); mail.messages.length = 0;
+      const r = await app().post("/api/fa4/session/result/email").set(auth(outside.token));
+      expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+      expect((await q("SELECT status FROM fa4_email_delivery WHERE project_id = $1 AND template = 'fa4_result_link'", [outside.pid]))[0].status).toBe("CANCELLED");
+      expect(await status(outside.pid)).toBe("DELIVERED");
+      const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = `ok.${uniq()}@beeside.you`;
+      const inside = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" });
+      const mailed = await app().post("/api/fa4/session/result/email").set(auth(inside.body.sessionToken as string));
+      expect(mailed.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
+    });
+  });
+  it("outside test mode the legal regime is final and e-mail is unrestricted", async () => {
+    expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "final" });
   });
 
   it("journey A also delivers through the explicit action and its envelope is complete", async () => {

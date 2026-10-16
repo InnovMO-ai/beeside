@@ -1,6 +1,6 @@
 # Discovery Public v1.0 — production runbook (controlled launch)
 
-Public home `https://beeside.you/discovery` · reserved `https://beeside.you/ops-control` (blocked) · technical alias `/fa4` redirects to `/discovery/`.
+**Canonical production URL: `https://discovery.beeside.you/`** (dedicated host, app owns `/`; `PUBLIC_PATH=/`). `https://beeside.you/discovery` is only a Wix 301 redirect to it — nothing proxies or sits in front of the Wix site. Reserved `/ops-control` on that host (blocked). Technical alias `/fa4` redirects to `/`.
 This is the final production product: the same deployment is opened commercially later by **configuration only** (`set-access.sh open`), never by moving host or rebuilding.
 
 ## 0. What is where
@@ -51,3 +51,17 @@ Authorized erasure only: `SELECT fa4_anonymize_project('<project_id>', '<actor>'
 ## 6. Reserved `/ops-control`
 
 Blocked (404, noindex) until the Discovery administration surface is connected. It must never serve the legacy Control Center and never redirect to `/admin`. Connecting it later is a code change + edge rule, not part of this release.
+
+## 7. CLOSED TEST mode (closed, fictitious data, no final Privacy version)
+
+`FA4_CLOSED_TEST_MODE=true` (backend/worker) + `CLOSED_TEST_MODE=true` (web, set by the deploy script). It exists so the final production environment can be validated before Legal supplies `FA4_PRIVACY_VERSION`; it invents no legal value.
+- **Only closed:** the web tier refuses to start unless `ACCESS_GATE_MODE=basic`; the preflight requires `LAUNCH_PHASE=controlled` + noindex; commercial Premium content is forbidden.
+- **Identifiable:** every visitor sees the runtime ribbon «PRUEBA CONTROLADA · datos ficticios · no comercial» (served by `/config.json`, no rebuild); every consent recorded carries the version `CLOSED-TEST-NOT-LEGAL`, so test data can be told apart (and purged) later.
+- **No real people:** e-mail is sent only to `FA4_CLOSED_TEST_EMAIL_DOMAINS` (default `beeside.you`); anything else is CANCELLED and reported as not sent.
+- **Fails closed when opening:** an open web tier (`ACCESS_GATE_MODE=off|edge`) asks the backend which legal regime it runs under (`GET /api/fa4/legal-mode`) and answers **503** unless it is `final`, or if it cannot tell. The backend refuses `FA4_CLOSED_TEST_MODE` together with a final `FA4_PRIVACY_VERSION`, so the switch to final is a deliberate step: remove the test flag, set the version, redeploy backend and worker, then `set-access.sh open` (after the open-phase preflight).
+- Test data created in this mode is **not real consent**; purge it with the erasure function before real use.
+
+## 8. Staged rollout (what exists, what is next)
+
+`STEPS="images database backend web worker alerts" bash deploy/production/deploy-production.sh …` runs any subset. Closed web tier first (`STEPS="images web alerts"`): the web needs only the deterministic backend URL, so it can be deployed and routed before the backend can start. The backend and worker start once the SMTP secret has a version (loaded by its owner directly into Secret Manager: `printf '%s' '<password>' | gcloud secrets versions add discovery-smtp-password --data-file=- --project beeside-discovery-prod`; never pasted in chat or logs).
+Edge: `HOSTNAME=discovery.beeside.you DRY_RUN=0 bash deploy/production/provision-edge.sh`, then in Wix DNS: `discovery  A  136.81.123.19`; the Google-managed certificate turns ACTIVE after that record resolves. In Wix: SEO → URL redirect manager: `/discovery` → `https://discovery.beeside.you/` (301). Measure `TRUST_PROXY_HOPS` once the load balancer serves traffic (the provisional value is 2).

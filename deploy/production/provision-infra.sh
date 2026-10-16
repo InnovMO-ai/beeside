@@ -65,10 +65,13 @@ else echo "database credentials secrets exist (users and secrets unchanged)"; fi
 secret discovery-hash-secret "$( [ "$DRY_RUN" = "0" ] && rand 48 || echo x )"
 GATE_USER=${GATE_USER:-team}
 secret discovery-access-gate-credentials "${GATE_USER}:$( [ "$DRY_RUN" = "0" ] && rand 24 || echo x )"
-echo "(discovery-smtp-password is NOT created here: it is the Google Workspace app password for contact@beeside.you and must come from its owner)"
+# SMTP: only the (empty) secret CONTAINER is created. Its VALUE is the Google Workspace app password for contact@beeside.you and is loaded directly into Secret Manager by its owner;
+# no process of ours ever receives, prints or logs it.
+exists secrets describe discovery-smtp-password || run g secrets create discovery-smtp-password --replication-policy automatic
 bind() { run g secrets add-iam-policy-binding "$1" --member "serviceAccount:$(SA $2)" --role roles/secretmanager.secretAccessor; }
 bind discovery-db-url backend; bind discovery-db-url worker
 bind discovery-hash-secret backend; bind discovery-hash-secret worker
+bind discovery-smtp-password backend; bind discovery-smtp-password worker
 bind discovery-migration-db-url migrate
 bind discovery-access-gate-credentials web
 

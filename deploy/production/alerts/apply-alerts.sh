@@ -2,9 +2,17 @@
 # Logging metrics + alert policies for Discovery production (hooks). Idempotent. DRY_RUN=1 (default) only prints. Needs ALERT_CHANNEL (a Cloud Monitoring
 # notification channel id, owned by the platform). Without it nothing is created and the preflight already refuses the deployment.
 set -euo pipefail
-: "${PROJECT_ID:?}"; : "${ALERT_CHANNEL:?ALERT_CHANNEL is required}"
+: "${PROJECT_ID:?}"
 DRY_RUN=${DRY_RUN:-1}; HERE="$(cd "$(dirname "$0")" && pwd)"
 run() { echo "+ $*"; if [ "$DRY_RUN" = "0" ]; then "$@"; fi; }
+# notification channel: use ALERT_CHANNEL, or create/find an e-mail channel for ALERT_EMAIL (e.g. contact@beeside.you)
+if [ -z "${ALERT_CHANNEL:-}" ]; then
+  : "${ALERT_EMAIL:?set ALERT_CHANNEL or ALERT_EMAIL}"
+  if [ "$DRY_RUN" = "0" ]; then
+    ALERT_CHANNEL=$(gcloud --project "$PROJECT_ID" alpha monitoring channels list --filter="displayName=\"Discovery alerts\" AND type=email" --format='value(name)' 2>/dev/null | head -1 | sed 's#.*/##')
+    [ -n "$ALERT_CHANNEL" ] || ALERT_CHANNEL=$(gcloud --project "$PROJECT_ID" alpha monitoring channels create --display-name="Discovery alerts" --type=email --channel-labels="email_address=${ALERT_EMAIL}" --format='value(name)' | sed 's#.*/##')
+  else ALERT_CHANNEL="<new-email-channel>"; echo "+ (create e-mail notification channel for ${ALERT_EMAIL})"; fi
+fi
 metric() { # name description filter
   if [ "$DRY_RUN" = "0" ] && gcloud --project "$PROJECT_ID" logging metrics describe "$1" >/dev/null 2>&1; then echo "metric $1 exists"; return; fi
   run gcloud --project "$PROJECT_ID" logging metrics create "$1" --description "$2" --log-filter "$3"

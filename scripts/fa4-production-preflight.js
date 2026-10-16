@@ -35,7 +35,11 @@ function evaluate(env, opts = {}) {
   const rows = []; const add = (id, status, detail = '') => rows.push({ id, status, detail });
   const need = (id, cond, detail) => add(id, cond ? 'SET' : 'MISSING', cond ? detail ?? '' : detail ?? 'not set');
   const must = (id, cond, bad) => add(id, cond ? 'OK' : 'INVALID', cond ? '' : bad);
-  const external = (id, flag, what) => add(id, truthy(env[flag]) ? 'SET' : 'EXTERNAL', truthy(env[flag]) ? `${flag}=true` : `${what} — confirm with ${flag}=true once done`);
+  // Platform items that cannot exist yet in a STAGED rollout (they are created by a later step) may be deferred explicitly via PREFLIGHT_DEFER; never legal/data/security items.
+  const DEFERRABLE = new Set(['EDGE_ROUTING_CONFIRMED', 'ORG_POLICY_CONFIRMED', 'MAIL_DNS_CONFIRMED']);
+  const deferred = new Set((env.PREFLIGHT_DEFER ?? '').split(',').map((x) => x.trim()).filter(Boolean));
+  must('PREFLIGHT_DEFER only lists deferrable platform items', [...deferred].every((d) => DEFERRABLE.has(d)), `allowed: ${[...DEFERRABLE].join(', ')}`);
+  const external = (id, flag, what) => add(id, truthy(env[flag]) ? 'SET' : deferred.has(flag) && DEFERRABLE.has(flag) ? 'WARN' : 'EXTERNAL', truthy(env[flag]) ? `${flag}=true` : deferred.has(flag) && DEFERRABLE.has(flag) ? `DEFERRED (${what}) — must be confirmed before the step that needs it` : `${what} — confirm with ${flag}=true once done`);
 
   // ---- target environment (never dev, never shared with dev data)
   need('PROJECT_ID', set(env.PROJECT_ID));
@@ -68,7 +72,15 @@ function evaluate(env, opts = {}) {
   need('TRUST_PROXY_HOPS', /^[0-5]$/.test(env.TRUST_PROXY_HOPS ?? ''), 'integer 0–5, measured behind the real edge (keys the rate limits)');
 
   // ---- legal / privacy
-  need('FA4_PRIVACY_VERSION', set(env.FA4_PRIVACY_VERSION), 'version identifier of the FINAL Privacy document — external (Legal), never invented; production refuses to start without it');
+  // CLOSED TEST: a closed, fictitious-data validation phase may run WITHOUT the final Privacy version (the backend then records the marker CLOSED-TEST-NOT-LEGAL and mails only
+  // allowed test domains). It can never coexist with opening, real data, commercial content or a final version.
+  const closedTest = truthy(env.FA4_CLOSED_TEST_MODE);
+  if (closedTest) {
+    must('closed test is only for a closed controlled phase', env.LAUNCH_PHASE === 'controlled' && env.ACCESS_GATE_MODE === 'basic' && truthy(env.ROBOTS_NOINDEX), 'FA4_CLOSED_TEST_MODE requires LAUNCH_PHASE=controlled, ACCESS_GATE_MODE=basic and ROBOTS_NOINDEX=true');
+    must('closed test excludes a final Privacy version and commercial content', !set(env.FA4_PRIVACY_VERSION) && !truthy(env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED), 'a final FA4_PRIVACY_VERSION ends test mode (remove FA4_CLOSED_TEST_MODE); commercial Premium content is forbidden in test mode');
+    must('closed test e-mail domains', /^([a-z0-9.-]+\.[a-z]{2,})(,\s*[a-z0-9.-]+\.[a-z]{2,})*$/i.test(env.FA4_CLOSED_TEST_EMAIL_DOMAINS || 'beeside.you'), 'FA4_CLOSED_TEST_EMAIL_DOMAINS must be a comma-separated domain list (default beeside.you)');
+    add('FA4_PRIVACY_VERSION', 'WARN', 'CLOSED TEST: no final value — fictitious data only, non-commercial, e-mail restricted; the FINAL version is required before real data or opening');
+  } else need('FA4_PRIVACY_VERSION', set(env.FA4_PRIVACY_VERSION), 'version identifier of the FINAL Privacy document — external (Legal), never invented; production refuses to start without it');
   must('Privacy / Terms URLs are https', [env.FA4_PRIVACY_URL, env.FA4_TERMS_URL].every((u) => !set(u) || /^https:\/\//.test(u)), 'URLs must be https');
   if (env.LAUNCH_PHASE === 'open') external('LEGAL-1 final validation', 'LEGAL1_CONFIRMED', 'Legal sign-off (Terms, Privacy, retention, consent wording)');
   else add('LEGAL-1 final validation', truthy(env.LEGAL1_CONFIRMED) ? 'SET' : 'WARN', truthy(env.LEGAL1_CONFIRMED) ? 'LEGAL1_CONFIRMED=true' : 'not confirmed: internal tests/presentations only — NO real prospect data until Legal clears it');
@@ -92,6 +104,7 @@ function evaluate(env, opts = {}) {
   if (gate === 'basic') need('SECRET_ACCESS_GATE_CREDENTIALS', /^[A-Za-z][A-Za-z0-9_-]{2,}$/.test(env.SECRET_ACCESS_GATE_CREDENTIALS ?? ''), 'Secret Manager secret NAME (one user:password per line, password ≥ 12)');
   if (gate === 'edge') external('edge access control (IAP / Cloud Armor / proxy)', 'EDGE_GATE_CONFIRMED', 'the gate that protects the service in front of it');
   if (phase === 'open') {
+    must('opening requires the final legal regime (no closed test)', !closedTest && set(env.FA4_PRIVACY_VERSION), 'FA4_CLOSED_TEST_MODE must be off and FA4_PRIVACY_VERSION set before opening');
     must('opening commercially is an explicit confirmation', truthy(env.OPEN_COMMERCIAL_CONFIRMED), 'OPEN_COMMERCIAL_CONFIRMED=true required');
     must('open phase: Premium comparison approved', truthy(env.COMPARISON_APPROVED), 'Product/Legal approval of the commercial comparison (COMPARISON_APPROVED=true)');
   }
@@ -106,9 +119,9 @@ function evaluate(env, opts = {}) {
   external('production database provisioned (instance, database, owner + runtime login roles)', 'DB_PROVISIONED_CONFIRMED', 'platform');
   external('automated backups enabled', 'DB_BACKUPS_CONFIRMED', 'platform');
   external('point-in-time recovery enabled', 'DB_PITR_CONFIRMED', 'platform');
-  external('DNS + load balancer + certificate route beeside.you/discovery here', 'EDGE_ROUTING_CONFIRMED', 'platform/marketing');
+  external('DNS + load balancer + certificate serve the public host', 'EDGE_ROUTING_CONFIRMED', 'platform/marketing');
   external('org policy allows the edge to invoke Cloud Run', 'ORG_POLICY_CONFIRMED', 'platform/security');
-  need('ALERT_CHANNEL (who is notified)', set(env.ALERT_CHANNEL), 'Cloud Monitoring notification channel id — external');
+  need('ALERT_CHANNEL (who is notified)', set(env.ALERT_CHANNEL) || /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(env.ALERT_EMAIL ?? ''), 'a Cloud Monitoring channel id (ALERT_CHANNEL) or an e-mail the alert step turns into one (ALERT_EMAIL)');
 
   // ---- built artifact (optional)
   if (opts.dist) {

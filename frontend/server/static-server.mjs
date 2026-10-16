@@ -157,6 +157,34 @@ if (DISCOVERY) {
   if (BASIC_AUTH || process.env.STAGING_TEST_LEGAL === "true" || ROOT_REDIRECT) fail("the staging switches (STAGING_BASIC_AUTH, STAGING_TEST_LEGAL, ROOT_REDIRECT) are not valid in discovery mode");
 }
 const PREFIX = PUBLIC_PATH === "/" ? "" : PUBLIC_PATH;   // "" = the app owns the whole (dedicated) host; "/discovery" = it shares the host under that path
+// CLOSED TEST (controlled launch, fictitious data, no final Privacy version): only valid while the application gate is closed. The label is shown to every visitor (runtime
+// config, so opening commercially needs no rebuild).
+const CLOSED_TEST = process.env.CLOSED_TEST_MODE === "true";
+const CLOSED_TEST_LABEL = (process.env.CLOSED_TEST_LABEL ?? "PRUEBA CONTROLADA · datos ficticios · no comercial").slice(0, 120);
+if (DISCOVERY && CLOSED_TEST && GATE_MODE !== "basic") throw new Error("discovery mode refuses to start: CLOSED_TEST_MODE requires ACCESS_GATE_MODE=basic (test mode exists only behind a closed gate)");
+if (!DISCOVERY && CLOSED_TEST) throw new Error("CLOSED_TEST_MODE is only valid in discovery mode");
+// An OPEN application (gate off / enforced elsewhere) must run under the FINAL legal regime: the backend says which regime it is in; anything else — including "cannot tell" —
+// answers 503 (fail closed). Checked per request with a short cache, so a backend switched back to test mode closes the front door too.
+let legalCache = { ok: false, at: 0 };
+async function legalIsFinal() {
+  if (Date.now() - legalCache.at < 30_000) return legalCache.ok;
+  let ok = false;
+  try {
+    if (UPSTREAM) {
+      const token = await upstreamIdToken();
+      const mod = await (UPSTREAM.protocol === "https:" ? import("node:https") : import("node:http"));
+      const body = await new Promise((resolve, reject) => {
+        const rq = mod.default.get(new URL("/api/fa4/legal-mode", UPSTREAM), { headers: token ? { "x-serverless-authorization": `Bearer ${token}` } : {}, timeout: 3000 }, (res) => {
+          let b = ""; res.on("data", (c) => (b += c)); res.on("end", () => (res.statusCode === 200 ? resolve(b) : reject(new Error("status"))));
+        });
+        rq.on("timeout", () => rq.destroy(new Error("timeout"))); rq.on("error", reject);
+      });
+      ok = JSON.parse(String(body)).legalMode === "final";
+    }
+  } catch { ok = false; }
+  legalCache = { ok, at: Date.now() };
+  return ok;
+}
 const GATE_KEY = createHash("sha256").update(GATE_CREDENTIALS.join("\n")).digest();
 const GATE_COOKIE = "discovery_gate";
 const gateCookieValue = (expires) => `${expires}.${createHmac("sha256", GATE_KEY).update(String(expires)).digest("hex")}`;
@@ -180,6 +208,8 @@ const clientOf = (request) => String(request.headers["x-forwarded-for"] ?? reque
 function tooManyFailures(ip) { const now = Date.now(); const list = (failures.get(ip) ?? []).filter((t) => now - t < 600_000); failures.set(ip, list); return list.length >= 10; }
 const noteFailure = (ip) => failures.set(ip, [...(failures.get(ip) ?? []), Date.now()]);
 
+const inner_isConfig = (p) => p === `${PREFIX}/config.json`;
+
 async function handleDiscovery(request, response) {
   const url = new URL(request.url, "http://localhost");
   let pathname; try { pathname = decodeURIComponent(url.pathname); } catch { response.writeHead(400); response.end(); return; }
@@ -187,8 +217,10 @@ async function handleDiscovery(request, response) {
   const notAvailable = (status = 404) => send(status, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow, noarchive" }, "Not available");
   if (NOINDEX || /^\/ops-control(\/|$)/.test(pathname)) response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
   // public by design: health probe, robots, and the brand files that e-mail clients fetch without any cookie
-  if (pathname === "/health") { send(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }, JSON.stringify({ status: "ok", service: "beeside-discovery-web", gate: GATE_MODE })); return; }
+  if (pathname === "/health") { send(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }, JSON.stringify({ status: "ok", service: "beeside-discovery-web", gate: GATE_MODE, closedTest: CLOSED_TEST })); return; }
   if (pathname === "/robots.txt") { if (NOINDEX) send(200, { "Content-Type": "text/plain; charset=utf-8" }, "User-agent: *\nDisallow: /\n"); else notAvailable(); return; }
+  // runtime, non-sensitive configuration (public; no gate): lets the page show that this is a closed, non-commercial test without a rebuild
+  if (inner_isConfig(pathname)) { send(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }, JSON.stringify({ closedTest: CLOSED_TEST, label: CLOSED_TEST ? CLOSED_TEST_LABEL : null })); return; }
   // Administration is RESERVED: blocked until the Discovery administration surface is connected. Never a redirect to /admin, never the legacy console.
   if (/^\/ops-control(\/|$)/.test(pathname)) { notAvailable(); return; }
   // technical alias → canonical public path (the fragment of private links survives a redirect)
@@ -196,6 +228,7 @@ async function handleDiscovery(request, response) {
   if (PREFIX && pathname === PREFIX) { send(308, { Location: `${PREFIX}/${url.search}`, "Cache-Control": "no-store" }); return; }
   if (PREFIX && !pathname.startsWith(PREFIX + "/")) { notAvailable(); return; }
   const inner = PREFIX ? pathname.slice(PREFIX.length) : pathname;          // always starts with "/"
+  if (GATE_MODE !== "basic" && !inner.startsWith("/brand/") && !(await legalIsFinal())) { send(503, { "Content-Type": "application/json", "Cache-Control": "no-store" }, JSON.stringify({ error: "NOT_OPEN" })); return; }
   const isApi = inner.startsWith("/api/");
   const exempt = inner.startsWith("/brand/");
   if (GATE_MODE === "basic" && !exempt) {

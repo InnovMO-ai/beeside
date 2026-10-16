@@ -1,5 +1,6 @@
 import { validateRuntimeConfig } from "../security/runtime-config";
-import { fa4DepsFromEnv, fa4IsInternalStaging, fa4LegalFromEnv } from "../index";
+import { fa4ClosedTestFromEnv, fa4DepsFromEnv, fa4IsInternalStaging, fa4LegalFromEnv } from "../index";
+import { closedTestRecipientAllowed } from "./email";
 
 describe("FA4 legal configuration (CHK-1)", () => {
   it("Terms default to the official page and version for both languages", () => {
@@ -52,5 +53,34 @@ describe("FA4 legal configuration (CHK-1)", () => {
   it("env vars override the Terms defaults for a future version", () => {
     const l = fa4LegalFromEnv({ NODE_ENV: "development", FA4_TERMS_VERSION: "2.0", FA4_TERMS_URL_ES: "https://t/es", FA4_TERMS_URL_EN: "https://t/en" } as never);
     expect([l.termsVersion, l.termsUrl.es, l.termsUrl.en]).toEqual(["2.0", "https://t/es", "https://t/en"]);
+  });
+});
+
+describe("CLOSED TEST mode (closed production, fictitious data, no final Privacy version)", () => {
+  const closed = { NODE_ENV: "production", FA4_CLOSED_TEST_MODE: "true" } as never;
+  it("lets a CLOSED deployment start without a Privacy version, records a visibly non-legal marker, and invents no legal value", () => {
+    const l = fa4LegalFromEnv(closed);
+    expect(l.privacyVersion).toBe("CLOSED-TEST-NOT-LEGAL");
+    expect(l.termsVersion).toBe("1.0-2026-08-27"); expect(l.privacyUrl.es).toBe("https://www.beeside.you/privacy");
+    expect(fa4ClosedTestFromEnv(closed)).toEqual({ emailDomains: ["beeside.you"] });
+  });
+  it("is opt-in only: without the flag production still refuses (final legal requirement intact)", () => {
+    expect(() => fa4LegalFromEnv({ NODE_ENV: "production" } as never)).toThrow(/requires FA4_PRIVACY_VERSION in production/);
+    expect(() => fa4LegalFromEnv({ NODE_ENV: "production", FA4_CLOSED_TEST_MODE: "yes" } as never)).toThrow(/requires FA4_PRIVACY_VERSION/);   // only the literal "true"
+  });
+  it("a final FA4_PRIVACY_VERSION ends test mode: the combination is refused so nobody runs 'final' data under the test regime", () => {
+    expect(() => fa4LegalFromEnv({ ...closed as object, FA4_PRIVACY_VERSION: "p1" } as never)).toThrow(/must be removed once the final FA4_PRIVACY_VERSION/);
+  });
+  it("is refused for internal staging and for commercial Premium content; e-mail domains are validated", () => {
+    expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_ENV: "staging" } as never)).toThrow(/not internal staging/);
+    expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED: "true" } as never)).toThrow(/forbids commercial/);
+    expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_CLOSED_TEST_EMAIL_DOMAINS: "not a domain" } as never)).toThrow(/domains/);
+    expect(fa4ClosedTestFromEnv({ ...closed as object, FA4_CLOSED_TEST_EMAIL_DOMAINS: "Beeside.you, test.example" } as never)).toEqual({ emailDomains: ["beeside.you", "test.example"] });
+  });
+  it("e-mail recipients are restricted to the allowed test domains (and unrestricted when not in test mode)", () => {
+    const ct = { emailDomains: ["beeside.you"] };
+    expect(closedTestRecipientAllowed("Ana@Beeside.you", ct)).toBe(true);
+    for (const bad of ["prospect@gmail.com", "x@beeside.you.evil.test", "x@sub.beeside.you", "nobody"]) expect(closedTestRecipientAllowed(bad, ct)).toBe(false);
+    expect(closedTestRecipientAllowed("anyone@gmail.com", undefined)).toBe(true);
   });
 });

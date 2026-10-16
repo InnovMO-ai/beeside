@@ -32,7 +32,15 @@ export interface Fa4EmailDeps {
     premiumCommercialContentAllowed?: boolean;
     /** Validity of the YEV email's private link (one token serves both "View" and "Talk to beeside"). */
     yevLinkDays?: number;
+    /** CLOSED TEST mode (no final Privacy version yet): e-mail goes ONLY to these domains, so a real prospect can never be mailed from a test deployment. */
+    closedTest?: { emailDomains: string[] };
   };
+}
+
+export function closedTestRecipientAllowed(address: string, closedTest?: { emailDomains: string[] }): boolean {
+  if (!closedTest) return true;
+  const domain = address.trim().toLowerCase().split("@").pop() ?? "";
+  return closedTest.emailDomains.includes(domain);
 }
 
 export interface Fa4EmailLimits { cooldownMinutes: number; recipientDailyQuota: number }
@@ -236,6 +244,7 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   }
 
   if (!p || !d.project_id) return null;
+  if (!closedTestRecipientAllowed(p.email, deps.config.closedTest)) return null;     // closed test: never mail an address outside the allowed test domains (the delivery is CANCELLED, reported as not sent)
   const locale = p.locale;
   const name = firstName(p.answers.identity?.name ?? "");
   if (d.template === "fa4_resume_link") {

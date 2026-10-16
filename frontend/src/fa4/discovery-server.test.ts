@@ -10,18 +10,21 @@ import { afterEach, beforeAll, afterAll, describe, expect, it, vi } from 'vitest
  * the reserved /ops-control, the /fa4 redirect, no legacy fallback, the controlled-access gate (runtime switch, fail closed) and its public exemptions.
  */
 let dist = ''; let upstream: http.Server; let upstreamPort = 0; const seen: Array<{ method?: string; url?: string }> = [];
+let legalMode = 'final';                                           // what the stub backend reports at /api/fa4/legal-mode
 beforeAll(async () => {
   dist = fs.mkdtempSync(path.join(os.tmpdir(), 'disc-dist-'));
   fs.mkdirSync(path.join(dist, 'assets')); fs.mkdirSync(path.join(dist, 'brand'));
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>Discovery shell</title><script src="/discovery/assets/app.js"></script>');
   fs.writeFileSync(path.join(dist, 'assets', 'app.js'), 'console.log(1)');
   fs.writeFileSync(path.join(dist, 'brand', 'beeside-lockup.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
-  upstream = http.createServer((req, res) => { seen.push({ method: req.method, url: req.url }); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"upstream":true}'); });
+  upstream = http.createServer((req, res) => {
+    if (req.url === '/api/fa4/legal-mode') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ legalMode })); return; }
+    seen.push({ method: req.method, url: req.url }); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"upstream":true}'); });
   await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r)); upstreamPort = (upstream.address() as AddressInfo).port;
 });
 afterAll(async () => { await new Promise((r) => upstream.close(r)); fs.rmSync(dist, { recursive: true, force: true }); });
 
-const ENV_KEYS = ['SERVE_MODE', 'PUBLIC_PATH', 'ACCESS_GATE_MODE', 'ACCESS_GATE_CREDENTIALS', 'ACCESS_GATE_COOKIE_TTL_HOURS', 'ROBOTS_NOINDEX', 'STAGING_BASIC_AUTH', 'STAGING_TEST_LEGAL', 'API_UPSTREAM_URL', 'UPSTREAM_AUTH_AUDIENCE', 'ROOT_REDIRECT', 'NODE_ENV', 'STATIC_ROOT'];
+const ENV_KEYS = ['CLOSED_TEST_MODE', 'CLOSED_TEST_LABEL', 'SERVE_MODE', 'PUBLIC_PATH', 'ACCESS_GATE_MODE', 'ACCESS_GATE_CREDENTIALS', 'ACCESS_GATE_COOKIE_TTL_HOURS', 'ROBOTS_NOINDEX', 'STAGING_BASIC_AUTH', 'STAGING_TEST_LEGAL', 'API_UPSTREAM_URL', 'UPSTREAM_AUTH_AUDIENCE', 'ROOT_REDIRECT', 'NODE_ENV', 'STATIC_ROOT'];
 async function load(env: Record<string, string>) {
   vi.resetModules(); for (const k of ENV_KEYS) delete process.env[k];
   Object.assign(process.env, { STATIC_SERVER_AUTOSTART: 'false', STATIC_ROOT: dist, SERVE_MODE: 'discovery', API_UPSTREAM_URL: `http://127.0.0.1:${upstreamPort}` }, env);
@@ -38,7 +41,7 @@ async function boot(env: Record<string, string>) {
   return { get: (p: string, h?: Record<string, string>) => call('GET', p, h), post: (p: string, h?: Record<string, string>, b = '{}') => call('POST', p, { 'content-type': 'application/json', ...h }, b), close: () => new Promise((r) => server.close(r)) };
 }
 let closer: (() => Promise<unknown>) | null = null;
-afterEach(async () => { await closer?.(); closer = null; seen.length = 0; });
+afterEach(async () => { await closer?.(); closer = null; seen.length = 0; legalMode = 'final'; });
 const basic = (u: string, p: string) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64') });
 const PW = 'correct-horse-battery';
 
@@ -154,5 +157,43 @@ describe('discovery mode — dedicated host (PUBLIC_PATH=/): the app owns the ho
     const s = await boot({ ACCESS_GATE_MODE: 'basic', ACCESS_GATE_CREDENTIALS: `tester:${PW}`, PUBLIC_PATH: '/' }); closer = s.close;
     expect((await s.get('/')).status).toBe(401); expect((await s.get('/api/fa4/catalog')).status).toBe(401);
     expect((await s.get('/brand/beeside-lockup.png')).status).toBe(200); expect((await s.get('/', basic('tester', PW))).status).toBe(200);
+  });
+});
+
+
+describe('discovery mode — CLOSED TEST and the open-access guard (no final Privacy version, no opening)', () => {
+  it('closed test exists only behind the basic gate; it is announced at runtime (public config, no rebuild) and in /health', async () => {
+    for (const env of [{ ACCESS_GATE_MODE: 'off' }, { ACCESS_GATE_MODE: 'edge' }]) await expect(load({ ...env, CLOSED_TEST_MODE: 'true' })).rejects.toThrow(/CLOSED_TEST_MODE requires ACCESS_GATE_MODE=basic/);
+    const s = await boot({ ACCESS_GATE_MODE: 'basic', ACCESS_GATE_CREDENTIALS: `tester:${PW}`, CLOSED_TEST_MODE: 'true', PUBLIC_PATH: '/' }); closer = s.close;
+    const cfg = await s.get('/config.json'); expect(cfg.status).toBe(200);                      // public: the ribbon must show before anyone logs in
+    expect(JSON.parse(cfg.body)).toEqual({ closedTest: true, label: 'PRUEBA CONTROLADA · datos ficticios · no comercial' });
+    expect(JSON.parse((await s.get('/health')).body).closedTest).toBe(true);
+    expect((await s.get('/')).status).toBe(401);                                                 // and the app itself stays closed
+  });
+  it('an open front door is refused while the backend is in test mode (or cannot be asked): 503, never the app', async () => {
+    legalMode = 'closed-test';
+    for (const mode of ['off', 'edge']) {
+      const s = await boot({ ACCESS_GATE_MODE: mode }); closer = s.close;
+      for (const p of ['/discovery/', '/discovery/api/fa4/catalog', '/discovery/assets/app.js']) expect((await s.get(p)).status, `${mode} ${p}`).toBe(503);
+      expect((await s.get('/health')).status).toBe(200); expect((await s.get('/discovery/brand/beeside-lockup.png')).status).toBe(200);
+      await s.close(); closer = null;
+    }
+    const dead = http.createServer(); await new Promise<void>((r) => dead.listen(0, '127.0.0.1', r)); const deadPort = (dead.address() as AddressInfo).port; await new Promise((r) => dead.close(r));   // a port nobody listens on
+    const down = await boot({ ACCESS_GATE_MODE: 'off', API_UPSTREAM_URL: `http://127.0.0.1:${deadPort}` }); closer = down.close;   // backend unreachable = cannot prove "final" = closed
+    expect((await down.get('/discovery/')).status).toBe(503);
+  }, 15000);
+  it('the same configuration opens only under the FINAL regime (configuration-only opening)', async () => {
+    legalMode = 'final';
+    const s = await boot({ ACCESS_GATE_MODE: 'off' }); closer = s.close;
+    expect((await s.get('/discovery/')).status).toBe(200); expect((await s.get('/discovery/api/fa4/catalog')).status).toBe(200);
+  });
+  it('the closed gate does not depend on the legal regime (test deployments stay usable by the team)', async () => {
+    legalMode = 'closed-test';
+    const s = await boot({ ACCESS_GATE_MODE: 'basic', ACCESS_GATE_CREDENTIALS: `tester:${PW}` }); closer = s.close;
+    expect((await s.get('/discovery/', basic('tester', PW))).status).toBe(200);
+  });
+  it('config.json says "not a test" when it is not one', async () => {
+    const s = await boot({ ACCESS_GATE_MODE: 'basic', ACCESS_GATE_CREDENTIALS: `tester:${PW}` }); closer = s.close;
+    expect(JSON.parse((await s.get('/discovery/config.json')).body)).toEqual({ closedTest: false, label: null });
   });
 });

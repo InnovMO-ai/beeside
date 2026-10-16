@@ -59,7 +59,7 @@ describe("production preflight (refuses a deployment while configuration is miss
     ["no purchase URL and no acknowledgement", { PREMIUM_PURCHASE_DEFERRED_ACK: "" }, "VITE_FA4_PREMIUM_PURCHASE_URL"],
     ["a non-https purchase URL", { VITE_FA4_PREMIUM_PURCHASE_URL: "http://pay.example" }, "VITE_FA4_PREMIUM_PURCHASE_URL is https"],
     ["no backups confirmation", { DB_BACKUPS_CONFIRMED: "" }, "automated backups enabled"],
-    ["no routing confirmation", { EDGE_ROUTING_CONFIRMED: "" }, "DNS + load balancer + certificate route beeside.you/discovery here"],
+    ["no routing confirmation", { EDGE_ROUTING_CONFIRMED: "" }, "DNS + load balancer + certificate serve the public host"],
     ["no alert channel", { ALERT_CHANNEL: "" }, "ALERT_CHANNEL (who is notified)"],
     ["premium commercial content without Legal", { FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED: "true" }, "premium commercial content only with Legal"],
   ])("refuses: %s", (_n, patch, id) => {
@@ -75,6 +75,27 @@ describe("production preflight (refuses a deployment while configuration is miss
     const d = { ...OK, PUBLIC_BASE_URL: "https://discovery.beeside.you", APP_BASE_URL: "https://discovery.beeside.you", ALLOWED_ORIGINS: "https://discovery.beeside.you", PUBLIC_PATH: "/", FA4_PUBLIC_PATH: "/", VITE_BASE_PATH: "/" };
     expect(evaluate(d).blocked).toBe(0);
     expect(blockedIds({ ...d, VITE_BASE_PATH: "/discovery/" })).toContain("VITE_BASE_PATH matches PUBLIC_PATH");
+  });
+  it("CLOSED TEST: a closed, fictitious-data phase may run without the final Privacy version (WARN), but only closed, and never with a final version, commercial content or opening", () => {
+    const { FA4_PRIVACY_VERSION: _drop, ...noVersion } = OK; void _drop;
+    expect(blockedIds(noVersion)).toContain("FA4_PRIVACY_VERSION");                                    // without test mode the final version is still required
+    const closed = { ...noVersion, FA4_CLOSED_TEST_MODE: "true" };
+    const r = evaluate(closed); expect(r.blocked).toBe(0); expect(r.rows.find((x) => x.id === "FA4_PRIVACY_VERSION")!.status).toBe("WARN");
+    expect(blockedIds({ ...closed, ACCESS_GATE_MODE: "edge", EDGE_GATE_CONFIRMED: "true" })).toContain("closed test is only for a closed controlled phase");
+    expect(blockedIds({ ...closed, ROBOTS_NOINDEX: "" })).toContain("closed test is only for a closed controlled phase");
+    expect(blockedIds({ ...closed, FA4_PRIVACY_VERSION: "v1" })).toContain("closed test excludes a final Privacy version and commercial content");
+    expect(blockedIds({ ...closed, FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED: "true", LEGAL1_CONFIRMED: "true" })).toContain("closed test excludes a final Privacy version and commercial content");
+    expect(blockedIds({ ...closed, FA4_CLOSED_TEST_EMAIL_DOMAINS: "not a domain" })).toContain("closed test e-mail domains");
+    const open = { ...closed, LAUNCH_PHASE: "open", ACCESS_GATE_MODE: "off", ROBOTS_NOINDEX: "", OPEN_COMMERCIAL_CONFIRMED: "true", COMPARISON_APPROVED: "true", LEGAL1_CONFIRMED: "true", VITE_FA4_PREMIUM_PURCHASE_URL: "https://pay.example/x" };
+    expect(blockedIds(open)).toContain("opening requires the final legal regime (no closed test)");
+    expect(blockedIds({ ...open, FA4_CLOSED_TEST_MODE: "", FA4_PRIVACY_VERSION: "v1" })).toEqual([]);   // the ONLY way to open: final version, test mode off, every confirmation
+  });
+  it("a staged rollout may defer ONLY the platform items that a later step creates; legal, data and security items can never be deferred", () => {
+    const d = { ...OK, EDGE_ROUTING_CONFIRMED: "", ORG_POLICY_CONFIRMED: "", PREFLIGHT_DEFER: "EDGE_ROUTING_CONFIRMED,ORG_POLICY_CONFIRMED" };
+    const r = evaluate(d); expect(r.blocked).toBe(0); expect(r.rows.find((x) => x.id === "DNS + load balancer + certificate serve the public host")!.status).toBe("WARN");
+    expect(blockedIds({ ...OK, PREFLIGHT_DEFER: "FA4_PRIVACY_VERSION" })).toContain("PREFLIGHT_DEFER only lists deferrable platform items");
+    expect(blockedIds({ ...OK, DB_BACKUPS_CONFIRMED: "", PREFLIGHT_DEFER: "DB_BACKUPS_CONFIRMED" })).toEqual(expect.arrayContaining(["PREFLIGHT_DEFER only lists deferrable platform items", "automated backups enabled"]));
+    expect(blockedIds({ ...OK, ALERT_CHANNEL: "", ALERT_EMAIL: "contact@beeside.you" })).toEqual([]);   // an e-mail is enough: the alert step creates the channel
   });
   it("never prints a secret value or an inlined credential", () => {
     const out = JSON.stringify(evaluate({ ...OK, DATABASE_URL: "postgres://user:SuperSecret123@h/db" }).rows);

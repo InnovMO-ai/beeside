@@ -133,6 +133,7 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
       yevLinkDays: Number(env.FA4_YEV_LINK_DAYS ?? 14),
       emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
+      ...(fa4ClosedTestFromEnv(env) ? { closedTest: fa4ClosedTestFromEnv(env), legalMode: "closed-test" as const } : { legalMode: "final" as const }),
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
@@ -182,6 +183,24 @@ export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): bool
 const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://beeside.you/termsandconditions" } as const;
 /** Canonical Privacy page. Its document VERSION is not supplied: it stays an explicit launch configuration (FA4_PRIVACY_VERSION), never defaulted. */
 const OFFICIAL_PRIVACY_URL = "https://www.beeside.you/privacy";
+/**
+ * CLOSED TEST MODE (controlled launch, fictitious data, no final Privacy version yet). Explicit opt-in FA4_CLOSED_TEST_MODE=true. It exists so infrastructure and the product can be
+ * validated in the final production environment without inventing a legal value:
+ *  - only valid for a CLOSED deployment: never together with FA4_ENV=staging, commercial Premium content, or a final FA4_PRIVACY_VERSION (that value ends test mode);
+ *  - e-mail is restricted to FA4_CLOSED_TEST_EMAIL_DOMAINS (default beeside.you): no prospect can be mailed;
+ *  - every acceptance it records carries the marker version CLOSED-TEST-NOT-LEGAL, so test data is identifiable and never mistaken for real consent;
+ *  - the web tier refuses to run open while the backend reports this mode (see /api/fa4/legal-mode).
+ */
+export function fa4ClosedTestFromEnv(env: NodeJS.ProcessEnv = process.env): { emailDomains: string[] } | undefined {
+  if (env.FA4_CLOSED_TEST_MODE !== "true") return undefined;
+  if (env.FA4_ENV === "staging") throw new Error("FA4_CLOSED_TEST_MODE is for the closed production deployment, not internal staging");
+  if (env.FA4_PRIVACY_VERSION) throw new Error("FA4_CLOSED_TEST_MODE must be removed once the final FA4_PRIVACY_VERSION is set (a final version ends test mode)");
+  if (env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true") throw new Error("FA4_CLOSED_TEST_MODE forbids commercial Premium content");
+  const domains = (env.FA4_CLOSED_TEST_EMAIL_DOMAINS ?? "beeside.you").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  if (!domains.length || !domains.every((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))) throw new Error("FA4_CLOSED_TEST_EMAIL_DOMAINS must be a comma-separated list of domains");
+  return { emailDomains: domains };
+}
+
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
   // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
   // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
@@ -195,6 +214,13 @@ export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConf
       termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
       termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
       privacyVersion: "STAGING-TEST-NOT-LEGAL", privacyUrl: { es: test, en: test },
+    };
+  }
+  if (fa4ClosedTestFromEnv(env)) {
+    return {
+      termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+      termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+      privacyVersion: "CLOSED-TEST-NOT-LEGAL", privacyUrl: { es: privacyEs, en: privacyEn },
     };
   }
   const missing = [!env.FA4_PRIVACY_VERSION && "FA4_PRIVACY_VERSION", !privacyEs && "FA4_PRIVACY_URL_ES (or FA4_PRIVACY_URL)", !privacyEn && "FA4_PRIVACY_URL_EN (or FA4_PRIVACY_URL)"].filter(Boolean);
