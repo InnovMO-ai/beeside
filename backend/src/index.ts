@@ -188,18 +188,24 @@ const OFFICIAL_PRIVACY_URL = "https://www.beeside.you/privacy";
  * CLOSED TEST MODE (controlled launch, fictitious data, no final Privacy version yet). Explicit opt-in FA4_CLOSED_TEST_MODE=true. It exists so infrastructure and the product can be
  * validated in the final production environment without inventing a legal value:
  *  - only valid for a CLOSED deployment: never together with FA4_ENV=staging, commercial Premium content, or a final FA4_PRIVACY_VERSION (that value ends test mode);
- *  - e-mail is restricted to FA4_CLOSED_TEST_EMAIL_DOMAINS (default beeside.you): no prospect can be mailed;
+ *  - e-mail is restricted to FA4_CLOSED_TEST_EMAIL_DOMAINS (default beeside.you) and/or the individual addresses in FA4_CLOSED_TEST_EMAIL_ADDRESSES (named reviewers):
+ *    no prospect can be mailed. Lists accept «,» «;» or spaces. An explicit empty FA4_CLOSED_TEST_EMAIL_DOMAINS drops the domain; both empty is refused (fail closed);
  *  - every acceptance it records carries the marker version CLOSED-TEST-NOT-LEGAL, so test data is identifiable and never mistaken for real consent;
  *  - the web tier refuses to run open while the backend reports this mode (see /api/fa4/legal-mode).
  */
-export function fa4ClosedTestFromEnv(env: NodeJS.ProcessEnv = process.env): { emailDomains: string[] } | undefined {
+export function fa4ClosedTestFromEnv(env: NodeJS.ProcessEnv = process.env): { emailDomains: string[]; emailAddresses: string[] } | undefined {
   if (env.FA4_CLOSED_TEST_MODE !== "true") return undefined;
   if (env.FA4_ENV === "staging") throw new Error("FA4_CLOSED_TEST_MODE is for the closed production deployment, not internal staging");
   if (env.FA4_PRIVACY_VERSION) throw new Error("FA4_CLOSED_TEST_MODE must be removed once the final FA4_PRIVACY_VERSION is set (a final version ends test mode)");
   if (env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true") throw new Error("FA4_CLOSED_TEST_MODE forbids commercial Premium content");
-  const domains = (env.FA4_CLOSED_TEST_EMAIL_DOMAINS ?? "beeside.you").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
-  if (!domains.length || !domains.every((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))) throw new Error("FA4_CLOSED_TEST_EMAIL_DOMAINS must be a comma-separated list of domains");
-  return { emailDomains: domains };
+  const list = (v: string) => v.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const domains = list(env.FA4_CLOSED_TEST_EMAIL_DOMAINS ?? "beeside.you");
+  const addresses = list(env.FA4_CLOSED_TEST_EMAIL_ADDRESSES ?? "");
+  if (!domains.every((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))) throw new Error("FA4_CLOSED_TEST_EMAIL_DOMAINS must be a list of domains");
+  // the offending value is never echoed: these are people's addresses
+  if (!addresses.every((x) => /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(x))) throw new Error("FA4_CLOSED_TEST_EMAIL_ADDRESSES must be a list of e-mail addresses");
+  if (!domains.length && !addresses.length) throw new Error("FA4_CLOSED_TEST_MODE needs at least one allowed e-mail domain or address (fail closed)");
+  return { emailDomains: domains, emailAddresses: addresses };
 }
 
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {

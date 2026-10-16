@@ -62,7 +62,7 @@ describe("CLOSED TEST mode (closed production, fictitious data, no final Privacy
     const l = fa4LegalFromEnv(closed);
     expect(l.privacyVersion).toBe("CLOSED-TEST-NOT-LEGAL");
     expect(l.termsVersion).toBe("1.0-2026-08-27"); expect(l.privacyUrl.es).toBe("https://www.beeside.you/privacy");
-    expect(fa4ClosedTestFromEnv(closed)).toEqual({ emailDomains: ["beeside.you"] });
+    expect(fa4ClosedTestFromEnv(closed)).toEqual({ emailDomains: ["beeside.you"], emailAddresses: [] });
   });
   it("is opt-in only: without the flag production still refuses (final legal requirement intact)", () => {
     expect(() => fa4LegalFromEnv({ NODE_ENV: "production" } as never)).toThrow(/requires FA4_PRIVACY_VERSION in production/);
@@ -75,13 +75,30 @@ describe("CLOSED TEST mode (closed production, fictitious data, no final Privacy
     expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_ENV: "staging" } as never)).toThrow(/not internal staging/);
     expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED: "true" } as never)).toThrow(/forbids commercial/);
     expect(() => fa4ClosedTestFromEnv({ ...closed as object, FA4_CLOSED_TEST_EMAIL_DOMAINS: "not a domain" } as never)).toThrow(/domains/);
-    expect(fa4ClosedTestFromEnv({ ...closed as object, FA4_CLOSED_TEST_EMAIL_DOMAINS: "Beeside.you, test.example" } as never)).toEqual({ emailDomains: ["beeside.you", "test.example"] });
+    expect(fa4ClosedTestFromEnv({ ...closed as object, FA4_CLOSED_TEST_EMAIL_DOMAINS: "Beeside.you, test.example" } as never)).toEqual({ emailDomains: ["beeside.you", "test.example"], emailAddresses: [] });
+  });
+  it("individual e-mail addresses: parsed (case, «,» «;» spaces), validated without echoing the value, combinable with or instead of domains, and fail closed when nothing is allowed", () => {
+    const cfg = (x: Record<string, string>) => ({ ...closed as object, ...x } as never);
+    expect(fa4ClosedTestFromEnv(cfg({ FA4_CLOSED_TEST_EMAIL_ADDRESSES: "Rev.One@Hive.example; rev.two@other.example  third@x.example" }))).toEqual({ emailDomains: ["beeside.you"], emailAddresses: ["rev.one@hive.example", "rev.two@other.example", "third@x.example"] });
+    expect(fa4ClosedTestFromEnv(cfg({ FA4_CLOSED_TEST_EMAIL_DOMAINS: "", FA4_CLOSED_TEST_EMAIL_ADDRESSES: "rev.one@hive.example" }))).toEqual({ emailDomains: [], emailAddresses: ["rev.one@hive.example"] });
+    let msg = ""; try { fa4ClosedTestFromEnv(cfg({ FA4_CLOSED_TEST_EMAIL_ADDRESSES: "good@x.example, secret.person@not valid" })); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toMatch(/must be a list of e-mail addresses/); expect(msg).not.toMatch(/secret\.person|good@/);
+    expect(() => fa4ClosedTestFromEnv(cfg({ FA4_CLOSED_TEST_EMAIL_DOMAINS: "" }))).toThrow(/fail closed/);
   });
   it("e-mail recipients are restricted to the allowed test domains (and unrestricted when not in test mode)", () => {
     const ct = { emailDomains: ["beeside.you"] };
     expect(closedTestRecipientAllowed("Ana@Beeside.you", ct)).toBe(true);
     for (const bad of ["prospect@gmail.com", "x@beeside.you.evil.test", "x@sub.beeside.you", "nobody"]) expect(closedTestRecipientAllowed(bad, ct)).toBe(false);
     expect(closedTestRecipientAllowed("anyone@gmail.com", undefined)).toBe(true);
+  });
+  it("an individually authorized address is mailed — exactly that one: no whole domain is opened, aliases and tricks are refused", () => {
+    const ct = { emailDomains: [], emailAddresses: ["rev.one@hive.example"] };
+    expect(closedTestRecipientAllowed("Rev.One@Hive.example", ct)).toBe(true);
+    for (const bad of ["rev.two@hive.example", "rev.one+tag@hive.example", "x.rev.one@hive.example", "rev.one@hive.example.evil.test", "rev.one@sub.hive.example",
+      "rev.one@hive.example, other@x.example", "rev.one@hive.example;other@x.example", "Rev <rev.one@hive.example>", "\"rev.one@hive.example\"", "other@x.example@hive.example", "rev.one@hive.example other@x.example", ""]) expect(closedTestRecipientAllowed(bad, ct)).toBe(false);
+    expect(closedTestRecipientAllowed("anybody@beeside.you", { emailDomains: ["beeside.you"], emailAddresses: ["rev.one@hive.example"] })).toBe(true);   // domains still work
+    expect(closedTestRecipientAllowed("anybody@hive.example", { emailDomains: [], emailAddresses: [] })).toBe(false);                                  // nothing allowed → nobody
+    expect(closedTestRecipientAllowed("a@beeside.you@evil.test", { emailDomains: ["beeside.you"] })).toBe(false);                                      // the old «last @» trick
   });
 });
 

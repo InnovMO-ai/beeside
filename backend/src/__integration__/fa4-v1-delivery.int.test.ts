@@ -28,7 +28,7 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   const adminDb: Db = createPoolDb(admin); const rtDb: Db = createPoolDb(rt);
   const mail = new CaptureEmailTransport();
   let publicPath: string | undefined;
-  let closedTest: { emailDomains: string[] } | undefined;
+  let closedTest: { emailDomains: string[]; emailAddresses?: string[] } | undefined;
   let edgeDiagnostic: boolean | undefined;
   const deps = (): Fa4Deps => ({
     db: rtDb, email: mail, emailDispatch: "inline",
@@ -279,7 +279,7 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   });
 
   describe("CLOSED TEST mode (no final Privacy version): identifiable, e-mail restricted to test domains", () => {
-    beforeAll(() => { closedTest = { emailDomains: ["beeside.you"] }; });
+    beforeAll(() => { closedTest = { emailDomains: ["beeside.you"], emailAddresses: [] }; });
     afterAll(() => { closedTest = undefined; });
     it("reports its legal regime, records the non-legal marker as the acceptance evidence, and keeps everything else working", async () => {
       expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "closed-test" });
@@ -296,6 +296,23 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       const inside = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" });
       const mailed = await app().post("/api/fa4/session/result/email").set(auth(inside.body.sessionToken as string));
       expect(mailed.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
+    });
+  });
+  describe("CLOSED TEST mode: individually authorized e-mail address (no domain opened)", () => {
+    const reviewer = () => `reviewer.${uniq()}@hive-reviewers.example`;
+    it("mails ONLY the authorized address; the same domain and an alias of it are CANCELLED; the domain list can be empty", async () => {
+      const addr = reviewer(); closedTest = { emailDomains: [], emailAddresses: [addr] };
+      try {
+        const mk = async (email: string) => { const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = email; const r = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" }); return { token: r.body.sessionToken as string, pid: r.body.projectId as string | undefined }; };
+        mail.messages.length = 0;
+        const ok = await mk(addr); const sent = await app().post("/api/fa4/session/result/email").set(auth(ok.token));
+        expect(sent.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
+        for (const other of [`someone.else.${uniq()}@hive-reviewers.example`, addr.replace("@", "+tag@"), `x.${uniq()}@beeside.you`]) {
+          mail.messages.length = 0; const o = await mk(other); const r = await app().post("/api/fa4/session/result/email").set(auth(o.token));
+          expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+        }
+        expect(JSON.stringify((await app().get("/api/fa4/legal-mode")).body)).not.toContain("hive-reviewers");   // the list is never exposed
+      } finally { closedTest = undefined; }
     });
   });
   it("edge-check (TRUST_PROXY_HOPS measurement aid) exists only when enabled and returns just the caller's own address and the X-Forwarded-For entry count", async () => {

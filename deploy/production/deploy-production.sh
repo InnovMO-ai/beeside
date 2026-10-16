@@ -43,7 +43,12 @@ ENV_COMMON="NODE_ENV=production,FA4_API_ENABLED=true,APP_BASE_URL=${APP_BASE_URL
 [ "${FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED:-}" = "true" ] && ENV_COMMON="${ENV_COMMON},FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED=true"
 [ "${FA4_EDGE_DIAGNOSTIC:-}" = "true" ] && ENV_COMMON="${ENV_COMMON},FA4_EDGE_DIAGNOSTIC=true"   # temporary TRUST_PROXY_HOPS measurement (closed test only; remove after measuring)
 # CLOSED TEST: no final Privacy version yet → fictitious data only, non-commercial, e-mail restricted to the test domains (backend records the marker CLOSED-TEST-NOT-LEGAL)
-if [ "${FA4_CLOSED_TEST_MODE:-}" = "true" ]; then ENV_COMMON="${ENV_COMMON},FA4_CLOSED_TEST_MODE=true,FA4_CLOSED_TEST_EMAIL_DOMAINS=${FA4_CLOSED_TEST_EMAIL_DOMAINS:-beeside.you}"; else ENV_COMMON="${ENV_COMMON},FA4_PRIVACY_VERSION=${FA4_PRIVACY_VERSION}"; fi
+# lists are passed with «;» (a comma would split gcloud's own KEY=VALUE list); an explicitly EMPTY domain list is kept (no domain opened), unset = beeside.you; individual addresses are optional
+semi() { printf '%s' "$1" | tr -s ' ,;' ';;;' | sed -e 's/^;//' -e 's/;$//'; }
+if [ "${FA4_CLOSED_TEST_MODE:-}" = "true" ]; then
+  ENV_COMMON="${ENV_COMMON},FA4_CLOSED_TEST_MODE=true,FA4_CLOSED_TEST_EMAIL_DOMAINS=$(semi "${FA4_CLOSED_TEST_EMAIL_DOMAINS-beeside.you}")"
+  [ -n "${FA4_CLOSED_TEST_EMAIL_ADDRESSES:-}" ] && ENV_COMMON="${ENV_COMMON},FA4_CLOSED_TEST_EMAIL_ADDRESSES=$(semi "${FA4_CLOSED_TEST_EMAIL_ADDRESSES}")"
+else ENV_COMMON="${ENV_COMMON},FA4_PRIVACY_VERSION=${FA4_PRIVACY_VERSION}"; fi
 SECRETS_COMMON="DATABASE_URL=${SECRET_DATABASE_URL}:latest,SECURITY_HASH_SECRET=${SECRET_HASH}:latest,SMTP_PASSWORD=${SECRET_SMTP_PASSWORD}:latest"
 
 want images && {

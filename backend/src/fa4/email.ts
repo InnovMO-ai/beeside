@@ -33,14 +33,22 @@ export interface Fa4EmailDeps {
     /** Validity of the YEV email's private link (one token serves both "View" and "Talk to beeside"). */
     yevLinkDays?: number;
     /** CLOSED TEST mode (no final Privacy version yet): e-mail goes ONLY to these domains, so a real prospect can never be mailed from a test deployment. */
-    closedTest?: { emailDomains: string[] };
+    closedTest?: ClosedTestConfig;
   };
 }
 
-export function closedTestRecipientAllowed(address: string, closedTest?: { emailDomains: string[] }): boolean {
+/** CLOSED TEST recipients: whole domains (internal) and/or individual addresses (e.g. two named external reviewers). Both empty = nobody is mailed. */
+export interface ClosedTestConfig { emailDomains: string[]; emailAddresses?: string[] }
+
+/**
+ * Closed test: an address is mailed only if its DOMAIN is allowed or the exact ADDRESS is allowed. Fails closed: anything that is not ONE plain address
+ * (several addresses, display names, quoted/escaped forms) is refused, and an alias such as «name+tag@…» is NOT the authorized address. Nothing is logged here.
+ */
+export function closedTestRecipientAllowed(address: string, closedTest?: ClosedTestConfig): boolean {
   if (!closedTest) return true;
-  const domain = address.trim().toLowerCase().split("@").pop() ?? "";
-  return closedTest.emailDomains.includes(domain);
+  const a = address.trim().toLowerCase();
+  if (!/^[^\s@,;<>"'()\\]+@[^\s@,;<>"'()\\]+$/.test(a)) return false;
+  return (closedTest.emailAddresses ?? []).includes(a) || closedTest.emailDomains.includes(a.slice(a.lastIndexOf("@") + 1));
 }
 
 export interface Fa4EmailLimits { cooldownMinutes: number; recipientDailyQuota: number }

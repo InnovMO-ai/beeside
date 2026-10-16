@@ -78,7 +78,11 @@ function evaluate(env, opts = {}) {
   if (closedTest) {
     must('closed test is only for a closed controlled phase', env.LAUNCH_PHASE === 'controlled' && env.ACCESS_GATE_MODE === 'basic' && truthy(env.ROBOTS_NOINDEX), 'FA4_CLOSED_TEST_MODE requires LAUNCH_PHASE=controlled, ACCESS_GATE_MODE=basic and ROBOTS_NOINDEX=true');
     must('closed test excludes a final Privacy version and commercial content', !set(env.FA4_PRIVACY_VERSION) && !truthy(env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED), 'a final FA4_PRIVACY_VERSION ends test mode (remove FA4_CLOSED_TEST_MODE); commercial Premium content is forbidden in test mode');
-    must('closed test e-mail domains', /^([a-z0-9.-]+\.[a-z]{2,})(,\s*[a-z0-9.-]+\.[a-z]{2,})*$/i.test(env.FA4_CLOSED_TEST_EMAIL_DOMAINS || 'beeside.you'), 'FA4_CLOSED_TEST_EMAIL_DOMAINS must be a comma-separated domain list (default beeside.you)');
+    const list = (v) => String(v ?? '').split(/[\s,;]+/).filter(Boolean);
+    const doms = list('FA4_CLOSED_TEST_EMAIL_DOMAINS' in env ? env.FA4_CLOSED_TEST_EMAIL_DOMAINS : 'beeside.you'); const addrs = list(env.FA4_CLOSED_TEST_EMAIL_ADDRESSES);
+    must('closed test e-mail domains', doms.every((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d)), 'FA4_CLOSED_TEST_EMAIL_DOMAINS must be a list of domains (default beeside.you; empty = none)');
+    must('closed test e-mail addresses', addrs.every((a) => /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(a)), 'FA4_CLOSED_TEST_EMAIL_ADDRESSES must be a list of e-mail addresses');   // the offending value is never printed
+    must('closed test allows at least one recipient (fail closed otherwise)', doms.length + addrs.length > 0, 'both FA4_CLOSED_TEST_EMAIL_DOMAINS and FA4_CLOSED_TEST_EMAIL_ADDRESSES are empty: the backend refuses to start');
     add('FA4_PRIVACY_VERSION', 'WARN', 'CLOSED TEST: no final value — fictitious data only, non-commercial, e-mail restricted; the FINAL version is required before real data or opening');
   } else need('FA4_PRIVACY_VERSION', set(env.FA4_PRIVACY_VERSION), 'version identifier of the FINAL Privacy document — external (Legal), never invented; production refuses to start without it');
   must('Privacy / Terms URLs are https', [env.FA4_PRIVACY_URL, env.FA4_TERMS_URL].every((u) => !set(u) || /^https:\/\//.test(u)), 'URLs must be https');

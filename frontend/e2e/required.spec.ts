@@ -74,3 +74,17 @@ test("Required answers: every screen explains what is missing, focuses the first
   await next(page, UI.next.es); expect((await keys(page)).length).toBe(k0.length);
   await expect(page.getByRole("alert").filter({ hasText: UI.reqSummary.es })).toBeVisible();
 });
+
+for (const loc of ["es", "en"] as const) {
+  test(`Support screen (${loc}): no extra «in your words» field; the approved question #34 appears exactly once; the single open question stays on «Algo más»`, async ({ page, request }) => {
+    const { journeyNortica } = await import("@beeside/fa-public-engine/testing");
+    const { seed, open } = await import("./helpers");
+    await open(page, await seed(request, journeyNortica(loc), "support_values"));
+    await expect(page.getByRole("heading", { name: UI.valuesTitle[loc] })).toBeVisible();
+    await expect(page.getByText(loc === "es" ? "En tus palabras (opcional)" : "In your own words (optional)")).toHaveCount(0);
+    await expect(page.getByText(UI.keepQ[loc])).toHaveCount(1);
+    await expect(page.getByRole("textbox")).toHaveCount(1);                                     // only the #34 field is left on this screen
+    await page.getByRole("button", { name: UI.next[loc], exact: true }).click();
+    await expect(page.getByLabel(UI.descr[loc])).toBeVisible();                                 // «Algo más» keeps its open question
+  });
+}

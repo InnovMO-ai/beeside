@@ -86,6 +86,11 @@ describe("production preflight (refuses a deployment while configuration is miss
     expect(blockedIds({ ...closed, FA4_PRIVACY_VERSION: "v1" })).toContain("closed test excludes a final Privacy version and commercial content");
     expect(blockedIds({ ...closed, FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED: "true", LEGAL1_CONFIRMED: "true" })).toContain("closed test excludes a final Privacy version and commercial content");
     expect(blockedIds({ ...closed, FA4_CLOSED_TEST_EMAIL_DOMAINS: "not a domain" })).toContain("closed test e-mail domains");
+    // individual reviewer addresses (no domain opened): valid list OK, invalid refused WITHOUT echoing the value, and at least one recipient must be allowed
+    expect(blockedIds({ ...closed, FA4_CLOSED_TEST_EMAIL_DOMAINS: "", FA4_CLOSED_TEST_EMAIL_ADDRESSES: "rev.one@hive.example; rev.two@other.example" })).toEqual([]);
+    expect(blockedIds({ ...closed, FA4_CLOSED_TEST_EMAIL_ADDRESSES: "rev.one@hive.example, not an address" })).toContain("closed test e-mail addresses");
+    expect(JSON.stringify(evaluate({ ...closed, FA4_CLOSED_TEST_EMAIL_ADDRESSES: "secret.person@bad" }))).not.toContain("secret.person");
+    expect(blockedIds({ ...closed, FA4_CLOSED_TEST_EMAIL_DOMAINS: "" })).toContain("closed test allows at least one recipient (fail closed otherwise)");
     const open = { ...closed, LAUNCH_PHASE: "open", ACCESS_GATE_MODE: "off", ROBOTS_NOINDEX: "", OPEN_COMMERCIAL_CONFIRMED: "true", COMPARISON_APPROVED: "true", LEGAL1_CONFIRMED: "true", VITE_FA4_PREMIUM_PURCHASE_URL: "https://pay.example/x" };
     expect(blockedIds(open)).toContain("opening requires the final legal regime (no closed test)");
     expect(blockedIds({ ...open, FA4_CLOSED_TEST_MODE: "", FA4_PRIVACY_VERSION: "v1" })).toEqual([]);   // the ONLY way to open: final version, test mode off, every confirmation

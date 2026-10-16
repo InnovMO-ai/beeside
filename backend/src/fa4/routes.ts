@@ -38,7 +38,7 @@ export interface Fa4Deps {
     /** Commercial-content policy gate of the YEV email's Premium block (LEGAL-1, external; fail-closed). */
     premiumCommercialContentAllowed?: boolean;
     /** CLOSED TEST mode: no final Privacy version, non-commercial, fictitious data only, e-mail restricted to these domains. */
-    closedTest?: { emailDomains: string[] };
+    closedTest?: import("./email").ClosedTestConfig;
     legalMode?: "final" | "closed-test";
     /** Temporary measurement aid for TRUST_PROXY_HOPS (closed test only): GET /api/fa4/edge-check answers the caller's own address as the server sees it. */
     edgeDiagnostic?: boolean;

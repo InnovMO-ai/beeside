@@ -520,12 +520,12 @@ export function CargoBlock(s: StepCtx) {
 }
 
 // ---------------- 5. more ----------------
+/** PO: no free-text «in your words» here (the «Algo más» screen has the one open question). `supportWords` stays in the model and the result for answers saved earlier; no screen collects it. */
 export function SupportValuesStep({ a, set, locale }: StepCtx) {
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[4]![locale]} title={UI.valuesTitle[locale]} lead={UI.valuesLead[locale]} />
       <ChipMulti values={a.supportValues} onChange={(v) => set((x) => ({ ...x, supportValues: v }))} options={(Object.keys(UI.values) as Array<keyof typeof UI.values>).map((v) => ({ value: v, label: T(UI.values[v], locale) }))} />
-      <TextField label={UI.valueWords[locale]} value={a.supportWords} onChange={(v) => set((x) => ({ ...x, supportWords: v }))} />
       <TextField label={UI.keepQ[locale]} value={a.keepWords} onChange={(v) => set((x) => ({ ...x, keepWords: v }))} />
     </div>
   );
