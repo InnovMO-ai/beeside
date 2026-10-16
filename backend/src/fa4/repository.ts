@@ -15,7 +15,7 @@ import { generateAccessToken, hashAccessToken } from "../fa/services/tokens";
  * FA Public v1.0 persistence (PostgreSQL, raw SQL over the shared `Db` abstraction, like the rest of the backend).
  * Tables: see db/schema/fa4.ts. Integrity (append-only results, immutable catalog versions) is enforced by triggers (0016).
  */
-export type TokenKind = "SESSION" | "RESUME";
+export type TokenKind = "SESSION" | "RESUME" | "YEV_LINK";
 export type ProjectStatus = "IN_PROGRESS" | "DELIVERED" | "INELIGIBLE" | "ANONYMIZED";
 
 export interface Fa4ProjectRow {
@@ -160,6 +160,7 @@ export async function publishCapability(
  */
 export async function issueToken(tx: Db, projectId: string, kind: TokenKind, expiresAt: Date): Promise<string> {
   if (kind === "RESUME") await tx.query("UPDATE fa4_access_token SET revoked_at = now() WHERE project_id = $1 AND kind = 'RESUME' AND used_at IS NULL AND revoked_at IS NULL", [projectId]);
+  if (kind === "YEV_LINK") await tx.query("UPDATE fa4_access_token SET revoked_at = now() WHERE project_id = $1 AND kind = 'YEV_LINK' AND revoked_at IS NULL", [projectId]);
   const token = generateAccessToken();
   await tx.query("INSERT INTO fa4_access_token (project_id, kind, token_hash, expires_at) VALUES ($1, $2, $3, $4)", [projectId, kind, hashAccessToken(token), expiresAt]);
   return token;
@@ -184,9 +185,29 @@ export async function createProject(db: Db, answers: Answers, stepKey: string, s
       `INSERT INTO fa4_legal_acceptance (project_id, document, document_version, document_url, language) VALUES ($1,'TERMS',$2,$3,$5), ($1,'PRIVACY',$4,$6,$5)`,
       [projectId, legal.termsVersion, legal.termsUrl[lang], legal.privacyVersion, lang, legal.privacyUrl[lang]],
     );
+    // The optional marketing decision is recorded on its own (true OR false) — never inferred from Terms / Privacy.
+    await recordMarketingConsent(tx, projectId, answers.identity.marketingConsent === true, lang, true);
     const sessionToken = await issueToken(tx, projectId, "SESSION", sessionExpiresAt);
     return { projectId, sessionToken };
   });
+}
+
+/** Wording shown next to the optional checkbox (identifier stored with each decision). */
+export const MARKETING_WORDING_REF = "marketing-v1";
+
+/** Appends a marketing-consent decision. Skips a no-op (same as the latest decision) unless `force` (the very first decision is always recorded). */
+export async function recordMarketingConsent(db: Db, projectId: string, consented: boolean, language: "es" | "en", force = false): Promise<void> {
+  if (!force) {
+    const last = (await db.query<{ consented: boolean }>("SELECT consented FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at DESC, consent_id DESC LIMIT 1", [projectId])).rows[0];
+    if (last && last.consented === consented) return;
+  }
+  await db.query("INSERT INTO fa4_marketing_consent (project_id, consented, language, wording_ref) VALUES ($1,$2,$3,$4)", [projectId, consented, language, MARKETING_WORDING_REF]);
+}
+export async function latestMarketingConsent(db: Db, projectId: string): Promise<boolean> {
+  return (await db.query<{ consented: boolean }>("SELECT consented FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at DESC, consent_id DESC LIMIT 1", [projectId])).rows[0]?.consented ?? false;
+}
+export async function marketingConsentHistory(db: Db, projectId: string) {
+  return (await db.query("SELECT consented, language, wording_ref, decided_at FROM fa4_marketing_consent WHERE project_id = $1 ORDER BY decided_at, consent_id", [projectId])).rows;
 }
 
 export async function legalAcceptances(db: Db, projectId: string) {
@@ -223,17 +244,40 @@ export async function exchangeResumeToken(db: Db, rawToken: string, now: Date, s
 }
 
 /**
- * Saves answers. Status is NORMALIZED from facts, never sticky: INELIGIBLE iff the answers say there is no existing business,
- * otherwise DELIVERED iff a result exists, else IN_PROGRESS. The captured email never changes here.
+ * Exchanges an emailed private link for a working session.
+ *  - YEV_LINK (the YEV email: "View" and "Talk to beeside" share ONE token): multi-use until it expires or is revoked; an exchange never spends it,
+ *    so opening one action never invalidates the other, and a scanner / prefetch cannot break it.
+ *  - RESUME: single-use, atomically spent (replays fail).
+ * Returns null for unknown, expired, revoked, used or anonymized links (one generic outcome).
+ */
+export async function exchangeLinkToken(db: Db, rawToken: string, now: Date, sessionExpiresAt: Date): Promise<{ projectId: string; sessionToken: string; kind: "YEV_LINK" | "RESUME" } | null> {
+  const hash = hashAccessToken(rawToken);
+  const yev = await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ token_id: string; project_id: string }>(
+      `SELECT t.token_id, t.project_id FROM fa4_access_token t JOIN fa4_project p ON p.project_id = t.project_id
+        WHERE t.token_hash = $1 AND t.kind = 'YEV_LINK' AND t.revoked_at IS NULL AND t.expires_at > $2 AND p.status <> 'ANONYMIZED'`,
+      [hash, now],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    await tx.query("UPDATE fa4_access_token SET last_used_at = $2 WHERE token_id = $1", [r.token_id, now]);
+    return { projectId: r.project_id, sessionToken: await issueToken(tx, r.project_id, "SESSION", sessionExpiresAt), kind: "YEV_LINK" as const };
+  });
+  if (yev) return yev;
+  const resumed = await exchangeResumeToken(db, rawToken, now, sessionExpiresAt);
+  return resumed ? { ...resumed, kind: "RESUME" as const } : null;
+}
+
+/**
+ * Saves answers. Status is NORMALIZED from facts, never sticky: DELIVERED iff a SEALED (explicitly delivered) result exists, else IN_PROGRESS.
+ * There is no eligibility status any more (a project without a business operating today is valid); `INELIGIBLE` remains only as a legacy value that a save heals. The captured email never changes here.
  */
 export async function saveProject(db: Db, projectId: string, answers: Answers, stepKey: string): Promise<void> {
-  const ineligible = answers.company.hasExistingBusiness === false;
   await db.query(
     `UPDATE fa4_project SET answers = $2::jsonb, step_key = $3, locale = $4, updated_at = now(),
-            status = CASE WHEN $5::boolean THEN 'INELIGIBLE'
-                          WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
+            status = CASE WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1 AND NOT r.legacy_unsealed) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
       WHERE project_id = $1 AND status <> 'ANONYMIZED'`,
-    [projectId, JSON.stringify(answers), stepKey, answers.locale, ineligible],
+    [projectId, JSON.stringify(answers), stepKey, answers.locale],
   );
 }
 
@@ -244,15 +288,32 @@ export async function recentProjectsForEmail(db: Db, email: string, limit: numbe
   return rows.map((r) => r.project_id);
 }
 
-// ------------------------------------------------------------------ results (append-only)
-export async function storeResult(tx: Db, projectId: string, model: YourExpansionViewModel): Promise<string> {
-  const { rows } = await tx.query<{ result_id: string }>("INSERT INTO fa4_result (project_id, catalog_version, model) VALUES ($1, $2, $3::jsonb) RETURNING result_id", [projectId, model.catalogVersion, JSON.stringify(model)]);
-  await tx.query("UPDATE fa4_project SET status = 'DELIVERED', updated_at = now() WHERE project_id = $1 AND status = 'IN_PROGRESS'", [projectId]);
-  return rows[0]!.result_id;
+// ------------------------------------------------------------------ results (the sealed historical envelope)
+/**
+ * A result row exists ONLY for an explicit delivery (D-156). It is written once, in the same transaction as the project's DELIVERED state, with the
+ * full A+ envelope (D-157): catalog + rules versions, source facts and the structured resolution. Rows are append-only (trigger + no UPDATE grant).
+ */
+export interface SealedEnvelope {
+  catalogVersion: string; rulesVersion: string;
+  sourceSchemaVersion: number; sourceSnapshot: unknown; resolutionSchemaVersion: number; resolutionSnapshot: unknown;
 }
-export async function latestResult(db: Db, projectId: string): Promise<{ resultId: string; model: YourExpansionViewModel } | null> {
-  const { rows } = await db.query<{ result_id: string; model: YourExpansionViewModel }>("SELECT result_id, model FROM fa4_result WHERE project_id = $1 ORDER BY result_seq DESC LIMIT 1", [projectId]);
-  return rows[0] ? { resultId: rows[0].result_id, model: rows[0].model } : null;
+export async function sealResult(tx: Db, projectId: string, model: YourExpansionViewModel, env: SealedEnvelope): Promise<{ resultId: string; deliveredAt: Date }> {
+  const { rows } = await tx.query<{ result_id: string; created_at: Date }>(
+    `INSERT INTO fa4_result (project_id, catalog_version, model, rules_version, source_schema_version, source_snapshot, resolution_schema_version, resolution_snapshot, legacy_unsealed)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7, $8::jsonb, false) RETURNING result_id, created_at`,
+    [projectId, env.catalogVersion, JSON.stringify(model), env.rulesVersion, env.sourceSchemaVersion, JSON.stringify(env.sourceSnapshot), env.resolutionSchemaVersion, JSON.stringify(env.resolutionSnapshot)],
+  );
+  await tx.query("UPDATE fa4_project SET status = 'DELIVERED', updated_at = now() WHERE project_id = $1 AND status <> 'ANONYMIZED'", [projectId]);
+  return { resultId: rows[0]!.result_id, deliveredAt: rows[0]!.created_at };
+}
+/** The DELIVERED result of a project (previews are never stored; rows from before Public v1.0 are legacy and ignored). */
+export async function latestResult(db: Db, projectId: string): Promise<{ resultId: string; model: YourExpansionViewModel; deliveredAt: Date } | null> {
+  const { rows } = await db.query<{ result_id: string; model: YourExpansionViewModel; created_at: Date }>(
+    "SELECT result_id, model, created_at FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed ORDER BY result_seq DESC LIMIT 1", [projectId]);
+  return rows[0] ? { resultId: rows[0].result_id, model: rows[0].model, deliveredAt: rows[0].created_at } : null;
+}
+export async function isDelivered(db: Db, projectId: string): Promise<boolean> {
+  return (await db.query("SELECT 1 FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed LIMIT 1", [projectId])).rows.length > 0;
 }
 export async function resultsFor(db: Db, projectId: string) {
   return (await db.query<{ result_id: string; catalog_version: string }>("SELECT result_id, catalog_version FROM fa4_result WHERE project_id = $1 ORDER BY result_seq", [projectId])).rows;

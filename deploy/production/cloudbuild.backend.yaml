@@ -1,0 +1,11 @@
+# Backend/worker/migration image only (used by prepare-database.sh before the web image exists).
+substitutions:
+  _REPO: ""
+  _TAG: ""
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_REPO}/discovery-backend:${_TAG}", "."]
+images:
+  - ${_REPO}/discovery-backend:${_TAG}
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,9 +1,9 @@
 import { SEED_CATALOG } from '../catalog/seed';
-import { resolveAll, destinationsNeedingCargoRoute } from '../engine/resolve';
+import { resolveAll, destinationsNeedingCargoRoute, destinationsWithCargoRouteRelevance } from '../engine/resolve';
 import { buildYourExpansionView } from '../engine/yev';
 import { deriveDemandSignals } from '../engine/demand';
-import { buildFlow, nextStep, prevStep, stepKey } from '../engine/flow';
-import { journeyA, journeyB, journeyC } from '../testing/journeys';
+import { buildFlow, isStepComplete, lastProjectStep, nextStep, normalizeStepKey, prevStep, stepKey } from '../engine/flow';
+import { journeyA, journeyB, journeyC, journeyNortica } from '../testing/journeys';
 import { deriveDecision } from '../domain/answers';
 import { demandSignalId } from '../engine/demand';
 import { reflectionParagraphs, projectParagraphs } from '../engine/yev';
@@ -31,13 +31,12 @@ describe('Journey A — simple / focused', () => {
     const ids = flowIds(a);
     expect(ids).toContain('activators');           // regulated only → single step
     expect(ids).not.toContain('activators_site');
-    expect(ids).not.toContain('same_in_all');
-    expect(ids).not.toContain('cargo_route');
-    expect(ids).toContain('scale');
+    expect(ids).not.toContain('same_in_all');            // merged screens (Final Design Delta): no separate steps for them
+    expect(ids).toContain('decision');                    // the project size is a block of «decision»
   });
   it('shows country-agnostic judgement: not-applicable groups, capped at three', () => {
     const y = buildYourExpansionView(a, cat);
-    expect(naNames(y.destinations[0]!)).toEqual(['Vender y llegar a tus clientes · Proteger tu marca', 'Dónde vas a operar (oficina, planta, local)', 'Importación y aduanas · Logística e inventario']);
+    expect(naNames(y.destinations[0]!)).toEqual(['Vender y llegar a tus clientes · Proteger tu marca', 'Importación y aduanas · Logística e inventario']);
   });
   it('offers Premium continuation (real value) and reports where the user is', () => {
     const y = buildYourExpansionView(a, cat);
@@ -82,19 +81,22 @@ describe('Journey B — complex multi-country', () => {
   it('transport route I-26: asked when freight is relevant and undeclared; never inferred', () => {
     const undeclared = journeyB('es');
     expect(destinationsNeedingCargoRoute(undeclared, cat)).toEqual(['MX']);
-    expect(flowIds(undeclared)).toContain('cargo_route');
     expect(destinationsNeedingCargoRoute(a, cat)).toEqual([]);          // already declared → not asked again
-    expect(flowIds(a)).toContain('cargo_route');                         // …but the step stays reachable so the answer can be edited
-    expect(flowIds(journeyA())).not.toContain('cargo_route');            // no freight relevance → never asked
+    expect(destinationsWithCargoRouteRelevance(a, cat)).toEqual(['MX']);  // …but the topics-screen block stays so the answer can be edited
+    expect(destinationsWithCargoRouteRelevance(journeyA(), cat)).toEqual([]);   // no freight relevance → never asked
+    expect(flowIds(undeclared)).not.toContain('cargo_route');            // it is a block of the topics screen, never a step
   });
   it('I-26 "within" confirms only the domestic leg → logistics ACTIVE; "both"/"into" stay REVIEW', () => {
     expect(states(journeyB('es', 'within'), 'MX').FR_LOGISTICS).toBe('ACTIVE');
     expect(states(journeyB('es', 'into_from_abroad'), 'MX').FR_LOGISTICS).toBe('REVIEW');
     expect(states(journeyB('es', 'both'), 'MX').FR_LOGISTICS).toBe('REVIEW');
   });
-  it('multi-destination asks "same in all?" and a component per destination', () => {
+  it('multi-destination: «same in all?» is asked on the destinations screen (completion needs it) and there is a component per destination', () => {
     const ids = flowIds(a);
-    expect(ids).toContain('same_in_all');
+    expect(ids).not.toContain('same_in_all');
+    const dest = { ...a, destinations: { ...a.destinations, sameInAll: null } };
+    expect(isStepComplete({ id: 'destinations' }, dest)).toBe(false);
+    expect(isStepComplete({ id: 'destinations' }, a)).toBe(true);
     expect(ids).toContain('activity:mx'); expect(ids).toContain('activity:us');
     expect(ids).toContain('activators_sell'); expect(ids).toContain('activators_site');
     expect(ids).toContain('fronts_critical');     // external calendar declared
@@ -145,9 +147,9 @@ describe('Journey C — "I know what I need" shortcut', () => {
     expect(states(journeyC('es', 'unknown'), 'MX').FR_LOGISTICS).toBe('REVIEW');
     expect(destinationsNeedingCargoRoute(journeyC('es'), cat)).toEqual(['MX']);
   });
-  it('shortcut flow skips scale and the status/support steps but keeps activators BEFORE the list', () => {
+  it('shortcut flow skips the status/support steps but keeps activators BEFORE the list', () => {
     const ids = flowIds(a);
-    expect(ids).not.toContain('scale'); expect(ids).not.toContain('fronts_status'); expect(ids).not.toContain('fronts_support');
+    expect(ids).not.toContain('fronts_status'); expect(ids).not.toContain('fronts_support');
     expect(ids.indexOf('activators_site') > -1 ? ids.indexOf('activators_site') : ids.indexOf('activators')).toBeLessThan(ids.indexOf('fronts_mark'));
     expect(ids.indexOf('fronts_mark')).toBeLessThan(ids.indexOf('fronts_critical'));
   });
@@ -159,11 +161,37 @@ describe('Journey C — "I know what I need" shortcut', () => {
 
 describe('navigation is robust when an answer removes the current step from the flow', () => {
   it('moves forward/back in canonical order instead of jumping to the cover', () => {
-    const a = journeyA();                                   // 'cargo_route' is not part of A's flow
-    expect(nextStep(a, cat, { id: 'cargo_route' }).id).toBe('support_values');
-    expect(prevStep(a, cat, { id: 'cargo_route' }).id).toBe('fronts_support');
-    const b = journeyB('es', 'unknown');
-    expect(nextStep(b, cat, { id: 'cargo_route' }).id).toBe('support_values');
+    const a = journeyA();                                   // 'activators_site' is not part of A's flow
+    expect(nextStep(a, cat, { id: 'activators_site' }).id).toBe('fronts_status');
+    expect(prevStep(a, cat, { id: 'activators_site' }).id).toBe('activators');
+  });
+});
+
+describe('Final Design Delta — merged screens, the clarity question, step_key compatibility', () => {
+  it('Nórtica flow: no reflection / same_in_all / existing / scale / cargo_route steps; presence carries the 3 questions', () => {
+    const ids = flowIds(journeyNortica());
+    for (const gone of ['reflection', 'same_in_all', 'existing:c1', 'scale', 'cargo_route']) expect(ids).not.toContain(gone);
+    expect(ids).toEqual(['cover', 'identity', 'company', 'destinations', 'activity:c1', 'presence:c1', 'reason', 'decision', 'activators_sell', 'activators_site', 'fronts_status', 'fronts_support', 'support_values', 'extra', 'result']);
+    const c = journeyNortica().components[0]!;
+    expect(isStepComplete({ id: 'presence', comp: 'c1' }, { ...journeyNortica(), components: [{ ...c, existing: null }] })).toBe(false);   // «today» is part of the screen
+    expect(isStepComplete({ id: 'presence', comp: 'c1' }, journeyNortica())).toBe(true);
+  });
+  it('the clarity question (D-079) lives on the LAST project screen: last presence, or the last activity when every component only invests', () => {
+    expect(stepKey(lastProjectStep(journeyB('es')))).toBe('presence:us');
+    const inv = journeyA(); inv.components = [{ ...inv.components[0]!, activities: ['invest_only'] }];
+    expect(stepKey(lastProjectStep(inv))).toBe('activity:c1');
+    expect(flowIds(inv)).not.toContain('presence:c1');
+  });
+  it('D-079 paths: YES → «mark the topics» shortcut (no status/support); NO → the diagnostic path', () => {
+    const yes = { ...journeyC(), knowsNeeds: true }; const no = { ...journeyC(), knowsNeeds: false };
+    expect(flowIds(yes)).toContain('fronts_mark'); expect(flowIds(yes)).not.toContain('fronts_status');
+    expect(flowIds(no)).toContain('fronts_status'); expect(flowIds(no)).not.toContain('fronts_mark');
+  });
+  it('saved step_key of removed screens resolve to a surviving screen of the SAME flow', () => {
+    const a = journeyB('es'); const ids = flowIds(a);
+    const cases: Record<string, string> = { reflection: 'presence:us', same_in_all: 'destinations', 'existing:mx': 'presence:mx', scale: 'decision', cargo_route: 'fronts_support', decision: 'decision' };
+    for (const [from, to] of Object.entries(cases)) { expect(normalizeStepKey(from, a)).toBe(to); expect(ids).toContain(normalizeStepKey(from, a)); }
+    expect(normalizeStepKey('cargo_route', { ...a, knowsNeeds: true })).toBe('fronts_mark');
   });
 });
 
@@ -261,7 +289,7 @@ describe('PO-approved rules 1, 3, 5, 6, 7, 8, 9', () => {
     }
   });
   it('Rule 10 — I-26 stays reachable after being answered', () => {
-    expect(flowIds(journeyB('es', 'within'))).toContain('cargo_route');
+    expect(destinationsWithCargoRouteRelevance(journeyB('es', 'within'), cat)).toEqual(['MX']);
   });
 });
 
@@ -300,7 +328,7 @@ describe('VERIFY fixes — engine', () => {
     expect(ya.glanceMode).toBe('topics');
     expect(ya.glanceItems.map((i) => [i.name.es, i.key])).toEqual([
       ['Estructura legal, impuestos y contabilidad', 'ACTIVE'], ['Encontrar a las personas', 'SOURCEABLE'], ['Contratar legalmente y pagar nómina', 'ACTIVE'], ['Banco y pagos en el país', 'DEPENDENT']]);
-    expect(ya.notApplicableCount).toBe(5);
+    expect(ya.notApplicableCount).toBe(4);
     for (const d of buildYourExpansionView(journeyB('es', 'unknown'), cat).destinations) expect(d.glanceMode).toBe('counts');
     expect(buildYourExpansionView(journeyC('es', 'unknown'), cat).destinations[0]!.glanceMode).toBe('counts');
   });

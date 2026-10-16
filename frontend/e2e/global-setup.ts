@@ -4,6 +4,7 @@ import { Client } from "pg";
 
 /** Fresh state for every run: real Drizzle migrations, the catalog seed, and no leftover projects. Refuses to run without an explicit disposable database. */
 export default async function globalSetup() {
+  if (process.env.E2E_SKIP_SETUP) return;   // local iteration against servers started by hand
   const url = process.env.E2E_DATABASE_URL;
   if (!url) throw new Error("E2E_DATABASE_URL is required (an empty, disposable PostgreSQL database)");
   if (/cloudsql|googleapis|beeside-dev|prod/i.test(url)) throw new Error("refusing to run end-to-end tests against a non-disposable database");

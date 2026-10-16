@@ -3,12 +3,15 @@ import { defineConfig } from "@playwright/test";
 /**
  * FA Public v1.0 end-to-end (real stack): PostgreSQL <- Express API (backend/dist) <- production static server (frontend/server) <- browser.
  * Requires E2E_DATABASE_URL pointing to an EMPTY, disposable PostgreSQL database (never a shared or cloud database). Migrations and the
- * catalog seed are applied by e2e/global-setup.ts. Runs at the two reference viewports: 375 (mobile) and 1440 (desktop).
+ * catalog seed are applied by e2e/global-setup.ts. Runs at 375 (mobile), 768 (tablet), 1024 (laptop: combined topics table) and 1440 (desktop).
  *   E2E_DATABASE_URL=postgres://postgres@127.0.0.1:54329/beeside_fa4_e2e npm run test:e2e --workspace=frontend
  */
 const DB = process.env.E2E_DATABASE_URL ?? "";
 // The API runs as the least-privilege runtime login role when E2E_RUNTIME_DATABASE_URL is set (CI does); migrations always use E2E_DATABASE_URL.
 const APP_DB = process.env.E2E_RUNTIME_DATABASE_URL ?? DB;
+// E2E_PREFIX=/discovery runs the WHOLE suite against the production-style build: base path, discovery-only bundle, discovery-mode static server, API under the prefix.
+const PREFIX = process.env.E2E_PREFIX ?? "";   // "" | "/discovery" | "/" (dedicated host)
+const BASE_PATH = PREFIX === "/" ? "/" : `${PREFIX}/`;
 const WEB = 4177;
 const API = 8087;
 export default defineConfig({
@@ -18,25 +21,31 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [["list"]],
   // bypassCSP only so axe-core can be injected; the production CSP itself is asserted by e2e/csp.spec.ts in a context without the bypass.
-  use: { baseURL: `http://localhost:${WEB}`, trace: "retain-on-failure", bypassCSP: true },
+  use: {
+    baseURL: `http://localhost:${WEB}`, trace: "retain-on-failure", bypassCSP: true,
+    // Internal-staging smoke: the same suite runs behind the staging basic-auth gate (E2E_BASIC_AUTH=user:password).
+    ...(process.env.E2E_BASIC_AUTH ? { httpCredentials: { username: process.env.E2E_BASIC_AUTH.split(":")[0]!, password: process.env.E2E_BASIC_AUTH.split(":").slice(1).join(":") } } : {}),
+  },
   globalSetup: "./e2e/global-setup.ts",
   webServer: [
     {
-      command: `FA4_API_ENABLED=true DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
+      command: `FA4_API_ENABLED=true FA4_EMAIL_DISPATCH=inline FA4_EMAIL_RECIPIENT_DAILY_QUOTA=1000 DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false ${PREFIX ? `FA4_PUBLIC_PATH=${PREFIX} ` : ""}PORT=${API} node ../backend/dist/index.js`,
       url: `http://localhost:${API}/health`,
       timeout: 60_000,
-      reuseExistingServer: false,
+      reuseExistingServer: !!process.env.E2E_REUSE,
     },
     {
       // Same layout as the production image: static-server.mjs next to ./dist.
-      command: `npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
+      command: `VITE_FA4_ALLOW_PURCHASE_FALLBACK=true ${PREFIX ? `VITE_BASE_PATH=${BASE_PATH} VITE_DISCOVERY_ONLY=true ` : ""}npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && ${PREFIX ? `SERVE_MODE=discovery PUBLIC_PATH=${PREFIX} ACCESS_GATE_MODE=off ` : ""}API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
       url: `http://localhost:${WEB}/health`,
       timeout: 120_000,
-      reuseExistingServer: false,
+      reuseExistingServer: !!process.env.E2E_REUSE,
     },
   ],
   projects: [
     { name: "mobile-375", use: { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true } },
+    { name: "tablet-768", use: { viewport: { width: 768, height: 1024 }, hasTouch: true } },
+    { name: "laptop-1024", use: { viewport: { width: 1024, height: 768 } } },
     { name: "desktop-1440", use: { viewport: { width: 1440, height: 900 } } },
   ],
 });

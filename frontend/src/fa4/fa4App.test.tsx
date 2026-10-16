@@ -7,6 +7,7 @@ import { clientResolution, toPublicCatalog } from "@beeside/fa-public-engine";
 import { journeyA } from "@beeside/fa-public-engine/testing";
 import { Fa4App } from "./Fa4App";
 import { modelFor } from "./fa4.test-helpers";
+import { resetRuntimeConfigForTests } from "./runtimeConfig";
 
 type Call = { url: string; method: string; body?: unknown; auth?: string };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -17,41 +18,49 @@ function mockApi(extra: (c: Call) => Response | null = () => null) {
   const calls: Call[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const headers = (init?.headers ?? {}) as Record<string, string>;
-    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers.Authorization };
+    const c: Call = { url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined, auth: headers["X-Fa4-Session"] };
     calls.push(c);
     const custom = extra(c); if (custom) return custom;
     if (url === "/api/fa4/catalog") return json(publicCatalog);
     if (url === "/api/fa4/session/resolution") return json(clientResolution((c.body as { answers: never }).answers, SEED_CATALOG));
     if (url === "/api/fa4/sessions") return json({ sessionToken: "S".repeat(43) }, 201);
     if (url === "/api/fa4/session" && c.method === "PUT") return json({ ok: true });
-    if (url === "/api/fa4/session/finish-later") return json({ ok: true, email: "l***@nubia.example" });
+    if (url === "/api/fa4/session/finish-later") return json({ state: "sent", email: "l***@nubia.example" });
     return json({ error: "NOT_FOUND" }, 404);
   }));
   return calls;
 }
 
-beforeEach(() => { vi.spyOn(window, "scrollTo").mockImplementation(() => undefined); sessionStorage.clear(); window.history.replaceState({}, "", "/fa4"); });
+beforeEach(() => { resetRuntimeConfigForTests(); vi.spyOn(window, "scrollTo").mockImplementation(() => undefined); sessionStorage.clear(); window.history.replaceState({}, "", "/fa4"); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("Fa4App (Vite/React) against the API contract", () => {
   it("cover offers ES/EN; the language is only chosen on the cover; identity creates the project and stores the Bearer session", async () => {
     const calls = mockApi();
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Empezar" });
-    fireEvent.click(screen.getByRole("radio", { name: "English" }));
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us about your expansion project");
+    await screen.findByRole("button", { name: "Comenzar" });
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar idioma a English" }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Your expansion starts with a clearer view.");
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
-    expect(screen.queryByRole("radio", { name: "Español" })).toBeNull();           // no language switcher after the cover
+    expect(screen.queryByRole("button", { name: /Switch language/ })).toBeNull();           // no language switcher after the cover
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Your name"), "Ana");
+    await user.type(screen.getByLabelText("Name"), "Ana");
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));            // terms and privacy are mandatory and separate: pressing it explains what is missing and does NOT move on
+    expect(screen.getByRole("alert")).toHaveTextContent(/I accept the Terms/); expect(screen.getByRole("alert")).toHaveTextContent(/I acknowledge the Privacy/);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us a little about yourself.");
+    const marketing = screen.getByLabelText(/I would like to receive news, information and commercial communications from beeside\./) as HTMLInputElement;
+    expect(marketing.checked).toBe(false);                                                  // optional: unchecked by default
+    await user.click(marketing);                                                            // ticking it does NOT satisfy the legal acceptances
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us a little about yourself.");
+    await user.click(marketing);
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByRole("heading", { name: "Who are you?" });
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));
+    await screen.findByRole("heading", { name: "Is your company currently operating?" });
     const create = calls.find((c) => c.url === "/api/fa4/sessions")!;
     expect(create.method).toBe("POST");
     expect((create.body as { answers: { identity: { email: string }; locale: string } }).answers.identity.email).toBe("ana@acme.example");
@@ -70,17 +79,71 @@ describe("Fa4App (Vite/React) against the API contract", () => {
       return null;
     });
     render(<Fa4App />);
-    await screen.findByRole("heading", { name: "¿En qué punto está la decisión?" });
+    // scanner-safe: nothing is redeemed until the person explicitly continues
+    await screen.findByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ });
+    expect(calls.find((c) => c.url === "/api/fa4/links/continue")).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ }));
+    await screen.findByRole("heading", { name: "¿En qué punto está la decisión sobre este proyecto?" });
     expect(calls.find((c) => c.url === "/api/fa4/links/continue")!.body).toEqual({ token: linkToken });
-    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe(`Bearer ${"T".repeat(43)}`);
+    expect(calls.find((c) => c.url === "/api/fa4/session" && c.method === "GET")!.auth).toBe("T".repeat(43));   // X-Fa4-Session (not Authorization, which gateways like IAP consume)
     expect(window.location.hash).toBe("");
   });
 
-  it("an invalid or expired link falls back to the cover without leaking the token", async () => {
-    window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
-    mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : null));
+  it("YEV email links: «View» and «Talk to beeside» need no confirmation click; Talk opens the existing contact form on the private YEV and sends origin stage YEV (never mailto)", async () => {
+    HTMLDialogElement.prototype.showModal ||= function () { this.setAttribute("open", ""); };   // jsdom
+    const a = journeyA("es"); const model = modelFor(a);
+    window.history.replaceState({}, "", `/fa4#r=${"Y".repeat(43)}&view=result&contact=open&origin=yev_email`);
+    const calls = mockApi((c) => {
+      if (c.url === "/api/fa4/links/continue") return json({ sessionToken: "T".repeat(43), kind: "YEV_LINK" });
+      if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "result", status: "DELIVERED" });
+      if (c.url === "/api/fa4/session/result" && c.method === "GET") return json({ resultId: "r1", model });
+      if (c.url === "/api/fa4/session/contact") return json({ state: "sent", email: "l***@nubia.example" });
+      return null;
+    });
     render(<Fa4App />);
-    await screen.findByRole("button", { name: "Empezar" });
+    const dialog = await screen.findByRole("dialog");                                       // opened by contact=open on the private YEV
+    expect(calls.find((c) => c.url === "/api/fa4/links/continue")).toBeDefined();
+    expect(screen.getByTestId("result-screen")).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(dialog.querySelector("textarea")!, "Hola desde el correo del YEV");
+    await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    await screen.findByText(/Recibimos tu mensaje/);
+    expect(calls.find((c) => c.url === "/api/fa4/session/contact")!.body).toMatchObject({ stage: "YEV", shareProgress: false });
+    expect(document.body.innerHTML).not.toMatch(/mailto:/);
+  });
+
+  it("an invalid or expired link shows the calm recovery screen (no raw error), drops the token, and offers a new link / a fresh start", async () => {
+    window.history.replaceState({}, "", `/fa4#r=${"X".repeat(43)}`);
+    const calls = mockApi((c) => (c.url === "/api/fa4/links/continue" ? json({ error: "NOT_FOUND" }, 404) : c.url === "/api/fa4/links/request" ? json({ ok: true }) : null));
+    render(<Fa4App />);
+    fireEvent.click(await screen.findByRole("button", { name: /Continuar donde lo dejaste|Pick up where you left off/ }));
+    await screen.findByRole("heading", { name: "Este enlace ya no es válido" });
+    expect(window.location.hash).toBe("");
+    expect(document.body.textContent).not.toMatch(/NOT_FOUND|404|undefined/);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Correo de trabajo"), "ana@acme.example");
+    await user.click(screen.getByRole("button", { name: "Enviarme un enlace nuevo" }));
+    await screen.findByText(/te enviaremos un enlace nuevo/);
+    expect(calls.find((c) => c.url === "/api/fa4/links/request")!.body).toEqual({ email: "ana@acme.example" });
+    await user.click(screen.queryByRole("button", { name: "Empezar uno nuevo" }) ?? document.body);   // hidden once requested: nothing breaks
+  });
+
+  it("Queued ≠ sent: 'save and continue later' says sent only on confirmation; a failure offers retry and never claims delivery", async () => {
+    const a = journeyA("es");
+    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43));
+    let fail = true;
+    mockApi((c) => {
+      if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "extra", status: "IN_PROGRESS" });
+      if (c.url === "/api/fa4/session/finish-later") { if (fail) { fail = false; return json({ error: "EMAIL_NOT_SENT" }, 502); } return json({ state: "sent", email: "l***@nubia.example" }); }
+      return null;
+    });
+    render(<Fa4App />);
+    const user = userEvent.setup();
+    await user.click((await screen.findAllByRole("button", { name: "Guardar y seguir después" }))[0]!);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("no pudimos enviarte el enlace"); expect(document.body.textContent).not.toMatch(/Te enviamos a/);
+    await user.click(screen.getByRole("button", { name: "Intentar de nuevo" }));
+    await screen.findByText(/Te enviamos a l\*\*\*@nubia\.example/);
   });
 
   it("generates the result through the API and renders the three components; 'save for later' uses the stored email", async () => {
@@ -93,7 +156,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
       return null;
     });
     render(<Fa4App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Guardar y seguir después" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Guardar y seguir después" }))[0]!);
     await screen.findByText(/l\*\*\*@nubia\.example/);
     fireEvent.click(screen.getByRole("button", { name: "Ver mi resultado" }));
     await screen.findByTestId("result-screen");
@@ -107,9 +170,9 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     mockApi((c) => (c.url === "/api/fa4/catalog" && failing ? json({ error: "X" }, 500) : null));
     render(<Fa4App />);
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("No pudimos cargar First Assessment");
+    expect(alert).toHaveTextContent("No pudimos cargar Discovery");
     failing = false;
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    await screen.findByRole("button", { name: "Empezar" });
+    await screen.findByRole("button", { name: "Comenzar" });
   });
 });

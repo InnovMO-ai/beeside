@@ -1,0 +1,19 @@
+REQUEST FROM DISCOVERY
+
+{{name}} would like to talk to beeside about their project.
+
+Hi beeside team,
+
+A new contact request was submitted from Discovery.
+
+Topic: {{topic}}
+Message: {{message}}
+Name: {{name}}
+Company: {{company}}
+Email: {{email}}
+<!--IF:has_destinations-->Destination(s): {{destinations}}
+<!--ENDIF:has_destinations-->Stage: {{stage}}
+FA language: {{fa_language}}
+<!--IF:has_project_id-->Project ID: {{project_id}}
+<!--ENDIF:has_project_id-->
+Replying to this email must address the person who submitted the request through Reply-To.

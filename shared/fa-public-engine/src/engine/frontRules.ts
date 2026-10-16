@@ -140,7 +140,7 @@ function notApplicableFor(c: ProjectComponent, verdicts: Map<FrontKey, FrontVerd
     const members = NA_FRONTS[g];
     if (members.some((f) => verdicts.get(f)?.kind !== 'none')) continue;
     if (g === 'sell' && c.activities.includes('sell')) continue;
-    if (g === 'place' && c.presence === 'own_physical') continue;
+    if (g === 'place' && (c.presence === 'own_physical' || c.presence === 'open' || c.presence === 'acquisition' || c.presence === null)) continue;   // VT-02: only a declared negative
     if (g === 'housing_exit' && c.permanence !== 'permanent') continue;
     if (g === 'goods' && c.withWhat.includes('goods')) continue;
     if (c.activities.includes('invest_only')) continue;
