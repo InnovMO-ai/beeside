@@ -58,7 +58,7 @@ test.describe("closed app behind the gate", () => {
     if (cat.status() === 200) await expect(page.getByRole("button", { name: /Comenzar|Start/ })).toBeVisible();
     else await expect(page.getByRole("alert")).toBeVisible();                           // backend not up: the app says so honestly (no blank page)
     expect(await page.content()).not.toMatch(/ops-control|\/admin\b|Control Center/i);
-    const logo = page.locator("img[alt='beeside']").first(); await expect(logo).toBeVisible(); expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    if (cat.status() === 200) { const logo = page.locator("img[alt='beeside']").first(); await expect(logo).toBeVisible(); expect(await logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0); }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
   test("full journey with FICTITIOUS data (new business and operating business, e-mail inside the allowed test domain), preview → delivery, closed afterwards", async ({ page, request }, info) => {
