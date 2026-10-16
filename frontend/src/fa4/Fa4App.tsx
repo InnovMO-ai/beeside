@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildFlow, emptyAnswers, isStepComplete, lastProjectStep, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
+  buildFlow, emptyAnswers, lastProjectStep, missingRequired, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel, isLikelyPersonalEmail } from '@beeside/fa-public-engine';
 import { api, ApiError, confirmSend, sessionStore, track } from './api';
 import { CoverScreen } from './components/CoverScreen';
@@ -14,6 +14,7 @@ import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
 import { ContactDialog, HelpTalkLinks, TopActions } from './components/HelpContact';
 import { RecoveryScreen } from './components/Recovery';
+import { focusBlock, ReqContext } from './components/required';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
@@ -51,6 +52,15 @@ export function Fa4App() {
   const confirmStabilization = () => { try { sessionStorage.setItem('beeside.fa4.stabilization-ack', '1'); } catch { /* the notice simply shows again */ } setStabAck(true); };
   // Personal e-mail: advisory warning once per address (never a blocker).
   const [personalWarn, setPersonalWarn] = useState(false);
+  // «Continue» pressed with required answers missing: which screen, and the labels of what is missing (the blocks themselves show the message and take the focus).
+  const [reqAttempt, setReqAttempt] = useState<{ key: string; n: number } | null>(null);
+  const [reqLabels, setReqLabels] = useState<string[]>([]);
+  useEffect(() => {
+    if (!reqAttempt) { setReqLabels([]); return; }
+    const bad = [...document.querySelectorAll<HTMLElement>('[data-req-bad="true"]')];
+    setReqLabels(bad.map((b) => b.getAttribute('data-req-label') ?? '').filter(Boolean));
+    if (bad[0]) focusBlock(bad[0]);
+  }, [reqAttempt]);
   const personalOk = useRef('');
   const [toast, setToast] = useState<string | null>(null);
   const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
@@ -162,6 +172,7 @@ export function Fa4App() {
 
   async function onNext() {
     if (!catalog) return;
+    if (missingRequired(step, a, { cargoRouteDestinations: res.cargoRouteDestinations, desktop }).length) { setReqAttempt((p) => ({ key: stepKey(step), n: (p?.n ?? 0) + 1 })); return; }
     if (step.id === 'identity') {
       const email = a.identity.email.trim().toLowerCase();
       if (isLikelyPersonalEmail(email) && personalOk.current !== email) { setPersonalWarn(true); return; }
@@ -270,7 +281,9 @@ export function Fa4App() {
   }
 
   const stage = STAGE_OF[step.id];
-  const complete = isStepComplete(step, a);
+  const missing = new Set(missingRequired(step, a, { cargoRouteDestinations: res.cargoRouteDestinations, desktop }));
+  const showReq = reqAttempt?.key === stepKey(step) && missing.size > 0;
+  const reqState = { show: showReq, missing, message: UI.reqField[locale] };
   const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
   const label = step.id === 'identity' ? UI.acceptContinue[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical'].includes(step.id);
@@ -289,12 +302,13 @@ export function Fa4App() {
         {resolveFailed && (
           <div className="state err" role="alert"><b>{UI.topicsErrorTitle[locale]}</b> {UI.resolveErrorBody[locale]} <button type="button" className="toast-btn" onClick={() => { setResolveFailed(false); setResolveTick((n) => n + 1); }}>{UI.tryAgain[locale]}</button></div>
         )}
-        <StepBody step={step} ctx={ctx}  desktop={desktop} />
+        {showReq && reqLabels.length > 0 && <div className="req-summary" role="alert"><b>{UI.reqSummary[locale]}</b> {reqLabels.join(' · ')}</div>}
+        <ReqContext.Provider value={reqState}><StepBody step={step} ctx={ctx}  desktop={desktop} /></ReqContext.Provider>
       </main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button type="button" className="linkbtn nav-save" onClick={saveLater}>{UI.saveLater[locale]}</button>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
-        <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>
+        <button className="btn primary" disabled={busy} onClick={onNext}>{label}</button>
       </div></div>
       {!wide && <aside className="deco" aria-hidden />}
       {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}

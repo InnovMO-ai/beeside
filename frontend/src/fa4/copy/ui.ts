@@ -24,7 +24,7 @@ export const UI = {
   coverSideBottom: [L('EXPANDE TU NEGOCIO', 'EXPAND YOUR BUSINESS'), L('CON CONFIANZA', 'WITH TRUST')],   // approved tagline: «EXPANDE TU NEGOCIO CON CONFIANZA» / «EXPAND YOUR BUSINESS WITH TRUST»
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
-  idTitle: L('Déjame conocerte.', 'Let me get to know you.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
+  idTitle: L('Cuéntanos un poco sobre ti.', 'Tell us a little about yourself.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
   name: L('Nombre', 'Name'), company: L('Empresa', 'Company'), email: L('Correo de trabajo', 'Work email'),
   emailHelp: L('Lo usaremos para guardar tu avance y enviarte tu resultado.', "We'll use it to save your progress and send you your result."),
   emailInvalid: L('Revisa el email', 'Check the email address'),
@@ -135,6 +135,7 @@ export const UI = {
   success: L('¿Cómo sabrás que la expansión salió bien?', 'How will you know the expansion went well?'), successHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'), constraints: L('¿Hay algo que hoy frene o limite el proyecto?', 'Is anything holding back or limiting the project today?'), constraintsHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'),
   descr: L('¿Quieres contarnos algo más con tus propias palabras?', "Anything else you'd like to tell us in your own words?"), experience: L('¿Has intentado antes expandirte a otro país?', 'Have you tried expanding to another country before?'), experienceHelp: L('Cuéntanos brevemente qué pasó y qué fue difícil.', 'Tell us briefly what happened and what was hard.'),
   personal: L('¿Hay alguna necesidad personal, tuya o de alguien de tu equipo, relacionada con este proyecto?', 'Is there a personal need, for you or someone on your team, related to this project?'), personalHelp: L('Solo queremos saber si existe; no necesitamos detalles.', 'We only need to know it exists; no details needed.'),
+  reqField: L('Falta responder esto para continuar.', 'This is needed to continue.'), reqSummary: L('Para continuar, completa:', 'To continue, please complete:'),
   seeResult: L('Ver mi resultado', 'See my result'),
   generating: L('Preparando tu resultado…', 'Preparing your result…'), resultError: L('No pudimos preparar el resultado. Inténtalo de nuevo.', "We couldn't prepare your result. Please try again."),
 

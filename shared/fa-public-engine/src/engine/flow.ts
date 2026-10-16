@@ -124,20 +124,71 @@ export const stageNumber = (id: StepId) => STAGE_OF[id];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export function isValidEmail(v: string) { return EMAIL.test(v.trim()); }
 
-/** Required-input check for "Continue". Optional steps are always complete. */
-export function isStepComplete(step: StepRef, a: Answers): boolean {
+/** Reserved for screens whose questions depend on the server-side resolution (none is required today). */
+export interface RequiredCtx { cargoRouteDestinations?: string[]; desktop?: boolean }
+
+/**
+ * The REQUIRED inputs still missing on a screen, as stable keys in the order they appear (so the UI can say which one and focus the first).
+ * Required = what the approved Interaction Model asks «always» (or conditionally, when the question is on the screen) and that has an explicit answer for every case
+ * ("not sure" / "not decided" are answers). Never required: role, regions, notes and free text, the date of an external deadline, the project size (I-14), the clarity
+ * question (I-19: unanswered = NO), the topic statuses/support and the cargo route (the design tolerates unanswered topics), the «mark the topics» shortcut,
+ * the critical-date choice, the whole «Algo más» block and the marketing consent.
+ */
+export function missingRequired(step: StepRef, a: Answers, ctx: RequiredCtx = {}): string[] {
+  const m: string[] = [];
   const comp = step.comp ? a.components.find((c) => c.id === step.comp) : undefined;
   switch (step.id) {
-    case 'cover': return true;
-    case 'identity': return !!a.identity.name.trim() && !!a.identity.company.trim() && isValidEmail(a.identity.email) && a.identity.decider !== null && a.identity.termsAccepted && a.identity.privacyAcknowledged;
-    case 'company': return a.company.hasExistingBusiness !== null && (a.company.hasExistingBusiness === false || (!!a.company.sector.trim() && a.company.size !== null && a.company.operatesIn.length > 0));
-    case 'destinations': return (a.destinations.open || a.destinations.list.length > 0) && (a.destinations.open || a.destinations.list.length < 2 || a.destinations.sameInAll !== null);
-    case 'activity': return !!comp && comp.activities.length > 0 && (!comp.activities.some((x) => x === 'sell' || x === 'produce' || x === 'source') || comp.withWhat.length > 0);
-    case 'presence': return !!comp && comp.presence !== null && comp.permanence !== null && (comp.permanence !== 'temporary' || comp.durationMonths === undefined || comp.durationMonths > 0) && comp.existing !== null;
-    case 'reason': return a.reasons.length > 0 || a.reasonText.trim().length > 0;
-    case 'decision': return a.decision !== null && (a.externalDate.has !== null);
-    case 'activators': case 'activators_sell': case 'activators_site': return true;
-    case 'fronts_mark': return true;
-    default: return true;
+    case 'identity':
+      if (!a.identity.name.trim()) m.push('identity.name');
+      if (!a.identity.company.trim()) m.push('identity.company');
+      if (!isValidEmail(a.identity.email)) m.push('identity.email');
+      if (a.identity.decider === null) m.push('identity.decider');
+      if (!a.identity.termsAccepted) m.push('identity.terms');
+      if (!a.identity.privacyAcknowledged) m.push('identity.privacy');
+      break;
+    case 'company':
+      if (a.company.hasExistingBusiness === null) m.push('company.hasBiz');
+      else if (a.company.hasExistingBusiness) {
+        if (!a.company.sector.trim()) m.push('company.sector');
+        if (a.company.size === null) m.push('company.size');
+        if (a.company.operatesIn.length === 0) m.push('company.operatesIn');
+      }
+      break;
+    case 'destinations':
+      if (!a.destinations.open && a.destinations.list.length === 0) m.push('dest.list');
+      else if (!a.destinations.open && a.destinations.list.length >= 2 && a.destinations.sameInAll === null) m.push('dest.same');
+      break;
+    case 'activity':
+      if (!comp) break;
+      if (comp.activities.length === 0) m.push('act.acts');
+      else if (comp.activities.some((x) => x === 'sell' || x === 'produce' || x === 'source') && comp.withWhat.length === 0) m.push('act.with');
+      break;
+    case 'presence':
+      if (!comp) break;
+      if (comp.presence === null) m.push('pres.how');
+      if (comp.permanence === null) m.push('pres.perm');
+      if (comp.existing === null) m.push('pres.exist');
+      break;
+    case 'reason':
+      if (a.reasons.length === 0 && a.reasonText.trim().length === 0) m.push('reason');
+      break;
+    case 'decision':
+      if (a.decision === null) m.push('dec.state');
+      if (a.startWhen === null) m.push('dec.start');
+      if (a.externalDate.has === null) m.push('dec.ext');
+      break;
+    case 'activators': case 'activators_sell': case 'activators_site': {
+      const f = activatorFields(a); const sell = step.id !== 'activators_site'; const site = step.id !== 'activators_sell';
+      if (sell && f.regulated && a.regulated === null) m.push('reg');
+      if (sell) for (const c of a.components.filter((x) => f.sells.includes(x.id))) { if (c.sellsTo === null) m.push(`to-${c.id}`); if (c.ownBrand === null) m.push(`br-${c.id}`); }
+      if (site) for (const c of a.components.filter((x) => f.location.includes(x.id))) { if (c.location === null) m.push(`lo-${c.id}`); if (c.carries.length === 0) m.push(`ca-${c.id}`); }
+      break;
+    }
+    // Topics (status / support) and the cargo route are deliberately NOT required: the approved design tolerates unanswered topics (the result has its own sentence for them, D-079/D-119).
+    default: break;
   }
+  return m;
 }
+
+/** "Continue" is allowed only when nothing required is missing. Optional steps are always complete. */
+export function isStepComplete(step: StepRef, a: Answers, ctx: RequiredCtx = {}): boolean { return missingRequired(step, a, ctx).length === 0; }

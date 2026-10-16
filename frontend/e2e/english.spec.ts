@@ -7,7 +7,7 @@ test('English: language is chosen on the cover only; the whole first steps rende
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Your expansion starts with a clearer view.');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('heading', { name: 'Let me get to know you.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tell us a little about yourself.' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Switch language|Cambiar idioma/ })).toHaveCount(0);                 // no language switcher after the cover
   await expect(page.getByRole('button', { name: 'Español' })).toHaveCount(0);
   await page.getByLabel('Name', { exact: true }).fill('Ana');

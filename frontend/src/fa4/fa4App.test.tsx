@@ -48,11 +48,14 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
-    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();       // terms and privacy are mandatory and separate
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));            // terms and privacy are mandatory and separate: pressing it explains what is missing and does NOT move on
+    expect(screen.getByRole("alert")).toHaveTextContent(/I accept the Terms/); expect(screen.getByRole("alert")).toHaveTextContent(/I acknowledge the Privacy/);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us a little about yourself.");
     const marketing = screen.getByLabelText(/I would like to receive news, information and commercial communications from beeside\./) as HTMLInputElement;
     expect(marketing.checked).toBe(false);                                                  // optional: unchecked by default
-    await user.click(marketing);                                                            // ticking it does NOT enable the button
-    expect(screen.getByRole("button", { name: "Accept and continue" })).toBeDisabled();
+    await user.click(marketing);                                                            // ticking it does NOT satisfy the legal acceptances
+    await user.click(screen.getByRole("button", { name: "Accept and continue" }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us a little about yourself.");
     await user.click(marketing);
     await user.click(screen.getByLabelText(/I accept the Terms/));
     await user.click(screen.getByLabelText(/I acknowledge the Privacy/));

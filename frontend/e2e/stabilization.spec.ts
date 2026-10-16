@@ -20,6 +20,8 @@ for (const loc of ["es", "en"] as const) {
     // keyboard: focus can only ever land in the dialog (or leave to the browser itself) — never on the page behind it
     for (let i = 0; i < 4; i++) { await page.keyboard.press("Tab"); expect(await page.evaluate(() => { const a = document.activeElement; return !a || a === document.body || !!a.closest("dialog"); })).toBe(true); }
     await page.keyboard.press("Escape"); await expect(dlg).toBeVisible();
+    const box = await page.getByRole("button", { name: UI.stabConfirm[loc] }).boundingBox(); const dbox = await dlg.boundingBox();   // finding #5: a normal-size button, not a full-width bar
+    expect(box!.height).toBeLessThanOrEqual(52); expect(box!.width).toBeLessThanOrEqual(Math.max(260, dbox!.width * 0.6));
     expect(await axeViolations(page)).toEqual([]); await noHorizontalOverflow(page);
     await page.getByRole("button", { name: UI.stabConfirm[loc] }).focus(); await page.keyboard.press("Enter");
     await expect(dlg).toHaveCount(0);

@@ -705,3 +705,18 @@ dialog.stab-notice .sheet-head h2, dialog.personal-email .sheet-head h2 { font-s
 dialog.stab-notice, dialog.personal-email { max-height: calc(100dvh - 32px); overflow: auto; }
 dialog.personal-email .sheet-actions { flex-wrap: wrap; }
 dialog.personal-email .sheet-actions .btn { flex: 1 1 200px; }
+
+/* a choice that is unavailable (mutually exclusive with another answer) */
+.choice.is-disabled { opacity: .5; cursor: not-allowed; background: #f6f6f9; }
+.choice.is-disabled:hover { border-color: var(--control-line); }
+.choice.is-disabled input { cursor: not-allowed; }
+/* Stabilization notice: the single action keeps a normal button size (not a full-width bar that dominates the dialog) */
+dialog.stab-notice .sheet-actions { justify-content: flex-end; }
+dialog.stab-notice .sheet-actions .btn.primary { flex: 0 0 auto; min-width: 200px; min-height: 44px; padding: 0 28px; font-size: 15px; }
+@media (max-width: 599px) { dialog.stab-notice .sheet-actions { justify-content: center; } dialog.stab-notice .sheet-actions .btn.primary { min-width: 220px; } }
+
+/* required answers missing after «Continue» (accessible: message under the block, aria-invalid, focus on the first one, summary as an alert) */
+.req-summary { margin: 0 0 16px; padding: 12px 14px; border: 1.5px solid #a1261b; border-radius: 10px; background: #fdf3f2; color: #7a1c14; font-size: 15px; line-height: 1.45; }
+.req-bad { position: relative; }
+.req-bad::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: #a1261b; }   /* no border/padding: nothing shifts when it appears */
+.req-msg { margin: 6px 0 0; color: #a1261b; font-size: 14px; font-weight: 600; }

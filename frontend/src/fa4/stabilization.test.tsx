@@ -78,7 +78,7 @@ describe("Stabilization notice (closed test only)", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: ES.button }));
     await waitFor(() => expect(screen.queryByTestId("stabilization-notice")).toBeNull());
     expect(sessionStorage.getItem("beeside.fa4.stabilization-ack")).toBe("1");
-    expect(screen.getByRole("heading", { name: "Déjame conocerte." }).textContent).toBeTruthy();     // the identity form is right there, untouched
+    expect(screen.getByRole("heading", { name: "Cuéntanos un poco sobre ti." }).textContent).toBeTruthy();     // the identity form is right there, untouched
   });
   it("does not return for a visitor who already confirmed in this browser session", async () => {
     sessionStorage.setItem("beeside.fa4.stabilization-ack", "1"); mockApi(true); await toIdentity("es");
