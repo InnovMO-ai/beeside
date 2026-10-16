@@ -149,7 +149,7 @@ export function createKnowledgeLayer(deps: KnowledgeLayerDeps): KnowledgeLayer {
     async openResource(id) {
       const r = await resources.get(id);
       if (!r || !r.active || !isOpenable(r)) return null;
-      return { id: r.id, title: r.title, url: r.destination.ref };
+      return { id: r.id, title: r.title, url: r.destination.ref, ...(r.resourceType ? { type: r.resourceType } : {}) };
     },
   };
 }

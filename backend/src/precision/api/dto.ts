@@ -106,12 +106,12 @@ export interface TurnDto {
   createdAt: string;
   quickReplies?: QuickReplyDto[];
   confirmCard?: ConfirmCardDto;
-  /** A country guide offered in this turn; opening it goes through GET /resources/:id (destination is Admin configuration). */
+  /** A country resource offered in this turn; opening it goes through GET /resources/:id (destination is Admin configuration). */
   resourceOffer?: { id: string; title: string };
 }
 
-/** A country guide the client was offered, resolved on demand. `ref` is Admin configuration (an https URL or a document reference). */
-/** `format` is derived from the configured destination (an https URL whose path ends in .pdf is a PDF); nothing about the destination is hardcoded. */
+/** A country resource the client was offered, resolved on demand. `ref` is Admin configuration (an https URL or a document reference). */
+/** `format` is the resource governed type (Admin); only an undeclared type falls back to the destination. Nothing about the destination is hardcoded. */
 export interface ResourceLinkDto { id: string; title: string; kind: "url" | "document"; ref: string; format: "pdf" | "web" }
 
 export type ThreadSurface = "understanding" | "category" | "add_service";

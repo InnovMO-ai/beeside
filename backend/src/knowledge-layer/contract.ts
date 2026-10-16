@@ -175,7 +175,7 @@ export interface DemandReceipt {
 export interface DemandContext { projectId: string; turnKey: string }
 
 // ------------------------------------------------------------------ country resources
-/** A country guide ("Doing Business in Mexico") published through the layer. The destination is never exposed here: it is opened through `openResource`. */
+/** A country resource (e.g. "beeside Doing Business México") published through the layer. The destination is never exposed here: it is opened through `openResource`. */
 export interface ResourceDescriptor {
   id: string;
   country: string;
@@ -199,5 +199,5 @@ export interface KnowledgeLayer {
   /** Country guides available for a country (newest active version, in the client's language first). */
   resources(q: { country: string; language: string; topic?: string; now?: string }): Promise<ResourceDescriptor[]>;
   /** Where a guide opens (an https URL); null when it is not active or not openable. */
-  openResource(id: string): Promise<{ id: string; title: string; url: string } | null>;
+  openResource(id: string): Promise<{ id: string; title: string; url: string; type?: "pdf" | "web" } | null>;
 }

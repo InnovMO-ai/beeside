@@ -67,14 +67,18 @@ describeWithDb("Admin Country Resource Library: roles, validation, versioned edi
 
   it("ADMIN manages guides per country (https only, new edition supersedes, deactivation is reversible); SUPERVISOR only reads; audit keeps ids not URLs", async () => {
     const { admin, supervisor } = await people();
-    const base = { countryCode: "mx", title: "Doing business in Mexico", language: "es", version: "2026.1", topic: "legal_entity", destination: { kind: "url", ref: "https://guides.example.test/mx-2026-1" } };
+    const base = { countryCode: "mx", title: "beeside Doing Business México", language: "es", version: "2026.1", topic: "legal_entity", destination: { kind: "url", ref: "https://guides.example.test/mx-2026-1" } };
 
     expect((await post(supervisor, "/precision/country-resources", base)).status).toBe(403);
     expect((await post(admin, "/precision/country-resources", { ...base, destination: { kind: "url", ref: "http://insecure.example.test/x" } })).status).toBe(400);
     expect((await post(admin, "/precision/country-resources", { ...base, countryCode: "MEX" })).status).toBe(400);
 
-    const first = await post(admin, "/precision/country-resources", base);
+    // governed resource type: only pdf|web
+    expect((await post(admin, "/precision/country-resources", { ...base, resourceType: "docx" })).status).toBe(400);
+
+    const first = await post(admin, "/precision/country-resources", { ...base, resourceType: "pdf" });
     expect(first.status).toBe(201);
+    expect(first.body).toMatchObject({ resourceType: "pdf" });
     expect(first.body).toMatchObject({ countryCode: "MX", active: true, destination: { kind: "url" } });
 
     const second = await post(admin, "/precision/country-resources", { ...base, version: "2026.2", destination: { kind: "url", ref: "https://guides.example.test/mx-2026-2" } });

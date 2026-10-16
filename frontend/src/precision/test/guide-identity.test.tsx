@@ -17,33 +17,33 @@ import { ResourceLink } from "../screens/Workspace";
 setupDom();
 vi.setConfig({ testTimeout: 30000 });
 const wrap = (n: ReactNode, locale: "en" | "es" = "en") => render(<I18nProvider initial={locale}>{n}</I18nProvider>);
-const dto = (ref: string, format: "pdf" | "web"): ResourceLinkDto => ({ id: "r1", title: "Doing Business in Mexico", kind: "url", ref, format });
+const dto = (ref: string, format: "pdf" | "web"): ResourceLinkDto => ({ id: "r1", title: "beeside Doing Business México", kind: "url", ref, format });
 
-describe("country guide offer (Doing Business)", () => {
-  it("a PDF guide offers View guide and Download PDF, both from the configured destination", async () => {
+describe("beeside Doing Business México (country resource offer)", () => {
+  it("a PDF resource offers View and Download PDF, both from the configured destination", async () => {
     current = async () => dto("https://files.example/guides/doing-business-mx.pdf", "pdf");
-    wrap(<ResourceLink offer={{ id: "r1", title: "Doing Business in Mexico" }} />);
-    const view = await screen.findByRole("link", { name: /View guide/ });
+    wrap(<ResourceLink offer={{ id: "r1", title: "beeside Doing Business México" }} />);
+    const view = await screen.findByRole("link", { name: /^View/ });
     const dl = screen.getByRole("link", { name: /Download PDF/ });
     expect(view).toHaveAttribute("href", "https://files.example/guides/doing-business-mx.pdf");
     expect(view).toHaveAttribute("target", "_blank");
     expect(view.getAttribute("rel")).toMatch(/noopener/);
     expect(dl).toHaveAttribute("href", "https://files.example/guides/doing-business-mx.pdf");
     expect(dl).toHaveAttribute("download");
-    expect(screen.getByText("Doing Business in Mexico")).toBeInTheDocument();
+    expect(screen.getByText("beeside Doing Business México")).toBeInTheDocument();
   });
 
-  it("a web guide offers only View guide", async () => {
+  it("a web resource offers only View", async () => {
     current = async () => dto("https://example.org/guide", "web");
-    wrap(<ResourceLink offer={{ id: "r1", title: "Doing Business in Mexico" }} />);
-    await screen.findByRole("link", { name: /View guide/ });
+    wrap(<ResourceLink offer={{ id: "r1", title: "beeside Doing Business México" }} />);
+    await screen.findByRole("link", { name: /^View/ });
     expect(screen.queryByRole("link", { name: /Download PDF/ })).toBeNull();
   });
 
-  it("Spanish labels", async () => {
+  it("Spanish labels: Ver / Descargar PDF", async () => {
     current = async () => dto("https://files.example/g.pdf", "pdf");
-    wrap(<ResourceLink offer={{ id: "r1", title: "Hacer negocios en México" }} />, "es");
-    await screen.findByRole("link", { name: /Ver guía/ });
+    wrap(<ResourceLink offer={{ id: "r1", title: "beeside Doing Business México" }} />, "es");
+    await screen.findByRole("link", { name: /^Ver/ });
     expect(screen.getByRole("link", { name: /Descargar PDF/ })).toBeInTheDocument();
   });
 

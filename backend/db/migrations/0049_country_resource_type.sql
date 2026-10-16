@@ -1,0 +1,2 @@
+ALTER TABLE "country_resource" ADD COLUMN "resource_type" text;--> statement-breakpoint
+ALTER TABLE "country_resource" ADD CONSTRAINT "country_resource_type" CHECK ("country_resource"."resource_type" IS NULL OR "country_resource"."resource_type" IN ('pdf','web'));

@@ -1,10 +1,11 @@
 /**
- * Country Resource Library — "Doing Business in Mexico"-style guides. Minimal by design (no DMS): a configurable list of resources per
+ * Country Resource Library — country resources such as "beeside Doing Business México". Minimal by design (no DMS): a configurable list of resources per
  * country, offered in context and never mandatory. Destinations (URL or document reference) are configuration managed in Admin; nothing is hardcoded.
  */
 export interface L10n { es: string; en: string }
 
 export type ResourceDestination = { kind: "url"; ref: string } | { kind: "document"; ref: string };
+export type ResourceType = "pdf" | "web";
 export interface CountryResource {
   id: string;
   countryCode: string; // ISO-2
@@ -17,6 +18,8 @@ export interface CountryResource {
   updatedAt: string;
   topic?: string;
   section?: string;
+  /** Governed type (Admin): `pdf` → View + Download PDF; `web` → View. Undeclared (legacy rows) → inferred from the destination. */
+  resourceType?: ResourceType;
 }
 export interface CountryResourceRepository {
   list(filter?: { countryCode?: string; activeOnly?: boolean }): Promise<CountryResource[]>;
@@ -30,6 +33,7 @@ export function validateResource(r: CountryResource): string[] {
   if (!r.title.trim()) e.push("title required");
   if (!/^[a-z]{2}$/.test(r.language)) e.push("language must be a 2-letter code");
   if (!r.version.trim()) e.push("version required");
+  if (r.resourceType !== undefined && r.resourceType !== "pdf" && r.resourceType !== "web") e.push("resourceType must be pdf or web");
   if (r.destination.kind === "url" && !/^https:\/\/[^\s]+$/.test(r.destination.ref)) e.push("url must be https");
   if (r.destination.kind === "document" && !/^[A-Za-z0-9][A-Za-z0-9_./:-]{2,200}$/.test(r.destination.ref)) e.push("document reference is invalid");
   // V1 has no document management: a customer-visible (active) resource always resolves to a valid https URL
@@ -71,8 +75,8 @@ export function offerResource(resources: CountryResource[], opts: { topics: stri
   return {
     resource: r,
     text: {
-      es: `Si quieres contexto general, tengo una guía disponible: «${r.title}». No es necesario leerla para seguir.`,
-      en: `If you want general context, I have a guide available: “${r.title}”. You do not need to read it to continue.`,
+      es: `Si quieres contexto general, tienes a tu disposición «${r.title}». No es necesario leerlo para seguir.`,
+      en: `If you want general context, “${r.title}” is available to you. You do not need to read it to continue.`,
     },
   };
 }

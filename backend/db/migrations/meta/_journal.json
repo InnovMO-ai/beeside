@@ -344,6 +344,13 @@
       "when": 1792084026006,
       "tag": "0048_discovery_promotion_continuity",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792115902763,
+      "tag": "0049_country_resource_type",
+      "breakpoints": true
     }
   ]
 }

@@ -228,12 +228,12 @@ describe("demand signals", () => {
 describe("country resources", () => {
   it("are listed without their destination and opened only while active and https", async () => {
     const { kl, resources } = await layer();
-    await resources.upsert({ id: "dbm", countryCode: "MX", title: "Doing business in Mexico", language: "en", version: "2026", destination: { kind: "url", ref: "https://guides.example.test/dbm.pdf" }, active: true, updatedAt: "2026-09-01" });
+    await resources.upsert({ id: "dbm", countryCode: "MX", title: "beeside Doing Business México", language: "es", version: "2026", destination: { kind: "url", ref: "https://cdn.example.test/d/8f3a1c?sig=1" }, active: true, updatedAt: "2026-09-01", resourceType: "pdf" });
     await resources.upsert({ id: "old", countryCode: "MX", title: "Old", language: "en", version: "2025", destination: { kind: "url", ref: "https://guides.example.test/old.pdf" }, active: false, updatedAt: "2025-09-01" });
-    const list = await kl.resources({ country: "MX", language: "en" });
-    expect(list).toEqual([{ id: "dbm", country: "MX", title: "Doing business in Mexico", language: "en", version: "2026" }]);
+    const list = await kl.resources({ country: "MX", language: "es" });
+    expect(list).toEqual([{ id: "dbm", country: "MX", title: "beeside Doing Business México", language: "es", version: "2026" }]);
     expect(JSON.stringify(list)).not.toMatch(/https?:/);
-    expect(await kl.openResource("dbm")).toEqual({ id: "dbm", title: "Doing business in Mexico", url: "https://guides.example.test/dbm.pdf" });
+    expect(await kl.openResource("dbm")).toEqual({ id: "dbm", title: "beeside Doing Business México", url: "https://cdn.example.test/d/8f3a1c?sig=1", type: "pdf" });
     expect(await kl.openResource("old")).toBeNull();
     expect(await kl.openResource("missing")).toBeNull();
   });

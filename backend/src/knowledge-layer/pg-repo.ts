@@ -143,8 +143,8 @@ export function createPgCandidateStore(db: Q): CandidateStore {
   };
 }
 
-interface ResRow { id: string; country_code: string; title: string; language: string; version: string; destination_kind: "url" | "document"; destination_ref: string; active: boolean; effective_at: string | null; updated_at: string; topic: string | null; section: string | null }
-const toRes = (r: ResRow): CountryResource => ({ id: r.id, countryCode: r.country_code, title: r.title, language: r.language, version: r.version, destination: { kind: r.destination_kind, ref: r.destination_ref }, active: r.active, ...(r.effective_at ? { effectiveAt: r.effective_at } : {}), updatedAt: r.updated_at, ...(r.topic ? { topic: r.topic } : {}), ...(r.section ? { section: r.section } : {}) });
+interface ResRow { id: string; country_code: string; title: string; language: string; version: string; destination_kind: "url" | "document"; destination_ref: string; active: boolean; effective_at: string | null; updated_at: string; topic: string | null; section: string | null; resource_type: "pdf" | "web" | null }
+const toRes = (r: ResRow): CountryResource => ({ id: r.id, countryCode: r.country_code, title: r.title, language: r.language, version: r.version, destination: { kind: r.destination_kind, ref: r.destination_ref }, active: r.active, ...(r.effective_at ? { effectiveAt: r.effective_at } : {}), updatedAt: r.updated_at, ...(r.topic ? { topic: r.topic } : {}), ...(r.section ? { section: r.section } : {}), ...(r.resource_type ? { resourceType: r.resource_type } : {}) });
 
 export function createPgCountryResources(db: Q): CountryResourceRepository {
   return {
@@ -160,10 +160,10 @@ export function createPgCountryResources(db: Q): CountryResourceRepository {
       const e = validateResource(res);
       if (e.length) throw new Error(e.join("; "));
       await db.query(
-        `INSERT INTO country_resource (id, country_code, title, language, version, destination_kind, destination_ref, active, effective_at, updated_at, topic, section) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        `INSERT INTO country_resource (id, country_code, title, language, version, destination_kind, destination_ref, active, effective_at, updated_at, topic, section, resource_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          ON CONFLICT (id) DO UPDATE SET country_code = EXCLUDED.country_code, title = EXCLUDED.title, language = EXCLUDED.language, version = EXCLUDED.version, destination_kind = EXCLUDED.destination_kind,
-           destination_ref = EXCLUDED.destination_ref, active = EXCLUDED.active, effective_at = EXCLUDED.effective_at, updated_at = EXCLUDED.updated_at, topic = EXCLUDED.topic, section = EXCLUDED.section`,
-        [res.id, res.countryCode, res.title, res.language, res.version, res.destination.kind, res.destination.ref, res.active, res.effectiveAt ?? null, res.updatedAt, res.topic ?? null, res.section ?? null],
+           destination_ref = EXCLUDED.destination_ref, active = EXCLUDED.active, effective_at = EXCLUDED.effective_at, updated_at = EXCLUDED.updated_at, topic = EXCLUDED.topic, section = EXCLUDED.section, resource_type = EXCLUDED.resource_type`,
+        [res.id, res.countryCode, res.title, res.language, res.version, res.destination.kind, res.destination.ref, res.active, res.effectiveAt ?? null, res.updatedAt, res.topic ?? null, res.section ?? null, res.resourceType ?? null],
       );
     },
   };

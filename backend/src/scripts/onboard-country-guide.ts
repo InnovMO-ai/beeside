@@ -1,8 +1,8 @@
 /**
- * Onboards a country guide ("Doing business in Mexico") in one step: curated source + KSeed ingestion (versioned, with provenance) +
+ * Onboards a country resource ("beeside Doing Business México") in one step: curated source + KSeed ingestion (versioned, with provenance) +
  * country resource with its HTTPS destination. Idempotent. No network: the file is supplied.
- *   DATABASE_URL=... npx tsx src/scripts/onboard-country-guide.ts --country MX --title "Doing business in Mexico" --language en \
- *     --edition 2026 --url https://example.org/doing-business-in-mexico.pdf --file ./doing-business-in-mexico.pdf [--published 2026-10-16] [--topic taxes]
+ *   DATABASE_URL=... npx tsx src/scripts/onboard-country-guide.ts --country MX --title "beeside Doing Business México" --language es \
+ *     --edition 2026 --url https://example.org/doing-business-in-mexico.pdf --file ./doing-business-in-mexico.pdf [--published 2026-10-16] [--topic taxes] [--type pdf|web]
  */
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
@@ -28,6 +28,7 @@ async function main(): Promise<void> {
       countryCode: need("country"), title: need("title"), language: need("language"), edition: need("edition"), url: need("url"),
       file: { filename: basename(file), data: readFileSync(file) }, now: new Date().toISOString(),
       ...(arg("published") ? { publishedAt: arg("published")! } : {}), ...(arg("topic") ? { topic: arg("topic")! } : {}),
+      ...(arg("type") === "pdf" || arg("type") === "web" ? { resourceType: arg("type") as "pdf" | "web" } : {}),
     });
     console.log(JSON.stringify({ source: r.sourceId, approvedHost: r.approvedHost, ingest: r.ingest.status, document: r.ingest.document.id, version: r.ingest.document.version, resource: r.resource.id, deactivated: r.deactivated }));
   } finally {

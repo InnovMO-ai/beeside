@@ -182,7 +182,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
     const stored = await createPgFrameStore(deps.db).load(a.projectId);
     const res = stored?.frame.asked[`res:${id}`] && options.knowledge ? await options.knowledge.openResource(id) : null;
     if (!res) throw new ApiError("NOT_FOUND");
-    return { id: res.id, title: res.title, kind: "url", ref: res.url, format: resourceFormat(res.url) } satisfies ResourceLinkDto;
+    return { id: res.id, title: res.title, kind: "url", ref: res.url, format: res.type ?? resourceFormat(res.url) } satisfies ResourceLinkDto;
   });
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));

@@ -130,21 +130,22 @@ describe("resources adapter — a country guide published through the layer is o
   it("the 'Doing Business' path is the same path as every other content: onboard -> layer -> offered in the conversation", async () => {
     const { kl, knowledge, resources } = await world();
     await onboardCountryGuide(knowledge, resources, {
-      countryCode: "MX", title: "Hacer negocios en México", language: "es", edition: "2026", url: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf",
+      countryCode: "MX", title: "beeside Doing Business México", language: "es", edition: "2026", url: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf",
       file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: "2026-10-16T09:00:00.000Z", publishedAt: "2026-10-16",
     });
     // the guide's knowledge is available to Precision through the same orientation path
     const o = await createOrientationPort(kl).answer(frame(), "¿Qué es el IMMEX?", "es");
     expect(o?.coverage).toBe("full");
-    expect(o?.text).toMatch(/Hacer negocios en México/);
+    expect(o?.text).toMatch(/beeside Doing Business México/);
     expect(o?.text).toMatch(/no una obligación/);
     // and offered as a guide, once, without its link
     const f = frame(); f.locale = "es";
     const port = createResourcesPort(kl);
     const offer = await port.offer(f, "es", "2026-10-17T00:00:00.000Z", "priority");
-    expect(offer?.title).toBe("Hacer negocios en México");
+    expect(offer?.title).toBe("beeside Doing Business México");
     expect(offer?.text).not.toMatch(/https?:/);
-    expect(offer?.text).toMatch(/No es necesario leerla/);
+    expect(offer?.text).not.toMatch(/gu[ií]a/i);   // the customer sees the product name, never a generic "guide"
+    expect(offer?.text).toMatch(/No es necesario leerlo/);
     f.asked[offer!.key] = 1;
     expect(await port.offer(f, "es", "2026-10-17T00:00:00.000Z", "priority")).toBeNull();
   });

@@ -52,9 +52,9 @@ function TurnView({ turn, last, active, onConfirm, saved, notSaved }: { turn: Tu
 }
 
 /**
- * An optional country guide offered in context ("Doing Business in Mexico"). The destination is Admin configuration, resolved from the API
- * (only for a guide offered to this project, only while active); nothing is hardcoded. Never blocks the conversation: if the guide is not
- * available the offer simply says so. A PDF gets "View guide" + "Download PDF"; a web page gets "View guide".
+ * An optional country resource offered in context ("beeside Doing Business México": its name is the Admin-configured title, shown as is). The destination is Admin configuration, resolved from the API
+ * (only for a resource offered to this project, only while active); nothing is hardcoded. Never blocks the conversation: if the resource is not
+ * available the offer simply says so. A PDF gets "View" + "Download PDF"; a web page gets "View". Forced download is not required (a browser may open its PDF viewer).
  */
 export function ResourceLink({ offer }: { offer: { id: string; title: string } }) {
   const { t } = useI18n();

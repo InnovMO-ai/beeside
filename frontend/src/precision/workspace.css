@@ -137,5 +137,5 @@
   .pz-knows-fix { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
-/* Country guide offer: title + "View guide" / "Download PDF" as quiet text links under the assistant turn */
+/* Country resource offer (beeside Doing Business México): title + "View" / "Download PDF" as quiet text links under the assistant turn */
 .pz-resource-title { font-weight: 600; color: var(--pz-ink); flex-basis: 100%; }

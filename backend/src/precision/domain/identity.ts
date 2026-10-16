@@ -14,7 +14,10 @@ export function displayNameOf(p: PersonNameParts | undefined | null): string | n
   return name || null;
 }
 
-/** A guide configured as an https URL whose path ends in `.pdf` is a PDF (offered as "View guide" + "Download PDF"); anything else is a web page. */
+/**
+ * FALLBACK only, for a resource whose type Admin has not declared: an https URL whose path ends in `.pdf` is a PDF. The governed `resourceType`
+ * always wins (a signed, proxied or CDN URL may expose no extension).
+ */
 export function resourceFormat(url: string): "pdf" | "web" {
   try {
     const u = new URL(url);

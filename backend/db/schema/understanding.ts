@@ -175,12 +175,15 @@ export const countryResource = pgTable(
     updatedAt: text("updated_at").notNull(),
     topic: text("topic"),
     section: text("section"),
+    /** Governed resource type: `pdf` shows View + Download PDF; `web` only View. NULL = not declared (the destination decides). */
+    resourceType: text("resource_type"),
   },
   (t) => [
     index("country_resource_country").on(t.countryCode, t.active),
     check("country_resource_country", sql`${t.countryCode} ~ '^[A-Z]{2}$'`),
     check("country_resource_language", sql`${t.language} ~ '^[a-z]{2}$'`),
     check("country_resource_kind", sql`${t.destinationKind} IN ('url','document')`),
+    check("country_resource_type", sql`${t.resourceType} IS NULL OR ${t.resourceType} IN ('pdf','web')`),
     check("country_resource_https", sql`${t.destinationKind} <> 'url' OR ${t.destinationRef} ~ '^https://[^ ]+$'`),
     // V1 (no document management): a customer-visible ACTIVE resource always resolves to an https URL
     check("country_resource_active_resolvable", sql`NOT ${t.active} OR ${t.destinationKind} = 'url'`),

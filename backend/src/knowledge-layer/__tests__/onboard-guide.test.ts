@@ -11,18 +11,18 @@ import { InMemoryDemandRepository } from "../demand";
 const FX = (n: string): Buffer => readFileSync(join(__dirname, "fixtures", n));
 const URL1 = "https://guides.beeside.example/doing-business-in-mexico-2026.pdf";
 const URL2 = "https://guides.beeside.example/doing-business-in-mexico-2027.pdf";
-const base = { countryCode: "MX", title: "Doing business in Mexico", language: "en", edition: "2026", url: URL1, file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: "2026-10-16T09:00:00.000Z", publishedAt: "2026-10-16" };
+const base = { countryCode: "MX", title: "beeside Doing Business México", language: "es", edition: "2026", url: URL1, file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: "2026-10-16T09:00:00.000Z", publishedAt: "2026-10-16" };
 
-describe("country guide onboarding — the document drops in without code changes", () => {
+describe("country resource onboarding — the document drops in without code changes", () => {
   it("one operation: curated source, versioned KSeed material, country resource with its HTTPS destination", async () => {
     const k = new InMemoryKnowledgeRepository(); const r = new InMemoryCountryResources();
-    const out = await onboardCountryGuide(k, r, base);
+    const out = await onboardCountryGuide(k, r, { ...base, resourceType: "pdf" });
     expect(out.ingest.status).toBe("ingested");
     expect(out.sourceId).toBe(guideSourceId("MX"));
     const src = await k.getSource(out.sourceId);
     expect(src).toMatchObject({ authority: "beeside_curated", roles: ["context"], reviewRequired: true, domains: ["guides.beeside.example"] });
-    expect(out.ingest.document).toMatchObject({ title: "Doing business in Mexico", edition: "2026", version: 1, locator: URL1, jurisdiction: "MX", status: "active", confidence: "medium" });
-    expect(out.resource).toMatchObject({ countryCode: "MX", destination: { kind: "url", ref: URL1 }, active: true, version: "2026" });
+    expect(out.ingest.document).toMatchObject({ title: "beeside Doing Business México", edition: "2026", version: 1, locator: URL1, jurisdiction: "MX", status: "active", confidence: "medium" });
+    expect(out.resource).toMatchObject({ countryCode: "MX", destination: { kind: "url", ref: URL1 }, active: true, version: "2026", resourceType: "pdf" });
     expect((await resolveResources(r, { countryCode: "MX", language: "en" })).map((x) => x.destination.ref)).toEqual([URL1]);
   });
 
@@ -38,7 +38,7 @@ describe("country guide onboarding — the document drops in without code change
   it("a later edition supersedes the older one in KSeed and replaces it as the offered resource; history and provenance remain", async () => {
     const k = new InMemoryKnowledgeRepository(); const r = new InMemoryCountryResources();
     const a = await onboardCountryGuide(k, r, base);
-    const b = await onboardCountryGuide(k, r, { ...base, title: "Doing business in Mexico 2027", edition: "2027", url: URL2, now: "2027-10-16T09:00:00.000Z", file: { filename: "dbm27.txt", data: Buffer.from(`${FX("guia-pais-sintetica.txt").toString()}\nSección nueva sobre incentivos de inversión.`) } });
+    const b = await onboardCountryGuide(k, r, { ...base, title: "beeside Doing Business México 2027", edition: "2027", url: URL2, now: "2027-10-16T09:00:00.000Z", file: { filename: "dbm27.txt", data: Buffer.from(`${FX("guia-pais-sintetica.txt").toString()}\nSección nueva sobre incentivos de inversión.`) } });
     expect(b.ingest.status).toBe("ingested");
     expect(b.deactivated).toEqual([a.resource.id]);
     const docs = await k.listDocuments({ sourceId: guideSourceId("MX") });

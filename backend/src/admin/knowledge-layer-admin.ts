@@ -28,6 +28,8 @@ function parseResource(id: string, b: Record<string, unknown>, now: Date): Count
   if (!kind) throw new FaError("INVALID_INPUT", "destination.kind must be url or document", { fields: ["destination"] });
   const topic = optStr(b.topic, "topic");
   const section = optStr(b.section, "section");
+  const resourceType = b.resourceType === undefined || b.resourceType === null || b.resourceType === "" ? undefined : b.resourceType;
+  if (resourceType !== undefined && resourceType !== "pdf" && resourceType !== "web") throw new FaError("INVALID_INPUT", "resourceType must be pdf or web", { fields: ["resourceType"] });
   const effectiveAt = optStr(b.effectiveAt, "effectiveAt", 40);
   if (effectiveAt && Number.isNaN(new Date(effectiveAt).getTime())) throw new FaError("INVALID_INPUT", "effectiveAt must be a date", { fields: ["effectiveAt"] });
   const r: CountryResource = {
@@ -43,6 +45,7 @@ function parseResource(id: string, b: Record<string, unknown>, now: Date): Count
     ...(effectiveAt ? { effectiveAt } : {}),
     ...(topic ? { topic } : {}),
     ...(section ? { section } : {}),
+    ...(resourceType ? { resourceType } : {}),
   };
   const errors = validateResource(r);
   if (errors.length) throw new FaError("INVALID_INPUT", errors.join("; "), { fields: ["resource"] });

@@ -1,5 +1,5 @@
 /**
- * Country guide onboarding ("Doing Business in Mexico" and any later guide): ONE operation that does everything the guide needs, so
+ * Country resource onboarding ("beeside Doing Business México" and any later edition of the family): ONE operation that does everything the guide needs, so
  * that when the document arrives no code has to change.
  *
  *   1. registers (or reuses) the curated source for the country, approving the host of the guide's HTTPS destination;
@@ -17,7 +17,7 @@ import { TOPICS, type KnowledgeRepository, type KnowledgeSource, type Topic } fr
 
 export interface GuideOnboardInput {
   countryCode: string;
-  /** Series title as clients see it, e.g. "Doing business in Mexico". The edition is NOT part of the title. */
+  /** Series title as clients see it, e.g. "beeside Doing Business México". The edition is NOT part of the title. */
   title: string;
   language: string;
   /** Edition / version label, e.g. "2026". */
@@ -30,6 +30,8 @@ export interface GuideOnboardInput {
   /** Optional topic to bind the offer to (otherwise the guide is offered at the priority moment, always optional). */
   topic?: string;
   institution?: string;
+  /** Governed resource type; defaults to `pdf` when the supplied file is a PDF. */
+  resourceType?: "pdf" | "web";
 }
 export interface GuideOnboardResult {
   sourceId: string;
@@ -71,6 +73,7 @@ export async function onboardCountryGuide(knowledge: KnowledgeRepository, resour
   const resource: CountryResource = {
     id: rid, countryCode: cc, title: seriesTitle(i.title), language: i.language, version: i.edition, destination: { kind: "url", ref: i.url }, active: true,
     effectiveAt: i.publishedAt ?? i.now.slice(0, 10), updatedAt: i.now, ...(i.topic ? { topic: i.topic } : {}),
+    ...((i.resourceType ?? (/\.pdf$/i.test(i.file.filename) ? "pdf" : undefined)) ? { resourceType: (i.resourceType ?? "pdf") } : {}),
   };
   const errs = validateResource(resource);
   if (errs.length || !isOpenable(resource)) throw new RegistryError(`invalid country resource: ${errs.join("; ")}`);

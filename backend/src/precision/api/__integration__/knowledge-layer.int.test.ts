@@ -202,8 +202,8 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
     const knowledge = createPgKnowledgeRepository(h.db);
     const resources = createPgCountryResources(h.db);
     const out = await onboardCountryGuide(knowledge, resources, {
-      countryCode: "MX", title: "Hacer negocios en México", language: "es", edition: "2026", url: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf",
-      file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: new Date().toISOString(), publishedAt: "2026-01-15",
+      countryCode: "MX", title: "beeside Doing Business México", language: "es", edition: "2026", url: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf",
+      file: { filename: "dbm.txt", data: FX("guia-pais-sintetica.txt") }, now: new Date().toISOString(), publishedAt: "2026-01-15", resourceType: "pdf",
     });
     try {
       expect(out.ingest.status).toBe("ingested");
@@ -213,9 +213,9 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
       const a = lastAssistant(r.body);
       const res = of("request")[0]!.result;
       expect(res.availability).toBe("sufficient");
-      expect(res.units[0].source).toMatchObject({ sourceId: guideSourceId("MX"), documentTitle: "Hacer negocios en México", edition: "2026", authority: "beeside_curated", status: "active" });
+      expect(res.units[0].source).toMatchObject({ sourceId: guideSourceId("MX"), documentTitle: "beeside Doing Business México", edition: "2026", authority: "beeside_curated", status: "active" });
       expect(res.units[0].wording).toBe("context");
-      expect(a.text).toMatch(/Hacer negocios en México/);
+      expect(a.text).toMatch(/beeside Doing Business México/);
 
       // the guide is a country resource served by the layer: offered once while the conversation advances, opened through the layer
       const offers: any[] = (r.body.turns as any[]).filter((t) => t.resourceOffer);
@@ -225,6 +225,11 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
       const opened = await api.get(`/resources/${out.resource.id}`);
       expect(opened.status).toBe(200);
       expect(opened.body).toMatchObject({ id: out.resource.id, kind: "url", ref: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf", format: "pdf" });
+      // governed type wins over the URL: a signed/proxied PDF with no extension is still a PDF; a declared web page stays a web page even if it ends in .pdf
+      await resources.upsert({ ...out.resource, destination: { kind: "url", ref: "https://cdn.beeside.example/d/8f3a1c?sig=abc123" }, resourceType: "pdf", updatedAt: new Date().toISOString() });
+      expect((await api.get(`/resources/${out.resource.id}`)).body).toMatchObject({ format: "pdf", ref: "https://cdn.beeside.example/d/8f3a1c?sig=abc123" });
+      await resources.upsert({ ...out.resource, destination: { kind: "url", ref: "https://beeside.example/viewer/doing-business.pdf" }, resourceType: "web", updatedAt: new Date().toISOString() });
+      expect((await api.get(`/resources/${out.resource.id}`)).body).toMatchObject({ format: "web" });
       expect(of("openResource").map((c) => c.args[0])).toContain(out.resource.id);
     } finally {
       await unpublish(out.ingest.status === "ingested" ? [out.ingest.document.id] : [], async () => {

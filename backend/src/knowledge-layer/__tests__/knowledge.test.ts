@@ -199,7 +199,7 @@ describe("Country Resource Library", () => {
     expect(rs.map((r) => r.id)).toEqual(["r3", "r2"]);
     expect(rs.some((r) => r.id === "r1")).toBe(false);
     const off = offerResource(rs, { topics: ["taxes"], alreadyOffered: [], language: "es" })!;
-    expect(off.text.es).toMatch(/No es necesario leerla/);
+    expect(off.text.es).toMatch(/No es necesario leerlo/);
     expect(offerResource(rs, { topics: ["taxes"], alreadyOffered: ["r3", "r2"], language: "es" })).toBeNull();
     expect(offerResource([rs[0]!], { topics: ["customs"], alreadyOffered: [], language: "es" })).toBeNull(); // topic-bound resource, topic not touched
   });

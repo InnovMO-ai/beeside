@@ -27,7 +27,7 @@ const ES_AUTH: Record<string, string> = { official_primary: "oficial primaria", 
 const cell = (s: string): string => s.replace(/\|/g, "/").replace(/\s+/g, " ").trim();
 
 export function hasDoingBusinessResource(resources: CountryResource[]): boolean {
-  return resources.some((r) => r.countryCode === "MX" && r.active && /doing business in mexico/i.test(r.title));
+  return resources.some((r) => r.countryCode === "MX" && r.active && /doing business (in mexico|m[eé]xico)/i.test(r.title));
 }
 
 export function renderGapReport(i: KSeedReportInput): string {
@@ -50,7 +50,7 @@ export function renderGapReport(i: KSeedReportInput): string {
     l.push(``);
   }
   const dbm = hasDoingBusinessResource(i.resources);
-  l.push(`Guía país para clientes: ${dbm ? "«Doing business in Mexico» ya está registrada como recurso de México." : "«Doing business in Mexico» aún no está registrada; falta el PDF final de beeside (ver «Qué necesitamos de ti»)."}`, ``);
+  l.push(`Recurso para clientes: ${dbm ? "«beeside Doing Business México» ya está registrado como recurso de México." : "«beeside Doing Business México» aún no está registrado; falta el PDF final de beeside (ver «Qué necesitamos de ti»)."}`, ``);
   for (const k of KNOWN_EDITIONS) {
     const have = i.documents.some((d) => d.doc.sourceId === k.sourceId && d.doc.edition === k.edition && d.doc.status === "active");
     if (!have) l.push(`Edición pendiente: ${k.sourceId} ${k.edition}. ${k.note}`, ``);
@@ -85,7 +85,7 @@ export function renderGapReport(i: KSeedReportInput): string {
 
   l.push(`## Qué necesitamos de ti`, ``);
   const asks: string[] = [];
-  if (!dbm) asks.push(`El PDF final de «Doing business in Mexico»: la URL pública HTTPS para registrarlo como recurso del país y, si lo autorizas, el archivo para ingerirlo como material curado por beeside y que Precision pueda orientar con su contenido.`);
+  if (!dbm) asks.push(`El PDF final de «beeside Doing Business México»: la URL pública HTTPS para registrarlo como recurso del país y, si lo autorizas, el archivo para ingerirlo como material curado por beeside y que Precision pueda orientar con su contenido.`);
   for (const k of KNOWN_EDITIONS) if (!i.documents.some((d) => d.doc.sourceId === k.sourceId && d.doc.edition === k.edition)) asks.push(`(No bloquea V1) Los archivos del ICE ${k.edition} de IMCO, cuando los tengas: entran como edición nueva de la serie y la 2025 queda como histórica.`);
   if (requiredOpen.some((x) => x.need.kind === "obligation")) asks.push(`La capa de obligaciones es la brecha mayor. Necesitamos que The Hive confirme las fuentes oficiales a curar (SAT y DOF, STPS e IMSS, Secretaría de Economía, INM, ANAM) y designe a quién de The Hive revisa las unidades curadas por área (legal, fiscal, laboral, aduanas, logística). Con eso preparamos las unidades y las ingerimos como material curado que remite a la fuente oficial.`);
   asks.push(`Nada que decidir sobre el alcance de países: V1 es México primero, no solo México. Para otro destino Precision sigue entendiendo el proyecto, usa el conocimiento aprobado que exista, reconoce el límite y registra la demanda con ese país; la demanda observada dirá qué país sembrar después.`);

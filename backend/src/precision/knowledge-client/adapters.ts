@@ -115,7 +115,7 @@ export function createDemandPort(kl: KnowledgeLayer, opts: { onError?: (err: unk
 const DESTINATION_ROLES = new Set(["operation", "sales"]);
 
 /**
- * Country guides ("Doing Business in Mexico"-style) published through the layer, offered inside the conversation ONCE, only for a country
+ * Country resources ("beeside Doing Business México") published through the layer, offered inside the conversation ONCE, only for a country
  * where the operation will happen (or sell), only when its topic is on the table (or it has no topic and the client is already at the
  * priority moment), always optional. The text never carries the destination: the client opens it through the resolver endpoint.
  */
@@ -132,8 +132,8 @@ export function createResourcesPort(kl: KnowledgeLayer): ResourcesPort {
         const r = usable.find((x) => !alreadyOffered.includes(x.id) && (!x.topic || topics.includes(x.topic)));
         if (r) {
           const text = locale === "es"
-            ? `Si quieres contexto general, tengo una guía disponible: «${r.title}». No es necesario leerla para seguir.`
-            : `If you want general context, I have a guide available: “${r.title}”. You do not need to read it to continue.`;
+            ? `Si quieres contexto general, tienes a tu disposición «${r.title}». No es necesario leerlo para seguir.`
+            : `If you want general context, “${r.title}” is available to you. You do not need to read it to continue.`;
           return { key: `res:${r.id}`, id: r.id, title: r.title, text };
         }
       }
