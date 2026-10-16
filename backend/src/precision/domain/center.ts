@@ -16,6 +16,7 @@ import { describeError } from "../../security/redact";
 import { progressOf, projectCountries } from "./categories";
 import { CONFIG_KEYS, configUrl, contactEmail, customerLink } from "./config";
 import { understandingStateOf } from "./context-reader";
+import { displayNameOf } from "./identity";
 import { ohContactAction } from "./oh-contact";
 import type { PrecisionDomainDeps } from "./deps";
 import { destinationsOf, type FaContextService } from "./fa-context";
@@ -95,6 +96,21 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
     return { block: { state: "pending_access", url: null, contact: null } };
   }
 
+  /** The project's responsible Person: the real profile name. A failure never blocks the Center (the block simply shows no name). */
+  async function identityFor(actor: Actor): Promise<CenterDto["identity"]> {
+    let name: string | null = null;
+    try {
+      const r = (await deps.db.query<{ first_name: string; last_name: string; preferred_name: string | null }>(
+        "SELECT pe.first_name, pe.last_name, pe.preferred_name FROM project pr JOIN person pe ON pe.person_id = pr.responsible_person_id WHERE pr.project_id = $1",
+        [actor.projectId],
+      )).rows[0];
+      name = displayNameOf(r);
+    } catch (error) {
+      deps.log("warn", "identity unavailable", { error: describeError(error) });
+    }
+    return { name, premium: actor.entitlement.accessMode === "FULL" };
+  }
+
   async function center(actor: Actor): Promise<CenterDto> {
     const { projectId, locale } = actor;
     const read = await fa.read(projectId);
@@ -130,6 +146,7 @@ export function createCenterService(deps: PrecisionDomainDeps, fa: FaContextServ
       addService: { available: addServiceAvailability({ paStatus: pa?.status ?? "not_started", snapshotCount: count, projectActive: writable }) },
       operationHub: hub.block,
       help: { helpCenterUrl: await customerLink(deps.db, CONFIG_KEYS.helpCenterUrl, locale) },
+      identity: await identityFor(actor),
     };
   }
 

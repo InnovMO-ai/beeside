@@ -224,7 +224,7 @@ d("Precision ↔ Knowledge Layer (PostgreSQL)", () => {
       expect(of("resources").length).toBeGreaterThan(0);
       const opened = await api.get(`/resources/${out.resource.id}`);
       expect(opened.status).toBe(200);
-      expect(opened.body).toMatchObject({ id: out.resource.id, kind: "url", ref: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf" });
+      expect(opened.body).toMatchObject({ id: out.resource.id, kind: "url", ref: "https://guides.beeside.example/doing-business-in-mexico-2026.pdf", format: "pdf" });
       expect(of("openResource").map((c) => c.args[0])).toContain(out.resource.id);
     } finally {
       await unpublish(out.ingest.status === "ingested" ? [out.ingest.document.id] : [], async () => {

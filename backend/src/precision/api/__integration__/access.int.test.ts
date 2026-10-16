@@ -140,13 +140,17 @@ describeWithDb("Precision API — session, access, errors", () => {
     it("FULL / READ_ONLY / REVOKED", async () => {
       const { projectId } = await h.newProject();
       const api = h.api(await h.session(projectId));
-      expect((await api.get("/center")).status).toBe(200);
+      const fullCenter = await api.get("/center");
+      expect(fullCenter.status).toBe(200);
+      expect(fullCenter.body.identity).toEqual({ name: "Test Person", premium: true });
       expect((await api.post("/understanding/turns", { turnKey: "turn-full-0001", text: "Open a hub in Mexico" })).status).toBe(200);
 
       h.entitlement.set({ projectId, premiumActive: false, accessMode: "READ_ONLY", readonlyUntil: "2027-01-01T00:00:00.000Z" });
       const center = await api.get("/center");
       expect(center.status).toBe(200);
       expect(center.body.access).toEqual({ mode: "READ_ONLY", readOnlyUntil: "2027-01-01T00:00:00.000Z" });
+      // identity: the real Person's name stays; the PREMIUM label only while the entitlement is FULL
+      expect(center.body.identity).toEqual({ name: "Test Person", premium: false });
       expect((await api.get("/understanding")).status).toBe(200);
       for (const [path, body] of [
         ["/understanding/turns", { turnKey: "turn-ro-0001", text: "hello there" }],

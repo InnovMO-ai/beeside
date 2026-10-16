@@ -77,6 +77,8 @@ export interface CenterDto {
   /** `contact`: the one contact action next to Operation Hub. "sherpa" only with a valid direct Sherpa channel; "beeside" when a Sherpa is assigned but none exists; null otherwise. */
   operationHub: { state: "hidden" | "pending_access" | "enter"; url: string | null; contact: OhContactDto | null };
   help: { helpCenterUrl: string | null };
+  /** Who is signed in: the project's responsible Person (real profile name, never hardcoded). `premium` only while the entitlement is FULL. */
+  identity: { name: string | null; premium: boolean };
 }
 
 // ---------------------------------------------------------------- conversation
@@ -109,7 +111,8 @@ export interface TurnDto {
 }
 
 /** A country guide the client was offered, resolved on demand. `ref` is Admin configuration (an https URL or a document reference). */
-export interface ResourceLinkDto { id: string; title: string; kind: "url" | "document"; ref: string }
+/** `format` is derived from the configured destination (an https URL whose path ends in .pdf is a PDF); nothing about the destination is hardcoded. */
+export interface ResourceLinkDto { id: string; title: string; kind: "url" | "document"; ref: string; format: "pdf" | "web" }
 
 export type ThreadSurface = "understanding" | "category" | "add_service";
 

@@ -237,6 +237,7 @@ export function createMockServer(opts: MockOptions = {}) {
       addService: { available: st.smConfirmedAt !== null },
       operationHub: operationHub(),
       help: { helpCenterUrl: st.cfg.helpUrl },
+      identity: { name: "Mariana Torres", premium: st.access.mode === "FULL" },
     };
   }
 

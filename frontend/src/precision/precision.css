@@ -374,3 +374,14 @@ a.pz-textlink { min-height: 32px; }
 @media (prefers-reduced-motion: reduce) {
   .pz-root *, .pz-root *::before, .pz-root *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+
+/* ------------------------------------------------------------ user identity (bottom-left): [initials] Person name / PREMIUM — compact, no menu in MVP1 */
+.pz-identity { display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: auto; padding: 12px 8px 4px; border-top: 1px solid var(--pz-line); }
+.pz-avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--pz-brand); color: var(--pz-on-fill); font: 600 12px/1 var(--pz-font-display); letter-spacing: .02em; }
+.pz-identity-text { display: grid; min-width: 0; line-height: 1.2; }
+.pz-identity-name { font: 600 13px/1.25 var(--pz-font-body); color: var(--pz-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-identity-tier { font: 700 10.5px/1.3 var(--pz-font-body); letter-spacing: .08em; color: var(--pz-brand); }
+@media (max-width: 899px) {
+  .pz-identity { margin-top: auto; padding: 10px 8px 6px; }
+  .pz-identity + .pz-side-foot { margin-top: 0; border-top: 0; padding-top: 4px; }
+}

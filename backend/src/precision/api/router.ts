@@ -23,6 +23,7 @@ import type { InternalStatusDto, Locale, ResourceLinkDto } from "./dto";
 import { ApiError, classifyError, errorBody } from "./errors";
 import type { KnowledgeLayer } from "../../knowledge-layer/contract";
 import { createPgFrameStore } from "../understanding/pg-store";
+import { resourceFormat } from "../domain/identity";
 
 const policy = (name: string, limit: number, windowSeconds: number): RateLimitPolicy => ({ name, limit, windowSeconds });
 export const PRECISION_RATE_LIMITS = {
@@ -181,7 +182,7 @@ export function createPrecisionRouter(deps: PrecisionDomainDeps, domain: Precisi
     const stored = await createPgFrameStore(deps.db).load(a.projectId);
     const res = stored?.frame.asked[`res:${id}`] && options.knowledge ? await options.knowledge.openResource(id) : null;
     if (!res) throw new ApiError("NOT_FOUND");
-    return { id: res.id, title: res.title, kind: "url", ref: res.url } satisfies ResourceLinkDto;
+    return { id: res.id, title: res.title, kind: "url", ref: res.url, format: resourceFormat(res.url) } satisfies ResourceLinkDto;
   });
   get("/add-service", (a) => domain.threads.addService.get(a));
   post("/add-service/turns", (a, req) => domain.threads.addService.turn(a, req.body));

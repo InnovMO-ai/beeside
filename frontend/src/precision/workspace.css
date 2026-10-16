@@ -136,3 +136,6 @@
   .pz-knows-line { flex-direction: column; align-items: flex-start; gap: 2px; }
   .pz-knows-fix { min-height: 44px; display: inline-flex; align-items: center; }
 }
+
+/* Country guide offer: title + "View guide" / "Download PDF" as quiet text links under the assistant turn */
+.pz-resource-title { font-weight: 600; color: var(--pz-ink); flex-basis: 100%; }

@@ -145,6 +145,31 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Up to two initials from a real profile name: first and last word, letters only (Unicode-aware). */
+export function initialsOf(name: string): string {
+  const words = name.split(/\s+/).map((w) => Array.from(w.replace(/[^\p{L}\p{N}]/gu, ""))[0] ?? "").filter(Boolean);
+  if (words.length === 0) return "";
+  return (words.length === 1 ? words[0]! : words[0]! + words[words.length - 1]!).toLocaleUpperCase();
+}
+
+/** Bottom-left of the workspace: [initials] Person name / PREMIUM. Real profile name; no menu in MVP1. Renders nothing without a name. */
+export function UserIdentity() {
+  const { t } = useI18n();
+  const { center } = useSession();
+  const id = center.data?.identity;
+  if (!id?.name) return null;
+  const initials = initialsOf(id.name);
+  return (
+    <div className="pz-identity" role="group" aria-label={t("identity.label")}>
+      <span className="pz-avatar" aria-hidden="true">{initials}</span>
+      <span className="pz-identity-text">
+        <span className="pz-identity-name" title={id.name}>{id.name}</span>
+        {id.premium ? <span className="pz-identity-tier">{t("identity.premium")}</span> : null}
+      </span>
+    </div>
+  );
+}
+
 /** Precision Center and Conversational Workspace: top bar + sidebar + content. Below 900px the sidebar becomes a left drawer. */
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useI18n();
@@ -181,6 +206,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button type="button" className="pz-iconbtn pz-side-close" aria-label={t("shell.menuClose")} onClick={() => { setOpen(false); opener.current?.focus(); }}><Icon name="close" size={22} /></button>
         </div>
         <Sidebar onNavigate={() => setOpen(false)} />
+        <UserIdentity />
         <div className="pz-side-foot">
           <HelpLink />
           <div className="pz-tools"><LocaleToggle /><ThemeToggle /></div>

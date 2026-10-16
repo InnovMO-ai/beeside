@@ -51,26 +51,30 @@ function TurnView({ turn, last, active, onConfirm, saved, notSaved }: { turn: Tu
   );
 }
 
-/** An optional country guide offered in context. The destination is Admin configuration, resolved only when the client opens it. */
-function ResourceLink({ offer }: { offer: { id: string; title: string } }) {
+/**
+ * An optional country guide offered in context ("Doing Business in Mexico"). The destination is Admin configuration, resolved from the API
+ * (only for a guide offered to this project, only while active); nothing is hardcoded. Never blocks the conversation: if the guide is not
+ * available the offer simply says so. A PDF gets "View guide" + "Download PDF"; a web page gets "View guide".
+ */
+export function ResourceLink({ offer }: { offer: { id: string; title: string } }) {
   const { t } = useI18n();
   const { client } = useSession();
-  const [state, setState] = useState<"idle" | "busy" | "gone">("idle");
-  const open = async () => {
-    if (state === "busy") return;
-    setState("busy");
-    try {
-      const r = await client.resource(offer.id);
-      if (r.kind === "url" && /^https:\/\//.test(r.ref)) { window.open(r.ref, "_blank", "noopener,noreferrer"); setState("idle"); }
-      else setState("gone");
-    } catch (e) {
-      setState(e instanceof ApiFailure ? "gone" : "idle");
-    }
-  };
+  const [res, setRes] = useState<{ ref: string; format: "pdf" | "web" } | "gone" | null>(null);
+  useEffect(() => {
+    let alive = true;
+    client.resource(offer.id).then(
+      (r) => { if (alive) setRes(r.kind === "url" && /^https:\/\//.test(r.ref) ? { ref: r.ref, format: r.format === "pdf" ? "pdf" : "web" } : "gone"); },
+      (e: unknown) => { if (alive && e instanceof ApiFailure) setRes("gone"); },
+    );
+    return () => { alive = false; };
+  }, [client, offer.id]);
+  if (res === "gone") return <div className="pz-resource"><span className="pz-muted" role="status">{t("ws.resource.gone")}</span></div>;
+  if (!res) return null;
   return (
-    <div className="pz-resource">
-      <button type="button" className="pz-textlink" onClick={() => void open()} aria-busy={state === "busy" || undefined}>{t("ws.resource.open", { title: offer.title })}<Icon name="arrow-right" size={14} /></button>
-      {state === "gone" ? <span className="pz-muted" role="status">{t("ws.resource.gone")}</span> : null}
+    <div className="pz-resource" role="group" aria-label={offer.title}>
+      <span className="pz-resource-title">{offer.title}</span>
+      <a className="pz-textlink" href={res.ref} target="_blank" rel="noopener noreferrer">{t("ws.resource.view")}<span className="pz-sr"> — {offer.title} {t("shell.newTab")}</span><Icon name="arrow-right" size={14} /></a>
+      {res.format === "pdf" ? <a className="pz-textlink" href={res.ref} download rel="noopener noreferrer">{t("ws.resource.download")}<span className="pz-sr"> — {offer.title}</span></a> : null}
     </div>
   );
 }
