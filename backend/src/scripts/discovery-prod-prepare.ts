@@ -23,11 +23,12 @@ export async function prepareRuntimeLogin(pool: Pool, login: string): Promise<Pr
   // Cloud SQL users created through the API arrive with cloudsqlsuperuser membership, CREATEROLE and CREATEDB, and PUBLIC may create objects in `public`:
   // the runtime login must have none of that.
   await pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cloudsqlsuperuser') AND pg_has_role(${literal(login)}, 'cloudsqlsuperuser', 'MEMBER') THEN EXECUTE 'REVOKE cloudsqlsuperuser FROM ' || quote_ident(${literal(login)}); END IF; END $$`);
-  await pool.query(`ALTER ROLE ${ident(login)} NOSUPERUSER NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS`);
+  // (NOSUPERUSER / NOREPLICATION / NOBYPASSRLS may only be changed by a true superuser, which Cloud SQL never gives us: they are verified below instead)
+  await pool.query(`ALTER ROLE ${ident(login)} NOCREATEROLE NOCREATEDB`);
   await pool.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
   await pool.query(`REVOKE CREATE ON SCHEMA public FROM ${ident(login)}`);
   const priv = async (table: string, p: string) => (await pool.query("SELECT has_table_privilege($1, $2, $3) AS ok", [login, `public.${table}`, p])).rows[0]!.ok as boolean;
-  const flags = (await pool.query("SELECT rolsuper, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname = $1", [login])).rows[0] as { rolsuper: boolean; rolcreaterole: boolean; rolcreatedb: boolean };
+  const flags = (await pool.query("SELECT rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls FROM pg_roles WHERE rolname = $1", [login])).rows[0] as { rolsuper: boolean; rolcreaterole: boolean; rolcreatedb: boolean; rolreplication: boolean; rolbypassrls: boolean };
   const checks = [
     { check: "can SELECT fa4_project", ok: await priv("fa4_project", "SELECT") },
     { check: "can INSERT fa4_project", ok: await priv("fa4_project", "INSERT") },
@@ -39,7 +40,7 @@ export async function prepareRuntimeLogin(pool: Pool, login: string): Promise<Pr
     { check: "cannot UPDATE fa4_privacy_erasure_log (append-only)", ok: !(await priv("fa4_privacy_erasure_log", "UPDATE")) },
     { check: "cannot UPDATE fa4_legal_acceptance (append-only)", ok: !(await priv("fa4_legal_acceptance", "UPDATE")) },
     { check: "cannot CREATE in schema public", ok: !(await pool.query("SELECT has_schema_privilege($1, 'public', 'CREATE') AS ok", [login])).rows[0]!.ok },
-    { check: "not superuser / cannot create roles or databases", ok: !flags.rolsuper && !flags.rolcreaterole && !flags.rolcreatedb },
+    { check: "not superuser / cannot create roles or databases / no replication / no RLS bypass", ok: !flags.rolsuper && !flags.rolcreaterole && !flags.rolcreatedb && !flags.rolreplication && !flags.rolbypassrls },
   ];
   return { login, checks };
 }
