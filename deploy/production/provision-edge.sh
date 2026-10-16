@@ -19,9 +19,10 @@ exists compute security-policies describe discovery-edge || {
 }
 echo "== backend service + URL map"
 exists compute backend-services describe discovery-web-backend --global || {
-  run g compute backend-services create discovery-web-backend --global --load-balancing-scheme EXTERNAL_MANAGED --protocol HTTPS --security-policy discovery-edge --enable-logging --logging-sample-rate 1.0
+  run g compute backend-services create discovery-web-backend --global --load-balancing-scheme EXTERNAL_MANAGED --enable-logging --logging-sample-rate 1.0
   run g compute backend-services add-backend discovery-web-backend --global --network-endpoint-group discovery-web-neg --network-endpoint-group-region "$REGION"
 }
+run g compute backend-services update discovery-web-backend --global --security-policy discovery-edge
 exists compute url-maps describe discovery-url-map || run g compute url-maps create discovery-url-map --default-service discovery-web-backend
 echo "== managed certificate + proxies + forwarding rules on the reserved IP"
 exists compute ssl-certificates describe discovery-cert --global || run g compute ssl-certificates create discovery-cert --global --domains "$HOSTNAME"
