@@ -8,6 +8,7 @@ import { deriveInherited } from "../category-inheritance";
 import { CONCEPTS, conceptById } from "../concepts";
 import { deriveMaterial } from "../category-materiality";
 import { ENTERPRISE_DIMENSIONS, ENTERPRISE_DOCUMENT_HINTS, ENTERPRISE_PROBES } from "../enterprise-services";
+import { probeState } from "../depth";
 import { PROBES, questionCtx, viewOf } from "../probes";
 import type { DiscoverySeedInput } from "../seed";
 import { Conv, runPersona, type Persona } from "./harness";
@@ -201,5 +202,73 @@ describe("Enterprise Services RAM — structure", () => {
     expect(c.frame.items["reporting.group"]).toMatchObject({ value: { frameworks: ["ifrs"], cadence: "monthly" } });
     expect(c.frame.items["scale.currencies"]).toMatchObject({ value: { invoice: ["MXN", "USD"] } });
     expect(c.critical()).toEqual([]);
+  });
+});
+
+// Source reconciliation (normalised source content, text only): minimal corrections found by contrasting the RAM with it.
+describe("Enterprise Services RAM — source reconciliation corrections", () => {
+  const BASE = "Ya constituimos nuestra entidad en México y necesitamos contabilidad, nómina y cumplimiento fiscal. Tenemos 35 empleados con nómina quincenal. ";
+
+  it("keeps the accounting system and the payroll system apart (or recognises that they are the same one)", () => {
+    const a = new Conv("es", SEED);
+    a.say(BASE + "Usamos CONTPAQi para la contabilidad y Aspel NOI para la nómina.");
+    expect(a.frame.items["accounting.systems"]).toMatchObject({ status: "known", value: { systems: ["CONTPAQi"], payroll: ["Aspel"] } });
+    expect(a.frame.items["accounting.systems"]!.display).toMatch(/Contabilidad: CONTPAQi; nómina: Aspel/);
+    const b = new Conv("es", SEED);
+    b.say(BASE + "Llevamos la contabilidad y la nómina en SAP.");
+    expect(b.frame.items["accounting.systems"]).toMatchObject({ value: { systems: ["SAP"], payroll: ["SAP"] } });
+    const d = new Conv("es", SEED);
+    d.say(BASE + "Llevamos la contabilidad en QuickBooks y la nómina en Aspel.");
+    expect(d.frame.items["accounting.systems"]).toMatchObject({ value: { systems: ["QuickBooks"], payroll: ["Aspel"] } });
+  });
+
+  it("a payroll system alone does not answer which system keeps the books", () => {
+    const c = new Conv("es", SEED);
+    c.say(BASE + "La nómina la corremos en Aspel NOI.");
+    const item = c.frame.items["accounting.systems"];
+    expect(item?.value).toMatchObject({ systems: [], payroll: ["Aspel"] });
+    expect(probeState(PROBES.find((p) => p.key === "accounting.systems")!, item, viewOf(c.frame))).toBe("partial"); // still open: which system keeps the books?
+  });
+
+  it("captures every volume figure given at once (invoices and payments), not only the first", () => {
+    const c = new Conv("es", SEED);
+    c.say(BASE + "Emitimos unas 120 facturas al mes y hacemos 200 pagos al mes.");
+    const v = String(c.frame.items["scale.volume"]?.value);
+    expect(v).toMatch(/120 facturas/);
+    expect(v).toMatch(/200 pagos/);
+  });
+
+  it("reads known discrepancies in the current books (neutral wording, no criticism of the incumbent, no conclusion)", () => {
+    const c = new Conv("es", SEED);
+    c.say(BASE + "La contabilidad actual tiene diferencias y errores en la balanza, hay que regularizar el ejercicio anterior.");
+    expect(c.frame.items["compliance.status"]).toMatchObject({ status: "known", value: { books: "behind" } });
+    expect(JSON.stringify(c.frame.items["compliance.status"])).not.toMatch(/incumpl|infraccion|sancion|multa|culp/i);
+  });
+
+  it("a natural answer that names where the foreign vendors are is understood and asked only once", () => {
+    const run = runPersona("es", SEED, {
+      opening: "Ya constituimos nuestra entidad en México y necesitamos contabilidad y administración de cuentas por pagar.",
+      answers: { "scale.foreign_vendors": "De Alemania, servicios de TI y licencias." },
+      priority: "Contabilidad.",
+    });
+    expect(run.conv.asked().filter((k) => k === "scale.foreign_vendors")).toHaveLength(1);
+    expect(run.conv.frame.items["scale.foreign_vendors"]).toMatchObject({ status: "known", value: { has: true, services: true, countries: ["DE"] } });
+  });
+
+  it("confidentiality is captured only when the client raises it, as a plain fact: no NDA flow, no catalog entry, never asked", () => {
+    const quiet = new Conv("es", SEED);
+    quiet.say(BASE);
+    expect((quiet.frame.crossCutting ?? []).map((x) => x.kind)).not.toContain("confidentiality");
+    const raised = new Conv("es", SEED);
+    raised.say(BASE + "Para este trabajo necesitamos un acuerdo de confidencialidad.");
+    expect((raised.frame.crossCutting ?? []).map((x) => x.kind)).toContain("confidentiality");
+    expect(raised.frame.needs.some((n) => n.conceptIds.some((id) => /nda|confiden/i.test(id)))).toBe(false);
+    expect(CONCEPTS.some((c) => /nda|confiden/i.test(c.id))).toBe(false);
+    expect(PROBES.some((p) => /confiden|nda/i.test(p.key))).toBe(false);
+  });
+
+  it("the document hints stay recommendations: neutral names, none requested by any probe", () => {
+    expect(ENTERPRISE_DOCUMENT_HINTS.map((d) => d.id)).toEqual(expect.arrayContaining(["trial_balance", "financial_statements", "annual_filings", "reporting_examples", "delivery_calendar", "chart_of_accounts"]));
+    for (const p of ENTERPRISE_PROBES) for (const loc of ["es", "en"] as const) expect(p.question(questionCtx(viewOf(new Conv(loc, SEED).frame), loc))).not.toMatch(/sub[ei]|adjunt|upload|attach|documento/i);
   });
 });

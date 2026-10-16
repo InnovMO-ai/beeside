@@ -110,7 +110,7 @@ export interface ConflictRecord { key: string; value: unknown; display: string; 
  * contract, a group policy...). It is a cross-cutting dimension of the Project Frame: kept with the client's own words and made available to
  * every relevant category (and to the specialist), so it is never lost because the taxonomy has no natural owner.
  */
-export type CrossKind = "existing_presence" | "partners" | "anchor_contract" | "group_policy" | "prior_registration" | "currency_flows" | "regulated_sector" | "audited_group";
+export type CrossKind = "existing_presence" | "partners" | "anchor_contract" | "group_policy" | "prior_registration" | "currency_flows" | "regulated_sector" | "audited_group" | "confidentiality";
 export interface CrossCuttingItem {
   id: string;
   kind: CrossKind;

@@ -26,6 +26,8 @@ const MARKERS: readonly Marker[] = [
     re: /\b(?:cobramos|facturamos|pagamos|pagos?|ingresos?) (?:en|a) (?:dolares|euros|moneda extranjera)|\b(?:paid|billed|invoiced) in (?:usd|dollars|euros)\b/ },
   { kind: "regulated_sector", categories: ["corporate_legal_admin", "international_trade_customs"],
     re: /\bsector regulado|requiere(?:n)? (?:una )?licencia|licencia (?:de operacion|sectorial)|regulated sector|requires? a licen[cs]e/ },
+  { kind: "confidentiality", categories: LEGAL_TAX_HR,
+    re: /\b(?:acuerdo|convenio|contrato) de confidencialidad|\bnda\b|(?:requerimos|necesitamos|exigimos|se requiere|es indispensable|firmar) (?:un |una )?(?:acuerdo de )?confidencialidad|confidentiality (?:agreement|requirement)|non-?disclosure/ },
   { kind: "audited_group", categories: ["tax_accounting_audit"],
     re: /\b(?:cotiza(?:mos)? en bolsa|somos una empresa (?:publica|listada)|auditoria (?:externa )?del grupo|sujet[oa]s? a auditoria|publicly (?:listed|traded)|group audit)\b/ },
 ];
@@ -72,5 +74,6 @@ const LABEL: Record<CrossKind, Record<Loc, string>> = {
   currency_flows: { es: "Flujos en otra moneda", en: "Foreign-currency flows" },
   regulated_sector: { es: "Sector con licencia o regulación", en: "Regulated sector" },
   audited_group: { es: "Grupo auditado o listado", en: "Audited or listed group" },
+  confidentiality: { es: "Requisito de confidencialidad", en: "Confidentiality requirement" },
 };
 export const crossKindLabel = (k: CrossKind, loc: Loc): string => LABEL[k][loc];

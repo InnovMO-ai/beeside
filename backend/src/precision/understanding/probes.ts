@@ -495,8 +495,13 @@ const BASE_PROBES: readonly ProbeDef[] = [
     applies: (v) => v.hasAny(["entity_setup", "accounting", "tax_compliance"]),
     tier: () => "material",
     extract: (ctx) => {
-      const m = new RegExp(`(${NUMBER_SOURCE})\\s*(facturas?|invoices?|transacciones|transactions|operaciones|contratos|contracts|pedidos|orders|ordenes|movimientos|pagos|payments|clientes|customers|proyectos|projects)(?:\\s+(?:al|por|a la|each|per|a|every)\\s+(mes|semana|ano|dia|trimestre|month|week|year|day|quarter))?`, "u").exec(ctx.f);
-      if (m) return mk(ctx, m[0], m[0], m[0]);
+      // every volume figure the client gives (invoices AND payments AND entries...) — one answer can size the whole workload
+      const all = [...ctx.f.matchAll(new RegExp(`(${NUMBER_SOURCE})\\s*(facturas?|invoices?|transacciones|transactions|operaciones|contratos|contracts|pedidos|orders|ordenes|movimientos|pagos|payments|asientos(?: contables)?|polizas|journal entries|clientes|customers|proyectos|projects)(?:\\s+(?:al|por|a la|each|per|a|every)\\s+(mes|semana|ano|dia|trimestre|month|week|year|day|quarter))?`, "gu"))];
+      if (all.length > 0) {
+        const parts = [...new Set(all.map((x) => x[0]))];
+        const joined = parts.join("; ");
+        return mk(ctx, parts[0]!, joined, joined);
+      }
       if (ctx.asked && ctx.f.length <= 160 && quantities(ctx.f).length > 0 && !money(ctx.f).length) return { value: ctx.text.trim(), display: ctx.text.trim().slice(0, 100), quote: ctx.text.trim().slice(0, 160) };
       return null;
     },

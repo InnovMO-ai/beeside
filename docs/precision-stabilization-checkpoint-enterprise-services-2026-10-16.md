@@ -24,7 +24,7 @@ Fecha: 2026-10-16 · Base: commit `50959ca` + cambios de este bloque (sin push, 
 
 Archivos: `understanding/enterprise-services.ts` (nuevo), `probes.ts`, `concepts.ts`, `cross-cutting.ts`, `compose.ts`, `frame.ts`, `category-inheritance.ts`.
 
-**Salvedad (no bloquea).** El archivo `F-BPS-01 Questionnarie for service proposal 2026.xlsm` no estaba accesible en las carpetas conectadas ni en el Project; la RAM se construyó a partir de la lista de dimensiones A–L de tu mensaje. Cuando lo compartas (p. ej. en el Escritorio) hago un diff final de cobertura. No hay cambios de producto previstos; solo posibles sondas adicionales.
+**Reconciliación con la fuente:** cerrada y congelada con el texto normalizado (ver `precision-enterprise-services-source-reconciliation-2026-10-16.md`); el workbook original no se usa.
 
 ## 2. Prueba de que NO se comporta como cuestionario
 
@@ -60,6 +60,5 @@ CODE → **ESTABILIZACIÓN** → **PRODUCCIÓN**. El término anterior del ciclo
 2. Contenido de la semilla inicial de KL en un bucket privado con `manifest.json` (el backend se niega a arrancar con KL vacío).
 3. Cliente OAuth Web de Google (Internal, beeside.you) + su secreto en Secret Manager + correo del primer SUPER_ADMIN.
 4. Aprobación explícita `STABILIZATION_DEPLOYMENT_APPROVAL`.
-5. *(No bloquea)* Workbook F-BPS-01 para el diff final de la RAM.
 
 ## 6. ESTABILIZACIÓN DEPLOYMENT READY: **NO** (únicamente por bloqueos externos; el código y el script están listos)
