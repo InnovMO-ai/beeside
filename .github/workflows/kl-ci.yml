@@ -51,7 +51,7 @@ jobs:
       - name: AC-10 candidate baseline for this platform (artifact only, never committed by CI)
         working-directory: backend
         run: |
-          KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
+          KL_AC10_DUMP_DIR="$RUNNER_TEMP/ac10-pdfs" KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
           cp src/kl/products/ac10-baseline.json "$RUNNER_TEMP/ac10-candidate.json"
           # second pass in normal mode: the rewritten baseline must match a fresh render, and an immediate repeat must be identical
           npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
@@ -59,7 +59,9 @@ jobs:
         if: always()
         with:
           name: ac10-linux-candidate
-          path: ${{ runner.temp }}/ac10-candidate.json
+          path: |
+            ${{ runner.temp }}/ac10-candidate.json
+            ${{ runner.temp }}/ac10-pdfs/
           if-no-files-found: ignore
 
   # Validación REAL de las imágenes (G2): construye runtime y runtime-kl-worker y ejecuta las pruebas de humo (ver scripts/kl/smoke/images.sh).

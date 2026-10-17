@@ -112,6 +112,11 @@ describeKl("R3 · generador determinista de PDF (B6, B7, AC-01, AC-10, AC-13, X1
       const arts = await renderGuidePdfs(fixtureSnapshot(), { status: "PUBLISHED", verificationId: VID, family: "lato", browser });
       const current = Object.fromEntries(arts.map((a) => [a.locale, { pdfSha256: a.pdfSha256, pages: a.pages, documentSha256: a.documentSha256 }]));
       const key = `${process.platform}-${process.arch}-chromium-${browser.version()}-lato`;
+      // Solo diagnóstico: exporta los PDF de la instantánea fija para compararlos entre plataformas (texto y posiciones).
+      if (process.env.KL_AC10_DUMP_DIR) {
+        fs.mkdirSync(process.env.KL_AC10_DUMP_DIR, { recursive: true });
+        for (const a of arts) fs.writeFileSync(path.join(process.env.KL_AC10_DUMP_DIR, `fixture-${a.locale}.pdf`), a.pdf);
+      }
       const baseline = JSON.parse(fs.existsSync(BASELINE) ? fs.readFileSync(BASELINE, "utf8") : "{}") as Record<string, unknown>;
       if (process.env.KL_UPDATE_AC10_BASELINE === "1") {
         fs.writeFileSync(BASELINE, `${JSON.stringify({ ...baseline, [key]: current }, null, 2)}\n`);
