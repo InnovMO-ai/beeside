@@ -1,0 +1,74 @@
+# G2 · Fase 6B · Habilitar el Admin API y el proveedor de identidad (IdP) en dev — opciones, requisitos, riesgos y decisores
+
+Estado: **PREPARADO. NADA SE HA EJECUTADO** (solo lecturas de código y de metadatos de GCP). Es el bloqueo **B1** del cableado de KL: sin `ADMIN_API_ENABLED=true` el backend no monta el módulo de KL, y sin un IdP nadie puede iniciar sesión (mo@beeside.you ya es `admin_user` ADMIN y KL_ADMIN, pero su identidad no está enlazada: `auth_subject` vacío).
+
+## 1. Qué es lo que realmente se habilita (alcance real)
+
+El Admin API **no es de KL**: es el **Control Center de la plataforma** (`backend/src/admin/admin-router.ts`, en `main` desde antes de KL). Encenderlo en el backend público de dev expone, tras iniciar sesión, **todo** el Control Center: proyectos y respuestas, instantáneas, premium, entregas de correo e integraciones, ejecución manual de jobs, analítica y comentarios, además de `/api/admin/kl/*`. KL solo se monta encima (`klRuntimeFromEnv` exige ese Admin API). Por eso es una decisión de **Plataforma**, no un cambio de KL.
+
+Datos útiles verificados:
+- La imagen que corre hoy (`backend-api:bc3f527…` = `main`) **ya contiene** el Admin API: habilitarlo **no requiere** una imagen de la rama KL. Se puede hacer primero y por separado (paso S2) y luego, en otro paso, cablear KL.
+- Autorización de dos capas: OIDC válido **y** fila en `admin_user` con `active` y `login_enabled`. Hoy hay 2 filas: la identidad técnica `@beeside.internal` (sin login) y `mo@beeside.you` (ADMIN). Nadie más puede entrar aunque el IdP los autentique.
+- El flujo: Authorization Code + PKCE (S256), `state`, `nonce`, token verificado localmente contra el JWKS (RS256/ES256), `iss`, `aud`, `exp`, `nonce` y **`email_verified = true`**; restricción opcional por dominio (`ADMIN_ALLOWED_EMAIL_DOMAINS`). Alcance pedido: `openid email`. Autenticación del cliente en el endpoint de token: `client_secret` en el cuerpo (`client_secret_post`).
+- Sesión: token opaco en cookie `HttpOnly`, `SameSite=Strict`, `Secure`; requiere **un único origen** para navegador y API. El frontend de dev (`beeside-dev-frontend-app`) ya tiene `API_UPSTREAM_URL` (proxy de `/api` al backend), así que el origen del Control Center es la URL del frontend: `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app`. Las escrituras exigen la cabecera `x-beeside-admin: 1` y `Origin` igual a `ADMIN_APP_ORIGIN`.
+- Organización de GCP: `beeside.you` (Google Workspace/Cloud Identity); `mo@beeside.you` es la cuenta Owner. `iap.googleapis.com` está habilitada (no se verificó si se usa). Único secreto relacionado hoy: `beeside-dev-sso-client-secret` (placeholder **sin versión**).
+
+## 2. Variables que exige el backend (`adminDepsFromEnv`)
+
+| Variable | Valor / origen |
+|---|---|
+| `ADMIN_API_ENABLED` | `true` |
+| `ADMIN_APP_ORIGIN` | `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app` (sin barra final) |
+| `ADMIN_OIDC_ISSUER` | depende del IdP (opción A: `https://accounts.google.com`, debe coincidir **exactamente** con el `issuer` del documento de descubrimiento) |
+| `ADMIN_OIDC_CLIENT_ID` | del IdP (no es secreto) |
+| `ADMIN_OIDC_CLIENT_SECRET` | **secreto** → Secret Manager (`beeside-dev-sso-client-secret`, hoy sin versión) |
+| `ADMIN_OIDC_REDIRECT_URI` | `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/auth/callback` (a registrar en el IdP; pasa por el proxy del frontend) |
+| `ADMIN_SESSION_SECRET` | **secreto** nuevo ≥ 32 caracteres → Secret Manager (p. ej. `beeside-dev-admin-session-secret`, aleatorio) |
+| `ADMIN_ALLOWED_EMAIL_DOMAINS` | `beeside.you` (recomendado) |
+| ya presentes | `DATABASE_URL`, `APP_BASE_URL`, `NODE_ENV`, `SECURITY_HASH_SECRET`, `TRUST_PROXY_HOPS`, `ALLOWED_ORIGINS` |
+
+## 3. Opciones de IdP
+
+| | Opción | Qué hace falta | Pros | Contras |
+|---|---|---|---|---|
+| **A** | **Google (Workspace `beeside.you`) como proveedor OIDC** — *recomendada para dev* | Crear un **cliente OAuth 2.0 «Aplicación web»** en la consola de Google Cloud (APIs y servicios → Credenciales) con pantalla de consentimiento **Interna** a la organización y la URI de redireccionamiento anterior; guardar el *client secret* en Secret Manager. La creación del cliente OAuth **es manual en la consola** (no hay Terraform/`gcloud` soportado para clientes OAuth web genéricos) | Sin costo ni servicio nuevo; el correo del titular ya es una cuenta Google verificada; cumple lo que valida el código (discovery, `email_verified`, RS256, PKCE); restringible por dominio | Acopla el Control Center a Google; dev/prod deberían usar clientes distintos; 2FA/ política de sesión las gobierna Workspace, no la plataforma |
+| **B** | IdP corporativo distinto (Okta/Entra ID/Auth0…) | Alta y configuración en ese proveedor, DNS/redirects, costo y responsable | Desacopla, SSO empresarial | Más tiempo, costo y un tercero; **no hay decisión tomada** (`docs/deployment/README.md` §4) |
+| **C** | Proveedor OIDC local de desarrollo (`dev-oidc-provider.ts`) | Nada en la nube; corre en `127.0.0.1` | Sirve para ejercitar el flujo y KL Admin **localmente**, sin exponer nada | **No** se despliega nunca (se niega en producción, sin almacén de usuarios); no resuelve el uso en Cloud Run. Para usarlo con datos reales de dev habría que apuntar un backend local a las dos bases por proxy (escribe sesiones en la base principal de dev) |
+
+Recomendación: **A para dev**, con un cliente OAuth exclusivo de dev; B queda como decisión de Plataforma para staging/producción (no bloquear KL por ello). C solo como prueba local previa si se quiere verificar KL Admin antes de tocar la nube.
+
+## 4. Secuencia propuesta (cada paso requiere autorización expresa)
+
+| # | Paso | Quién | Cambia |
+|---|---|---|---|
+| S0 | Decisiones: IdP (A/B), aceptar la exposición del Control Center completo en la URL pública de dev, dominio permitido | **PO/Plataforma** | — |
+| S1 | Crear el cliente OAuth (consola) y registrar la URI de redireccionamiento; crear versiones de `beeside-dev-sso-client-secret` (secreto del cliente) y de `beeside-dev-admin-session-secret` (aleatorio); conceder `secretAccessor` por secreto a la cuenta del backend | Titular de la consola (Owner) + operador | Credenciales OAuth del proyecto; 2 secretos (el segundo nuevo); IAM por secreto |
+| S2 | **Habilitar el Admin API sobre la imagen actual de `main`** (sin KL): `gcloud run services update beeside-dev-backend-api --update-secrets ADMIN_OIDC_CLIENT_SECRET=beeside-dev-sso-client-secret:latest,ADMIN_SESSION_SECRET=beeside-dev-admin-session-secret:latest --update-env-vars ADMIN_API_ENABLED=true,ADMIN_APP_ORIGIN=…,ADMIN_OIDC_ISSUER=…,ADMIN_OIDC_CLIENT_ID=…,ADMIN_OIDC_REDIRECT_URI=…,ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`. Guardar antes el nombre de la revisión actual (`beeside-dev-backend-api-00007-gtk`) | Operador | Una revisión nueva del servicio compartido (misma imagen) |
+| S3 | **Verificación**: `/health` y `/health/ready` 200; `GET /api/admin/me` sin sesión → 401; abrir `…/admin` y entrar con `mo@beeside.you` (la persona misma, en su navegador); comprobar `auth_subject` enlazado, `admin_session` creada y `admin_audit_event` de inicio de sesión; un correo de otro dominio o sin `admin_user` es rechazado | PO (titular) + operador | Filas de sesión/auditoría en la base principal |
+| S4 | **Cableado de KL (Fase 6B original)**: cambiar a `kl-backend:<sha>` y añadir `beeside-dev-kl-db`, `KL_DB_URL_APP/READER` y `PRECISION_KNOWLEDGE_PROVIDER=off`, según `G2_FASE6_BOOTSTRAP_Y_CABLEADO.md` §B; resolver antes los topes de conexión (9 vs 8) y la deriva del módulo | Operador | Otra revisión del servicio compartido |
+| S5 | Verificar KL Admin con `mo@beeside.you` (KL_ADMIN) y que la ruta pública de ediciones responde `unknown` | PO + operador | — |
+
+**Rollback (S2/S4):** `gcloud run services update-traffic beeside-dev-backend-api --to-revisions beeside-dev-backend-api-00007-gtk=100` devuelve el tráfico a la revisión previa de inmediato; después, `--remove-env-vars`/`--remove-secrets` de lo añadido. Si la revisión nueva no arranca (variable faltante), Cloud Run no le envía tráfico. Retirar el acceso: borrar el cliente OAuth y las versiones de secreto; `admin_user.login_enabled=false` bloquea al usuario sin tocar el IdP.
+
+## 5. Riesgos
+
+| Riesgo | Detalle / mitigación |
+|---|---|
+| **Superficie pública mayor** | El Control Center completo queda alcanzable en una URL pública (`--no-invoker-iam-check`). Capas: OIDC + dominio + `admin_user` (solo 1 humano) + cookie `Strict/Secure` + cabecera/origen en escrituras + límites de tasa. Datos de dev. Mitigar con `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you` y revisar `admin_user` antes de S2 |
+| El emisor no coincide | El código exige `issuer` configurado == `issuer` del descubrimiento. Con Google: `https://accounts.google.com` exacto; un error deja el inicio de sesión en «unavailable», sin efecto de seguridad |
+| Redirect URI mal registrada | Falla el callback (Google lo rechaza); sin daño |
+| Cuenta equivocada enlazada | La identidad se **enlaza en el primer inicio de sesión** (`auth_subject`). Debe hacerla el titular real de `mo@beeside.you`; una vez enlazada, un `sub` distinto no entra. No simular sesiones |
+| Secreto de cliente/sesión | Solo en Secret Manager con acceso por secreto; el valor no debe pasar por chat, commits ni logs |
+| Servicio compartido | Cada cambio crea una revisión de `beeside-dev-backend-api` (Discovery/Precision/FA4 usan ese backend o comparten identidad). Rollback inmediato; ventanas cortas |
+| Deriva de Terraform | `modules/cloud-run` ignora deriva de `env`/`image` pero no de secretos montados ni de volúmenes; hoy dev se despliega con `gcloud`, no `apply`. Registrar el cambio y, si Plataforma quiere gestionarlo en Terraform, incorporar las variables al módulo (cambio compartido a aprobar) |
+| Segundo administrador | `padmin@beeside.you` sigue **sin aprovisionar** y sin usarse para doble intervención hasta confirmar su titular individual y su autenticación |
+| Producción | Nada de esto define producción: allí no hay script de aprovisionamiento; los usuarios los crea un ADMIN desde el Control Center con el IdP corporativo elegido |
+
+## 6. Quién decide
+- **PO / Plataforma (Mike, según los documentos de despliegue):** IdP (A/B), aceptar la exposición del Control Center en dev, dominio permitido, y la creación del cliente OAuth (requiere un Owner de la consola).
+- **KL (yo):** solo S4–S5 (cableado y verificación de KL) cuando S1–S3 estén cumplidos; preparo comandos y verificaciones, no decido el IdP.
+
+## 7. Qué necesito para avanzar
+1. Elegir A, B o C.
+2. Si A: que un Owner cree el cliente OAuth «Aplicación web» (consentimiento Interno) con la redirect URI de la sección 2 y entregue **solo el client id** por chat; el secreto lo coloca directamente en `beeside-dev-sso-client-secret` (yo puedo dejar listo el comando `gcloud secrets versions add … --data-file=-` para que lo ejecute él/ella).
+3. Autorización expresa de S1 (parte de secretos/IAM), S2 y S3; S4–S5 después.
