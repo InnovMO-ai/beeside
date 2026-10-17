@@ -202,3 +202,19 @@ Solo después de que se despliegue la corrección (X o Y) y se verifique; con la
 - `beeside-dev-backend-api` actualizado a esa imagen conservando las variables y secretos de S2: revisión **`beeside-dev-backend-api-00009-cm2`** (100 % del tráfico); **rollback** disponible a `00008-l7p` (imagen `main` con Admin API) o `00007-gtk` (sin Admin API).
 - Verificación: `/health` y `/health/ready` 200; `/api/admin/me` sin sesión 401; `/api/admin/auth/login` → Google con `client_id` y `redirect_uri` correctos y PKCE S256; **la cookie de estado ahora se emite `SameSite=Lax`** (`Path=/api/admin/auth; HttpOnly; Secure; Max-Age=600`). KL sigue **inerte** (sin `KL_DB_URL_*`): la ruta pública de ediciones y `/api/admin/kl/*` no están montadas/operativas. Los demás servicios no cambiaron.
 - Pendiente: que el titular repita el inicio de sesión (S3) y verificación posterior en solo lectura (`auth_subject`, sesión, auditoría).
+
+---
+
+## 11. Pantalla en blanco en Analytics (2026-10-17) · defecto del frontend del Control Center, NO de KL ni de la cookie
+
+**Reporte del titular:** en *Analytics*, al pulsar *Journey health*, *Friction* u *Operational metrics* la pantalla se queda en blanco; *User feedback* no falla.
+
+**Evidencia (solo lectura):** los registros del backend muestran que `/api/admin/analytics/journey-health`, `/friction` y `/operations` **nunca se solicitaron** (solo `funnel` y `feedback`, todos 200). El fallo ocurre al **pintar**, en el navegador, antes de pedir los datos.
+
+**Causa raíz** (`frontend/src/admin/AnalyticsView.tsx`): al cambiar de pestaña, la primera renderización usa `tab` nuevo pero **`data` todavía del tab anterior**; el `useEffect` que limpia `data` corre *después* de ese render. Las pestañas *Journey health* y *Friction* hacen `Object.entries(data.outcomes / data.signals …)` y *Operational metrics* lee `data.retention.purgedInRange`, y con la forma de otra pestaña esos campos son `undefined` → `TypeError`. Como no hay *error boundary*, React desmonta todo y queda la página en blanco. *User feedback* sobrevive porque usa campos tolerantes (`?? []`, `num(undefined)`). Pasa con **cualquier** dato, no solo con el de dev. Recargar `/admin` recupera la pantalla (la sesión sigue).
+
+**Reproducción:** una prueba de regresión nueva reproduce los tres errores exactos (`Cannot convert undefined or null to object` y `reading 'purgedInRange'`) contra el componente sin corregir.
+
+**Corrección propuesta (NO aplicada):** `docs/knowledge-layer/kl-1.0-code/patches/analytics-tab-switch-blank-screen.patch`. El componente guarda a qué pestaña pertenece el dato cargado y solo lo usa si coincide con la pestaña actual (`data = loadedTab === tab ? loaded : null`). Incluye `AnalyticsView.test.tsx` (5 pruebas: Funnel → Journey health / Friction / Operational metrics / User feedback y vuelta a Funnel). Validado en una copia temporal: **12/12 pruebas del frontend de admin**, `tsc` y `eslint` limpios.
+
+**Por qué no la apliqué:** es código del frontend de la plataforma (fuera de KL) y la imagen del frontend **no la construye ni la despliega el pipeline de KL** (`kl-publish-images` solo publica el backend); desplegarla implica construir y desplegar `beeside-dev-frontend-app`, un servicio compartido. Camino recomendado: PR a `main` para el responsable de Plataforma (el defecto afecta a producción) o, si el PO lo autoriza como excepción, un despliegue puntual del frontend de dev. Mientras tanto, evitar esas tres pestañas (o recargar `/admin` tras el fallo).

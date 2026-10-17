@@ -1,0 +1,89 @@
+diff --git a/frontend/src/admin/AnalyticsView.test.tsx b/frontend/src/admin/AnalyticsView.test.tsx
+new file mode 100644
+index 0000000..1ace00a
+--- /dev/null
++++ b/frontend/src/admin/AnalyticsView.test.tsx
+@@ -0,0 +1,46 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
++import "@testing-library/jest-dom/vitest";
++import { jsonResponse } from "../fa/test-fixtures";
++import { AnalyticsView } from "./AnalyticsView";
++
++const FUNNEL = { anonymous: { entered: 15, started: 9 }, projects: { identity_completed: 3, finish_later: 1, resumed: 1, completed: 2, snapshot_viewed: 2, preview_room_clicked: 1, premium_interest: 0, premium_requested: 0, premium_activated: 0, feedback_submitted: 1 }, rates: { start_rate: 0.6 } };
++const BY_VIEW: Record<string, unknown> = {
++  funnel: FUNNEL,
++  "journey-health": { outcomes: { completed: 2, completionRate: 0.5 }, timing: { medianMinutes: 12 }, resume: { resumed: 1, resumeRate: 0.25 }, extensions: [], lifecycle: { active: 3 } },
++  friction: { dropOffByStep: [], questions: [], steps: [], signals: { notSureAnswers: 0 } },
++  feedback: { responses: 1, completed: 2, responseRate: 0.5, average: 4, distribution: [] },
++  operations: { email: [], jobs: [], integrations: [], rateLimits: [], retention: { purgedInRange: 0, dueForPurge: 0, heldByPendingPremiumRequest: 0, oldestPendingPremiumRequestDays: 0 } },
++};
++
++afterEach(() => {
++  cleanup();
++  vi.unstubAllGlobals();
++});
++
++describe("Analytics · cambio de pestaña", () => {
++  it.each([["Journey health", "Outcomes"], ["Friction", "Signals"], ["Operational metrics", "Retention"], ["User feedback", "Distribution"]])(
++    "al pasar de Funnel a %s no se rompe con los datos de la pestaña anterior (pantalla en blanco)",
++    async (label, heading) => {
++      vi.stubGlobal("fetch", vi.fn(async (url: string) => {
++        const view = Object.keys(BY_VIEW).find((v) => url.includes(`/analytics/${v}`) && !url.includes("/comments"));
++        if (url.includes("/comments")) return jsonResponse({ comments: [] });
++        return jsonResponse(BY_VIEW[view as string] ?? {});
++      }));
++      render(<AnalyticsView />);
++      await screen.findByText("Entered (anonymous)");
++      fireEvent.click(screen.getByRole("button", { name: label }));
++      expect(await screen.findByText(heading)).toBeInTheDocument();
++    },
++  );
++
++  it("de User feedback de vuelta a Funnel tampoco se rompe", async () => {
++    vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.includes("/comments") ? jsonResponse({ comments: [] }) : jsonResponse(url.includes("/feedback") ? BY_VIEW.feedback : BY_VIEW.funnel))));
++    render(<AnalyticsView />);
++    await screen.findByText("Entered (anonymous)");
++    fireEvent.click(screen.getByRole("button", { name: "User feedback" }));
++    await screen.findByText("Distribution");
++    fireEvent.click(screen.getByRole("button", { name: "Funnel" }));
++    await waitFor(() => expect(screen.getByText("Entered (anonymous)")).toBeInTheDocument());
++  });
++});
+diff --git a/frontend/src/admin/AnalyticsView.tsx b/frontend/src/admin/AnalyticsView.tsx
+index 6ab3b14..4533d4a 100644
+--- a/frontend/src/admin/AnalyticsView.tsx
++++ b/frontend/src/admin/AnalyticsView.tsx
+@@ -77,7 +77,11 @@ export function AnalyticsView() {
+   const [from, setFrom] = useState("");
+   const [to, setTo] = useState("");
+   const [segment, setSegment] = useState<Record<string, string>>({});
+-  const [data, setData] = useState<Json | null>(null);
++  const [loaded, setLoaded] = useState<Json | null>(null);
++  // Which tab the loaded data belongs to. The fetch effect clears `loaded` only AFTER the render that follows a tab change, so that first
++  // render would otherwise draw the new tab with the previous tab's payload (different shape) and throw, leaving a blank page.
++  const [loadedTab, setLoadedTab] = useState<Tab | null>(null);
++  const data = loadedTab === tab ? loaded : null;
+   const [comments, setComments] = useState<Json[] | null>(null);
+   const [error, setError] = useState<string | null>(null);
+ 
+@@ -93,12 +97,17 @@ export function AnalyticsView() {
+   useEffect(() => {
+     let active = true;
+     setError(null);
+-    setData(null);
++    setLoaded(null);
++    setLoadedTab(null);
+     setComments(null);
+     const search = query();
+     adminApi
+       .analytics(tab, search)
+-      .then((result) => active && setData(result))
++      .then((result) => {
++        if (!active) return;
++        setLoaded(result);
++        setLoadedTab(tab);
++      })
+       .catch((e: unknown) => active && setError(e instanceof AdminApiError ? `${e.code}${e.detail ? `: ${e.detail}` : ""}` : "Something went wrong."));
+     if (tab === "feedback") {
+       adminApi
