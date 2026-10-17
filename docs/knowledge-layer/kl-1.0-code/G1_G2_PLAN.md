@@ -326,3 +326,25 @@ Primer push (`e1262db`): `kl-preflight` ✅; `kl-images` ✅ (18 comprobaciones)
 
 ### Comparativo contenedor ↔ host: RESULTADO (CI run `39032673173`, commit `b873e33`)
 Documento de referencia del humo, clave `linux-x64-chromium-153.0.8010.12-lato`: **host (kl-tests) `62b5a1508ebb5db94f1fa61411579f5b3402152738963b9cb0a3aa039962f942`, 3 páginas; contenedor `runtime-kl-worker` (node:20-slim fijada por digest, `--network none`) la misma huella y 3 páginas. Sin desviación.** Se registró la clave Linux en `ac10-smoke-baseline.json` y `kl-ci.yml` pasa a exigir la coincidencia (`KL_SMOKE_REQUIRE_BASELINE=1`). Alcance: documento sintético mínimo (no la edición completa de la instantánea fija, que no corre en el contenedor porque el código de prueba no viaja en la imagen). Cierra el pendiente (5) de la lista de G2; quedan (1), (2), (3) y la migración de Node 20.
+
+---
+
+## 12. Fase 5 EJECUTADA (2026-10-17) · estado: HECHA
+
+Autorizada por el PO (con congelación de KL-0001…0005 en dev-kl confirmada). Cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`. Commit base de las imágenes: `7af37659a4b68285c36d8498b8ed9d7151f83115` (CI en verde sobre ese commit).
+
+| Subfase | Resultado |
+|---|---|
+| Precondiciones | gcloud válido; gate OK; `terraform plan` sin deriva; `beeside-dev-kl-db` RUNNABLE con usuarios = cinco `kl_*` + `postgres` y solo `beeside_kl` |
+| **5.1** publicación | Etiqueta `kl-publish-dev-7af3765` → workflow `KL publish images` (run `39036612441`) ✅: 19 controles de humo y publicación de `kl-backend:7af37659…` (`sha256:ff0d6646e1310648351a428106e321fc887237ec6e6e6dfd1bfae9064d5104ae`) y `kl-worker:7af37659…` (`sha256:37957dc614794099f6c7787e52ca47e71bccc3fdab2542aa04c66e30bc8e6be7`); los jobs `beeside-dev-kl-migrate` y `beeside-dev-kl-worker` apuntan a ellas. `backend-api`/`frontend-app` y los servicios en ejecución no cambiaron. **El worker no se ejecutó.** |
+| **5.2** exportación previa | `gs://beeside-dev-508220-beeside-dev-kl-exports/pre-migration/pre-KL-0001-0005-7af3765.sql.gz` (452 bytes; base vacía): primera prueba real del permiso de escritura de Cloud SQL en el bucket |
+| **5.3** ensayo en seco | Ejecución `beeside-dev-kl-migrate-6qgw9` ✅: conectó como `kl_owner` a `beeside_kl` por `/cloudsql`; `applied: []`, 10 pendientes |
+| **5.4** migración | Ejecución `beeside-dev-kl-migrate-vw5w7` ✅: **`applied` = las 10 migraciones** (KL-0001…0005 y sus `_integrity`), `pending: []` |
+| **5.5** verificación | Diario con 10 filas y huellas idénticas a las esperadas; `kl.agents_enabled = false` y `kl.r10_claims_enabled = false`; 51 tablas, 28 vistas, 116 funciones en `kl`; **ninguna tabla concedida directamente** a `kl_app`, `kl_reader_precision`, `kl_agent`, `kl_knowledge`; CONNECT verdadero para los cinco roles; sin uso de `public` ni objetos en `public`; los cuatro roles de aplicación se conectan a `beeside_kl` |
+| **5.6** E1–E15 (condición G1) | Evidencia: `evidence/G1-post-KL0001-2026-10-17/`. Con un rol simple de prueba: **35 intentos de escalada, los 35 fallan**; E7 todo `false`; E8 = 0; E9 solo `kl_owner` y `pg_database_owner` (ya con 51 tablas, 116 funciones y tipos); E10 los cinco `kl_*` reciben `permission denied` al leer `pg_authid`; E14 = 0; miembros de `cloudsqlsuperuser`: solo `postgres` y roles internos de Cloud SQL. Ventana de `g1_admin` (miembro temporal de `cloudsqlsuperuser`): segundos, eliminado; `g1_probe` eliminado; usuarios finales = cinco `kl_*` + `postgres` |
+
+**Incidencias.** (1) *Defecto del script de evidencia, no del producto:* la primera ejecución de `scripts/kl/g1/run-e.sh` marcó E10 como «PERMITIDO» porque con `set -o pipefail` el cierre anticipado de `grep -q` devolvía SIGPIPE; una comprobación directa mostró `permission denied` en los cinco roles. Se corrigió el script, se repitió **toda** la ejecución y la evidencia archivada es la de la repetición limpia. (2) *Deriva menor de Terraform:* `gcloud run jobs update` fija `client`/`client_version` en los jobs; se añadieron a `ignore_changes` del módulo (no se aplicó nada) y el plan volvió a 0 cambios. (3) La etiqueta de las imágenes usa el SHA completo (`github.sha`).
+
+**G1:** las condiciones de la aprobación condicionada **se cumplen para KL-0001…0005** (E1–E15 repetidos con objetos y ACL finales; miembros de `cloudsqlsuperuser` correctos). La condición sigue vigente para cualquier migración posterior que cambie privilegios, y el control de «no crear usuarios por API en esta instancia» es continuo.
+
+**Pendientes reales (fuera de la Fase 5):** `kl-bootstrap` (primer KL_ADMIN; requiere la credencial de lectura de la plataforma, decisión de Plataforma); cableado del backend (`KL_DB_URL_APP`/`KL_DB_URL_READER` en `beeside-dev-backend-api`; hoy la ruta de KL no está montada en dev); ejecución del `kl-worker` con agentes apagados; Cloud Scheduler (D9); X24 (restauración: necesita una base nueva con dueño `kl_owner`, lo que exige un aprovisionador temporal), X26/X27; adaptador GCS (D8); migración de Node 20; SA propia del backend (D3); AC-13 (revisión manual con lector de pantalla).

@@ -266,7 +266,8 @@ resource "google_cloud_run_v2_job" "migrate" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].template[0].containers[0].image]
+    # image and the gcloud client markers are set by `gcloud run jobs update` (kl-publish-images workflow / operator), not by Terraform
+    ignore_changes = [template[0].template[0].containers[0].image, client, client_version]
   }
 }
 
@@ -353,7 +354,8 @@ resource "google_cloud_run_v2_job" "worker" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].template[0].containers[0].image]
+    # image and the gcloud client markers are set by `gcloud run jobs update` (kl-publish-images workflow / operator), not by Terraform
+    ignore_changes = [template[0].template[0].containers[0].image, client, client_version]
   }
 }
 
