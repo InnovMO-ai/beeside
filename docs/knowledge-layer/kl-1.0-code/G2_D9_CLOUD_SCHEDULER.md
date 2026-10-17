@@ -67,3 +67,19 @@ Autorización expresa de: (1) `apply` (habilita la API y crea los 2 schedules **
 - **A.** `resume export` y, en cuanto se confirme el objeto y la identidad en los registros, `pause export` (ventana de unos minutos; el siguiente disparo programado sería a las 08:30 UTC, no inmediato). Igual con `worker`, cuyo tick de 5 min dispararía a lo sumo 1–2 ciclos antes de pausarlo.
 - **B.** Fixtures de prueba **fuera de Terraform**: dos schedules temporales habilitados con un cron que casi nunca dispara (p. ej. `0 0 29 2 *`), `run-now`, verificación y borrado. Es lo que más se acerca a «probar sin reanudar», pero crea y destruye recursos que no están en el plan aprobado.
 - **C.** No probar ahora: activar con `resume` cuando el PO decida y verificar con las primeras ejecuciones reales (`retriedCount`, objeto en `daily/`, identidad en los registros); si fallara, `pause`.
+
+---
+
+## Prueba A ejecutada (2026-10-17, 17:27–17:31 UTC) · autorizada por el PO · ambos schedules vuelven a `PAUSED`
+
+**Exportación (`beeside-dev-kl-daily-export`)** — `resume` → ejecución forzada → `pause` inmediato:
+- Intento del scheduler `AttemptFinished` **HTTP 200** (17:27:42). Objeto creado: `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz`, **59.465 bytes**, versión `#1792258059416087` (el bucket está versionado).
+- Operación de Cloud SQL `EXPORT` **DONE** (17:27:38–17:27:49), **emitida por `beeside-dev-kl-scheduler@beeside-dev-508220.iam.gserviceaccount.com`** (campo `user` del registro de la operación). Quedan probados empíricamente el permiso `cloudsql.instances.export` del rol `klExportOnlyDev` y su **condición IAM** (`resource.name == projects/…/instances/beeside-dev-kl-db`).
+- El filtro de Cloud Logging de la auditoría de administración no devolvió entradas (retraso o nombre de método distinto); la identidad queda demostrada por el registro de la operación.
+
+**Worker (`beeside-dev-kl-worker-tick`)** — `resume` → ejecución forzada + un tick natural → `pause`:
+- Dos ejecuciones nuevas del job, **ambas con éxito en el primer intento**: `beeside-dev-kl-worker-lbc5z` (17:28:53, forzada) y `beeside-dev-kl-worker-zdxg9` (17:30:05, **tick natural del cron `*/5`**). `succeededCount = 1`, **sin `failedCount` ni `retriedCount`**, un único intento (`attempt 0`, `exit(0)`), sin `exit(1)`; ambos ciclos `{"claimed":0,"failed":0,"message":"kl-worker cycle"}` (agentes apagados). Los intentos del scheduler terminaron con **HTTP 200**.
+- Frente a la ejecución del 16:47 (primer intento fallido y reintento), **tres ejecuciones consecutivas** (16:59, 17:28 y 17:30) sin fallos con el timeout de 10 s: refuerza, sin demostrar estadísticamente, que la corrección funciona.
+- **El worker estuvo activo ~2 min** (resume 17:28:45 → pausa tras la verificación). El siguiente tick (17:35) no se ejecutó.
+
+**Estado final:** ambos schedules `PAUSED`; `terraform plan` con D9 activo sin deriva. Falta (decisión del PO) `resume` para la operación periódica real. Pendiente menor: la identidad del scheduler en las ejecuciones del worker se infiere (único invocador configurado y HTTP 200); la de la exportación está demostrada.
