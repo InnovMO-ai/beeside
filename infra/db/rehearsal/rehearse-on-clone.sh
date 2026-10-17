@@ -367,12 +367,46 @@ if [ -n "${PRIV_T:-}" ]; then
   eq "$(brt "select status from fa4_project where project_id='$PRIV_T'")" ANONYMIZED "after COMMIT the Precision runtime sees it as ANONYMIZED"
   eq "$(bdr "select count(*) from fa4_project where md5(email)='$PRIV_ORIG_MD5'")" 0 "the original address no longer resolves to any project (an anonymised address is not resumable by email)"
   eq "$(bm "select count(*) from fa4_access_token where project_id='$PRIV_T' and revoked_at is null")" 0 "no live session or resume token remains"
-  expect_fail_like "after COMMIT the results are append-only again (no bypass left behind)" "append-only" bm "update fa4_result set model='{}'::jsonb where project_id='$PRIV_T'"
+  expect_fail_like "after COMMIT the results stay closed (append-only guard + erasure tombstone; no bypass left behind)" "append-only|only the scrubbed form" bm "update fa4_result set model='{}'::jsonb where project_id='$PRIV_T'"
   expect_fail_like "after COMMIT the erasure log is append-only" "append-only" bm "delete from fa4_privacy_erasure_log where project_id='$PRIV_T'"
   expect_ok "a second erasure of the same project is harmless" bm "select fa4_anonymize_project('$PRIV_T','rehearsal-clone','second run')"
   eq "$(bm "select status||'/'||(answers='{}'::jsonb)::text from fa4_project where project_id='$PRIV_T'")" "ANONYMIZED/true" "the second run keeps it anonymised"
 fi
 eq "$(bm "select count(*) from fa4_project where status='ANONYMIZED'")" 1 "exactly one project is anonymised in $NEWDB"
+crit_gate "S6b persisted anonymisation (no DROP while the persisted erasure is not as specified)"
+
+# ---- F2: the erasure must survive the transition (propagation to the legacy side, rollback without reappearance) ------------------------------------------------------------
+echo "== S6c  F2: an erasure committed in $NEWDB must reach $LEGDB before a rollback, and the rollback must not bring the personal data back"
+identity_gate "S6c erasure propagation (writes into $LEGDB, through its own migrator)"
+SECTION="S6c erasure propagation"
+recon(){ env ERASURE_SIDE_A_URL=$SRC ERASURE_SIDE_B_URL=$DST "$@" bash -c "cd $B && node dist/scripts/domain-erasure-reconcile.js"; }
+gsync(){ env SYNC_SOURCE_URL=$1 SYNC_TARGET_URL=$2 DOMAIN_SYNC_APPROVED=yes bash -c "cd $B && node dist/scripts/domain-data-sync.js"; }
+if [ -n "${PRIV_T:-}" ]; then
+  eq "$(dm "select (status<>'ANONYMIZED')::text from fa4_project where project_id='$PRIV_T'")" true "before propagation legacy still holds the project that was erased in $NEWDB (the rollback target is stale)"
+  NLEG=$(dm "select count(*) from fa4_project")
+  gsync $DST $SRC >"$EVID/.s6c1" 2>&1; eq "$?" 3 "FAIL SAFE: the rollback replay is refused by the privacy gate while the two sides disagree (exit 3)"
+  eq "$(dm "select (status<>'ANONYMIZED')::text from fa4_project where project_id='$PRIV_T'")" true "the refused replay wrote nothing into legacy"
+  eq "$(dm "select count(*) from fa4_project")" "$NLEG" "legacy project count unchanged"
+  recon DRY_RUN=yes >"$EVID/.s6c2" 2>&1; eq "$?" 2 "the reconciliation dry run reports the disagreement (exit 2) and writes nothing"
+  eq "$(dm "select (status<>'ANONYMIZED')::text from fa4_project where project_id='$PRIV_T'")" true "the dry run applied nothing"
+  recon ERASURE_RECONCILE_APPROVED=yes >"$EVID/.s6c3" 2>&1; eq "$?" 0 "the erasure is applied on legacy by the legacy migrator"
+  eq "$(dm "select status from fa4_project where project_id='$PRIV_T'")" ANONYMIZED "legacy: the project is ANONYMIZED"
+  eq "$(dm "select (email like 'anonymized+%@invalid.invalid' and answers='{}'::jsonb)::text from fa4_project where project_id='$PRIV_T'")" true "legacy: e-mail and answers are scrubbed"
+  eq "$(dm "select count(*) from fa4_result where project_id='$PRIV_T' and model<>'{\"anonymized\": true}'::jsonb")" 0 "legacy: no sealed result keeps the model"
+  eq "$(dm "select count(*) from fa4_privacy_erasure_log where project_id='$PRIV_T' and reason like 'propagated of erasure %'")" 1 "evidence: ONE new legacy log row naming its origin"
+  gsync $DST $SRC >"$EVID/.s6c4" 2>&1; eq "$?" 0 "the rollback replay now succeeds"
+  eq "$(dm "select status from fa4_project where project_id='$PRIV_T'")" ANONYMIZED "NO REAPPEARANCE: legacy keeps the project anonymised after the replay"
+  eq "$(sqlu discovery_runtime "$LEGRT" $LEGDB "select (email like 'anonymized+%@invalid.invalid')::text from fa4_project where project_id='$PRIV_T'")" true "the legacy application sees no personal data"
+  gsync $SRC $DST >"$EVID/.s6c5" 2>&1; eq "$?" 0 "re-cutover (forward copy) succeeds"
+  eq "$(bm "select status from fa4_project where project_id='$PRIV_T'")" ANONYMIZED "NO REAPPEARANCE in $NEWDB after the forward copy"
+  eq "$(bm "select count(*) from fa4_privacy_erasure_log")" "$(dm "select count(*) from fa4_privacy_erasure_log")" "both erasure logs hold the same history"
+  expect_fail_like "database-level backstop (0053): nobody can put personal data back into the erased project in $NEWDB" "cannot receive personal data" bm "update fa4_project set email='back@example.invalid' where project_id='$PRIV_T'"
+  IPP=$(bm "select project_id from fa4_project where status='IN_PROGRESS' order by project_id limit 1")
+  bm "select fa4_anonymize_project('$IPP','rehearsal-clone','in-progress project erased')" >/dev/null
+  expect_fail_like "tombstone: the Discovery runtime edits in-progress projects but NOT an erased one" "cannot receive personal data" bdr "update fa4_project set answers='{\"x\":1}', updated_at=now() where project_id='$IPP'"
+  expect_fail_like "tombstone: an erased project cannot be reopened" "cannot receive personal data" bdr "update fa4_project set status='IN_PROGRESS' where project_id='$IPP'"
+fi
+crit_gate "S6c erasure propagation (no DROP while an erasure is not consistent across the sides)"
 
 # ---- rollback drill of the provisioning itself, then repeat from zero -----------------------------------------------------------------------------------------------
 echo "== S7  rollback drill: remove everything the provisioning created, prove legacy is untouched, provision again"

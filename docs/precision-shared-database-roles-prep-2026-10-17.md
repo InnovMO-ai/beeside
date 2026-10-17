@@ -1,5 +1,7 @@
 # PRECISION V2.0 — Base canónica compartida · Preparativos técnicos (roles por dominio, reinicio sin CASCADE, alineación de ESTABILIZACIÓN)
 
+> **Actualización 2026-10-17 (F1/F2):** el linaje canónico pasa de 52 a **54 migraciones** con `0052_privacy_guards_runtime_groups` (guardas de privacidad cerradas a ambos runtimes de aplicación) y `0053_privacy_erasure_tombstone` (un proyecto anonimizado no puede recibir datos personales de nuevo). Diseño, procedimiento de borrado en la ventana de transición e impacto sobre contratos: `docs/precision-privacy-erasure-transition-2026-10-17.md`. Las cifras de 52 migraciones de este documento son históricas.
+
 Fecha: 2026-10-17 · Decisión vigente: **Opción A** (una base PostgreSQL canónica, dominios lógicos, roles de runtime independientes, rol de migración independiente) · Estado: **preparado y probado SOLO en bases locales desechables. Nada desplegado, nada tocado en GCP, sin push, sin merge.**
 
 Complementa `precision-shared-database-phase1-diagnosis-2026-10-17.md` (Fase 1) y `precision-continuity-source-of-truth-2026-10-16.md`.

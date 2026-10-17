@@ -1,4 +1,5 @@
 import type { Queryable } from "./domain-isolation";
+import { assertErasureConverged, reconcileErasures, ErasureGateError, type ReconcileReport } from "./privacy-erasure-sync";
 
 /**
  * Domain data sync between the legacy `discovery` database and the canonical `beeside` database (both directions). It is the ONE tool for the three moments of the transition:
@@ -11,6 +12,12 @@ import type { Queryable } from "./domain-isolation";
  *   - mutable with `updated_at`: ON CONFLICT DO UPDATE only when the source row is newer (last writer wins by updated_at);
  *   - mutable without `updated_at`: DO NOTHING, and a divergence is reported by the checksum comparison instead of being resolved silently.
  * Verification compares per-table row counts and an order-independent checksum of the common columns on both sides.
+ *
+ * PRIVACY GATE (Discovery domain, no override): a personal-data erasure must stay effective across the transition and a sync must never bring erased data back. Before copying anything
+ * the two sides must agree about every erasure (privacy-erasure-sync: each erased project is scrubbed AND has evidence on every side where it exists); the target's erasure log is locked
+ * (SHARE ROW EXCLUSIVE) for the whole transaction so no erasure can be recorded there meanwhile; and right before COMMIT the same check runs again together with a comparison of the
+ * erasure ledger seen at the start (an erasure recorded on the source while the sync ran aborts it). Anything else -> ErasureGateError, ROLLBACK, nothing written. The sync itself never
+ * runs an erasure: that is domain-erasure-reconcile, a separate, separately approved step.
  */
 export interface TablePlan {
   table: string;
@@ -22,6 +29,7 @@ export interface TablePlan {
 
 export const quote = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 const SAFE = /^[a-z_][a-z0-9_]*$/;
+const LEDGER_TABLE = "fa4_privacy_erasure_log";
 
 /** Parent-before-child order over the foreign keys among the given tables (self references ignored). Throws on a cycle. */
 export function orderTables(tables: string[], fks: Array<{ child: string; parent: string }>): string[] {
@@ -38,23 +46,39 @@ export function orderTables(tables: string[], fks: Array<{ child: string; parent
   return out;
 }
 
+/**
+ * Rows of an ERASED project. Two sides that both scrubbed the same project hold identical content, but each stamped its own time of scrubbing (updated_at / revoked_at = now()).
+ * That time is not a business difference, so (1) the checksum ignores the masked columns for a scrubbed row, and (2) a scrubbed target row is never overwritten by the upsert, whatever
+ * the source holds (the sync cannot reintroduce personal data even if the privacy gate were bypassed; the gate refuses to run in that state in the first place).
+ */
+const ERASED_ROWS: Record<string, { erased: (alias: string) => string; masked: string[] }> = {
+  fa4_project: { erased: (a) => `${a}."status" = 'ANONYMIZED'`, masked: ["updated_at"] },
+  fa4_demand_signal: { erased: (a) => `${a}."payload" = '{"anonymized": true}'::jsonb`, masked: ["updated_at"] },
+  fa4_access_token: { erased: (a) => `EXISTS (SELECT 1 FROM public.fa4_project ep WHERE ep.project_id = ${a}."project_id" AND ep.status = 'ANONYMIZED')`, masked: ["revoked_at"] },
+};
+
 export function upsertSql(p: TablePlan): string {
   const cols = p.columns.map(quote).join(", ");
   const conflict = p.pk.map(quote).join(", ");
   const base = `INSERT INTO public.${quote(p.table)} (${cols}) SELECT ${cols} FROM json_populate_recordset(null::public.${quote(p.table)}, $1::json)`;
   if (p.policy !== "upsert-by-updated_at") return `${base} ON CONFLICT (${conflict}) DO NOTHING`;
   const sets = p.columns.filter((c) => !p.pk.includes(c)).map((c) => `${quote(c)} = EXCLUDED.${quote(c)}`).join(", ");
-  return `${base} ON CONFLICT (${conflict}) DO UPDATE SET ${sets} WHERE public.${quote(p.table)}."updated_at" < EXCLUDED."updated_at"`;
+  const er = ERASED_ROWS[p.table];
+  const notErased = er ? ` AND NOT (${er.erased(`public.${quote(p.table)}`)})` : "";
+  return `${base} ON CONFLICT (${conflict}) DO UPDATE SET ${sets} WHERE public.${quote(p.table)}."updated_at" < EXCLUDED."updated_at"${notErased}`;
 }
 
-export function checksumSql(table: string, columns: string[], pk: string[]): string {
-  const row = `md5(json_build_object(${columns.map((c) => `'${c}', t.${quote(c)}`).join(", ")})::text)`;
-  return `SELECT count(*)::int AS n, COALESCE(md5(string_agg(${row}, '' ORDER BY ${pk.map((c) => `t.${quote(c)}`).join(", ")})), '') AS sum FROM public.${quote(table)} t`;
+export function checksumSql(table: string, columns: string[], pk: string[], where?: string): string {
+  const er = ERASED_ROWS[table];
+  const val = (c: string): string => (er?.masked.includes(c) ? `CASE WHEN ${er.erased("t")} THEN to_jsonb('scrubbed'::text) ELSE to_jsonb(t.${quote(c)}) END` : `t.${quote(c)}`);
+  const row = `md5(json_build_object(${columns.map((c) => `'${c}', ${val(c)}`).join(", ")})::text)`;
+  return `SELECT count(*)::int AS n, COALESCE(md5(string_agg(${row}, '' ORDER BY ${pk.map((c) => `t.${quote(c)}`).join(", ")})), '') AS sum FROM public.${quote(table)} t${where ? ` WHERE ${where}` : ""}`;
 }
 
-export interface SyncOptions { domain?: string; batch?: number; dryRun?: boolean }
+export interface SyncOptions { domain?: string; batch?: number; dryRun?: boolean; lockTimeoutMs?: number }
 export interface TableResult { table: string; policy: TablePlan["policy"]; sourceRows: number; read: number; inserted: number; updated: number; skipped: number; targetRows: number; match: boolean | null; note?: string }
-export interface SyncReport { domain: string; direction: string; tables: TableResult[]; ignoredSourceTables: Array<{ table: string; rows: number }>; missingOnSource: string[]; ok: boolean }
+export interface ErasureGateReport { checked: boolean; converged: boolean | null; erasedProjects: number; manifestSha256: string | null; detail?: string; report?: ReconcileReport }
+export interface SyncReport { domain: string; direction: string; tables: TableResult[]; ignoredSourceTables: Array<{ table: string; rows: number }>; missingOnSource: string[]; erasure: ErasureGateReport; ok: boolean }
 
 export async function planSync(source: Queryable, target: Queryable, domain = "DISCOVERY"): Promise<{ plans: TablePlan[]; missingOnSource: string[]; ignored: Array<{ table: string; rows: number }> }> {
   // the registry lives in the canonical database; in the rollback direction the target (legacy) has none, so the source's is used
@@ -115,9 +139,28 @@ export async function runSync(source: Queryable, target: Queryable & { query: Qu
   const batch = Math.min(Math.max(opts.batch ?? 500, 1), 5000);
   const { plans, missingOnSource, ignored } = await planSync(source, target, domain);
   const tables: TableResult[] = [];
+  const guarded = domain === "DISCOVERY"; // the erasure tables belong to the Discovery domain
+  let erasure: ErasureGateReport = { checked: false, converged: null, erasedProjects: 0, manifestSha256: null };
+  if (guarded && opts.dryRun) {
+    try {
+      const g = await assertErasureConverged(source, target);
+      erasure = { checked: true, converged: true, erasedProjects: g.report.erasedProjects, manifestSha256: g.report.manifestSha256, report: g.report };
+    } catch (e) {
+      if (!(e instanceof ErasureGateError)) throw e;
+      const r = (e.detail["report"] as ReconcileReport | undefined);
+      erasure = { checked: true, converged: false, erasedProjects: r?.erasedProjects ?? 0, manifestSha256: r?.manifestSha256 ?? null, detail: e.message, ...(r ? { report: r } : {}) };
+    }
+  }
   // ONE transaction on the target: all-or-nothing, and the deferred integrity triggers (a DELIVERED project needs its sealed result) are checked at the end, not table by table
   if (!opts.dryRun) await target.query("BEGIN");
   try {
+  if (guarded && !opts.dryRun) {
+    // no erasure can be recorded on the target while this transaction lives; a lock that cannot be taken fails fast instead of hanging an erasure or the sync
+    await target.query(`SET LOCAL lock_timeout = '${Math.min(Math.max(Math.trunc(opts.lockTimeoutMs ?? 15000), 100), 120000)}ms'`);
+    await target.query("LOCK TABLE public.fa4_privacy_erasure_log IN SHARE ROW EXCLUSIVE MODE");
+    const g = await assertErasureConverged(source, target);
+    erasure = { checked: true, converged: true, erasedProjects: g.report.erasedProjects, manifestSha256: g.report.manifestSha256, report: g.report };
+  }
   for (const p of plans) {
     const cols = p.columns.map(quote).join(", ");
     const total = Number((await source.query<{ n: string }>(`SELECT count(*)::text AS n FROM public.${quote(p.table)}`)).rows[0]!.n);
@@ -140,17 +183,28 @@ export async function runSync(source: Queryable, target: Queryable & { query: Qu
         await target.query(`SELECT setval($1::regclass, GREATEST((SELECT COALESCE(max(${quote(s.column)}), 1) FROM public.${quote(p.table)}), (SELECT last_value FROM ${s.sequence})))`, [s.sequence]);
       }
     }
-    const [a, b] = [await source.query<{ n: number; sum: string }>(checksumSql(p.table, p.columns, p.pk)), await target.query<{ n: number; sum: string }>(checksumSql(p.table, p.columns, p.pk))];
-    res.targetRows = b.rows[0]!.n;
+    const ledger = p.table === LEDGER_TABLE;
+    // The erasure log is a LEDGER both sides append to (a propagated erasure writes its evidence row on the lagging side), so each side may hold rows the other lacks until the sync has run in
+    // both directions: it is verified as "every source row is in the target, identical", not as equality.
+    const ids = ledger ? (await source.query<{ i: string }>(`SELECT ${quote(p.pk[0]!)}::text AS i FROM public.${quote(p.table)}`)).rows.map((r) => r.i) : [];
+    const [a, b] = [await source.query<{ n: number; sum: string }>(checksumSql(p.table, p.columns, p.pk)),
+                    ledger ? await target.query<{ n: number; sum: string }>(checksumSql(p.table, p.columns, p.pk, `t.${quote(p.pk[0]!)}::text = ANY($1::text[])`), [ids]) : await target.query<{ n: number; sum: string }>(checksumSql(p.table, p.columns, p.pk))];
+    res.targetRows = ledger ? Number((await target.query<{ n: string }>(`SELECT count(*)::text AS n FROM public.${quote(p.table)}`)).rows[0]!.n) : b.rows[0]!.n;
     res.match = a.rows[0]!.sum === b.rows[0]!.sum && a.rows[0]!.n === b.rows[0]!.n;
     if (!res.match && p.policy === "insert-only-report") res.note = "differs: a mutable table without updated_at is never overwritten; resolve by hand";
     if (!res.match && opts.dryRun) res.note = "dry run: nothing was written";
     tables.push(res);
+  }
+  if (guarded && !opts.dryRun) {
+    // the same question after the copy: nothing copied may have reintroduced personal data, and no erasure may have been recorded on the source meanwhile
+    const after = await reconcileErasures(source, target, { apply: false });
+    if (!after.converged) throw new ErasureGateError("aborted: personal data of an erased project would remain or reappear after this sync; nothing was written", { report: after });
+    if (after.manifestSha256 !== erasure.manifestSha256) throw new ErasureGateError("aborted: an erasure was recorded while the sync was running; reconcile erasures and run the sync again; nothing was written", { report: after });
   }
   if (!opts.dryRun) await target.query("COMMIT");
   } catch (e) {
     if (!opts.dryRun) await target.query("ROLLBACK");
     throw e;
   }
-  return { domain, direction: "source->target", tables, ignoredSourceTables: ignored, missingOnSource, ok: tables.every((t) => t.match === true) };
+  return { domain, direction: "source->target", tables, ignoredSourceTables: ignored, missingOnSource, erasure, ok: tables.every((t) => t.match === true) && (!guarded || erasure.converged === true) };
 }

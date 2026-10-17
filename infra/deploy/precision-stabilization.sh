@@ -107,7 +107,7 @@ sys.exit("NOT production-grade: " + ", ".join(bad)) if bad else print("instance 
   fi
   echo "== read-only: Precision services must not be public (expect no allUsers / allAuthenticatedUsers)"
   g run services get-iam-policy "$BACKEND" --region "$REGION" --format='value(bindings.members)' || true
-  echo "== read-only migration state of the TARGET database (expects safe=true; expected=52; pending = what this build adds)"
+  echo "== read-only migration state of the TARGET database (expects safe=true; expected=54; pending = what this build adds)"
   g run jobs deploy "$CHECK_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/migrate.js,--check \
     --set-secrets "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest" --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 120
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
@@ -161,7 +161,7 @@ migrate)
   g run jobs deploy "$MIGRATE_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/migrate.js \
     --set-secrets "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest" --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 600
   g run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait
-  echo "== verify: expected applied=52 pending=[]"
+  echo "== verify: expected applied=54 pending=[]"
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
   echo "Next: infra/db/provision-beeside.sh post (Precision login + memberships), then 'prepare'."
   ;;
@@ -253,7 +253,7 @@ smoke)
   echo "S4 backend ready (authenticated as the invoker): $(curl -s --max-time 20 -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences="$BACKEND_URL")" "$BACKEND_URL/health/ready")  (expect {\"status\":\"ready\"})"
   echo "S4b the web identity holds no secret: $(gcloud --project "$PROJECT" run services describe "$WEB" --region "$REGION" --format='value(spec.template.spec.containers[0].env)' | grep -ci secret) secret references (expect 0)"
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
-  echo "S5 migration state must read: applied=52 pending=[] safe=true (see the job log)"
+  echo "S5 migration state must read: applied=54 pending=[] safe=true (see the job log)"
   echo "S6 knowledge layer is not empty (read-only):"
   g run jobs update "$SEED_JOB" --region "$REGION" --args dist/scripts/kl-seed.js,--check,--countries,"$REQUIRED_COUNTRIES"
   g run jobs execute "$SEED_JOB" --region "$REGION" --wait

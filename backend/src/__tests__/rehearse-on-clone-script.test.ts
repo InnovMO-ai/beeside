@@ -113,3 +113,31 @@ describe("rehearse-on-clone.sh — the privacy check runs the real erasure funct
     expect((text.match(/must_fail_like "/g) ?? []).length).toBeGreaterThanOrEqual(9);
   });
 });
+
+describe("rehearse-on-clone.sh — F1/F2: the fixes are part of the lineage and the erasure survives the rollback", () => {
+  it("rehearses the lineage as it is (no proposed SQL is needed for F1; the hook stays simulator-only)", () => {
+    expect(text).not.toContain("proposals/");
+    expect(text).toContain('if [ "${REHEARSAL_SIMULATOR:-0}" = 1 ] && [ -n "${REHEARSAL_APPLY_SQL:-}" ]');
+  });
+  it("S6c propagates the committed erasure to legacy, through the guarded tools, before anything destructive", () => {
+    const s6c = text.slice(at('echo "== S6c'), at('echo "== S7 '));
+    expect(s6c).toContain('identity_gate "S6c erasure propagation');
+    expect(s6c).toContain("FAIL SAFE: the rollback replay is refused by the privacy gate");
+    expect(s6c).toContain("domain-erasure-reconcile.js");
+    expect(s6c).toContain("NO REAPPEARANCE: legacy keeps the project anonymised after the replay");
+    expect(s6c).toContain("NO REAPPEARANCE in $NEWDB after the forward copy");
+    expect(s6c).toContain("both erasure logs hold the same history");
+    expect(s6c).toContain("database-level backstop (0053)");
+    expect(s6c).toMatch(/crit_gate "S6c erasure propagation/);
+    expect(s6c).not.toMatch(/DROP DATABASE|DROP ROLE/);
+  });
+  it("the persisted anonymisation (S6b) is checked and gated BEFORE S6c, and S6c BEFORE the DROPs", () => {
+    expect(at('crit_gate "S6b persisted anonymisation')).toBeLessThan(at('echo "== S6c'));
+    expect(at('crit_gate "S6c erasure propagation')).toBeLessThan(at('echo "== S7 '));
+    expect(at('crit_gate "S6c erasure propagation')).toBeLessThan(at('must_ok "DROP DATABASE $NEWDB"'));
+  });
+  it("the reverse reconciliation and the sync tools used by the rehearsal are the privacy-gated ones (no direct SQL copy)", () => {
+    expect(text).not.toMatch(/INSERT INTO fa4_project .* SELECT .* FROM .*discovery/i);
+    expect(text).toContain("domain-data-sync.js");
+  });
+});

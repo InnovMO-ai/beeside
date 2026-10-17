@@ -5,8 +5,8 @@ Simulates the production Cloud SQL instance on a throw-away PostgreSQL 16 cluste
 
     bash infra/db/rehearsal/create-cluster.sh
     npm run build --workspace=backend
-    bash infra/db/rehearsal/rehearse-provision.sh   # plan, gates, PRE, migrate to 52, POST, 17-point isolation contract   (28 checks)
-    bash infra/db/rehearsal/rehearse-cutover.sh     # data copy, reconcile, runtime permissions, privacy bypass, rollback, legacy hardening  (41 checks)
+    bash infra/db/rehearsal/rehearse-provision.sh   # plan, gates, PRE, migrate to 54, POST, 17-point isolation contract   (27 checks)
+    bash infra/db/rehearsal/rehearse-cutover.sh     # data copy, reconcile, runtime permissions, privacy bypass, rollback, legacy hardening  (150 checks: copy, reconcile, permissions, F1 guards, erasure propagation before/during/after the cutover, manifest, tombstone, optional legacy protection, rollback, hardening)
 
 Everything is local and destructive only to the simulation cluster. Passwords are random per run and never printed.
 
@@ -19,5 +19,5 @@ Everything is local and destructive only to the simulation cluster. Passwords ar
     # both scripts STOP if PROJECT, REGION, SOURCE_INSTANCE, SOURCE, CLONE, ALLOW_OTHER_PROJECT, SQL_INSTANCE, PROXY_PORT or REHEARSAL_DIR is set
 
 The simulator is aligned with the production evidence of Part B Q13 (no creator-ADMIN row on `discovery_migrate`, legacy database owned by `cloudsqlsuperuser`).
-`rehearse-on-clone.sh` stops at the first critical failure and never continues into destructive steps (reverse reconciliation, legacy hardening, DROP DATABASE/ROLE): see RUNBOOK §5.1. Its privacy check runs the real `fa4_anonymize_project` and verifies the effects (RUNBOOK §5.2). Without the candidate fix F1 it HALTS at S4 on the simulator too (expected); `REHEARSAL_SIMULATOR=1 REHEARSAL_DIR=<dir> REHEARSAL_APPLY_SQL=infra/db/proposals/0053_guard_runtime_groups.sql bash rehearse-on-clone.sh` rehearses the fix end to end (184/184).
-`SIM_Q13=creator-row` restores the earlier hazard model (used as a negative control). `rehearse-on-clone.sh` is itself tested against this simulator (184/184 with the F1 fix; REHEARSAL_SIMULATOR=1 REHEARSAL_DIR=<dir> selects the simulator on port 5433).
+`rehearse-on-clone.sh` stops at the first critical failure and never continues into destructive steps (reverse reconciliation, legacy hardening, DROP DATABASE/ROLE): see RUNBOOK §5.1. Its privacy check runs the real `fa4_anonymize_project` and verifies the effects (RUNBOOK §5.2). F1 (migration 0052) and F2 (migration 0053 + `domain-erasure-reconcile` + the privacy gate of `domain-data-sync`) are part of the lineage: the run needs no proposed SQL (204/204 on the simulator, S6c rehearses the propagation and the rollback without reappearance). `REHEARSAL_APPLY_SQL` (simulator only) stays as a hook for defect-injection drills: with the pre-0052 guards the run HALTS at S4; without the tombstone it HALTS at S6c, before any DROP.
+`SIM_Q13=creator-row` restores the earlier hazard model (used as a negative control). `rehearse-on-clone.sh` is itself tested against this simulator (204/204; REHEARSAL_SIMULATOR=1 REHEARSAL_DIR=<dir> selects the simulator on port 5433).

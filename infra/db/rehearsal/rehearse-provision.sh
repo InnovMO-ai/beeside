@@ -46,8 +46,8 @@ expect_fail "legacy discovery_migrate cannot connect to beeside" sql discovery_m
 expect_fail "migrator cannot create roles" sql beeside_migrate "$MIGRATE_DB_PASSWORD" beeside "create role should_not_exist"
 expect_fail "migrator cannot create databases" sql beeside_migrate "$MIGRATE_DB_PASSWORD" beeside "create database should_not_exist"
 
-echo "== R4  MIGRATE beeside to 52 as beeside_migrate"
-( cd $B && MIGRATION_DATABASE_URL="postgres://beeside_migrate:$MIGRATE_DB_PASSWORD@127.0.0.1:5433/beeside" node dist/scripts/migrate.js ) >/tmp/mig.out 2>&1 && ok "52 migrations applied :: $(tail -1 /tmp/mig.out | cut -c1-80)" || bad "migrate :: $(tail -3 /tmp/mig.out | cut -c1-300)"
+echo "== R4  MIGRATE beeside to 54 as beeside_migrate"
+( cd $B && MIGRATION_DATABASE_URL="postgres://beeside_migrate:$MIGRATE_DB_PASSWORD@127.0.0.1:5433/beeside" node dist/scripts/migrate.js ) >/tmp/mig.out 2>&1 && ok "54 migrations applied :: $(tail -1 /tmp/mig.out | cut -c1-80)" || bad "migrate :: $(tail -3 /tmp/mig.out | cut -c1-300)"
 [ "$(sql beeside_migrate "$MIGRATE_DB_PASSWORD" beeside "select count(*) from pg_auth_members m join pg_roles g on g.oid=m.roleid join pg_roles u on u.oid=m.member where u.rolname='beeside_migrate' and g.rolname in ('beeside_runtime_role','beeside_discovery_rw')")" = "0" ] && ok "migrator has NO membership row in the groups after migrating" || bad "migrator got a membership row"
 ( cd $B && MIGRATION_DATABASE_URL="postgres://beeside_migrate:$MIGRATE_DB_PASSWORD@127.0.0.1:5433/beeside" node dist/scripts/migrate.js --check ) >/tmp/mig.out 2>&1 && ok "migrate --check safe" || bad "migrate --check"
 

@@ -1,14 +1,15 @@
--- PROPOSAL, NOT PART OF THE MIGRATION LINEAGE, NOT APPLIED ANYWHERE. Found by the strengthened privacy rehearsal (finding F1).
+-- PRIVACY GUARDS vs. THE CANONICAL RUNTIME LOGINS (finding F1 of the clone rehearsal review; Product Owner decision 2026-10-17, option A).
 --
 -- Problem: the erasure bypass guards (fa4_result_guard 0016, fa4_project_delivered_guard 0023) accept the transaction-local flag fa4.erasure='on' from any role that is NOT a
--- direct member of beeside_runtime_role. In the legacy database the Discovery application login (discovery_runtime) IS a member, so the application cannot open the bypass.
--- In the canonical database the Discovery login (beeside_discovery_runtime) belongs to beeside_discovery_rw and NOT to beeside_runtime_role (that is the point of the domain
--- separation), so the guard treats it as an operator: a session of the Discovery application can run  set_config('fa4.erasure','on',true)  and rewrite `answers` of a DELIVERED
--- project (it has UPDATE on fa4_project). fa4_result stays protected only by the missing UPDATE privilege. Reproduced on the simulator and by rehearse-on-clone.sh (S4).
+-- DIRECT member of beeside_runtime_role. In the legacy database the Discovery application login is a member, so the application cannot open the bypass. In the canonical
+-- database the Discovery login belongs to beeside_discovery_rw (0051) and NOT to beeside_runtime_role (that is the point of the data-domain separation), so the guard treated it as an
+-- operator: a session of the Discovery application could run set_config('fa4.erasure','on',true) and rewrite `answers` of a DELIVERED project (it holds UPDATE on fa4_project).
 --
--- Fix: both guards deny the bypass to a direct member of EITHER runtime group. Operators (the migration owner, SECURITY DEFINER fa4_anonymize_project) are in neither.
--- Bodies are the 0016 / 0023 bodies with ONE changed predicate. Idempotent (CREATE OR REPLACE); no data change; rollback = re-create the previous bodies.
--- Adopting it means a new migration in the shared lineage (renumber, mirror in Discovery, update the pinned counts): a Product Owner decision.
+-- Fix: both guards deny the bypass to a direct member of EITHER application group. Operators stay able to use it: the migration owner and the SECURITY DEFINER function
+-- fa4_anonymize_project() run as the owner, who belongs to neither group. Discovery is NOT added to beeside_runtime_role (no widening of any privilege): the predicate only names the
+-- second group. Bodies are the 0016 / 0023 bodies with ONE changed predicate (the membership test is by role NAME, so it is a no-op on a database that has no beeside_discovery_rw).
+-- Direct membership (pg_auth_members) is kept on purpose: pg_has_role() would be TRUE for every role for a superuser/owner.
+-- Idempotent (CREATE OR REPLACE); no data change; rollback = re-create the 0016 / 0023 bodies.
 
 CREATE OR REPLACE FUNCTION fa4_result_guard() RETURNS TRIGGER AS $$
 BEGIN
