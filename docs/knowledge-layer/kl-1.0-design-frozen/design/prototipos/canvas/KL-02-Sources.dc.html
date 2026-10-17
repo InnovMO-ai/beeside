@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Source Registry</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[po]@beeside</span><span class="admin-badge" data-role="ADMIN">KL_ADMIN</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Matriz funcional S01–S10 del Source Registry de trabajo (verificada al <span class="kl-nowrap">15-oct-2026</span>). Ninguna fuente está aprobada.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html" aria-current="page">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<p class="kl-sub" lang="es">La IA puede proponer fuentes; solo KL_ADMIN las aprueba. Aprobar autoriza la recolección, no publica nada. Comerciales excluidas salvo excepción con vencimiento.</p>
+<form class="admin-search" role="search">
+<label for="src-q" class="visually-hidden">Search sources</label>
+<input id="src-q" class="input" placeholder="Institution, publication or ID">
+<label for="src-st" class="visually-hidden">Status</label>
+<select id="src-st" class="select" style="width: auto"><option>All statuses</option><option>Candidate</option><option>Approved</option><option>Blocked</option><option>Historical</option></select>
+<a class="button button-secondary" href="#">Propose source</a>
+</form>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">ID</th><th scope="col">Publication</th><th scope="col">Class · role</th><th scope="col">Level</th><th scope="col">Check frequency</th><th scope="col">Permitted use</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+<tbody lang="es">
+<tr><td>S01</td><th scope="row">IMCO · ICE 2025 (libro, boletas, anexo)</th><td>B · intermediario</td><td>2</td><td>None · histórico</td><td>Cita y paráfrasis</td><td><span class="admin-badge" data-tone="muted">Histórico</span></td><td><a href="#">Open</a></td></tr>
+<tr><td>S02</td><th scope="row">IMCO · ICE 2026</th><td>B · intermediario</td><td>2</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Cita y paráfrasis</td><td><span class="admin-badge" data-tone="attention">Blocked · método</span></td><td><a href="KL-03a-ChangeReview.dc.html">Open</a></td></tr>
+<tr><td>S03</td><th scope="row">IMCO · ICU 2026 (72 zonas metropolitanas)</th><td>B · intermediario</td><td>2</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Cita y paráfrasis</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S04</td><th scope="row">INEGI · DENUE (solo agregados)</th><td>A · primaria</td><td>1</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Comercial con atribución</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S05</td><th scope="row">INEGI · ENOE</th><td>A · primaria</td><td>1</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Comercial con atribución</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="KL-02a-SourceApprove.dc.html">Review</a></td></tr>
+<tr><td>S06</td><th scope="row">INEGI · PIBE e ITAEE</th><td>A · primaria</td><td>1</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Comercial con atribución</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S07</td><th scope="row">Banxico · SIE (FIX, tasa objetivo)</th><td>A · primaria</td><td>1</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Cita con URL · uso comercial por verificar</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S08</td><th scope="row">Banxico · Reporte sobre las Economías Regionales</th><td>A · análisis</td><td>2</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Cita con URL</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S09</td><th scope="row">IMSS · puestos afiliados y SBC</th><td>A · primaria</td><td>1</td><td>Monthly · fijada por KL_ADMIN (paquete de Precision)</td><td>Licencia por verificar</td><td><span class="admin-badge" data-tone="info">Candidate</span></td><td><a href="#">Review</a></td></tr>
+<tr><td>S10</td><th scope="row">ATDT · Registro Nacional de Regulaciones</th><td>A · normativa</td><td>3</td><td><span class="kl-muted">Inherit</span> · semestral (DB)</td><td>Por verificar</td><td><span class="admin-badge" data-tone="attention">Blocked · verificar</span></td><td><a href="#">Open</a></td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">Periodicidad: semanal, mensual, trimestral, semestral, anual o no actualizar; por defecto hereda la más frecuente de los productos y paquetes que usan la fuente. No hay revisión diaria; «Check now» queda auditado (<span class="kl-nowrap">PO-6</span>).</p>
+<p class="helper" lang="es">Registro amplio (R1–R34) y fuentes por registrar (INM, tratados de SE, Secretaría Anticorrupción y Buen Gobierno) en la siguiente página de la tabla.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

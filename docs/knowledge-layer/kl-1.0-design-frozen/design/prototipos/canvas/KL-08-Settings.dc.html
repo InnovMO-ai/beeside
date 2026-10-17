@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Governance and settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[po]@beeside</span><span class="admin-badge" data-role="ADMIN">KL_ADMIN</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Titulares por asignar (condición de habilitación operativa). Configuración inicial: valores de Workspace (T17), con la periodicidad sustituida por <span class="kl-nowrap">PO-6</span>.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html" aria-current="page">Governance &amp; Settings</a></div></nav>
+<section class="admin-card" aria-labelledby="st-roles">
+<h2 id="st-roles">Roles</h2>
+<p class="kl-guard" lang="es">KL no está habilitado para operar: faltan titulares. Mínimo dos personas internas distintas para cubrir la doble intervención (subir y aprobar; redactar y validar).</p>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Role</th><th scope="col">Can</th><th scope="col">Holders</th><th scope="col"><span class="visually-hidden">Action</span></th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">KL_ADMIN</th><td>Fuentes, excepciones, políticas, presupuestos, roles, revocar ediciones</td><td><span class="admin-badge" data-tone="attention">Por asignar</span></td><td><a href="#">Grant</a></td></tr>
+<tr><th scope="row">KL_EDITOR</th><td>Subir cargas, redactar fichas, componer ediciones</td><td><span class="admin-badge" data-tone="attention">Por asignar</span></td><td><a href="#">Grant</a></td></tr>
+<tr><th scope="row">KL_REVIEWER</th><td>Aprobar cargas y fichas nivel 2, decidir demanda, registrar validaciones externas</td><td><span class="admin-badge" data-tone="attention">Por asignar</span></td><td><a href="#">Grant</a></td></tr>
+<tr><th scope="row">KL_REVIEWER · editorial</th><td>Aprobar cambios de producto y ediciones, despublicar</td><td><span class="admin-badge" data-tone="attention">Por asignar</span></td><td><a href="#">Grant</a></td></tr>
+<tr><th scope="row">SPECIALIST_VALIDATOR</th><td>Validar nivel 3 de su dominio (internos)</td><td><span class="admin-badge" data-tone="attention">Por asignar · por dominio</span></td><td><a href="#">Grant</a></td></tr>
+<tr><th scope="row">SUPERVISOR (plataforma)</th><td>Solo lectura</td><td>Heredado del Control Center</td><td></td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">Solo cuentas de beeside (misma identidad del Control Center). Cuentas de servicio: <span class="kl-nowrap">kl-agent</span> (solo nivel 1) y <span class="kl-nowrap">kl-knowledge</span> (solo contenido publicado).</p>
+</section>
+<section class="admin-card" aria-labelledby="st-cfg">
+<h2 id="st-cfg">Initial settings</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">Periodicidad de revisión (<span class="kl-nowrap">PO-6</span>)</th><td>Por producto y por fuente: semanal, mensual, trimestral, semestral, anual o no actualizar. Sin revisión diaria. Doing Business: semestral. Fuentes: heredan de quien las usa</td></tr>
+<tr><th scope="row">Revisión fuera de ciclo</th><td>Manual y auditada: «Check now» (KL_EDITOR, KL_ADMIN) y edición extraordinaria (KL_ADMIN)</td></tr>
+<tr><th scope="row">Alerta por publicación atrasada</th><td>5 días hábiles</td></tr>
+<tr><th scope="row">Anomalía estadística (nivel 1)</th><td>Variación &gt; 3 desviaciones estándar de la serie → revisión humana</td></tr>
+<tr><th scope="row">Tolerancia entre documentos</th><td>Dentro de la precisión mostrada = mismo dato; se conserva el más preciso</td></tr>
+<tr><th scope="row">Uso por defecto clase B</th><td>Cita y paráfrasis con atribución</td></tr>
+<tr><th scope="row">Carga manual</th><td>PDF, DOCX, XLSX, CSV · 50 MB</td></tr>
+<tr><th scope="row">Revalidación especializada</th><td>12 meses o reforma en el DOF</td></tr>
+</tbody></table></div>
+<div class="admin-actions"><button type="button" class="button button-secondary">Edit (creates a new version)</button></div>
+</section>
+<div class="admin-grid">
+<section class="admin-card" aria-labelledby="st-int">
+<h2 id="st-int">Integrations</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Precision knowledge port</dt><dd><span class="admin-badge" data-tone="muted">Off</span> PRECISION_KNOWLEDGE_PROVIDER = off</dd></div>
+<div><dt>Edition verification page</dt><dd>Plataforma de cara al cliente · solo estado</dd></div>
+<div><dt>R10 approved claims (CR-KL-001)</dt><dd><span class="admin-badge" data-tone="muted">Off</span> kl.r10_claims_enabled = false · requiere aceptación registrada del responsable de Precision</dd></div>
+<div><dt>Links</dt><dd>kl.links.discovery_start = https://beeside.you (estabilización)</dd></div>
+<div><dt>Service catalog</dt><dd>Catálogo provisional · 17 categorías</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="st-aud">
+<h2 id="st-aud">Audit</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">When</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Entity</th></tr></thead>
+<tbody><tr><td colspan="4" class="kl-muted">No events. The audit log is append-only; no role can delete entries.</td></tr></tbody>
+</table></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

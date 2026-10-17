@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Demand decision</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design · caso A03.</b> Elige una decisión: las que implican fuente nueva o costo pasan a KL_ADMIN.</p>
+<p><a href="KL-05-Demand.dc.html">← Knowledge Demand</a></p>
+<h1 class="admin-title" lang="es">Conectividad ferroviaria puerto–región</h1>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="dd-ctx">
+<h2 id="dd-ctx">Group</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Topic</dt><dd><code>logistics.rail.port_hinterland</code></dd></div>
+<div><dt>Dimensions</dt><dd>MX · <span class="kl-nowrap">MX-COL</span>, <span class="kl-nowrap">MX-GUA</span> · <code>logistics</code> · contexto</dd></div>
+<div><dt>Recurrence</dt><dd>[n] señales · [n] proyectos distintos · primera [fecha] · última [fecha]</dd></div>
+<div><dt>Possible sources</dt><dd>[fuente oficial a proponer · no registrada]</dd></div>
+<div><dt>Specialist criterion</dt><dd>Ruta, costos y tiempos: servicio de logística</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="dd-why">
+<h2 id="dd-why">Decision criteria</h2>
+<p class="helper" lang="es" style="margin-top: 0">Recurrencia, valor diagnóstico, confiabilidad de fuentes, estabilidad, costo de mantenimiento, riesgo de desactualización y riesgo de sustituir un estudio especializado.</p>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="dd-dec">
+<h2 id="dd-dec">Decision</h2>
+<fieldset style="border: 0; padding: 0; margin: 0; display: grid; gap: 0.4rem">
+<legend class="visually-hidden">Decision</legend>
+<sc-for list="{{options}}" as="o" hint-placeholder-count="7">
+<label><input type="radio" name="dec" checked="{{o.on}}" onChange="{{o.pick}}"> <b>{{o.code}}</b> · {{o.text}}</label>
+</sc-for>
+</fieldset>
+<sc-if value="{{needsAdmin}}" hint-placeholder-val="{{false}}"><p class="kl-guard" lang="es">Esta decisión requiere una fuente nueva o costo: queda pendiente de KL_ADMIN.</p></sc-if>
+<div class="field" style="margin-top: 1rem"><label for="dd-r">Reason (required)</label><textarea id="dd-r" class="textarea" style="min-height: 5rem" value="{{reason}}" onChange="{{setReason}}"></textarea></div>
+<div class="admin-actions"><button type="button" class="button button-primary" disabled="{{blocked}}" onClick="{{confirm}}">{{cta}}</button></div>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><p class="admin-notice" role="status">{{doneText}}</p></sc-if>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { sel: '', reason: '', done: false }; }
+renderVals() {
+const s = this.state;
+const defs = [
+['CREATE', 'create new knowledge with a source', true],
+['ENRICH', 'extend an existing unit', false],
+['PARTIAL', 'publish general guidance with declared limits', false],
+['MAP', 'point to an existing unit or category', false],
+['SPECIALIST ONLY', 'answer is a specialist service, not knowledge', false],
+['DEFER', 'revisit after a date', false],
+['REJECT', 'not knowledge beeside will hold', false]
+];
+const cur = defs.find((d) => d[0] === s.sel);
+const needsAdmin = !!(cur && cur[2]);
+return {
+options: defs.map((d) => ({ code: d[0], text: d[1], on: s.sel === d[0], pick: () => this.setState({ sel: d[0], done: false }) })),
+needsAdmin, reason: s.reason, done: s.done,
+blocked: !s.sel || s.reason.trim().length < 5 || s.done,
+cta: needsAdmin ? 'Send to KL_ADMIN' : 'Record decision',
+doneText: needsAdmin ? 'Sent to KL_ADMIN with the reason. Nothing is published until a source is approved and its content passes review.' : 'Decision recorded with reason and author.',
+setReason: (e) => this.setState({ reason: e.target.value }),
+confirm: () => this.setState({ done: true })
+};
+}
+}
+</script>
+</body>
+</html>

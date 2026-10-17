@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Change review</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design · caso A05.</b> Hechos de ICE 2026 (<span class="kl-nowrap">21-sep-2026</span>) y la comparación de Nuevo León tomados de la prueba de Workspace.</p>
+<p><a href="KL-03-Agents.dc.html">← Agent Operations</a></p>
+<h1 class="admin-title" lang="es">Cambio de método · IMCO ICE 2026</h1>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="cr-what">
+<h2 id="cr-what">What the agent found</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Publication</dt><dd>ICE 2026 · publicado <span class="kl-nowrap">21-sep-2026</span> · 53 indicadores, 6 subíndices · sin base descargable</dd></div>
+<div><dt>Classification</dt><dd><span class="admin-badge" data-tone="attention">Method change</span> un indicador sustituido; otro con método nuevo y serie recalculada hacia atrás</dd></div>
+<div><dt>Review level</dt><dd>2 · no se publica solo; no se promueve a la RAM hasta aprobar</dd></div>
+<div><dt>Products affected</dt><dd>Doing Business México · cap. 02 y 10 (aviso, nunca reescritura)</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="cr-cmp">
+<h2 id="cr-cmp">Comparison across editions</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Indicator · state</th><th scope="col">ICE 2025</th><th scope="col">ICE 2026</th><th scope="col">Reading</th></tr></thead>
+<tbody lang="es"><tr><th scope="row">Informalidad laboral · Nuevo León</th><td>35%</td><td>33%</td><td>Nuevo periodo, no corrección; como 2026 recalcula la historia, la comparación requiere evaluar el método</td></tr></tbody>
+</table></div>
+<p class="kl-guard" lang="es">No se empalman ediciones: la serie recalculada entra como serie nueva ligada. El dato vigente de informalidad sigue viniendo de la primaria (ENOE).</p>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="cr-dec">
+<h2 id="cr-dec">Decision</h2>
+<fieldset style="border: 0; padding: 0; margin: 0; display: grid; gap: 0.5rem">
+<legend class="visually-hidden">Decision</legend>
+<label><input type="radio" name="d" checked="{{d1}}" onChange="{{p1}}"> Accept as new linked series</label>
+<label><input type="radio" name="d" checked="{{d2}}" onChange="{{p2}}"> Request re-extraction</label>
+<label><input type="radio" name="d" checked="{{d3}}" onChange="{{p3}}"> Reject this edition for now</label>
+</fieldset>
+<div class="field" style="margin-top: 1rem"><label for="cr-reason">Reason (required)</label><textarea id="cr-reason" class="textarea" style="min-height: 6rem" value="{{reason}}" onChange="{{setReason}}"></textarea></div>
+<div class="admin-actions"><button type="button" class="button button-primary" disabled="{{blocked}}" onClick="{{confirm}}">Confirm decision</button></div>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><p class="admin-notice" role="status" lang="es">Decisión registrada con motivo y autor. Los productos afectados reciben un aviso de cambio.</p></sc-if>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { d: 0, reason: '', done: false }; }
+renderVals() {
+const s = this.state;
+return {
+d1: s.d === 1, d2: s.d === 2, d3: s.d === 3, reason: s.reason, done: s.done,
+blocked: s.d === 0 || s.reason.trim().length < 5 || s.done,
+p1: () => this.setState({ d: 1 }), p2: () => this.setState({ d: 2 }), p3: () => this.setState({ d: 3 }),
+setReason: (e) => this.setState({ reason: e.target.value }),
+confirm: () => this.setState({ done: true })
+};
+}
+}
+</script>
+</body>
+</html>

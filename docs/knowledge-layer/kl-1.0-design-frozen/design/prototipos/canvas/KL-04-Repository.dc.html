@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Knowledge Repository</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[editor]@beeside</span><span class="admin-badge">KL_EDITOR</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> La carga ICE 2025 corresponde al paquete de evidencia de Workspace (1,696 registros, candidatos). KSeed aún no está preparado.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html" aria-current="page">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<section class="admin-card" aria-labelledby="rp-up">
+<h2 id="rp-up">Uploads</h2>
+<div class="admin-actions"><a class="button button-primary" href="KL-04a-Upload.dc.html">New upload</a></div>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Upload</th><th scope="col">Origin</th><th scope="col">Source</th><th scope="col">Records</th><th scope="col">QA</th><th scope="col">Status</th><th scope="col">Uploaded by</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">ICE 2025 · boletas por estado y anexo metodológico</th><td>Equipo</td><td>S01</td><td>1,696</td><td><span class="admin-badge" data-tone="ok">0 bloqueantes</span></td><td><span class="admin-badge" data-tone="attention">In review</span></td><td>[editor]</td><td><a href="KL-04b-UploadReview.dc.html">Open</a></td></tr>
+<tr><th scope="row">KSeed · lote inicial</th><td>KSeed</td><td>[varias]</td><td>[n]</td><td>—</td><td><span class="admin-badge" data-tone="muted">Not received</span></td><td>—</td><td></td></tr>
+</tbody></table></div>
+</section>
+<section class="admin-card" aria-labelledby="rp-units">
+<h2 id="rp-units">Units</h2>
+<form class="admin-search" role="search">
+<label for="u-q" class="visually-hidden">Search units</label><input id="u-q" class="input" placeholder="Key, topic, state or category">
+<label for="u-st" class="visually-hidden">Status</label><select id="u-st" class="select" style="width: auto"><option>All statuses</option><option>Draft</option><option>In review</option><option>Awaiting validation</option><option>Published</option><option>Requires review</option><option>Superseded</option><option>Withdrawn</option></select>
+</form>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Unit</th><th scope="col">Kind</th><th scope="col">Risk</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>imco.ice2025.informalidad.<span class="kl-nowrap">MX-NLE</span></code></th><td lang="es">Estadístico · vista de intermediario</td><td>low</td><td><span class="admin-badge" data-tone="attention">Candidate</span></td><td>1</td><td><a href="KL-04c-Unit.dc.html">Open</a></td></tr>
+<tr><td colspan="6" class="kl-muted" lang="es">0 unidades publicadas. Precision no recibe nada hasta que haya unidades publicadas y el puerto esté encendido.</td></tr>
+</tbody></table></div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

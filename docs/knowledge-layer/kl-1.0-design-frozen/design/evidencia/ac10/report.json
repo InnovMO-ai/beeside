@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "kind": "knowledge_guide",
+  "locale": "es",
+  "generatedAt": "2026-10-16T00:00:00.000Z",
+  "chrome": {
+    "footerLeft": "Doing Business beeside México · Edición [2026.1] · PROTOTIPO",
+    "notAdviceLabel": "No constituye asesoría",
+    "verifyUrl": "[dominio público]/verificar/[identificador de edición]"
+  },
+  "sections": [
+    {
+      "id": "cover",
+      "blocks": [
+        {
+          "type": "guide_cover",
+          "eyebrow": "DOING BUSINESS BEESIDE · MÉXICO",
+          "title": "Doing Business beeside México",
+          "subtitle": "Guía práctica para establecer y operar una empresa en México",
+          "editionLabel": "Edición [2026.1] · PROTOTIPO DE DESIGN, NO DISTRIBUIR",
+          "publishedOn": "[fecha de publicación]",
+          "currentAsOf": "[fecha de corte del manifiesto]",
+          "locale": "Español"
+        }
+      ]
+    },
+    {
+      "id": "toc",
+      "pageBreakBefore": true,
+      "heading": {
+        "text": "Contenido",
+        "level": 1
+      },
+      "blocks": [
+        {
+          "type": "toc",
+          "title": "Contenido"
+        }
+      ]
+    },
+    {
+      "id": "how-to-read",
+      "heading": {
+        "text": "Cómo leer esta guía",
+        "level": 1
+      },
+      "blocks": [
+        {
+          "type": "points",
+          "title": "Tres tipos de contenido, siempre marcados",
+          "intro": "Cada bloque indica qué es, de dónde sale y hasta cuándo es válido.",
+          "points": [
+            "DATO: cifras de fuentes autorizadas, con fuente, periodo y fecha de publicación en cada fila. Nadie las escribe a mano.",
+            "ORIENTACIÓN: explicación práctica de cómo funciona algo en general, con su fecha de última revisión.",
+            "OBLIGACIÓN GENERAL: requisitos vigentes según la fuente oficial primaria, validados por un especialista del dominio. Nunca se aplican a un caso particular."
+          ]
+        },
+        {
+          "type": "callout",
+          "title": "Qué no es esta guía",
+          "text": "No sustituye la asesoría legal, fiscal, laboral, aduanera ni de ubicación. Prepara las decisiones que conviene tomar con un especialista.",
+          "emphasis": "plain"
+        }
+      ],
+      "pageBreakBefore": true
+    },
+    {
+      "id": "ch08",
+      "pageBreakBefore": true,
+      "heading": {
+        "text": "Comercio exterior, aduanas y logística",
+        "level": 1,
+        "number": "08"
+      },
+      "blocks": [
+        {
+          "type": "guidance",
+          "mark": "guidance",
+          "title": "Lo esencial",
+          "paragraphs": [
+            "[Tres a cinco ideas de la ficha guía aprobada del capítulo 08. Marcador: no hay ficha aprobada todavía.]"
+          ],
+          "lastReviewedOn": "[fecha de revisión]",
+          "unitRefs": [
+            "[mx.card.customs.essentials@n]"
+          ]
+        },
+        {
+          "type": "partial_coverage",
+          "title": "Cobertura de esta sección",
+          "text": "Las obligaciones aduaneras de esta edición se limitan a orientación general respaldada por fuentes oficiales. Lo que requiere validación especializada y aún no la tiene no se publica."
+        },
+        {
+          "type": "obligation",
+          "mark": "obligation",
+          "title": "Padrón de importadores",
+          "paragraphs": [
+            "[Texto de la ficha normativa validada. Marcador: la ficha no existe aún y, sin validación especializada vigente, no entra a una edición.]"
+          ],
+          "primarySource": {
+            "citation": "[Fuente primaria: DOF o SAT, ley y artículo]",
+            "publishedOn": "[fecha DOF]",
+            "effectiveFrom": "[vigente desde]"
+          },
+          "lastValidatedOn": "[fecha de validación]",
+          "unitRefs": [
+            "[mx.card.customs.padron_importadores@n]"
+          ]
+        },
+        {
+          "type": "decide_with",
+          "title": "Qué decidir y con quién",
+          "limits": [
+            "Clasificación arancelaria de tus mercancías.",
+            "Rutas, costos y tiempos de transporte.",
+            "Conveniencia de un programa de fomento como IMMEX para tu operación."
+          ],
+          "categories": [
+            {
+              "key": "international_trade_customs",
+              "label": "Comercio exterior y aduanas"
+            },
+            {
+              "key": "logistics",
+              "label": "Logística"
+            },
+            {
+              "key": "procurement_supply_chain",
+              "label": "Compras y cadena de suministro"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch10",
+      "pageBreakBefore": true,
+      "heading": {
+        "text": "Perfiles estatales",
+        "level": 1,
+        "number": "10"
+      },
+      "blocks": []
+    },
+    {
+      "id": "ch10-nle",
+      "heading": {
+        "text": "Nuevo León",
+        "level": 2
+      },
+      "blocks": [
+        {
+          "type": "data_table",
+          "mark": "data",
+          "title": "Datos clave",
+          "caption": "Mismos indicadores, en el mismo orden, para los 32 estados. Valores de la fuente primaria con su periodo.",
+          "columns": [
+            {
+              "key": "indicator",
+              "label": "Indicador"
+            },
+            {
+              "key": "value",
+              "label": "Valor",
+              "align": "end"
+            },
+            {
+              "key": "period",
+              "label": "Periodo"
+            },
+            {
+              "key": "source",
+              "label": "Fuente"
+            }
+          ],
+          "rows": [
+            {
+              "cells": {
+                "indicator": "PIB estatal",
+                "value": "[valor]",
+                "period": "[año]",
+                "source": "INEGI · PIBE"
+              },
+              "citation": {
+                "unitRef": "[mx.stat.pibe.MX-NLE@n]",
+                "source": "INEGI, PIB por entidad federativa",
+                "period": "[año]",
+                "sourcePublishedOn": "[fecha]"
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Informalidad laboral",
+                "value": "[valor]",
+                "period": "[trimestre]",
+                "source": "INEGI · ENOE"
+              },
+              "citation": {
+                "unitRef": "[mx.stat.enoe.informalidad_laboral.MX-NLE@n]",
+                "source": "INEGI, Encuesta Nacional de Ocupación y Empleo",
+                "period": "[trimestre]",
+                "sourcePublishedOn": "[fecha]"
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Ingreso promedio de trabajadores",
+                "value": "[valor]",
+                "period": "[trimestre]",
+                "source": "INEGI · ENOE"
+              },
+              "citation": {
+                "unitRef": "[mx.stat.enoe.ingreso_promedio.MX-NLE@n]",
+                "source": "INEGI, Encuesta Nacional de Ocupación y Empleo",
+                "period": "[trimestre]",
+                "sourcePublishedOn": "[fecha]"
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Puestos de trabajo afiliados",
+                "value": "[valor]",
+                "period": "[mes]",
+                "source": "IMSS"
+              },
+              "citation": {
+                "unitRef": "[mx.stat.imss.puestos_afiliados.MX-NLE@n]",
+                "source": "IMSS, puestos de trabajo afiliados",
+                "period": "[mes]",
+                "sourcePublishedOn": "[fecha]",
+                "noteNumbers": [
+                  1
+                ]
+              }
+            }
+          ],
+          "notAvailableLabel": "No disponible"
+        },
+        {
+          "type": "data_table",
+          "mark": "data",
+          "title": "Posición relativa entre las 32 entidades",
+          "caption": "Posiciones publicadas por IMCO en el Índice de Competitividad Estatal 2025. No son un ranking de beeside ni una recomendación de ubicación.",
+          "columns": [
+            {
+              "key": "indicator",
+              "label": "Indicador (IMCO)"
+            },
+            {
+              "key": "position",
+              "label": "Posición de 32",
+              "align": "end"
+            },
+            {
+              "key": "period",
+              "label": "Periodo"
+            },
+            {
+              "key": "source",
+              "label": "Fuente original"
+            }
+          ],
+          "rows": [
+            {
+              "cells": {
+                "indicator": "Informalidad laboral",
+                "position": "2",
+                "period": "2024",
+                "source": "INEGI · ENOE"
+              },
+              "citation": {
+                "unitRef": "imco.ice2025.informalidad.MX-NLE",
+                "source": "IMCO, ICE 2025, boletas p. 73",
+                "period": "2024",
+                "sourcePublishedOn": "9-jun-2025",
+                "noteNumbers": [
+                  2,
+                  3
+                ]
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Ingreso promedio de trabajadores",
+                "position": "4",
+                "period": "2024",
+                "source": "INEGI · ENOE"
+              },
+              "citation": {
+                "unitRef": "imco.ice2025.ingreso_promedio.MX-NLE",
+                "source": "IMCO, ICE 2025, boletas p. 73",
+                "period": "2024",
+                "sourcePublishedOn": "9-jun-2025",
+                "noteNumbers": [
+                  2,
+                  3
+                ]
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Crecimiento de puestos de trabajo",
+                "position": "5",
+                "period": "2024",
+                "source": "IMSS"
+              },
+              "citation": {
+                "unitRef": "imco.ice2025.crecimiento_imss.MX-NLE",
+                "source": "IMCO, ICE 2025, boletas p. 73",
+                "period": "2024",
+                "sourcePublishedOn": "9-jun-2025",
+                "noteNumbers": [
+                  2,
+                  3
+                ]
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Terminales punto de venta",
+                "position": "5",
+                "period": "2024",
+                "source": "CNBV"
+              },
+              "citation": {
+                "unitRef": "imco.ice2025.terminales_pv.MX-NLE",
+                "source": "IMCO, ICE 2025, boletas p. 72",
+                "period": "2024",
+                "sourcePublishedOn": "9-jun-2025",
+                "noteNumbers": [
+                  2,
+                  3
+                ]
+              }
+            },
+            {
+              "cells": {
+                "indicator": "Carga aérea",
+                "position": "6",
+                "period": "2024",
+                "source": "SICT / AFAC"
+              },
+              "citation": {
+                "unitRef": "imco.ice2025.carga_aerea.MX-NLE",
+                "source": "IMCO, ICE 2025, boletas p. 72",
+                "period": "2024",
+                "sourcePublishedOn": "9-jun-2025",
+                "noteNumbers": [
+                  2,
+                  3
+                ]
+              }
+            }
+          ],
+          "notAvailableLabel": "No disponible"
+        },
+        {
+          "type": "notes",
+          "title": "Notas",
+          "notes": [
+            {
+              "number": 1,
+              "text": "Desde enero de 2026 la serie del IMSS incluye trabajadores de plataformas digitales; comparar periodos a través de ese cambio lleva límite."
+            },
+            {
+              "number": 2,
+              "text": "Periodo inferido del anexo metodológico del ICE 2025; la boleta no lo muestra. El índice no predice ni determina causalidad."
+            },
+            {
+              "number": 3,
+              "text": "PROTOTIPO: registros candidatos del paquete de evidencia ICE 2025, no publicados en KL. Se muestran solo para validar el formato."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ch12",
+      "pageBreakBefore": true,
+      "heading": {
+        "text": "Fuentes, método y avisos",
+        "level": 1,
+        "number": "12"
+      },
+      "blocks": [
+        {
+          "type": "sources",
+          "title": "Fuentes citadas en esta edición",
+          "sources": [
+            {
+              "citation": "IMCO, Índice de Competitividad Estatal 2025 (libro, boletas y anexo metodológico)",
+              "publication": "9-jun-2025",
+              "periods": [
+                "2022–2024 según indicador"
+              ],
+              "consultedOn": "[fecha]",
+              "attribution": "Derechos reservados de IMCO: se cita y parafrasea, no se reproducen tablas.",
+              "permittedUse": "Cita y paráfrasis"
+            },
+            {
+              "citation": "INEGI, Encuesta Nacional de Ocupación y Empleo",
+              "publication": "[fecha]",
+              "periods": [
+                "[trimestre]"
+              ],
+              "consultedOn": "[fecha]",
+              "attribution": "Fuente: INEGI.",
+              "permittedUse": "Libre uso con atribución"
+            },
+            {
+              "citation": "IMSS, puestos de trabajo afiliados",
+              "publication": "[fecha]",
+              "periods": [
+                "[mes]"
+              ],
+              "consultedOn": "[fecha]",
+              "attribution": "[licencia por verificar]",
+              "permittedUse": "[por verificar]"
+            }
+          ],
+          "method": [
+            "Cada cifra proviene de un registro publicado en Knowledge Layer y citado por su identificador y versión; ninguna se escribe a mano.",
+            "Las posiciones de IMCO se muestran solo como posición relativa, con su nota metodológica; el dato vigente proviene de la fuente primaria.",
+            "Se excluyen indicadores de percepción y valores diarios."
+          ],
+          "changesFromPrevious": [
+            "Primera edición."
+          ]
+        },
+        {
+          "type": "edition_stamp",
+          "editionCode": "[2026.1]",
+          "manifestSha256": "__MANIFEST_SHA256__",
+          "verifyLabel": "Verifica si esta edición sigue vigente",
+          "verifyUrl": "[dominio público]/verificar/[identificador de edición]"
+        }
+      ]
+    }
+  ]
+}

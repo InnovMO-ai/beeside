@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>KL 1.0 · Validación externa y entrega del PDF</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/beesidedesignsystem_5ba1bd/styles.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@600;700&amp;family=Public+Sans:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F1F1FA}
+a{color:#7654C8}a:hover{color:#2E0879}
+</style>
+</helmet>
+<div style="width: 1440px; height: 960px; box-sizing: border-box; padding: 56px 64px; background: #F1F1FA; font-family: 'Public Sans', 'Open Sans', sans-serif; color: #00303F; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">Resoluciones del PO del 16-oct · diseño</div>
+<h1 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 700; font-size: 36px; line-height: 44px; letter-spacing: -0.02em; color: #2E0879">Validación externa y entrega del PDF</h1>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; flex-grow: 1">
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">R2</div>
+<h2 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 22px; line-height: 28px; color: #2E0879">Especialista externo, sin abrir KL Admin</h2>
+</div>
+<ol style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 21px">
+<li><b>Registro del validador.</b> KL_ADMIN da de alta nombre, organización, dominios y encargo. Nunca aparece en el PDF.</li>
+<li><b>Hoja de validación.</b> KL genera un PDF de la versión exacta con su código de verificación (12 caracteres de la huella del contenido).</li>
+<li><b>Respuesta firmada.</b> El especialista devuelve la hoja firmada o un correo desde su dominio que cita el código.</li>
+<li><b>Registro interno.</b> Un KL_REVIEWER distinto del autor sube la evidencia y teclea el código que aparece en ella; si no coincide con la versión, se rechaza.</li>
+<li><b>Vigencia.</b> 12 meses como máximo o hasta una reforma detectada en el DOF; avisos a 60 y 30 días en Overview y Knowledge Products.</li>
+</ol>
+<div style="margin-top: auto; padding: 14px 16px; background: #F1F1FA; border-radius: 8px; font-size: 13px; line-height: 19px; color: #194C5C">Validador interno con rol SPECIALIST_VALIDATOR: valida en la aplicación sobre la misma versión, sin archivo de evidencia.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">R3</div>
+<h2 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 22px; line-height: 28px; color: #2E0879">Entrega por Precision, sin enlaces reenviables</h2>
+</div>
+<ol style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 21px">
+<li><b>Congelar.</b> Al publicar la edición, el worker renderiza ES y EN una vez y guarda cada PDF con su huella en almacenamiento privado con retención.</li>
+<li><b>Descubrir.</b> Precision pide recursos relacionados y recibe la edición vigente, su fecha de corte y las secciones pertinentes.</li>
+<li><b>Pedir.</b> El cliente abre la guía desde su espacio; la ruta de Precision verifica sesión y acceso al proyecto en cada petición.</li>
+<li><b>Entregar.</b> Precision llama a openEdition y transmite el archivo con Cache-Control privado. KL suma una descarga anónima por edición, idioma y día.</li>
+<li><b>Revocar.</b> Efecto inmediato: la siguiente petición recibe el aviso y la edición vigente. Las copias descargadas llevan "información vigente al" y su código.</li>
+</ol>
+<div style="margin-top: auto; padding: 14px 16px; background: #F1F1FA; border-radius: 8px; font-size: 13px; line-height: 19px; color: #194C5C">Pendiente de PO-2: página pública mínima de estado de edición y aviso en el espacio del cliente cuando su edición se revoca.</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

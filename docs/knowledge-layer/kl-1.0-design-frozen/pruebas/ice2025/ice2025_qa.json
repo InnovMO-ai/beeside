@@ -1,0 +1,263 @@
+{
+ "entidades": 32,
+ "registros": 1696,
+ "entidades_incompletas": {},
+ "indicadores_faltantes": {},
+ "rangos_fuera_1_32": [],
+ "empates_de_posicion": {
+  "cobertura_educativa": {
+   "21": [
+    "MX-COL",
+    "MX-NAY"
+   ],
+   "15": [
+    "MX-MOR",
+    "MX-PUE"
+   ],
+   "23": [
+    "MX-OAX",
+    "MX-SON"
+   ]
+  },
+  "pasajeros_aereos": {
+   "31": [
+    "MX-HID",
+    "MX-TLA"
+   ]
+  },
+  "carga_aerea": {
+   "29": [
+    "MX-HID",
+    "MX-MOR",
+    "MX-NAY",
+    "MX-TLA"
+   ]
+  },
+  "diversificacion": {
+   "9": [
+    "MX-BCN",
+    "MX-CHH"
+   ],
+   "23": [
+    "MX-DUR",
+    "MX-MOR"
+   ],
+   "16": [
+    "MX-HID",
+    "MX-SIN"
+   ],
+   "2": [
+    "MX-JAL",
+    "MX-MEX"
+   ],
+   "25": [
+    "MX-TAB",
+    "MX-TLA"
+   ]
+  },
+  "mejora_regulatoria": {
+   "17": [
+    "MX-CAM",
+    "MX-CHH"
+   ],
+   "25": [
+    "MX-DUR",
+    "MX-ZAC"
+   ]
+  },
+  "percepcion_corrupcion": {
+   "8": [
+    "MX-NLE",
+    "MX-TAM"
+   ]
+  },
+  "participacion_ciudadana": {
+   "28": [
+    "MX-AGU",
+    "MX-CHH"
+   ],
+   "24": [
+    "MX-BCS",
+    "MX-SIN"
+   ],
+   "16": [
+    "MX-COL",
+    "MX-NAY",
+    "MX-TAM"
+   ],
+   "20": [
+    "MX-DUR",
+    "MX-NLE"
+   ],
+   "26": [
+    "MX-HID",
+    "MX-MIC"
+   ],
+   "22": [
+    "MX-MEX",
+    "MX-SON"
+   ]
+  }
+ },
+ "monotonia_valor_posicion": {},
+ "direccion": {
+  "homicidios": "menor_es_mejor",
+  "robo_vehiculos": "menor_es_mejor",
+  "incidencia_delictiva": "menor_es_mejor",
+  "delitos_no_denunciados": "menor_es_mejor",
+  "percepcion_seguridad": "mayor_es_mejor",
+  "notarios": "mayor_es_mejor",
+  "agresiones_periodistas": "menor_es_mejor",
+  "aguas_residuales": "mayor_es_mejor",
+  "morbilidad_respiratoria": "menor_es_mejor",
+  "camas_hospital": "mayor_es_mejor",
+  "cobertura_educativa": "mayor_es_mejor",
+  "acceso_salud": "mayor_es_mejor",
+  "esperanza_vida": "mayor_es_mejor",
+  "mortalidad_infantil": "menor_es_mejor",
+  "personal_medico": "mayor_es_mejor",
+  "personal_especialidad": "mayor_es_mejor",
+  "heridos_transito": "menor_es_mejor",
+  "telefonia_movil": "mayor_es_mejor",
+  "acceso_internet": "mayor_es_mejor",
+  "terminales_pv": "mayor_es_mejor",
+  "banca_movil": "mayor_es_mejor",
+  "captacion_ahorro": "mayor_es_mejor",
+  "pasajeros_aereos": "mayor_es_mejor",
+  "carga_aerea": "mayor_es_mejor",
+  "pib_turistico": "mayor_es_mejor",
+  "ied": "mayor_es_mejor",
+  "exportaciones": "mayor_es_mejor",
+  "pib_per_capita": "mayor_es_mejor",
+  "crecimiento_pib": "mayor_es_mejor",
+  "diversificacion": "mayor_es_mejor",
+  "complejidad": "mayor_es_mejor",
+  "patentes": "mayor_es_mejor",
+  "intensidad_energetica": "menor_es_mejor",
+  "informalidad": "menor_es_mejor",
+  "ingreso_promedio": "mayor_es_mejor",
+  "desigualdad_salarial": "menor_es_mejor",
+  "bajo_linea_bienestar": "menor_es_mejor",
+  "jornadas_48h": "menor_es_mejor",
+  "educacion_superior": "mayor_es_mejor",
+  "mujeres_pea": "mayor_es_mejor",
+  "brecha_genero": "menor_es_mejor",
+  "dif_informalidad_genero": "menor_es_mejor",
+  "escolaridad": "mayor_es_mejor",
+  "crecimiento_imss": "mayor_es_mejor",
+  "crecimiento_ue50": "mayor_es_mejor",
+  "tasa_participacion": "mayor_es_mejor",
+  "deuda_estatal": "menor_es_mejor",
+  "costo_deuda": "menor_es_mejor",
+  "ingresos_propios": "mayor_es_mejor",
+  "mejora_regulatoria": "mayor_es_mejor",
+  "percepcion_corrupcion": "menor_es_mejor",
+  "consulta_finanzas": "mayor_es_mejor",
+  "participacion_ciudadana": "mayor_es_mejor"
+ },
+ "valores_nulos": [
+  [
+   "costo_deuda",
+   "MX-TLA",
+   "-"
+  ]
+ ],
+ "unidad_boleta_vs_anexo": [
+  [
+   "acceso_internet",
+   "Porcentaje de viviendas",
+   "Porcentaje del total de las viviendas que cuenta con acceso a internet."
+  ],
+  [
+   "carga_aerea",
+   "Kilogramos por cada mil habitantes",
+   "Kilogramos por cada mil habitantes."
+  ],
+  [
+   "complejidad",
+   "Índice normalizado (0-100)",
+   "Índice (normalización 0-100)."
+  ],
+  [
+   "costo_deuda",
+   "Tasa de interés promedio ponderada",
+   "Tasa de interés promedio ponderada."
+  ],
+  [
+   "crecimiento_imss",
+   "Tasa de crecimiento anual",
+   "Tasa de crecimiento anual."
+  ],
+  [
+   "crecimiento_pib",
+   "Promedio de la tasa de crecimiento real de los últimos 3 años",
+   "Promedio de la tasa de crecimiento real de los últimos tres años."
+  ],
+  [
+   "diversificacion",
+   "Número de sectores presentes en la economía",
+   "Número de sectores presentes en la economía."
+  ],
+  [
+   "educacion_superior",
+   "Porcentaje de la población de 25 años y más con educación técnica y superior",
+   "Porcentaje de la población de 25 años y más."
+  ],
+  [
+   "exportaciones",
+   "Porcentaje del PIB",
+   "Porcentaje del PIB."
+  ],
+  [
+   "ied",
+   "Dólares por millar de PIB (promedio 3 años)",
+   "Dólares por millar de PIB (promedio tres años)."
+  ],
+  [
+   "informalidad",
+   "Porcentaje de la población ocupada que se encuentra en condición de informalidad laboral",
+   "Porcentaje de la población económicamente activa ocupada que se encuentra en"
+  ],
+  [
+   "ingreso_promedio",
+   "Pesos por mes",
+   "Pesos mensuales."
+  ],
+  [
+   "mejora_regulatoria",
+   "Índice normalizado (0-100)",
+   "Índice normalizado (0-100), más es mejor."
+  ],
+  [
+   "pasajeros_aereos",
+   "Por cada mil habitantes",
+   "Pasajeros por cada mil habitantes."
+  ],
+  [
+   "percepcion_corrupcion",
+   "Porcentaje de la población urbana de 18 años y más que considera que las prácticas corruptas en el estado son frecuentes y muy frecuentes",
+   "Porcentaje de la población urbana de 18 años y más que considera que las"
+  ],
+  [
+   "percepcion_seguridad",
+   "Porcentaje de la población adulta que se siente segura",
+   "Porcentaje de la población de 18 años y más que se siente segura en suentidad"
+  ],
+  [
+   "pib_per_capita",
+   "Pesos por habitante",
+   "Pesos por habitante."
+  ],
+  [
+   "tasa_participacion",
+   "Proporción de la PEA en relación con la población de 15 años o más",
+   "Proporción de la PEA en relación con la población de 15 años o más."
+  ],
+  [
+   "terminales_pv",
+   "Por cada 10 mil adultos",
+   "Terminales punto de venta por cada 10 mil adultos."
+  ]
+ ],
+ "percepcion_excluidos": 64
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Agent Operations</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Aún no hay ejecuciones: el agente de recolección solo trabaja sobre fuentes aprobadas. El caso ICE 2026 es el escenario A05 con hechos reales de la edición.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html" aria-current="page">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<section class="admin-card" aria-labelledby="ag-q">
+<h2 id="ag-q">Sent to human review</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Change</th><th scope="col">Source</th><th scope="col">Class</th><th scope="col">Review level</th><th scope="col">Detected</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">Nueva edición ICE 2026: un indicador sustituido, otro con método nuevo y serie recalculada</th><td>S02 · IMCO</td><td><span class="admin-badge" data-tone="attention">Method change</span></td><td>2</td><td>[escenario A05]</td><td><a href="KL-03a-ChangeReview.dc.html">Review</a></td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">Un cambio que el agente no puede clasificar con certeza sube de nivel; nunca baja.</p>
+</section>
+<div class="admin-grid">
+<section class="admin-card" aria-labelledby="ag-runs">
+<h2 id="ag-runs">Runs</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Agent</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Tokens · cost</th><th scope="col">When</th></tr></thead>
+<tbody><tr><td colspan="5" class="kl-muted" lang="es">Sin ejecuciones. El agente de recolección se habilita al aprobar la primera fuente; el de conocimiento, al publicar la primera unidad.</td></tr></tbody>
+</table></div>
+</section>
+<section class="admin-card" aria-labelledby="ag-ctl">
+<h2 id="ag-ctl">Controls</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Collector</dt><dd><span class="admin-badge" data-tone="muted">Idle</span> solo dominios del Source Registry</dd></div>
+<div><dt>Knowledge agent</dt><dd><span class="admin-badge" data-tone="muted">Idle</span> sin red; solo contenido publicado</dd></div>
+<div><dt>Budget per run</dt><dd>[por fijar con la línea base]</dd></div>
+<div><dt>Monthly budget</dt><dd>[por fijar con la línea base]</dd></div>
+<div><dt>Retries</dt><dd>3, espera creciente</dd></div>
+<div><dt>Loop cut</dt><dd>Más de [N] cambios por ejecución → a revisión</dd></div>
+</dl>
+<div class="admin-actions"><button type="button" class="button button-secondary">Pause collector</button></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

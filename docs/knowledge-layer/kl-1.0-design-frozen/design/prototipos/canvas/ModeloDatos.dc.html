@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>KL 1.0 · Modelo de datos</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/beesidedesignsystem_5ba1bd/styles.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@600;700&amp;family=Public+Sans:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F1F1FA}
+a{color:#7654C8}a:hover{color:#2E0879}
+code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:13px;color:#2E0879}
+</style>
+</helmet>
+<div style="width: 1712px; height: 1120px; box-sizing: border-box; padding: 56px 64px; background: #F1F1FA; font-family: 'Public Sans', 'Open Sans', sans-serif; color: #00303F; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">Esquema kl · PostgreSQL existente</div>
+<h1 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 700; font-size: 36px; line-height: 44px; letter-spacing: -0.02em; color: #2E0879">Modelo de datos</h1>
+<p style="margin: 0; max-width: 1300px; font-size: 16px; line-height: 24px; color: #4A6B77">Contenido de versión inmutable por trigger; el estado solo cambia por transición permitida y cada cambio deja una fila en kl.audit_event. Referencia canónica de toda pieza: unit_key@versión. Un periodo nuevo es una unidad nueva; una corrección, una versión nueva.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; flex-grow: 1">
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Source Registry</div>
+<div><code>kl.institution</code><br>clase de autoridad A–D, tipo (pública, comercial…)</div>
+<div><code>kl.publication</code><br>serie o publicación, uso permitido, periodicidad, estado, S01–S10 / R1–R34</div>
+<div><code>kl.publication_config_version</code><br>ventanas, presupuesto, reintentos, exclusiones</div>
+<div><code>kl.source_exception</code><br>excepción comercial con vencimiento</div>
+<div><code>kl.indicator</code><br>un concepto, una clave; objetivo, percepción o compuesto</div>
+<div><code>kl.topic</code><br>taxonomía controlada para fichas y demanda</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Ingestión</div>
+<div><code>kl.file_object</code><br>original inmutable, SHA-256, tipo por firma</div>
+<div><code>kl.ingest_batch</code><br>carga del equipo, KSeed o agente; máquina de estados</div>
+<div><code>kl.extracted_row</code><br>valor con localizador y clase de cambio</div>
+<div><code>kl.qa_report</code><br>completitud, rangos, empates, cruce con primaria</div>
+<div><code>kl.agent_run</code><br>ejecución, resultado, tokens, costo, error</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Repositorio</div>
+<div><code>kl.unit</code><br>identidad estable: clave, país, región, tema, categorías, servicios, content_risk</div>
+<div><code>kl.unit_version</code><br>estado, review_level, origen, vigencia, límites, autor, aprobador, content_sha256</div>
+<div><code>kl.stat_value</code><br>proyección estadística consultable: indicador, geo, periodo, valor o no disponible</div>
+<div><code>kl.card_content</code><br>ficha en español maestro, enunciados citables, citas</div>
+<div><code>kl.card_locale_variant</code><br>variante en inglés con su propia aprobación</div>
+<div><code>kl.unit_link</code><br>primaria ↔ intermediario, complemento, serie</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Validación especializada</div>
+<div><code>kl.validator</code><br>registro de validadores internos y externos, dominios</div>
+<div><code>kl.specialist_validation</code><br>versión exacta (huella), dominio, alcance, veredicto, evidencia, vencimiento ≤ 12 meses</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">RAM (contexto compilado)</div>
+<div><code>kl.context_package</code><br>núcleo o etapa, manifiesto id@versión, hash, tokens, estado</div>
+<div><code>kl.package_member</code><br>índice pieza → paquete para invalidar</div>
+<div><code>kl.promotion_policy</code><br>umbrales y presupuestos por nivel</div>
+<div><code>kl.promotion_event</code><br>promover o retirar, con motivo</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Demanda y uso</div>
+<div><code>kl.demand_signal</code><br>dimensiones, cobertura, candidato, clave opaca HMAC; solo inserción</div>
+<div><code>kl.demand_group</code><br>recurrencia y proyectos distintos</div>
+<div><code>kl.demand_decision</code><br>CREATE, ENRICH, PARTIAL, MAP, SPECIALIST ONLY, DEFER, REJECT</div>
+<div><code>kl.usage_daily</code><br>uso por pieza, etapa y país; sin proyecto</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Knowledge Products</div>
+<div><code>kl.product</code> · <code>kl.product_section</code><br>12 capítulos, plantilla y tipo de contenido por sección</div>
+<div><code>kl.composition_item</code><br>pieza fijada por versión y su estado editorial</div>
+<div><code>kl.edition</code><br>2026.1, manifiesto congelado y su huella, fecha de corte</div>
+<div><code>kl.edition_rendering</code><br>PDF por idioma, huellas del documento, HTML y PDF</div>
+<div><code>kl.change_notice</code> · <code>kl.distribution_daily</code><br>avisos de cambio; descargas anónimas</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 19px">
+<div style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 18px; color: #2E0879">Gobierno</div>
+<div><code>kl.role_grant</code><br>KL_ADMIN, KL_EDITOR, KL_REVIEWER (+ editorial), SPECIALIST_VALIDATOR por dominio</div>
+<div><code>kl.setting_version</code><br>presupuestos, umbrales, tamaños, rutas</div>
+<div><code>kl.audit_event</code><br>solo inserción; nadie borra</div>
+<div style="margin-top: 4px; padding: 12px; background: #F1F1FA; border-radius: 8px; color: #194C5C">Precision lee solo la vista <code>kl.v_consumable</code> con el rol de base de datos kl_reader_precision e inserta señales y uso por función.</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1712,"height":1120}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
