@@ -185,7 +185,7 @@ Instancia desechable `g1-rehearsal-kl` (PG16, `db-f1-micro`, ENTERPRISE) en `bee
 | Principal | E1 | E2 GRANT | E3 SET ROLE | E4 ALTER/DROP | E5 CREATE ROLE | E6 OWNER | E7 | E8 | E11 DROP DB | E12 terminar sesiones | E14 | E15 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `beeside_app` (API, `cloudsqlsuperuser`) | falla ✅ | **ÉXITO ❌** | **ÉXITO ❌** | **ÉXITO ❌** (PASSWORD, NOLOGIN) | **ÉXITO ❌** | **ÉXITO ❌** | **todo true ❌** | **5 filas ❌** | **ÉXITO ❌** | n/c | 0 ✅ | falla ✅ |
-| `postgres` (`cloudsqlsuperuser`) | — | **ÉXITO ❌** | falla en `kl_app` tras GRANT individual (comportamiento de `set_option`; el GRANT ya otorgó membresía) | **ÉXITO ❌** | — | — | — | — | — | **2 sesiones terminadas ❌** | — | — |
+| `postgres` (`cloudsqlsuperuser`) | — | **ÉXITO ❌** | no concluyente: `SET ROLE kl_app` falló porque solo se concedió `kl_owner` (el `GRANT kl_owner TO postgres` tuvo éxito, y se revirtió) | **ÉXITO ❌** | — | — | — | — | — | **2 sesiones terminadas ❌** | — | — |
 | `fa4_staging_runtime` (rol simple por SQL) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | sin efecto ✅ | 0 ✅ | falla ✅ |
 | `beeside_app` **degradado** (`REVOKE cloudsqlsuperuser`, `NOCREATEROLE NOCREATEDB`) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | falla ✅ (necesita `pg_signal_backend`) | 0 ✅ | falla ✅ |
 
