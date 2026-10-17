@@ -10,5 +10,17 @@
       "pages": 7,
       "documentSha256": "d74bd431f7d0876d8c5041beed7dcb3885627530f30f12ade7dad222c60411c8"
     }
+  },
+  "linux-x64-chromium-153.0.8010.12-lato": {
+    "es": {
+      "pdfSha256": "3705cf1d03c8fe32dc6b2779c1058e7f038a8a441c9d77ece0447e1b29389a9a",
+      "pages": 7,
+      "documentSha256": "c55d4e7fd4b0d4d86aadaefe800180a82108c83a86448a1e37e05094af70b79c"
+    },
+    "en": {
+      "pdfSha256": "b68557505a34700f1bc02d6c824e740ddc0563f3d2a815177e60e50e53cb4aa3",
+      "pages": 7,
+      "documentSha256": "d74bd431f7d0876d8c5041beed7dcb3885627530f30f12ade7dad222c60411c8"
+    }
   }
 }

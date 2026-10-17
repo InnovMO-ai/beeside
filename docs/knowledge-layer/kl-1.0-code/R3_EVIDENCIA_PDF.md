@@ -48,3 +48,11 @@ Con pdf.js (instalado fuera del repo) se extrae el texto del PDF: contiene cada 
 - **PDF/UA**: no hay validador instalable en este entorno; AC-13 se cumple con etiquetado, estructura de encabezados (`H2`/`P`), idioma, marcadores y fuentes incrustadas, y queda **pendiente la revisión con lector de pantalla** documentada (AC-13 es «parcial» en la Matriz).
 - **Antimalware (B8) y bucket (B9)**: el almacén local es solo de desarrollo; el adaptador de producción llega con G2.
 - **Chromium en CI/imagen**: se instala con `playwright-core install chromium` (paso agregado a `kl-ci.yml`); el paquete `playwright-core` debe declararse como dependencia del backend (cambio compartido solicitado, aún no ejecutado).
+
+## Línea base AC-10 en Linux (2026-10-17)
+
+Se registró `linux-x64-chromium-153.0.8010.12-lato` en `ac10-baseline.json` (la clave de macOS no cambió). Criterios aplicados antes de aceptarla:
+- **Determinismo:** el candidato generado por CI es idéntico en dos ejecuciones independientes (runs `39004780807` y `39005024374`), y dentro de cada ejecución un segundo render inmediato y la comparación con la línea base reescrita coinciden.
+- **Mismo contenido que el diseño aprobado:** `documentSha256` idéntico al de macOS en ES y EN; 7 páginas en ambos idiomas y en ambas plataformas.
+- **Equivalencia visual entre plataformas (pdf.js, instantánea fija ES y EN):** texto idéntico en las 7 páginas, mismo número de elementos de texto, mismas cajas de página, posición vertical idéntica (Δy = 0) y desviación horizontal ≤ 0,11 pt (ancho de trazo ≤ 0,24 pt). Las huellas del PDF difieren por plataforma (por eso la línea base es por motor y plataforma); no hay diferencia de contenido ni de maquetación.
+- **Límite declarado:** la clave es la del *runner* de CI (Chromium del host), no la de la imagen `runtime-kl-worker`. La imagen usa el mismo Chromium (153.0.8010.12) y la misma tipografía incrustada, pero la huella del render dentro del contenedor no se comparó con la del host; además `node:20-slim` no está fijada por resumen (digest). Pendiente: fijar el digest y, si se quiere, una línea base de contenedor.
