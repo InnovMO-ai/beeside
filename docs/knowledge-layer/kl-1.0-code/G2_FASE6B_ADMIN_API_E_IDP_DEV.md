@@ -72,3 +72,53 @@ Recomendación: **A para dev**, con un cliente OAuth exclusivo de dev; B queda c
 1. Elegir A, B o C.
 2. Si A: que un Owner cree el cliente OAuth «Aplicación web» (consentimiento Interno) con la redirect URI de la sección 2 y entregue **solo el client id** por chat; el secreto lo coloca directamente en `beeside-dev-sso-client-secret` (yo puedo dejar listo el comando `gcloud secrets versions add … --data-file=-` para que lo ejecute él/ella).
 3. Autorización expresa de S1 (parte de secretos/IAM), S2 y S3; S4–S5 después.
+
+---
+
+## 8. S1 con la opción A elegida: pasos exactos para el Owner (PREPARADO, NO EJECUTADO)
+
+Decisión del PO: **opción A — Google Workspace como IdP de dev**. Estado leído hoy (solo lectura): `beeside-dev-sso-client-secret` existe como placeholder **sin versiones ni IAM**; `beeside-dev-admin-session-secret` **no existe**; el backend corre como `640247497574-compute@developer.gserviceaccount.com`; cuenta activa de `gcloud`: `mo@beeside.you` (Owner).
+
+### 8.1 En la consola de Google Cloud (manual; solo el Owner)
+1. *APIs y servicios → Pantalla de consentimiento de OAuth* (o *Google Auth Platform → Branding/Audiencia*): tipo de usuario **Interno** (limita el acceso a la organización `beeside.you`); nombre de la app «beeside Control Center (dev)»; correo de soporte; alcances solo **`openid`** y **`email`** (no sensibles).
+2. *Credenciales → Crear credenciales → ID de cliente de OAuth* → tipo **Aplicación web**, nombre `beeside-dev-control-center`. **URI de redireccionamiento autorizada** (exacta): `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/auth/callback`. Orígenes de JavaScript: no se necesitan (el flujo es de servidor).
+3. Al crear, la consola muestra el **ID de cliente** y el **secreto**. Entrega por chat **solo el ID de cliente** (no es secreto). **El secreto no sale del terminal del Owner.**
+(La interfaz de Google cambia de nombre con frecuencia: si «Pantalla de consentimiento» aparece como «Google Auth Platform», las opciones equivalen.)
+
+### 8.2 Secretos e IAM (terminal del Owner, desde la raíz del repositorio)
+```bash
+bash scripts/kl/g2/s1-idp-secrets.sh plan                              # solo lectura
+S1_CONFIRM=yes bash scripts/kl/g2/s1-idp-secrets.sh session           # crea beeside-dev-admin-session-secret con 48 bytes aleatorios (no se muestra)
+S1_CONFIRM=yes bash scripts/kl/g2/s1-idp-secrets.sh client-secret     # pide el client secret de Google OCULTO y lo agrega a beeside-dev-sso-client-secret
+S1_CONFIRM=yes bash scripts/kl/g2/s1-idp-secrets.sh iam               # secretAccessor a la cuenta del backend SOLO sobre esos dos secretos
+bash scripts/kl/g2/s1-idp-secrets.sh verify                            # versiones habilitadas y miembros de IAM; nunca lee el contenido
+```
+Los subcomandos que escriben se niegan sin `S1_CONFIRM=yes` (probado: sale con código 2); `client-secret` exige terminal interactivo y rechaza valores de menos de 20 caracteres. El secreto de sesión lo puedo ejecutar yo (sesión de `gcloud` del Owner) si lo autorizas; **el del cliente OAuth lo teclea el Owner**.
+
+Comandos equivalentes sin el script (por si se prefiere):
+```bash
+P=beeside-dev-508220; SA=640247497574-compute@developer.gserviceaccount.com
+gcloud secrets create beeside-dev-admin-session-secret --project $P --replication-policy=automatic --labels=environment=dev,purpose=admin-session-signing
+openssl rand -base64 48 | tr -d '\n' | gcloud secrets versions add beeside-dev-admin-session-secret --project $P --data-file=-
+read -rs -p "client secret: " CS; echo; printf '%s' "$CS" | gcloud secrets versions add beeside-dev-sso-client-secret --project $P --data-file=-; unset CS
+for s in beeside-dev-sso-client-secret beeside-dev-admin-session-secret; do
+  gcloud secrets add-iam-policy-binding $s --project $P --member serviceAccount:$SA --role roles/secretmanager.secretAccessor --condition=None
+done
+```
+
+### 8.3 Efectos y límites de S1
+- **Cambia:** 1 secreto nuevo (`beeside-dev-admin-session-secret`, fuera de Terraform; opcionalmente se incorpora después a `modules/secrets`, cambio compartido), 1 versión en el placeholder existente y 2 enlaces de IAM por secreto. **No** cambia el servicio, ni la base, ni KL.
+- **Efecto lateral conocido (D3):** la cuenta del backend es la cuenta compute por defecto, compartida con los servicios `fa4-*`; también podrían leer estos dos secretos. Se corrige con una cuenta de servicio propia del backend (decisión abierta).
+- **El secreto de sesión firma las sesiones del Control Center:** rotarlo invalida todas las sesiones abiertas.
+
+### 8.4 Rollback de S1
+```bash
+gcloud secrets versions list beeside-dev-sso-client-secret --project $P                       # identificar la versión
+gcloud secrets versions destroy <N> --secret beeside-dev-sso-client-secret --project $P       # o "disable" para poder reactivarla
+gcloud secrets delete beeside-dev-admin-session-secret --project $P
+gcloud secrets remove-iam-policy-binding <secreto> --project $P --member serviceAccount:$SA --role roles/secretmanager.secretAccessor
+```
+y borrar el cliente OAuth `beeside-dev-control-center` en la consola. Mientras S2 no se ejecute, S1 no tiene efecto sobre ningún servicio.
+
+### 8.5 Siguiente
+Con el ID de cliente y los secretos listos, S2 (habilitar el Admin API sobre la imagen actual de `main`) y S3 (inicio de sesión real de `mo@beeside.you`) requieren su propia autorización expresa.
