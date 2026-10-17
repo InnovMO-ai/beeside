@@ -284,3 +284,27 @@ E1–E15 sobre `beeside-dev-kl-db` (evidencia: `evidence/G1-dev-kl-2026-10-16/E1
 **Límites declarados (no es aprobación plena todavía):** (1) E9/E10 se ejecutaron con la base vacía y sin las ACL finales; deben **repetirse tras KL-0001** (que concede CONNECT y define privilegios). (2) El plano IAM sigue pudiendo restablecer la contraseña de `postgres` o crear usuarios por API (`cloudsql.users.*`: hoy solo el owner humano `mo@beeside.you`); crear cualquier usuario por API en esta instancia **rompe el aislamiento**. Control recomendado: prohibirlo por proceso y comprobar periódicamente (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` solo debe devolver `postgres` y `cloudsql*`), y vigilar en Cloud Audit Logs `cloudsql.users.create/update`. (3) El principal `postgres` no se probó (no tiene contraseña); es equivalente a un miembro de `cloudsqlsuperuser`.
 
 **Decisión del PO:** declarar **G1 aprobado condicionado** (repetición E1–E15 + comprobación de miembros tras KL-0001) o exigir esa repetición antes de aprobarlo. No se migró nada; `beeside_kl` sigue vacía. Siguiente fase del RUNBOOK (5: exportación previa y migración KL-0001…0005) requiere imagen `runtime` construida (validación de imagen **PENDIENTE G2**: sin Docker local; requiere push de la rama para CI o Cloud Build).
+
+---
+
+## 11. Estado de G1 y validación de imágenes (preparada, NO ejecutada)
+
+### G1 — APROBADO CONDICIONADO (decisión del PO, 2026-10-16)
+Condiciones, a cumplir **después de KL-0001 (y de cada migración KL posterior que cambie privilegios)**:
+1. Repetir E1–E15 con `scripts/kl/g1/run-e.sh` (rol simple de prueba creado y eliminado según RUNBOOK Fase 4), incluyendo E9 y E10 ya con objetos y ACL finales, y archivar la salida en `evidence/G1-<fecha>/`.
+2. Comprobar `pg_auth_members` de `cloudsqlsuperuser`: solo `postgres` y `cloudsql*`.
+3. Prohibir por proceso crear usuarios por API en `beeside-dev-kl-db` y vigilar `cloudsql.users.create/update` en Cloud Audit Logs.
+Si cualquiera falla: **G1 deja de estar aprobado** y no se continúa.
+
+### Validación de imágenes (G2, `runtime` y `runtime-kl-worker`)
+Este Mac no tiene Docker: **PENDIENTE G2; el worker NO se declara listo para producción** hasta que corra con éxito. Preparado sin ejecutar:
+- `scripts/kl/smoke/images.sh`: construye los dos destinos y el predeterminado (debe ser idéntico a `runtime`), y comprueba metadatos (usuario `node`, CMD, puerto), disposición de archivos exactamente donde el código compilado los busca (`dist/kl/db/migrations`, `dist/kl/products/assets` con `fonts` y `fonts-fallback`, `db/migrations` de plataforma, `playwright-core`), ausencia de Chromium en la API y presencia legible en el worker, las migraciones empaquetadas (contiguas, con huellas y lint contra las tablas ajenas), la API arrancando **sin KL** (`/health` 200; `/api/public/editions/*` y `/api/admin/kl/*` → 404; sin credenciales de KL en el log), el render real en el worker con `--network none` y que el worker se niega a arrancar sin configuración.
+- `scripts/kl/smoke/render-smoke.js` y `migrations-smoke.js` (se ejecutan dentro de las imágenes).
+- Job `kl-images` en `.github/workflows/kl-ci.yml` (sin credenciales de GCP, sin publicar imágenes).
+- **Validado localmente** (fuera de contenedor, Chromium 153.0.8010.12 en macOS): `render-smoke.js` pasa (Lato verificada, 3 páginas, dos renders idénticos, petición remota bloqueada y registrada) y `migrations-smoke.js` pasa (10 archivos, 56 tablas ajenas comparadas). El comportamiento **dentro del contenedor Linux** sigue sin comprobar.
+
+Cómo se ejecuta (requiere tu autorización de **push** de la rama para el CI, D1; o Docker en otra máquina con `bash scripts/kl/smoke/images.sh`). Alternativa con Cloud Build (D2): etiqueta `kl-g2-<sha>` en Artifact Registry sin desplegar.
+
+Hallazgos de la preparación:
+- **AC-10 en Linux no tiene línea base.** `ac10-baseline.json` solo tiene `darwin-arm64-chromium-153.0.8010.12-lato`. El smoke verifica determinismo dentro de la plataforma e informa la huella; registrar la clave `linux-x64-…` es un cambio a aprobar tras la primera ejecución.
+- **El worker en producción no puede renderizar aún:** `kl-worker.ts` lanza `KlConfigError` si `KL_RENDER_ENABLED=true` con `NODE_ENV=production` hasta existir el adaptador de almacenamiento GCS (D8). En dev (`NODE_ENV=development`, como define el job de Terraform) usaría `LocalObjectStore` sobre disco efímero de Cloud Run: sirve para el humo, **no** para publicar ediciones.

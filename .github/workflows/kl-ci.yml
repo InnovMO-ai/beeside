@@ -47,3 +47,21 @@ jobs:
       - name: KL tests (R1 X01-X22/X28/X29, R2 X30, R3 AC-10/X19, rehearsal of E1-E10)
         working-directory: backend
         run: npx jest -c src/kl/jest.kl.config.js --ci
+
+  # Validación REAL de las imágenes (G2): construye runtime y runtime-kl-worker y ejecuta las pruebas de humo (ver scripts/kl/smoke/images.sh).
+  # Sin credenciales de GCP, sin subir imágenes, render con --network none. Su resultado es lo que cierra «validación de imagen PENDIENTE G2».
+  kl-images:
+    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
+    runs-on: ubuntu-latest
+    env:
+      PRECISION_KNOWLEDGE_PROVIDER: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build both Dockerfile targets and smoke-test them
+        run: bash scripts/kl/smoke/images.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kl-image-smoke
+          path: scripts/kl/smoke/out/
+          if-no-files-found: ignore
