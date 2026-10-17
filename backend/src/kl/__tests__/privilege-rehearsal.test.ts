@@ -1,5 +1,5 @@
 import { Client } from "pg";
-import { describeKl, freshBeesideDatabase, freshKlDatabase, withSuper, roleUrl } from "../testing/env";
+import { describeKl, freshBeesideDatabase, freshKlDatabase, withSuper, roleUrl, passwordClause } from "../testing/env";
 
 /**
  * Ensayo LOCAL del protocolo E1–E10 (Contratos de seguridad §8.3, condición G1) en el clúster efímero, con un rol ajeno a KL
@@ -8,7 +8,7 @@ import { describeKl, freshBeesideDatabase, freshKlDatabase, withSuper, roleUrl }
  * algo que este clúster no reproduce.
  */
 describeKl("ensayo local de G1 · E1–E10", () => {
-  const url = (user: string, db: string) => roleUrl("postgres", db).replace("//postgres@", `//${user}@`);
+  const url = (user: string, db: string) => roleUrl(user, db);
   let app: Client;
 
   beforeAll(async () => {
@@ -16,7 +16,7 @@ describeKl("ensayo local de G1 · E1–E10", () => {
     await freshKlDatabase();
     await withSuper(async (c) => {
       await c.query("DROP ROLE IF EXISTS app_sim");
-      await c.query("CREATE ROLE app_sim LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB");
+      await c.query(`CREATE ROLE app_sim LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB${passwordClause()}`);
     });
     await withSuper((c) => c.query("GRANT ALL ON ALL TABLES IN SCHEMA public TO app_sim; GRANT ALL ON SCHEMA public TO app_sim"), "beeside");
     app = new Client({ connectionString: url("app_sim", "beeside") });

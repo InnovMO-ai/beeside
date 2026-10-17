@@ -16,13 +16,27 @@ function superUrl(db: string): string {
   return u.toString();
 }
 
-/** URL de un rol de KL hacia una base (el clúster efímero usa autenticación `trust`). */
-export function roleUrl(role: KlRole | "postgres", db = "beeside_kl"): string {
+/**
+ * URL de un rol hacia una base. El clúster efímero local usa autenticación `trust` (sin contraseña); un servicio con contraseña
+ * (`KL_TEST_PG_URL` con credenciales, p. ej. `postgres:16` en GitHub Actions) reutiliza esa misma contraseña para todos los roles de
+ * prueba: `bootstrapRoles` y `testPassword` la fijan en cada uno. Son clústeres efímeros con datos sintéticos.
+ */
+export function roleUrl(role: string, db = "beeside_kl"): string {
   const u = new URL(process.env.KL_TEST_PG_URL as string);
   u.username = role;
-  u.password = "";
   u.pathname = `/${db}`;
   return u.toString();
+}
+
+/** Contraseña del superusuario del clúster de prueba ("" con `trust`); se reutiliza para los roles de prueba. */
+export function testPassword(): string {
+  return decodeURIComponent(new URL(process.env.KL_TEST_PG_URL as string).password);
+}
+
+/** Fragmento SQL `PASSWORD '...'` para un rol de prueba, o cadena vacía si el clúster usa `trust`. */
+export function passwordClause(): string {
+  const pw = testPassword();
+  return pw ? ` PASSWORD '${pw.replace(/'/g, "''")}'` : "";
 }
 
 export async function connectAs(role: KlRole | "postgres", db = "beeside_kl"): Promise<Client> {
@@ -43,7 +57,11 @@ export async function withSuper<T>(fn: (c: Client) => Promise<T>, db = "postgres
 
 /** Crea los roles (idempotente). Lo llama el globalSetup una vez por clúster. */
 export async function bootstrapRoles(): Promise<void> {
-  await withSuper((c) => c.query(rolesSql()));
+  await withSuper(async (c) => {
+    await c.query(rolesSql());
+    const pw = passwordClause();
+    if (pw) for (const r of ["kl_owner", "kl_app", "kl_reader_precision", "kl_agent", "kl_knowledge"]) await c.query(`ALTER ROLE ${r}${pw}`);
+  });
 }
 
 /** Base `beeside_kl` nueva (borra la anterior) migrada con el runner de KL como `kl_owner`. */
