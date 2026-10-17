@@ -111,3 +111,9 @@ Una pausa detiene los disparos futuros sin interrumpir una ejecución en curso. 
 
 ### Qué vigilar (sin alertas automáticas todavía)
 `gcloud run jobs executions list --job beeside-dev-kl-worker --region northamerica-south1 --limit 10` (columnas `FAILED_COUNT`/`RETRIED_COUNT` vacías) y los registros `stderr`; una racha de `exit(1)` pide pausar. Recomendado como decisión posterior: una alerta de Cloud Monitoring sobre ejecuciones fallidas del job.
+
+
+---
+
+## Verificación de la PRIMERA exportación programada (preparada 2026-10-17, 23:20 UTC)
+Aún no ha disparado: el siguiente disparo del schedule es **2026-10-18 08:30:00 UTC (02:30 CDMX)**. Comando único, solo lectura: `bash scripts/kl/g2/verify-scheduled-export.sh` (a partir de las **08:35 UTC**). Comprueba que, **tras el disparo programado**: (1) el intento del scheduler terminó con HTTP 200; (2) hay una **versión nueva** de `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz`; (3) existe una operación `EXPORT` **DONE** emitida por `beeside-dev-kl-scheduler@…`. Sale con 0 solo si las tres se cumplen (**G2 puede cerrarse**), con 3 si aún no ha disparado y con 1 si falla (entonces: `d9-scheduler.sh pause export` y diagnóstico). Probado hoy: devuelve «aún no ha disparado» y, con `LAST_OVERRIDE` apuntando a la ejecución manual de las 17:27 UTC, las tres comprobaciones salen OK (valida el análisis; **no** cuenta como la verificación programada). Nota: el campo `lastAttemptTime` de Cloud Scheduler solo refleja disparos programados, no las ejecuciones forzadas.

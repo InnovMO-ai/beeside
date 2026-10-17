@@ -30,7 +30,7 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 ## 5. Pendientes reales
 **A · Cierre de G2**
 1. ~~X24 restauración~~ **HECHA** (17-oct, 18:05 UTC).
-2. **Primera exportación programada:** 18-oct 08:30 UTC; verificar objeto/versión y que la operación la emite `beeside-dev-kl-scheduler@…`. Si falla: pausar y reportar.
+2. **Primera exportación programada:** 18-oct 08:30 UTC (02:30 CDMX; verificar con `bash scripts/kl/g2/verify-scheduled-export.sh` a partir de las 08:35 UTC, comprobado el 17-oct 23:20 UTC que aún no ha disparado); verificar objeto/versión y que la operación la emite `beeside-dev-kl-scheduler@…`. Si falla: pausar y reportar.
 
 **B · Riesgos abiertos del entorno actual (no bloquean G2, sí la fiabilidad)**
 3. **Procesos de fondo de KL en el backend** (reconciliador de identidades cada 5 min, correlación de auditoría diaria — X30) **no son fiables**: el servicio escala a cero y estrangula CPU. Requiere instancia mínima con CPU siempre asignada (decisión de Plataforma/coste) o moverlos a un job.
