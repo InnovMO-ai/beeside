@@ -1,6 +1,6 @@
-# CR-KL-003 · Anexo de implementación (borrador v0.2, no aprobado)
+# CR-KL-003 · Anexo de implementación (aprobado por el PO el 17-oct-2026)
 
-> Parte de CR-KL-003 (decisión 1 del PO, 17-oct-2026: separar las reglas operativas C7–C9 del cuerpo). **No modifica CR-KL-002.** Se aprueba junto con `CR-KL-003.md`, pero puede revisarse sin reabrir las reglas C1–C6. Evidencia: `docs/knowledge-layer/kl-1.0-code/G2_D9_CLOUD_SCHEDULER.md` y `G2_FASE7_WORKER_Y_PRUEBAS.md`.
+> Parte de CR-KL-003 (decisión 1 del PO, 17-oct-2026: separar las reglas operativas C7–C9 del cuerpo). **No modifica CR-KL-002.** Aprobado junto con `CR-KL-003.md`; puede revisarse sin reabrir las reglas C1–C6. Evidencia: `docs/knowledge-layer/kl-1.0-code/G2_D9_CLOUD_SCHEDULER.md` y `G2_FASE7_WORKER_Y_PRUEBAS.md`.
 
 | # | Regla (antes) | Texto |
 |---|---|---|

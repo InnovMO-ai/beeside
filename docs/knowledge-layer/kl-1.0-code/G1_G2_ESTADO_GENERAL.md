@@ -17,7 +17,8 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 - **Seguridad de credenciales:** X27 **probada** (la identidad del worker recibe 403 en los secretos de plataforma y de otros roles); X26 **por política** (sin prueba empírica).
 - **Calidad:** KL 351/351, backend 402, línea base AC-10 en macOS y Linux (contenido idéntico, Δ ≤ 0,11 pt), `terraform validate/plan` limpios.
 
-## 3. Desviaciones del diseño aprobado que conviene formalizar
+## 3. Desviaciones del diseño aprobado — FORMALIZADAS en CR-KL-003 (aprobado por el PO el 17-oct-2026)
+> `docs/knowledge-layer/kl-1.0-addenda/CR-KL-003/` (v1.0; reglas C1–C6, anexo AI-1…AI-3 y recomendación a Plataforma). Huella de su `MANIFEST.sha256`: `9e8b2d3693ee5875d463156203d6fd93ff94f543a198376e8c97ded49b34070a`. **No fijado en el preflight** por decisión del PO; CR-KL-002 y los archivos de guarda intactos. Lo siguiente es el texto previo a la aprobación (referencia histórica):
 1. **Instancia dedicada** en lugar de la compartida (CR-KL-002 B7/§10/§12 decía «misma instancia; separada diferida»). Decisión del PO (opción A) justificada con evidencia; el CR-KL-002 es inmutable, por lo que debería registrarse como un **addendum nuevo** (p. ej. CR-KL-003), no editando el existente.
 2. Roles `kl_*` creados **por SQL** con un aprovisionador de un solo uso (no `google_sql_user`, que los haría `cloudsqlsuperuser`); la IAM de base de datos **no** resuelve el riesgo (probado).
 3. Cloud Scheduler en `us-south1`; almacén de desarrollo local en el worker (**sin adaptador GCS**).
@@ -60,4 +61,4 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 | Verificar KL de extremo a extremo | abrir `/api/admin/kl/me` con sesión; `scripts/kl/preflight.sh --gate` |
 
 ## 7. Decisiones que necesita el PO
-(1) ¿Se verifica mañana la primera exportación programada y se da G2 por cerrada? (2) ¿Se formaliza la instancia dedicada en un addendum (CR-KL-003)? (3) Procesos de fondo: ¿instancia mínima con CPU asignada o job? (4) ¿Cuenta de servicio propia del backend (D3)? (5) ¿X26 empírico? (6) ¿Quién lleva a `main` los dos parches de la plataforma y cuándo se fusiona la rama (impacto de `deploy-dev`)? (7) Prioridad de D8 (GCS) frente a staging/producción y G3.
+(1) ¿Se verifica mañana la primera exportación programada y se da G2 por cerrada? (2) ~~¿Se formaliza la instancia dedicada en un addendum (CR-KL-003)?~~ **Hecho (aprobado 17-oct-2026).** (3) Procesos de fondo: ¿instancia mínima con CPU asignada o job? (4) ¿Cuenta de servicio propia del backend (D3)? (5) ¿X26 empírico? (6) ¿Quién lleva a `main` los dos parches de la plataforma y cuándo se fusiona la rama (impacto de `deploy-dev`)? (7) Prioridad de D8 (GCS) frente a staging/producción y G3.

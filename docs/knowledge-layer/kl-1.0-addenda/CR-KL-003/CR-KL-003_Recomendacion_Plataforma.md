@@ -1,6 +1,6 @@
 # CR-KL-003 · Recomendación a Plataforma: degradar `beeside_app` y cerrar el vector de escalada en la instancia canónica
 
-> **Documento de recomendación — NO normativo para KL, NO enviado, NO ejecutado.** Preparado por Knowledge Layer Code a petición del PO (decisión 4 del 17-oct-2026) para que lo entregue a quien responda por la plataforma (Discovery, Precision, FA4, Control Center). KL **no** modifica la instancia canónica ni a `beeside_app`.
+> **Documento de recomendación — NO normativo para KL, NO enviado, NO ejecutado.** Forma parte de la carpeta CR-KL-003 aprobada el 17-oct-2026, pero su contenido es una recomendación, no una regla. Preparado por Knowledge Layer Code a petición del PO (decisión 4 del 17-oct-2026) para que lo entregue a quien responda por la plataforma (Discovery, Precision, FA4, Control Center). KL **no** modifica la instancia canónica ni a `beeside_app`.
 
 ## 1. Hallazgo
 En la instancia Cloud SQL canónica (`beeside-dev-canonical-db`, PG16) los usuarios `beeside_app` y `postgres` son miembros de `cloudsqlsuperuser` (todo usuario creado por la API lo es). En Cloud SQL, **un miembro de `cloudsqlsuperuser` administra por completo cualquier rol no superusuario de la instancia**: `GRANT <rol>`, `SET ROLE`, `ALTER ROLE … PASSWORD/NOLOGIN`, `CREATE ROLE`, `ALTER DATABASE … OWNER` y `DROP DATABASE`. Se comprobó en una instancia desechable que reproduce la semántica de Cloud SQL (evidencia: `docs/knowledge-layer/kl-1.0-code/evidence/G1-rehearsal-2026-10-16/`, resumen en `G1_G2_PLAN.md` §9).

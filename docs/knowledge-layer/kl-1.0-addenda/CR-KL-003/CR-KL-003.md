@@ -1,18 +1,18 @@
 # CR-KL-003 · Instancia Cloud SQL dedicada para `beeside_kl` y desviaciones de implementación verificadas
 
-> **BORRADOR v0.2 — NO APROBADO.** Propuesto a partir de la evidencia real de G1–G2 en dev (16 y 17-oct-2026); incorpora las decisiones del PO sobre el borrador v0.1 (17-oct-2026, §0). No tiene vigencia normativa hasta la aprobación expresa del PO. **No modifica CR-KL-002**, que sigue íntegro y vigente salvo en lo que este documento, una vez aprobado, sustituya de forma explícita (§5).
+> **APROBADO por el PO el 17-oct-2026 (Ciudad de México).** Formaliza lo verificado en G1–G2 en dev (16 y 17-oct-2026) e incorpora las decisiones del PO sobre el borrador v0.1 (§0). El texto normativo es el del borrador v0.2 revisado y aprobado por el PO; al aprobarse solo cambian los metadatos (versión 1.0, estado, aprobación y trazabilidad). **No modifica CR-KL-002**, que sigue íntegro y vigente salvo en lo que este documento sustituye de forma explícita (§5).
 
 | Campo | Valor |
 |---|---|
-| Identificador | CR-KL-003 · versión 0.2 (borrador) |
+| Identificador | CR-KL-003 · versión 1.0 (texto del borrador v0.2 aprobado) |
 | Tipo | Cambio arquitectónico y de infraestructura (precisa y corrige CR-KL-002) |
-| Estado | **Borrador v0.2, pendiente de la aprobación final del PO** |
+| Estado | **Aprobado por el PO** (17-oct-2026, Ciudad de México) |
 | Plataforma | Knowledge Layer 1.0 · MVP1 |
 | Base de referencia (sin modificar) | CR-KL-002 v1.0, manifiesto `08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b` · diseño congelado `kl-design-1.0-frozen` (`69f211a`), manifiesto `8901ecfa25db28acde1445399774ab614f9e046fbefb935a86214d17ad5f4afe` |
 | Decisión del PO que lo origina | Opción A «instancia dedicada `beeside-dev-kl-db`», 16-oct-2026, tras el ensayo D2 de G1 |
 | Evidencia | `docs/knowledge-layer/kl-1.0-code/` — `G1_G2_PLAN.md` §9–§10 y §12, `G2_FASE5_PROCEDIMIENTO.md`, `G2_FASE7_WORKER_Y_PRUEBAS.md`, `G2_D9_CLOUD_SCHEDULER.md`, `G1_G2_ESTADO_GENERAL.md`, y `evidence/G1-*`, `evidence/X24-*` |
 | Código y rama | `feat/kl-1.0-code`, commit de referencia `e0e3931` |
-| Documentos de este cambio | `CR-KL-003.md` (este, reglas normativas C1–C6) · `CR-KL-003_Anexo_Implementacion.md` (AI-1…AI-3, antes C7–C9) · `CR-KL-003_Recomendacion_Plataforma.md` (recomendación a Plataforma, no normativa para KL) |
+| Documentos de este cambio | `CR-KL-003.md` (este, reglas normativas C1–C6) · `CR-KL-003_Anexo_Implementacion.md` (AI-1…AI-3, antes C7–C9) · `CR-KL-003_Recomendacion_Plataforma.md` (recomendación a Plataforma, no normativa para KL) · `MANIFEST.sha256` |
 
 ## 0. Decisiones del PO sobre el borrador v0.1 (17-oct-2026)
 
@@ -106,12 +106,12 @@ CR-KL-002 §2 completo; reglas B1–B6, B8–B10; el contrato `kl.v1`; la base `
 ## 10. Trazabilidad y aprobación
 | Elemento | Referencia |
 |---|---|
-| Este documento | `docs/knowledge-layer/kl-1.0-addenda/CR-KL-003/CR-KL-003.md` en la rama `feat/kl-1.0-code` (borrador) |
-| Integridad | Al aprobarse se generará `MANIFEST.sha256` de la carpeta. **Decisión del PO: no se fija el CR en el preflight por ahora**; no se toca ningún archivo de guarda (`scripts/kl/preflight.sh`, `scripts/kl/kl.fingerprint`) ni CR-KL-002. Se podrá fijar más adelante con su propia aprobación. |
+| Este documento | `docs/knowledge-layer/kl-1.0-addenda/CR-KL-003/` en la rama `feat/kl-1.0-code` |
+| Integridad | `MANIFEST.sha256` de la carpeta (desde ella: `shasum -a 256 -c MANIFEST.sha256`). **Decisión del PO: no se fija en el preflight por ahora**: no se tocó ningún archivo de guarda (`scripts/kl/preflight.sh`, `scripts/kl/kl.fingerprint`) ni CR-KL-002; se podrá fijar más adelante con su propia aprobación. La huella del manifiesto se registra en `docs/knowledge-layer/kl-1.0-code/G1_G2_ESTADO_GENERAL.md` (no puede estar dentro de un archivo que el propio manifiesto cubre). |
 | Modificaciones | Cualquier cambio posterior exige CR-KL-003 v1.1 o un CR nuevo aprobado por el PO |
-| **Aprobación del PO** | **Pendiente** — fecha: ____ · decisión: ____ |
+| **Aprobación del PO** | **Aprobado** — 17-oct-2026 (Ciudad de México), por el PO en la sesión de Knowledge Layer Code, sobre el borrador v0.2 con sus cinco decisiones (§0) |
 
-### Pendiente para la aprobación final
-1. Revisión del PO de esta v0.2 y del anexo (la aprobación se registra arriba: fecha y decisión).
-2. Dimensionar el nivel dedicado y la alta disponibilidad de staging y producción antes de crear esas instancias (costo con la calculadora oficial).
-3. Decidir quién entrega a Plataforma `CR-KL-003_Recomendacion_Plataforma.md` (KL no lo envía por su cuenta).
+### Seguimiento tras la aprobación (no condiciona su vigencia)
+1. Dimensionar el nivel dedicado y la alta disponibilidad de staging y producción antes de crear esas instancias (costo con la calculadora oficial).
+2. Decidir quién entrega a Plataforma `CR-KL-003_Recomendacion_Plataforma.md` (KL no lo envía por su cuenta).
+3. Verificar la primera exportación programada (18-oct 08:30 UTC) y cerrar G2 en el registro de estado.
