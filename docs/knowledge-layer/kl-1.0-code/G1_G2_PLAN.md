@@ -264,3 +264,23 @@ No se ejecutó ninguna migración KL, ni G1/E1–E15, ni se tocó la instancia c
 `terraform apply` con `provisioner_enabled=false`: **0 añadidos, 0 cambiados, 4 destruidos** (usuario `kl_provisioner`, su secreto, su versión y su contraseña aleatoria; ningún otro recurso). Plan posterior sin cambios. Verificación como `kl_owner` por proxy (solo lectura): miembros de `cloudsqlsuperuser` = `postgres` (sin contraseña) y los roles internos de Cloud SQL (`cloudsqlagent`, `cloudsqlimportexport`, `cloudsqllogical`); **ningún usuario humano ni de otra plataforma**. `pg_auth_members`: ninguna fila con un `kl_*` como rol o miembro. Única fila con `ADMIN OPTION` en la instancia: `cloudsqlsuperuser` sobre `pg_checkpoint` (interna de Cloud SQL, no afecta a KL). Los cinco `kl_*` no son superusuario ni tienen CREATEROLE/CREATEDB ni pertenecen a `cloudsqlsuperuser`. La instancia canónica conserva sus usuarios (`beeside_app`, `fa4_staging_runtime`, `postgres`). El secreto del aprovisionador ya no existe.
 
 **Estado de G1:** sigue **NO APROBADO**. Falta la Fase 4 (E1–E15 sobre la instancia dedicada, con evidencia archivada) y debe ejecutarse **antes de cualquier migración**. `beeside_kl` está vacía (sin esquema `kl`).
+
+### Fase 4 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase · sin migraciones
+E1–E15 sobre `beeside-dev-kl-db` (evidencia: `evidence/G1-dev-kl-2026-10-16/E1-E15_beeside-dev-kl-db.txt`). Principal ajeno: `g1_probe`, rol **simple creado por SQL** (`NOSUPERUSER NOCREATEROLE NOCREATEDB`, fuera de `cloudsqlsuperuser`). Para crearlo se usó `g1_admin` (usuario de API temporal, miembro de `cloudsqlsuperuser`), **eliminado segundos después**; `g1_probe` también se eliminó al terminar. Estado final verificado: usuarios = los cinco `kl_*` y `postgres`; `terraform plan` sin deriva; la instancia canónica intacta.
+
+| Caso | Resultado |
+|---|---|
+| E1 conexión a `beeside_kl` | falla ✅ (`permission denied for database`) |
+| E2 GRANT de cada `kl_*` · E3 SET ROLE · E4 ALTER (PASSWORD, NOLOGIN) / DROP · E5 CREATE ROLE IN/ADMIN | todos fallan ✅ (5 + 5 + 15 + 2 intentos) |
+| E6 cambiar dueño · E11 DROP DATABASE · E13 GRANT CONNECT / a PUBLIC / SET de base | fallan ✅ |
+| E7 `pg_has_role` recursivo (incl. `cloudsqlsuperuser`) | todo `false` ✅ |
+| E8 filas con `admin_option` sobre `kl_*` o con `cloudsqlsuperuser`/probe como miembro | **0** ✅ |
+| E9 dueños | `beeside_kl` = `kl_owner`; esquemas: `kl_owner` y el rol predefinido `pg_database_owner`; bases de la instancia: solo las propias de Cloud SQL y `postgres` ✅ |
+| E10 inverso (cada `kl_*` lee `pg_authid`) | denegado ×5 ✅. *No aplica el caso "tabla de `beeside`": esta instancia no contiene bases de otras plataformas (aislamiento estructural)* |
+| E12 terminar sesión activa de `kl_app` | falla ✅ (`permission denied to terminate process`) |
+| E14 `kl_*` con super/createrole/createdb/`cloudsqlsuperuser` | **0** ✅ · E15 leer `pg_authid` | falla ✅ |
+
+**Veredicto G1.** *Pre-migración:* **CUMPLE** en el entorno destino real: ningún intento de escalada tiene éxito, y los únicos miembros de `cloudsqlsuperuser` son `postgres` (sin contraseña, no puede iniciar sesión) y roles internos de Cloud SQL. La condición se cumple *por construcción de la instancia dedicada*, no porque `cloudsqlsuperuser` esté contenido (el ensayo D2 demostró que no lo está).
+**Límites declarados (no es aprobación plena todavía):** (1) E9/E10 se ejecutaron con la base vacía y sin las ACL finales; deben **repetirse tras KL-0001** (que concede CONNECT y define privilegios). (2) El plano IAM sigue pudiendo restablecer la contraseña de `postgres` o crear usuarios por API (`cloudsql.users.*`: hoy solo el owner humano `mo@beeside.you`); crear cualquier usuario por API en esta instancia **rompe el aislamiento**. Control recomendado: prohibirlo por proceso y comprobar periódicamente (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` solo debe devolver `postgres` y `cloudsql*`), y vigilar en Cloud Audit Logs `cloudsql.users.create/update`. (3) El principal `postgres` no se probó (no tiene contraseña); es equivalente a un miembro de `cloudsqlsuperuser`.
+
+**Decisión del PO:** declarar **G1 aprobado condicionado** (repetición E1–E15 + comprobación de miembros tras KL-0001) o exigir esa repetición antes de aprobarlo. No se migró nada; `beeside_kl` sigue vacía. Siguiente fase del RUNBOOK (5: exportación previa y migración KL-0001…0005) requiere imagen `runtime` construida (validación de imagen **PENDIENTE G2**: sin Docker local; requiere push de la rama para CI o Cloud Build).
