@@ -1,0 +1,7 @@
+# Cambios propuestos por KL Code en componentes compartidos o en archivos de guarda del preflight.
+# Formato (una línea por ruta o prefijo terminado en "/"):
+#   ruta | justificación (obligatoria) | aprobación del PO (referencia) o vacío = pendiente
+# Declarar NO autoriza: solo permite que el preflight los deje pasar como REVISAR.
+# Precision, Discovery, backend/db/migrations y el Design congelado nunca son declarables: siempre STOP.
+# Ejemplo:
+#   backend/src/reports/report-model.ts | builder knowledge_guide (Design §PDF, DD-13) |

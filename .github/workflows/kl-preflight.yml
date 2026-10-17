@@ -1,0 +1,26 @@
+name: KL preflight
+
+# CI aislado de Knowledge Layer: solo corre para la rama feat/kl-1.0-code.
+# No despliega, no migra y no usa secretos.
+on:
+  push:
+    branches: ["feat/kl-1.0-code"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kl-preflight:
+    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+      - name: KL preflight (gate)
+        env:
+          KL_PLATFORM: knowledge-layer-code
+        run: bash scripts/kl/preflight.sh --ci
