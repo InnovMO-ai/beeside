@@ -314,6 +314,12 @@ resource "google_cloud_run_v2_job" "worker" {
           name  = "PRECISION_KNOWLEDGE_PROVIDER"
           value = "off"
         }
+        # Development-only local object store (NODE_ENV != production): the image's working directory is read-only for the `node` user, so the
+        # default ./.kl-storage cannot be created. /tmp is writable (in-memory) and ephemeral; it is NOT a place to publish editions (decision D8).
+        env {
+          name  = "KL_STORAGE_DIR"
+          value = "/tmp/kl-storage"
+        }
         # Consumed by the Cloud Storage ObjectStore, which is NOT implemented yet (decision D8): documented so the wiring is ready.
         env {
           name  = "KL_STORE_BUCKET"
