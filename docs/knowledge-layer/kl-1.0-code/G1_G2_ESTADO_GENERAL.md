@@ -1,4 +1,4 @@
-# KL 1.0 · Estado general G1–G2 (corte 2026-10-17, ~17:50 UTC)
+# KL 1.0 · Estado general G1–G2 (corte 2026-10-17, ~18:10 UTC; X24 incorporada)
 
 Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes; 137 commits sobre `main`; 8 archivos compartidos fuera de KL, todos declarados). Entorno: **solo dev** (`beeside-dev-508220`). Staging y producción no existen para KL.
 
@@ -6,7 +6,7 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 | Puerta | Estado | Fundamento |
 |---|---|---|
 | **G1 · sin escalada de privilegios hacia `beeside_kl`** | **CUMPLIDA para KL-0001…0005** (aprobada condicionada por el PO; condiciones cumplidas) | En la instancia compartida el protocolo **falló** (cualquier `cloudsqlsuperuser` administra todos los roles). Con la **instancia dedicada** `beeside-dev-kl-db`: E1–E15 limpios antes y después de migrar (35 intentos de escalada, todos fallan; E7 todo `false`; E8 = 0; E9 solo `kl_owner`; E14 = 0). Evidencia en `evidence/G1-*`. Control continuo: **ningún usuario creado por API** en esa instancia (hoy solo `postgres` sin contraseña y roles internos) |
-| **G2 · infraestructura** | **PARCIAL: falta la prueba de restauración (X24)** | Hecho: base, roles (por SQL, no por Terraform: desviación declarada), secretos y jobs por Terraform (`dev-kl`, 45 recursos, sin deriva), migración aplicada (10/10 con huellas), exportación previa y **programada probada una vez**, plan de reversión. **No hecho: restauración en `beeside_kl_restore` y comparación de huellas**, que el criterio exige explícitamente |
+| **G2 · infraestructura** | **CUMPLIDA (con desviaciones declaradas); queda verificar la primera exportación programada (18-oct 08:30 UTC)** | Hecho: base, roles (por SQL, no por Terraform: desviación declarada), secretos y jobs por Terraform (`dev-kl`, 45 recursos, sin deriva), migración aplicada (10/10 con huellas), exportación previa y **programada probada una vez**, plan de reversión. **X24 ejecutada (17-oct): restauración en `beeside_kl_restore` con comparación de 121 elementos — idéntica salvo una restricción equivalente por normalización de paréntesis** (ver `G2_FASE7_WORKER_Y_PRUEBAS.md`). Desviaciones: roles por SQL en lugar de Terraform e instancia dedicada |
 | G3 · control de salida a red | **No iniciada** (fuera de alcance: sin agentes ni tráfico externo) | `kl-worker` sin firewall ni NAT; agentes apagados por base y por configuración |
 | G4 | No iniciada | — |
 
@@ -27,8 +27,8 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 `backend/Dockerfile` (etapas + base fijada por digest), `backend/package.json` y `package-lock.json` (`playwright-core` fijada), `backend/src/index.ts` (montaje de KL y ruta pública), `backend/src/admin/kl/router.ts` (API de KL Admin), y la **excepción de S3**: `admin-session.ts`, `admin-router.ts`, `admin-cookies.test.ts` (cookie de estado de login `SameSite=Lax`). En GCP: Artifact Registry (imágenes `kl-*`), 2 secretos nuevos/uno poblado (`beeside-dev-admin-session-secret`, `beeside-dev-sso-client-secret`) con `secretAccessor` para la cuenta compute, API de Scheduler y rol `klExportOnlyDev`, cliente OAuth de Google, y las revisiones `00008–00010` del backend. **`kl-preflight` marca 13 elementos «REVISAR»** (declarados y aprobados; solo informativos).
 
 ## 5. Pendientes reales
-**A · Para cerrar G2 (bloqueante)**
-1. **X24 restauración:** exportación → importar en `beeside_kl_restore` (dueño `kl_owner`, requiere un aprovisionador temporal con el patrón de Fase 4/W0; por verificar si `gcloud sql import` exige `--user`) → comparar recuentos y huella del diario → borrar. Preparado (`G2_FASE7…` §7.3), no ejecutado.
+**A · Cierre de G2**
+1. ~~X24 restauración~~ **HECHA** (17-oct, 18:05 UTC).
 2. **Primera exportación programada:** 18-oct 08:30 UTC; verificar objeto/versión y que la operación la emite `beeside-dev-kl-scheduler@…`. Si falla: pausar y reportar.
 
 **B · Riesgos abiertos del entorno actual (no bloquean G2, sí la fiabilidad)**
@@ -60,4 +60,4 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 | Verificar KL de extremo a extremo | abrir `/api/admin/kl/me` con sesión; `scripts/kl/preflight.sh --gate` |
 
 ## 7. Decisiones que necesita el PO
-(1) ¿Se ejecuta ya **X24** (cierra G2) y se verifica la primera exportación de mañana? (2) ¿Se formaliza la instancia dedicada en un addendum (CR-KL-003)? (3) Procesos de fondo: ¿instancia mínima con CPU asignada o job? (4) ¿Cuenta de servicio propia del backend (D3)? (5) ¿X26 empírico? (6) ¿Quién lleva a `main` los dos parches de la plataforma y cuándo se fusiona la rama (impacto de `deploy-dev`)? (7) Prioridad de D8 (GCS) frente a staging/producción y G3.
+(1) ¿Se verifica mañana la primera exportación programada y se da G2 por cerrada? (2) ¿Se formaliza la instancia dedicada en un addendum (CR-KL-003)? (3) Procesos de fondo: ¿instancia mínima con CPU asignada o job? (4) ¿Cuenta de servicio propia del backend (D3)? (5) ¿X26 empírico? (6) ¿Quién lleva a `main` los dos parches de la plataforma y cuándo se fusiona la rama (impacto de `deploy-dev`)? (7) Prioridad de D8 (GCS) frente a staging/producción y G3.
