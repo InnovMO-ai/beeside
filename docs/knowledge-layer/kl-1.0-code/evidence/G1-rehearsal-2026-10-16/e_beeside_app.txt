@@ -1,0 +1,40 @@
+== principal: beeside_app
+E1  | connect beeside_kl | FAILS (psql: error: connection to server at "127.0.0.1", port 5455 failed: FATAL:  permission den)
+E2  | GRANT kl_owner TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E2  | GRANT kl_app TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E2  | GRANT kl_reader_precision TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E2  | GRANT kl_agent TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E2  | GRANT kl_knowledge TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E3  | SET ROLE kl_owner | SUCCEEDED-NO-ERROR [ ]
+E3  | SET ROLE kl_app | SUCCEEDED-NO-ERROR [ ]
+E3  | SET ROLE kl_reader_precision | SUCCEEDED-NO-ERROR [ ]
+E3  | SET ROLE kl_agent | SUCCEEDED-NO-ERROR [ ]
+E3  | SET ROLE kl_knowledge | SUCCEEDED-NO-ERROR [ ]
+E4a | ALTER ROLE kl_owner PASSWORD | SUCCEEDED-NO-ERROR [ ]
+E4b | ALTER ROLE kl_owner NOLOGIN | SUCCEEDED-NO-ERROR [ ]
+E4c | DROP ROLE kl_owner | FAILS (ERROR:  role "kl_owner" cannot be dropped because some objects depend on it)
+E4a | ALTER ROLE kl_app PASSWORD | SUCCEEDED-NO-ERROR [ ]
+E4b | ALTER ROLE kl_app NOLOGIN | SUCCEEDED-NO-ERROR [ ]
+E4c | DROP ROLE kl_app | FAILS (ERROR:  role "kl_app" cannot be dropped because some objects depend on it)
+E4a | ALTER ROLE kl_reader_precision PASSWORD | SUCCEEDED-NO-ERROR [ ]
+E4b | ALTER ROLE kl_reader_precision NOLOGIN | SUCCEEDED-NO-ERROR [ ]
+E4c | DROP ROLE kl_reader_precision | FAILS (ERROR:  role "kl_reader_precision" cannot be dropped because some objects depend on it)
+E4a | ALTER ROLE kl_agent PASSWORD | SUCCEEDED-NO-ERROR [ ]
+E4b | ALTER ROLE kl_agent NOLOGIN | SUCCEEDED-NO-ERROR [ ]
+E4c | DROP ROLE kl_agent | FAILS (ERROR:  role "kl_agent" cannot be dropped because some objects depend on it)
+E4a | ALTER ROLE kl_knowledge PASSWORD | SUCCEEDED-NO-ERROR [ ]
+E4b | ALTER ROLE kl_knowledge NOLOGIN | SUCCEEDED-NO-ERROR [ ]
+E4c | DROP ROLE kl_knowledge | FAILS (ERROR:  role "kl_knowledge" cannot be dropped because some objects depend on it)
+E5a | CREATE ROLE x_probe IN ROLE kl_owner | SUCCEEDED-NO-ERROR [ ]
+E5b | CREATE ROLE x_probe2 ADMIN kl_owner | SUCCEEDED-NO-ERROR [ ]
+E6  | ALTER DATABASE beeside_kl OWNER TO beeside_app | SUCCEEDED-NO-ERROR [ ]
+E7  | pg_has_role MEMBER (recursive) |                                      string_agg                                      ------------------------------------------------------------------------------------  kl_owner=true,kl_app=true,kl_
+E8  | pg_auth_members kl_* with admin or cloudsqlsuperuser/beeside_app |      5
+E9  | owners of beeside_kl + objects | 
+E11 | DROP DATABASE beeside_kl | SUCCEEDED-NO-ERROR [ ]
+E12 | pg_terminate_backend on kl_* sessions | SUCCEEDED-NO-ERROR [ count  -------      0 (1 row) ]
+E13 | GRANT CONNECT ON DATABASE beeside_kl TO beeside_app | FAILS (ERROR:  database "beeside_kl" does not exist)
+E14 | kl_* attrs (super/createrole/createdb/member of cloudsqlsuperuser) |      0
+E15 | read pg_authid | FAILS (ERROR:  permission denied for table pg_authid)
+E13b| GRANT ALL ON DATABASE beeside_kl TO PUBLIC | FAILS (ERROR:  database "beeside_kl" does not exist)
+E13c| ALTER DATABASE beeside_kl SET search_path=public | FAILS (ERROR:  database "beeside_kl" does not exist)

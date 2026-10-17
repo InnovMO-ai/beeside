@@ -1,6 +1,6 @@
 # KL 1.0 · Plan ejecutable G1–G2 (diagnóstico y preparación)
 
-Estado: **PREPARADO, NO EJECUTADO**. Fecha del diagnóstico: 2026-10-16. Alcance observado: proyecto `beeside-dev-508220`, región `northamerica-south1`, con la cuenta `mo@beeside.you` (roles/owner), **solo con lecturas**. No se creó ni cambió ningún recurso. No se leyó ni se mostró ningún valor de secreto; de tres secretos de cadena de conexión se extrajo únicamente el nombre del usuario de base de datos (la contraseña nunca se imprimió).
+Estado: **PREPARADO; ensayo D2 EJECUTADO en instancia desechable (ya destruida); la instancia compartida NO se tocó** (ver §9). Fecha del diagnóstico: 2026-10-16. Alcance observado: proyecto `beeside-dev-508220`, región `northamerica-south1`, con la cuenta `mo@beeside.you` (roles/owner), **solo con lecturas**. No se creó ni cambió ningún recurso. No se leyó ni se mostró ningún valor de secreto; de tres secretos de cadena de conexión se extrajo únicamente el nombre del usuario de base de datos (la contraseña nunca se imprimió).
 Staging y producción no existen como proyectos desplegados (los `envs/staging|production` de Terraform son andamios sin aplicar y con bucket de estado sin definir): este plan es para **dev**.
 
 ---
@@ -175,3 +175,37 @@ Opciones, de menor a mayor impacto: **(A)** job en `kl-ci.yml` (runner con Docke
 | D10 | Aceptar `db-g1-small` si hay margen de conexiones, o cambiar de tier |
 
 Sin ninguna de estas aprobaciones no se ejecuta nada. **No declaro G1 aprobado ni G2 listo.**
+
+---
+
+## 9. Resultado del ensayo D2 (2026-10-16)
+
+Instancia desechable `g1-rehearsal-kl` (PG16, `db-f1-micro`, ENTERPRISE) en `beeside-dev-508220`; reproduce la semántica de usuarios por API/`cloudsqlsuperuser`. Se imitó el estado de la compartida (`beeside_app` por API, `postgres`, `fa4_staging_runtime` por SQL, bases `beeside`/`fa4_staging`) y se aprovisionó KL según §5.2 (roles por SQL con `roles.sql`, `beeside_kl` con dueño `kl_owner`, aprovisionador sin ADMIN residual). Contraseñas aleatorias en memoria, jamás impresas y borradas; la instancia fue **eliminada** y `gcloud sql instances list` solo muestra `beeside-dev-canonical-db`. Evidencia: `evidence/G1-rehearsal-2026-10-16/`. Las E se ejecutaron contra roles `kl_*` aprovisionados y una base `beeside_kl` con esquema `kl` simulado (sin las migraciones KL-0001…0005).
+
+| Principal | E1 | E2 GRANT | E3 SET ROLE | E4 ALTER/DROP | E5 CREATE ROLE | E6 OWNER | E7 | E8 | E11 DROP DB | E12 terminar sesiones | E14 | E15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `beeside_app` (API, `cloudsqlsuperuser`) | falla ✅ | **ÉXITO ❌** | **ÉXITO ❌** | **ÉXITO ❌** (PASSWORD, NOLOGIN) | **ÉXITO ❌** | **ÉXITO ❌** | **todo true ❌** | **5 filas ❌** | **ÉXITO ❌** | n/c | 0 ✅ | falla ✅ |
+| `postgres` (`cloudsqlsuperuser`) | — | **ÉXITO ❌** | falla en `kl_app` tras GRANT individual (comportamiento de `set_option`; el GRANT ya otorgó membresía) | **ÉXITO ❌** | — | — | — | — | — | **2 sesiones terminadas ❌** | — | — |
+| `fa4_staging_runtime` (rol simple por SQL) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | sin efecto ✅ | 0 ✅ | falla ✅ |
+| `beeside_app` **degradado** (`REVOKE cloudsqlsuperuser`, `NOCREATEROLE NOCREATEDB`) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | falla ✅ (necesita `pg_signal_backend`) | 0 ✅ | falla ✅ |
+
+Además: E9 → solo `kl_owner` (más `pg_database_owner`, rol predefinido de PG para el esquema `public`; aceptable, documentar); E10 → los cinco `kl_*` reciben `permission denied` al leer una tabla de `beeside`; la degradación de `beeside_app` conserva su acceso a sus propias tablas y DDL. Controles: un rol creado **por la API** (`kl_provisioner`) también fue tomado por `beeside_app` (`GRANT` a sí mismo, `ALTER ROLE … PASSWORD`, `SET ROLE`), y un usuario **IAM** de base de datos (cuenta de servicio) también fue manipulado por `postgres` (`GRANT`, `SET ROLE`, `ALTER ROLE NOLOGIN`, `DROP ROLE` con éxito).
+
+### Conclusiones
+1. **G1 FALLA en el estado actual de la plataforma.** Cualquier miembro de `cloudsqlsuperuser` administra por completo todo rol no superusuario de la instancia, sea creado por API, por SQL o IAM, sin ADMIN explícito en `pg_auth_members` (E8 sí lo detecta para `beeside_app` por haberse concedido a sí mismo). Esto contradice el supuesto de CR-KL-002 §8.3 y cierra las dos vías que el addendum sugería primero: **crear los roles por SQL no basta, y la autenticación IAM tampoco** (la propia §8.3 mencionaba IAM; queda descartada como remedio *por sí sola*).
+2. Los principales que hoy son `cloudsqlsuperuser`: `beeside_app` (runtime del backend **y** migrador), `postgres` y, por construcción, cualquier usuario creado por API. **El backend en ejecución corre como uno de ellos.**
+3. Un principal ajeno que **no** sea `cloudsqlsuperuser` queda aislado; también `beeside_app` después de degradarlo, con E1–E15 limpios.
+
+### Opciones (decisión del PO/Plataforma)
+| | Opción | Efecto | Costo/impacto |
+|---|---|---|---|
+| **A** | **Instancia dedicada `beeside-dev-kl-db`** (recomendada) | Los únicos `cloudsqlsuperuser` son los de KL; aislamiento duro (también `max_connections`, PITR, mantenimiento). Ningún cambio en `beeside_app` ni en FA4 | Nueva instancia (no dimensionado aquí); contradice la decisión MVP1 "una instancia", pero es lo que CR-KL-002 §12 dejó como alternativa diferida |
+| **B** | Misma instancia + **degradar** `beeside_app` a rol simple (`REVOKE cloudsqlsuperuser`, `NOCREATEROLE NOCREATEDB`) y tratar `postgres` y los usuarios de API como inertes (contraseña no registrada, restablecible solo por IAM) | G1 pasa para los principales de la plataforma; sigue siendo un ajuste a una instancia viva de otras plataformas. `fa4-staging-prepare` usa `beeside_app` para `CREATE ROLE`: se rompería. Cualquier futuro usuario creado por API volvería a romper el aislamiento | Cambio en Discovery/Precision/FA4 (modificación de entorno compartido) |
+| **C** | Misma instancia sin cambios | **No permitido**: G1 no se cumple y CR-KL-002 prohíbe habilitar KL | — |
+
+**Recomendación: A.** B es viable técnicamente (ensayado), pero deja a KL dependiendo de una disciplina operativa sobre usuarios de otras plataformas y de que nadie cree otro usuario por API en la instancia compartida. En A el procedimiento de §5.2 y E1–E15 se mantiene idéntico; solo cambia el destino y se simplifica D5/D6 (no hay otros principales: solo `postgres` de la nueva instancia, a no registrar).
+
+### Pendientes tras el ensayo
+- E12 en el principal simple se verificó con sesión activa solo para `beeside_app` degradado; para `fa4_staging_runtime` quedó sin sesión activa (resultado "sin efecto" no es concluyente, pero PostgreSQL exige `pg_signal_backend`, que ese rol no tiene).
+- La prueba se hizo antes de KL-0001: repetir E1–E15 en el destino real tras la migración, porque KL-0001 concede CONNECT y define las ACL finales.
+- No ensayado: conector `/cloudsql` con los pools de KL, `max_connections` real de `db-g1-small` y X24/X26/X27.
