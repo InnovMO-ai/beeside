@@ -101,3 +101,13 @@ Si la revisión nueva no arranca, Cloud Run **no** le envía tráfico y la revis
 ## Qué necesito de ti
 1. **Para A:** el correo del primer KL_ADMIN (y que existe como `admin_user` activo con login habilitado), y tu autorización expresa de `--check` y, si es elegible, de `--apply`.
 2. **Para B:** una decisión de Plataforma sobre B1 (habilitar el Admin API y el IdP en dev), aprobación del despliegue de una imagen de rama en el servicio compartido (B2), la variante para B3/deriva y los topes de conexión. **No recomiendo ejecutar B hasta resolver B1**; A sí puede hacerse antes.
+
+---
+
+## Resultado del `--check` (2026-10-17) · BLOQUEADO, no se ejecutó `--apply`
+`bash scripts/kl/g2/bootstrap-admin.sh --check contact@beeside.you` (solo lectura; cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`):
+- `admin_user existe=0 activo=false login_habilitado=false` → **`contact@beeside.you` no existe como `admin_user`** en la base principal de dev.
+- `KL_ADMIN no revocados=0` (nadie tiene KL_ADMIN todavía).
+Diagnóstico adicional (solo conteos, sin correos): `admin_user total=1, activos=1, con_login=0, elegibles=0, técnicas(@beeside.internal)=1, del dominio beeside.you=0`. **El único `admin_user` de dev es una identidad técnica `@beeside.internal` sin login; no hay ningún administrador humano aprovisionado.** El bootstrap se rechazaría (`not_found`) por diseño, y no se creó ninguna identidad ni se sustituyó el correo.
+
+**Desbloqueo (decisión de Plataforma/PO):** aprovisionar a `contact@beeside.you` como `admin_user` de dev (`active = true`, `login_enabled = true`, rol `ADMIN`). Camino existente solo-desarrollo: `CONFIG_BOOTSTRAP_ENV=development npm run admin:provision --workspace=backend -- --development-only --email contact@beeside.you --role ADMIN` contra la base principal de dev (escribe 1 fila en `admin_user` y 1 en `admin_audit_event` en una base compartida). En producción esto lo hace un ADMIN desde el Control Center, no un script. Luego se repite `--check` y, si es satisfactorio, `--apply`. Recordatorio: sin IdP/Admin API (bloqueo B1) esa persona no podrá iniciar sesión aunque el KL_ADMIN exista.
