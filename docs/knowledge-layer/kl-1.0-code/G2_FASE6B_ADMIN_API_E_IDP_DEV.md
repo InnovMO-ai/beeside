@@ -159,3 +159,39 @@ Verificación independiente de KL (solo metadatos; el contenido de los secretos 
 `S2_CONFIRM=yes OIDC_CLIENT_ID=640247497574-05msqa6kpbh6iense14hb11r78mjjvdh.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh apply` (autorizado por el PO). Resultado: **revisión `beeside-dev-backend-api-00008-l7p` sirviendo el 100 % del tráfico**; la revisión previa `00007-gtk` queda disponible para rollback. **Misma imagen** (`backend-api:bc3f52760a5c427c0b057a1e2bb0d71d8d0034d3`, `main`, sin KL). Variables añadidas: `ADMIN_API_ENABLED=true`, `ADMIN_APP_ORIGIN`, `ADMIN_OIDC_ISSUER=https://accounts.google.com`, `ADMIN_OIDC_CLIENT_ID`, `ADMIN_OIDC_REDIRECT_URI=…/api/admin/auth/callback`, `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`; `ADMIN_OIDC_CLIENT_SECRET` y `ADMIN_SESSION_SECRET` montados **por referencia a Secret Manager** (no literales). Verificación del script (sin rollback necesario) y verificación independiente desde el origen del navegador (frontend): `/health` 200; `/admin` 200; `/api/admin/me` sin sesión **401**; `/api/admin/auth/login` → **302** a `accounts.google.com/o/oauth2/v2/auth` con `client_id` correcto, `redirect_uri` exacta, `response_type=code`, `scope=openid email`, `code_challenge_method=S256` y `state`/`nonce`/`code_challenge` presentes; cookie de login `HttpOnly; SameSite=Strict; Secure; Path=/api/admin/auth; Max-Age=600`. Los demás servicios (`frontend-app`, `fa4-*`) no cambiaron de revisión. Los avisos «database privilege check» del arranque son **los mismos que ya tenía la revisión 00007** (el usuario de runtime `beeside_app` es el migrador, puede crear bases y objetos en `public`); no los introduce este cambio.
 **Rollback:** `gcloud run services update-traffic beeside-dev-backend-api --region northamerica-south1 --project beeside-dev-508220 --to-revisions beeside-dev-backend-api-00007-gtk=100` (y, si se quiere retirar la configuración, `gcloud run services update … --remove-env-vars ADMIN_API_ENABLED,… --remove-secrets ADMIN_OIDC_CLIENT_SECRET,ADMIN_SESSION_SECRET`).
 **Siguiente: S3** — el inicio de sesión real lo hace el titular de `mo@beeside.you` en su navegador; KL solo verifica después (solo lectura) que `auth_subject` quedó enlazado y que existen la sesión y su evento de auditoría.
+
+---
+
+## 10. Diagnóstico de S3 (2026-10-17, ~09:21 CDMX = 15:21 UTC) · causa raíz identificada; corrección PENDIENTE de excepción
+
+**Síntoma:** tras autenticarse en Google, el Control Center muestra «Sign-in could not be completed. Please try again.» (`/admin?login=failed`).
+
+### Evidencia (solo lectura, salvo dos filas de auditoría de diagnóstico, ver abajo)
+| Comprobación | Resultado |
+|---|---|
+| Logs de la revisión `00008-l7p` | `GET /api/admin/auth/login` 302 (15:21:22) → `GET /api/admin/auth/callback?state=…&iss=https://accounts.google.com&code=…` **302** (15:21:32) → `/api/admin/me` 401. Sin errores de aplicación ni de secretos; el servicio arrancó con los dos secretos montados |
+| Código de error interno (`admin_audit_event`) | `admin.login · DENIED · {"reason":"invalid_login_state"}` a las 15:21:32.917 |
+| Dónde se produce ese motivo | **Antes** de cualquier intercambio con Google: el callback exige la cookie de estado `beeside_admin_login` (sellada con HMAC) y que `state` coincida; si la cookie falta, llega vacía o no se puede abrir, devuelve `invalid_login_state` sin consultar al IdP |
+| `redirect_uri` | Correcta: Google devolvió el navegador a `/api/admin/auth/callback` en el origen esperado (con una discordancia habría mostrado `redirect_uri_mismatch` en Google) |
+| Secretos | Montados y legibles (el servicio arrancó; las variables `ADMIN_OIDC_CLIENT_SECRET` y `ADMIN_SESSION_SECRET` son referencias a Secret Manager) |
+| Estado/nonce/PKCE | El `state` llegó en el callback; el intento de login duró 10 s (la cookie vive 600 s: no es caducidad). El sellado es sin estado en servidor: no depende de qué instancia atienda |
+| Vinculación | `mo@beeside.you`: `ADMIN`, `active=true`, `login_enabled=true`, `auth_subject` **sin enlazar**, `admin_session` = 0 filas → el flujo nunca pasó de la validación de estado, por eso no hubo intento de vincular |
+| Audience/dominio | Sin evidencia que apunte a ellos: la pantalla de consentimiento de Google se completó y el correo no llegó a evaluarse |
+| **Reproducción controlada** | Login por el frontend → callback **con** la cookie y el `state` correctos pero un código falso: llega al intercambio de tokens y falla ahí (`code_rejected`). Mismo callback **sin** la cookie: `invalid_login_state`, idéntico a tu intento |
+
+### Causa raíz
+El callback se alcanza mediante una **navegación de nivel superior entre sitios** (accounts.google.com → nuestro origen), y `cookieHeader` emite **todas** las cookies con `SameSite=Strict`, incluida la de estado de inicio de sesión (`backend/src/admin/admin-session.ts`, línea 94). Los navegadores **no envían cookies `Strict`** en una navegación iniciada desde otro sitio, así que el callback nunca ve la cookie → `invalid_login_state`. Es un defecto latente del Control Center de la plataforma (en `main`): no aparecía con el proveedor OIDC de desarrollo local (mismo sitio, `127.0.0.1`) y las pruebas de integración fijan la cookie a mano con supertest, por lo que no lo detectan. **No es un problema del cliente OAuth, de la audiencia, de los secretos ni de la URI.** No se hizo rollback ni se cambió nada de OAuth.
+
+### Corrección propuesta (no aplicada)
+Parche mínimo en `docs/knowledge-layer/kl-1.0-code/patches/admin-login-cookie-samesite-lax.patch` (76 líneas; aplica limpio a la rama): `cookieHeader` admite un `sameSite` opcional (por omisión **Strict**, sin cambio para la cookie de sesión); la cookie de estado de login, al emitirse y al limpiarse, usa **`SameSite=Lax`** (el valor estándar para el retorno de OIDC: `HttpOnly`, `Secure`, ruta `/api/admin/auth`, 10 min y sellada con HMAC; la defensa CSRF del callback sigue siendo `state` + sellado + `nonce` + PKCE). Incluye una prueba de regresión (`admin-cookies.test.ts`). Validado en una copia temporal: `tsc` sin errores; `admin-cookies` y `operations-admin` 17/17.
+
+**Excepción que necesita aprobación (no es un cambio de KL):** toca 2 archivos compartidos del Control Center (`backend/src/admin/admin-session.ts`, `admin-router.ts`) y exige **desplegar una imagen nueva** del backend compartido de dev; no hay corrección solo de configuración.
+- **Opción X (recomendada para desbloquear dev):** aplicar el parche en `feat/kl-1.0-code` (declararlo en `shared-changes.txt`), publicar `kl-backend:<sha>` con la etiqueta `kl-publish-dev-*` (corre los 19 controles de humo) y actualizar el servicio a esa imagen con las mismas variables de S2. La imagen incluye `main` + KL (inerte: sin `KL_DB_URL_*`) + los 5 archivos compartidos ya aprobados + este parche. Rollback inmediato a `00008-l7p` (imagen `main`). Adelanta el bloqueo B2 del cableado de KL.
+- **Opción Y:** proponer el mismo parche como PR a `main` para el responsable de la plataforma y esperar su despliegue normal. Más limpia a largo plazo (el defecto también afectaría a staging/producción), pero no desbloquea dev hoy y un merge dispara `deploy-dev` (`DEPLOY_DEV_ENABLED=true`).
+Se recomienda X ahora **y** Y como propuesta a Plataforma.
+
+### Rastro de diagnóstico que dejé en la auditoría de la plataforma (disclosure)
+Dos filas `admin.login · DENIED` a las 15:23:45 UTC (`code_rejected` e `invalid_login_state`) generadas por mis llamadas de reproducción con un código falso. No afectan a ninguna sesión ni usuario.
+
+### Cuándo repetir el inicio de sesión
+Solo después de que se despliegue la corrección (X o Y) y se verifique; con la imagen actual volvería a fallar igual.

@@ -1,0 +1,76 @@
+diff --git a/backend/src/__tests__/admin-cookies.test.ts b/backend/src/__tests__/admin-cookies.test.ts
+new file mode 100644
+index 0000000..cdffedb
+--- /dev/null
++++ b/backend/src/__tests__/admin-cookies.test.ts
+@@ -0,0 +1,30 @@
++import { ADMIN_LOGIN_COOKIE, ADMIN_SESSION_COOKIE, cookieHeader } from "../admin/admin-session";
++import { createAdminRouter } from "../admin/admin-router";
++
++describe("Admin cookies · SameSite", () => {
++  it("la cookie de sesión es Strict por omisión y la del estado de inicio de sesión puede ser Lax", () => {
++    expect(cookieHeader(ADMIN_SESSION_COOKIE, "t", { secure: true, maxAgeSeconds: 60, path: "/api/admin" })).toContain("SameSite=Strict");
++    const login = cookieHeader(ADMIN_LOGIN_COOKIE, "s", { secure: true, maxAgeSeconds: 600, path: "/api/admin/auth", sameSite: "Lax" });
++    expect(login).toContain("SameSite=Lax");
++    expect(login).not.toContain("SameSite=Strict");
++    expect(login).toEqual(expect.stringContaining("HttpOnly"));
++    expect(login).toEqual(expect.stringContaining("Secure"));
++  });
++
++  it("el inicio de sesión emite la cookie de estado con SameSite=Lax (el regreso desde el IdP es una navegación entre sitios)", async () => {
++    const request = (await import("supertest")).default;
++    const express = (await import("express")).default;
++    const identity = { issuer: "https://idp.test", authorizationUrl: async () => "https://idp.test/auth", exchangeCode: async () => { throw new Error("no"); } };
++    const app = express();
++    app.use("/api/admin", createAdminRouter({
++      fa: { db: { query: async () => ({ rows: [] }), transaction: async (fn: (x: unknown) => unknown) => fn({}) }, config: { now: () => new Date() } },
++      identity,
++      session: { sessionSecret: "s".repeat(40), sessionTtlMinutes: 480, idleTimeoutMinutes: 30, cookieSecure: true, appOrigin: "https://admin.test" },
++    } as never));
++    const res = await request(app).get("/api/admin/auth/login");
++    const cookie = (res.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith(`${ADMIN_LOGIN_COOKIE}=`)) as string;
++    expect(res.status).toBe(302);
++    expect(cookie).toContain("SameSite=Lax");
++    expect(cookie).toContain("Path=/api/admin/auth");
++  });
++});
+diff --git a/backend/src/admin/admin-router.ts b/backend/src/admin/admin-router.ts
+index 89f109e..15cce6f 100644
+--- a/backend/src/admin/admin-router.ts
++++ b/backend/src/admin/admin-router.ts
+@@ -123,7 +123,7 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
+       const verifier = randomUrlToken(48);
+       const sealed = sealLoginState(deps.session.sessionSecret, { state, nonce, verifier, returnTo: safeReturnTo(req.query.returnTo), exp: now().getTime() + 10 * 60_000 });
+       const url = await deps.identity.authorizationUrl({ state, nonce, codeChallenge: pkceChallenge(verifier) });
+-      res.set("Set-Cookie", cookieHeader(ADMIN_LOGIN_COOKIE, sealed, { secure: deps.session.cookieSecure, maxAgeSeconds: 600, path: `${API_PATH}/auth` }));
++      res.set("Set-Cookie", cookieHeader(ADMIN_LOGIN_COOKIE, sealed, { secure: deps.session.cookieSecure, maxAgeSeconds: 600, path: `${API_PATH}/auth`, sameSite: "Lax" }));
+       res.redirect(302, url);
+     })().catch((error: unknown) => {
+       if (error instanceof AdminAuthError) loginRedirect(res, "unavailable");
+@@ -133,7 +133,7 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
+ 
+   router.get("/auth/callback", (req: AdminRequest, res, next) => {
+     void (async () => {
+-      const clearLogin = cookieHeader(ADMIN_LOGIN_COOKIE, "", { secure: deps.session.cookieSecure, maxAgeSeconds: 0, path: `${API_PATH}/auth` });
++      const clearLogin = cookieHeader(ADMIN_LOGIN_COOKIE, "", { secure: deps.session.cookieSecure, maxAgeSeconds: 0, path: `${API_PATH}/auth`, sameSite: "Lax" });
+       const cookies = parseCookies(req.header("cookie"));
+       const pending = openLoginState(deps.session.sessionSecret, cookies[ADMIN_LOGIN_COOKIE], now());
+       const code = typeof req.query.code === "string" ? req.query.code : null;
+diff --git a/backend/src/admin/admin-session.ts b/backend/src/admin/admin-session.ts
+index 03136ac..77d28fe 100644
+--- a/backend/src/admin/admin-session.ts
++++ b/backend/src/admin/admin-session.ts
+@@ -90,8 +90,11 @@ export function parseCookies(header: string | undefined): Record<string, string>
+   return out;
+ }
+ 
+-export function cookieHeader(name: string, value: string, options: { secure: boolean; maxAgeSeconds: number; path: string }): string {
+-  const attributes = [`${name}=${encodeURIComponent(value)}`, `Path=${options.path}`, "HttpOnly", "SameSite=Strict", `Max-Age=${options.maxAgeSeconds}`];
++export function cookieHeader(name: string, value: string, options: { secure: boolean; maxAgeSeconds: number; path: string; sameSite?: "Strict" | "Lax" }): string {
++  // The sign-in state cookie must be "Lax": the identity provider returns the browser to /auth/callback through a cross-site top-level
++  // navigation, and browsers do not send SameSite=Strict cookies on that request (the callback would always see "invalid_login_state").
++  // The session cookie stays "Strict".
++  const attributes = [`${name}=${encodeURIComponent(value)}`, `Path=${options.path}`, "HttpOnly", `SameSite=${options.sameSite ?? "Strict"}`, `Max-Age=${options.maxAgeSeconds}`];
+   if (options.secure) attributes.push("Secure");
+   return attributes.join("; ");
+ }
