@@ -83,3 +83,31 @@ Autorización expresa de: (1) `apply` (habilita la API y crea los 2 schedules **
 - **El worker estuvo activo ~2 min** (resume 17:28:45 → pausa tras la verificación). El siguiente tick (17:35) no se ejecutó.
 
 **Estado final:** ambos schedules `PAUSED`; `terraform plan` con D9 activo sin deriva. Falta (decisión del PO) `resume` para la operación periódica real. Pendiente menor: la identidad del scheduler en las ejecuciones del worker se infiere (único invocador configurado y HTTP 200); la de la exportación está demostrada.
+
+---
+
+## ACTIVADO (2026-10-17, 17:32 UTC) · autorizado por el PO · ambos schedules `ENABLED`
+
+**Estado:** `beeside-dev-kl-worker-tick` (`*/5 * * * *` UTC) y `beeside-dev-kl-daily-export` (`30 8 * * *` UTC, próximo disparo **18-oct 08:30 UTC = 02:30 CDMX**) reanudados. **Quedan activos.**
+
+**Verificación de las primeras ejecuciones del worker (tres ticks naturales consecutivos):** `…-gxhl2` (17:35:07), `…-8k54s` (17:40:05) y `…-z6qn4` (17:45:05): cada una `succeededCount = 1`, **sin `failedCount` ni `retriedCount`**, intento 0, 6–8 s, ciclo `{"claimed":0,"failed":0}` (agentes apagados); **0 ejecuciones fallidas o reintentadas** desde la reanudación, sin `stderr` ni `exit(1)` en los registros; intentos del scheduler con HTTP 200. Con las dos de la prueba anterior son **cinco ejecuciones seguidas sin fallos** desde la imagen con el timeout de 10 s.
+**Pendiente de comprobar (no se puede antes de mañana):** la **primera exportación programada** (18-oct 08:30 UTC). Lista de verificación: objeto nuevo/versión en `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz` (`gcloud storage ls -a …`), operación `EXPORT` `DONE` con `user = beeside-dev-kl-scheduler@…` (`gcloud sql operations list --instance beeside-dev-kl-db --filter="operationType=EXPORT" --limit 3`), tamaño comparable (~59 KB hoy). Si falla: `pause export` y reportar.
+
+**Terraform alineado con el estado activo:** `scheduler_enabled=true` y `scheduler_paused=false` por omisión en `envs/dev-kl/main.tf`; `terraform plan` sin variables → **No changes** (sin deriva). Cuidado: poner `scheduler_enabled=false` **destruiría** los schedules.
+
+### Procedimiento de pausa (listo)
+```bash
+cd /Users/miguelortega/Developer/beeside-kl
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh pause            # ambos, inmediato (fuera de Terraform)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh pause worker     # solo el worker  (o: pause export)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh resume [worker|export]
+# equivalente directo, sin repositorio:
+gcloud scheduler jobs pause beeside-dev-kl-worker-tick   --location us-south1 --project beeside-dev-508220
+gcloud scheduler jobs pause beeside-dev-kl-daily-export  --location us-south1 --project beeside-dev-508220
+# tras una pausa de emergencia, alinear Terraform (la pausa manual aparece como deriva):
+D9_PAUSED=true bash scripts/kl/g2/d9-scheduler.sh verify           # o fijar scheduler_paused=true y aplicar
+```
+Una pausa detiene los disparos futuros sin interrumpir una ejecución en curso. **Rollback completo** (destruye los recursos de D9): `D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh rollback`.
+
+### Qué vigilar (sin alertas automáticas todavía)
+`gcloud run jobs executions list --job beeside-dev-kl-worker --region northamerica-south1 --limit 10` (columnas `FAILED_COUNT`/`RETRIED_COUNT` vacías) y los registros `stderr`; una racha de `exit(1)` pide pausar. Recomendado como decisión posterior: una alerta de Cloud Monitoring sobre ejecuciones fallidas del job.

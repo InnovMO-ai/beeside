@@ -17,7 +17,8 @@ cleanup() { rm -rf "$TF/.terraform" "$TF/.terraform.lock.hcl" /tmp/d9.tfplan; };
 init() { tf init -input=false -no-color >/dev/null; }
 need() { [[ "${D9_CONFIRM:-}" == "yes" ]] || { echo "STOP: este subcomando cambia recursos; repite con D9_CONFIRM=yes" >&2; exit 2; }; }
 job() { case "${1:-}" in worker) echo beeside-dev-kl-worker-tick;; export) echo beeside-dev-kl-daily-export;; *) echo "";; esac; }
-FLAGS=(-var scheduler_enabled=true -var scheduler_paused=true)
+# D9 está APLICADO y ACTIVO (2026-10-17): por omisión el estado deseado es "no en pausa". Para la creación inicial en pausa: D9_PAUSED=true.
+FLAGS=(-var scheduler_enabled=true -var "scheduler_paused=${D9_PAUSED:-false}")
 
 case "${1:-}" in
   plan)

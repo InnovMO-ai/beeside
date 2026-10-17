@@ -44,14 +44,15 @@ variable "provisioner_enabled" {
 }
 
 variable "scheduler_enabled" {
-  description = "Decision D9: also enables cloudscheduler.googleapis.com. Off by default."
+  description = "Decision D9 (applied 2026-10-17): enables cloudscheduler.googleapis.com and the KL schedules. Keep true; false would DESTROY the schedules."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "scheduler_paused" {
-  type    = bool
-  default = true
+  description = "Schedules were created paused and resumed by the PO on 2026-10-17 (worker tick every 5 min, daily export). Set true to pause them through Terraform."
+  type        = bool
+  default     = false
 }
 
 variable "deletion_protection" {
