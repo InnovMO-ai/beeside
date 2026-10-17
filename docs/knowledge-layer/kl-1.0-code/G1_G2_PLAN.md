@@ -209,3 +209,33 @@ Además: E9 → solo `kl_owner` (más `pg_database_owner`, rol predefinido de PG
 - E12 en el principal simple se verificó con sesión activa solo para `beeside_app` degradado; para `fa4_staging_runtime` quedó sin sesión activa (resultado "sin efecto" no es concluyente, pero PostgreSQL exige `pg_signal_backend`, que ese rol no tiene).
 - La prueba se hizo antes de KL-0001: repetir E1–E15 en el destino real tras la migración, porque KL-0001 concede CONNECT y define las ACL finales.
 - No ensayado: conector `/cloudsql` con los pools de KL, `max_connections` real de `db-g1-small` y X24/X26/X27.
+
+---
+
+## 10. Opción A aprobada: módulo Terraform y costo (preparado, NO aplicado)
+
+Decisión del PO (2026-10-16): **instancia dedicada `beeside-dev-kl-db`**. Preparado sin ejecutar: `infra/terraform/modules/kl-database`, `modules/kl-runtime`, `envs/dev-kl` (raíz propia con estado propio, prefijo `dev-kl`; no modifica `envs/dev|staging|production`) y `envs/dev-kl/RUNBOOK.md` (fases 0–6 con rollback).
+
+**Verificado offline:** `terraform validate` OK; `terraform plan` contra un estado local vacío (en copia temporal, con solo lecturas de datos): **38 recursos a crear, 0 a cambiar, 0 a destruir** (48 con `provisioner_enabled` y `scheduler_enabled`). No se creó ni cambió nada en GCP en esta fase.
+
+**Contenido:** instancia PG16 ENTERPRISE (`db-g1-small`, ZONAL, 10 GB, PITR + 7 respaldos, `deletion_protection=true`, TLS con certificado de cliente), sin `google_sql_user` para los `kl_*` (se crean por SQL), 5 secretos de conexión por rol (`/cloudsql`, base `beeside_kl`), aprovisionador de un solo uso conmutable, 3 cuentas de servicio nuevas (`migrate`, `worker`, `scheduler`), acceso por secreto (migrate→owner; worker→agent+knowledge; backend→app+reader), 2 buckets privados (almacén con retención de 30 días no bloqueada, exportaciones con versiones), jobs `migrate` y `worker` (agentes apagados, `PRECISION_KNOWLEDGE_PROVIDER=off`), y schedules opcionales **pausados**. Reutiliza solo hechos del proyecto (cuenta compute, cuenta de CI).
+
+**Cambios respecto a lo supuesto antes:** D5 y D6 dejan de ser necesarias (no hay otros principales en la instancia dedicada); D3 (SA propia del backend) sigue abierta: el backend actual comparte cuenta con `fa4-*`, que podrían leer `kl_app`/`kl_reader_precision` (sin escalada de BD, pero con acceso de aplicación). D7 queda resuelta con A.
+
+### Estimación de costo (mensual, dev, USD, orden de magnitud)
+Las fuentes de precios oficiales no se pudieron consultar de forma automática (la API de facturación no está habilitada en el proyecto y no se habilitó; la página de precios no se puede extraer). Las cifras salen de un agregador público y de tarifas generales: **confirmar en la calculadora de Google Cloud antes de aprobar**.
+
+| Concepto | Estimación | Nota |
+|---|---|---|
+| Instancia `db-g1-small` | ≈ 28 | Cifra de agregador para `northamerica-south1` (tabla MySQL; no verificada para PostgreSQL). Núcleo compartido |
+| Disco 10 GB SSD + respaldos/PITR | ≈ 2–4 | Datos mínimos (KL no guarda datos de clientes) |
+| Secret Manager (6 secretos) | < 1 | |
+| Almacenamiento (2 buckets, pocos GB) | < 1 | |
+| Cloud Run jobs | ≈ 0–5 | `worker` cada 5 min (288 ejecuciones/día) de pocos segundos; probablemente dentro del nivel gratuito. Chromium en 2 GiB |
+| Cloud Scheduler | 0 | 3 trabajos entran en el nivel gratuito por cuenta de facturación |
+| **Total** | **≈ 31–40** | Mayormente la instancia. Es costo **incremental** sobre la instancia canónica existente |
+
+Palanca: `db-f1-micro` (variable `tier`) cuesta una fracción, pero su `max_connections` y memoria son menores; los topes de conexión de KL (28 entre los cinco roles) deben revisarse antes de usarla. Para staging/producción habrá que dimensionar aparte (`db-custom-*`, REGIONAL).
+
+### Pendiente de aprobación antes de ejecutar (Fase 0 en adelante)
+D3 (SA del backend), D8 (`GcsObjectStore` y su dependencia), D9 (habilitar Cloud Scheduler) y autorización expresa de cada fase del RUNBOOK. Los archivos de `infra/` son componentes compartidos: quedan declarados en `scripts/kl/shared-changes.txt` como **preparados, sin autorización de aplicar**.
