@@ -111,3 +111,20 @@ Si la revisión nueva no arranca, Cloud Run **no** le envía tráfico y la revis
 Diagnóstico adicional (solo conteos, sin correos): `admin_user total=1, activos=1, con_login=0, elegibles=0, técnicas(@beeside.internal)=1, del dominio beeside.you=0`. **El único `admin_user` de dev es una identidad técnica `@beeside.internal` sin login; no hay ningún administrador humano aprovisionado.** El bootstrap se rechazaría (`not_found`) por diseño, y no se creó ninguna identidad ni se sustituyó el correo.
 
 **Desbloqueo (decisión de Plataforma/PO):** aprovisionar a `contact@beeside.you` como `admin_user` de dev (`active = true`, `login_enabled = true`, rol `ADMIN`). Camino existente solo-desarrollo: `CONFIG_BOOTSTRAP_ENV=development npm run admin:provision --workspace=backend -- --development-only --email contact@beeside.you --role ADMIN` contra la base principal de dev (escribe 1 fila en `admin_user` y 1 en `admin_audit_event` en una base compartida). En producción esto lo hace un ADMIN desde el Control Center, no un script. Luego se repite `--check` y, si es satisfactorio, `--apply`. Recordatorio: sin IdP/Admin API (bloqueo B1) esa persona no podrá iniciar sesión aunque el KL_ADMIN exista.
+
+---
+
+## Parte A EJECUTADA (2026-10-17) · primer KL_ADMIN = mo@beeside.you
+
+Corrección del PO: el administrador principal es **mo@beeside.you**; `contact@beeside.you` es institucional y **no** se aprovisionó. `padmin@beeside.you` queda como posible segundo administrador, **sin aprovisionar** y sin usarse para ningún control de doble intervención (pendiente de confirmar su titular individual y su autenticación).
+
+1. **Aprovisionamiento** en la base principal de dev con el mecanismo de desarrollo del repositorio (`admin:provision --development-only`, con `CONFIG_BOOTSTRAP_ENV=development`; en producción lo haría un ADMIN desde el Control Center): `admin_user` `67e7bb19-ea05-4ac0-bf0c-091cdb1607ff`, **rol ADMIN, `active = true`, `login_enabled = true`**; 1 evento `admin_user.provisioned` (SYSTEM, ALLOWED) en `admin_audit_event`. `admin_user` total = 2 (la identidad técnica `@beeside.internal` y esta).
+2. **`--check`:** `admin_user existe=1 activo=true login_habilitado=true`; `KL_ADMIN no revocados=0`.
+3. **`--apply`** (con `KL_BOOTSTRAP_CONFIRM`): `{"ok":true,"requestId":"bde136c4-cd38-44a4-82ae-bd85b523eeac"}`; `KL_ADMIN no revocados=1`.
+4. **Verificación posterior (solo lectura):** en `beeside_kl`, un único principal humano (`kind = admin_user`, activo) con la concesión `KL_ADMIN` **vigente**, concedida por la cuenta de servicio `kl-bootstrap` (`…00a3`); concesiones vigentes por rol: `KL_ADMIN=1`, `SERVICE_AGENT=1`, `SERVICE_KNOWLEDGE=1`. **Auditoría correlacionada:** `kl.audit_event` (`kl.bootstrap_admin`, actor `kl-bootstrap`) y `admin_audit_event` (`kl.bootstrap_admin`, `SYSTEM`, `ALLOWED`) comparten el mismo `request_id`. El `admin_user_id` de la plataforma coincide con el `principal_id` de KL. Usuarios de `beeside-dev-kl-db` sin cambios (cinco `kl_*` + `postgres`).
+
+**Límites que no se ocultan:**
+- **La autenticación no se pudo verificar**: no existe IdP/Admin API en dev (bloqueo B1). `admin_user.auth_subject` queda sin enlazar; la identidad se enlaza en el primer inicio de sesión real. No se crearon sesiones ficticias ni se omitió ningún control.
+- **Separación de funciones:** con un solo humano en KL (KL_ADMIN) no pueden ejercerse los controles que exigen una segunda persona (p. ej. «quien compone envía; otra persona con rol editorial aprueba»). Eso queda pendiente de más identidades, no de `padmin@beeside.you` hasta confirmarla.
+- Un KL_ADMIN no puede revocarse a sí mismo; si hubiera que deshacer el bootstrap antes de que existan datos reales, el camino es el reinicio descrito arriba (`DROP SCHEMA kl CASCADE` y re-migrar).
+- La parte B (cableado del backend) sigue **bloqueada** por B1–B3.
