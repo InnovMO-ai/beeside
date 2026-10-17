@@ -128,3 +128,32 @@ Corrección del PO: el administrador principal es **mo@beeside.you**; `contact@b
 - **Separación de funciones:** con un solo humano en KL (KL_ADMIN) no pueden ejercerse los controles que exigen una segunda persona (p. ej. «quien compone envía; otra persona con rol editorial aprueba»). Eso queda pendiente de más identidades, no de `padmin@beeside.you` hasta confirmarla.
 - Un KL_ADMIN no puede revocarse a sí mismo; si hubiera que deshacer el bootstrap antes de que existan datos reales, el camino es el reinicio descrito arriba (`DROP SCHEMA kl CASCADE` y re-migrar).
 - La parte B (cableado del backend) sigue **bloqueada** por B1–B3.
+
+---
+
+## S3 VERIFICADO (2026-10-17, 15:37 UTC) y S4 (cableado de KL) PREPARADO, NO EJECUTADO
+
+### S3 — inicio de sesión real de mo@beeside.you (verificación solo lectura)
+- `admin_user mo@beeside.you`: `ADMIN`, `active=true`, `login_enabled=true`, **`auth_subject` enlazado** (identificador de Google de 21 caracteres), `last_login_at = 2026-10-17 15:37:50 UTC`.
+- `admin_session`: 1 fila, creada 15:37:50, **vigente hasta 23:37:50 UTC (8 h)**, usuario `mo@beeside.you`, rol `ADMIN`.
+- Auditoría: `admin.login · ALLOWED · ADMIN_USER → admin_session · {"role":"ADMIN"}` a las 15:37:50.865 (antes, las 3 filas `DENIED` del fallo original y de mis pruebas de reproducción). La identidad técnica `@beeside.internal` no cambió (sin login). **S3 cumplido; sin sesiones ficticias.**
+
+### Pantalla en blanco al navegar (reportada por el titular)
+Los registros del frontend y del backend muestran, tras el login, solo respuestas **200**: `/api/admin/me` (15:37:51), `config/current` y `config/question-bank/versions` (15:38:10–11), `communications/templates` (15:38:17–18) y `analytics/funnel` (15:38:26); después no hay más peticiones. **No hay un solo 4xx/5xx del servidor**, así que el problema está en el navegador: el Control Center (código de la plataforma en `main`) **no tiene un error boundary de React**, de modo que una excepción de render en cualquier vista deja la página en blanco. No lo introducen ni el parche de la cookie (solo afecta al inicio de sesión) ni KL (inerte). Recuperación: recargar `…/admin`; la sesión sigue vigente hasta las 23:37 UTC y volverá a pedir `/api/admin/me`. Si reaparece, abrir Herramientas de desarrollo → Consola y enviar **solo el primer error en rojo** (texto, sin cookies). No se modificó el frontend.
+
+### S4 — cableado de KL en `beeside-dev-backend-api` (script: `scripts/kl/g2/s4-wire-backend.sh`)
+Los bloqueos B1 (Admin API/IdP) y B2 (imagen con KL) **ya están resueltos**: el servicio corre `kl-backend:8f82c58…` (revisión `00009-cm2`) con el Admin API activo. Queda B3 (adjuntar `beeside-dev-kl-db`) y las variables de KL.
+- **Plan (probado, solo lectura):** imagen `kl-backend` ✔; `ADMIN_API_ENABLED` definido ✔; sin `KL_DB_URL_*` ni variables prohibidas ✔; la cuenta del backend puede leer `beeside-dev-kl-app-url` y `beeside-dev-kl-reader-precision-url` y ambos tienen versión habilitada ✔; `beeside-dev-kl-db` RUNNABLE ✔; revisión de rollback `beeside-dev-backend-api-00009-cm2`.
+- **Comando:** `S4_CONFIRM=yes bash scripts/kl/g2/s4-wire-backend.sh apply` → una revisión nueva con `--add-cloudsql-instances …:beeside-dev-kl-db`, `KL_DB_URL_APP` y `KL_DB_URL_READER` por referencia a Secret Manager y `PRECISION_KNOWLEDGE_PROVIDER=off`. Verifica (por el origen del navegador): `/health` y `/health/ready` 200; `/api/admin/me` y `/api/admin/kl/me` sin sesión **401**; `/api/public/editions/<id>/status` → `{"status":"unknown"}` con `Cache-Control: no-store`; el login sigue redirigiendo a Google. **Si algo falla: rollback automático** a `00009-cm2`.
+- **Comprobación autenticada (la hace el titular):** abrir `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. Después KL verifica en solo lectura las conexiones de `kl_app` / `kl_reader_precision` y la correlación de auditoría.
+
+#### Capacidad (medida en solo lectura en `beeside-dev-kl-db`)
+`max_connections = 50` (3 reservadas), 3 sesiones activas ahora; topes por rol: `kl_owner=4, kl_app=8, kl_reader_precision=8, kl_agent=4, kl_knowledge=4` (suma 28). Los pools del backend son 3 + 3 por instancia y el servicio escala hasta 3 instancias → **9 conexiones por rol frente a un tope de 8** en el peor caso. Opción recomendada **W0** (antes de S4): subir `kl_app` y `kl_reader_precision` a **12** (suma 36 ≤ 47 disponibles) con una ventana corta de un usuario de API temporal, igual que en la Fase 4, y reflejar los topes en `roles.sql`. Si se decide no hacerlo, el riesgo solo aparece a escala máxima (errores «too many connections for role» en KL, no en la plataforma).
+
+#### Limitación importante: los procesos de fondo de KL en el backend
+`startBackground` arranca el **reconciliador de identidades (cada 5 min)** y la **correlación de auditoría (cada 24 h)** con `setInterval` dentro del proceso del backend. El servicio tiene `minScale=0` y CPU asignada solo durante las peticiones: con escala a cero esos procesos **no corren de forma fiable** (la instancia se apaga y el CPU se estrangula entre peticiones). Para que funcionen se necesita al menos una instancia con CPU siempre asignada (cambio de configuración y coste del servicio compartido: decisión de Plataforma) o moverlos a un job programado (otro diseño). No impide el cableado ni las lecturas/escrituras de KL Admin, pero la **desactivación de identidades por reconciliación y el informe diario de correlación (X30) no se darían por cumplidos en dev** hasta resolverlo.
+
+#### Riesgos y rollback de S4
+Una revisión nueva del servicio compartido (rollback inmediato a `00009-cm2`); si la revisión no arranca no recibe tráfico; deriva de Terraform en `envs/dev` (el módulo `cloud-run` no ignora el volumen de Cloud SQL: un `terraform apply` posterior quitaría `beeside-dev-kl-db`; hoy dev se despliega con `gcloud`); la cuenta compute compartida con `fa4-*` podría leer `kl_app`/`kl_reader_precision` (D3 abierta). Retirar el cableado: `gcloud run services update beeside-dev-backend-api --remove-secrets KL_DB_URL_APP,KL_DB_URL_READER --remove-env-vars PRECISION_KNOWLEDGE_PROVIDER --remove-cloudsql-instances <instancia KL>`.
+
+**Qué necesito:** tu autorización expresa de S4 (y de W0 si lo quieres), y una decisión sobre la limitación de los procesos de fondo.
