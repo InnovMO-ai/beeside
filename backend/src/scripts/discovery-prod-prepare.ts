@@ -1,19 +1,26 @@
 /* eslint-disable no-console */
 import { Pool } from "pg";
+import { bindDomainRoles } from "../db/domain-isolation";
 
 /**
  * PRODUCTION preparation step that runs right after the migrations, as the migration/owner role (job `discovery-prepare`). Idempotent.
- *  1. makes the runtime LOGIN role (`RUNTIME_LOGIN_ROLE`, default discovery_runtime) a member of `beeside_runtime_role`, whose table privileges the migrations define
- *     (the production database is dedicated, so membership — not a mirrored copy — is the right mechanism);
- *  2. VERIFIES the least-privilege contract and fails the job if it does not hold: the runtime login can read/write what Discovery needs, cannot DELETE, cannot UPDATE the
- *     append-only tables, cannot create objects, is not a superuser and cannot create roles.
- * Input: MIGRATION_DATABASE_URL (owner credential). No secret is printed.
+ *
+ * Two database models exist, and the job never guesses between them:
+ *  - SHARED CANONICAL DATABASE (migrations 0050/0051 applied: `db_domain_registry` + group `beeside_discovery_rw`). The runtime login belongs ONLY to
+ *    `beeside_discovery_rw`, which holds exactly what the registry lists (Discovery's 14 tables + the rate-limit counters). The job refreshes that group,
+ *    moves the login out of the Precision group, closes Precision's write access to Discovery's tables, and VERIFIES the isolation contract (see
+ *    `db/domain-isolation.ts`); it fails if the login could reach anything that belongs to Precision.
+ *  - LEGACY DEDICATED DATABASE (only Discovery's own 24 migrations): the login joins `beeside_runtime_role`, as before. Allowed only with the explicit
+ *    ALLOW_LEGACY_RUNTIME_GROUP=1, because that group reaches every table of a shared database.
+ * Input: MIGRATION_DATABASE_URL (owner credential); RUNTIME_LOGIN_ROLE (default discovery_runtime); PRECISION_RUNTIME_LOGIN (optional, verified when given).
+ * No secret is printed.
  */
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
 const literal = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 export interface PrepareReport { login: string; checks: Array<{ check: string; ok: boolean }> }
 
+/** LEGACY dedicated-database model (Discovery's own migrations only). Kept for the existing database until it joins the shared lineage. */
 export async function prepareRuntimeLogin(pool: Pool, login: string): Promise<PrepareReport> {
   const role = await pool.query("SELECT rolname FROM pg_roles WHERE rolname = $1", [login]);
   if (!role.rowCount) throw new Error(`runtime login role ${login} does not exist (the platform creates it with the Cloud SQL user)`);
@@ -45,16 +52,33 @@ export async function prepareRuntimeLogin(pool: Pool, login: string): Promise<Pr
   return { login, checks };
 }
 
+/** Which model this database is in: the domain registry and the Discovery group exist only after the shared-lineage migrations 0050/0051. */
+export async function databaseModel(pool: Pool): Promise<"shared" | "legacy"> {
+  const r = await pool.query("SELECT to_regclass('public.db_domain_registry') IS NOT NULL AS reg, EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'beeside_discovery_rw') AS grp");
+  return r.rows[0]!.reg && r.rows[0]!.grp ? "shared" : "legacy";
+}
+
+/** SHARED canonical database model: own group only, Precision closed on Discovery's tables, contract verified. */
+export async function prepareDomainLogin(pool: Pool, login: string, precisionLogin?: string): Promise<PrepareReport> {
+  const checks = await bindDomainRoles(pool, { discoveryLogin: login, ...(precisionLogin ? { precisionLogin } : {}) });
+  return { login, checks };
+}
+
 async function main() {
   const url = process.env.MIGRATION_DATABASE_URL;
   if (!url) throw new Error("MIGRATION_DATABASE_URL is required");
   const login = process.env.RUNTIME_LOGIN_ROLE ?? "discovery_runtime";
+  const precisionLogin = process.env.PRECISION_RUNTIME_LOGIN || undefined;
   const pool = new Pool({ connectionString: url });
   try {
-    const report = await prepareRuntimeLogin(pool, login);
+    const model = await databaseModel(pool);
+    if (model === "legacy" && process.env.ALLOW_LEGACY_RUNTIME_GROUP !== "1") {
+      throw new Error("this database does not have the data-domain roles (migrations 0050/0051): the legacy runtime group reaches every table of a shared database. Migrate with the shared lineage first, or set ALLOW_LEGACY_RUNTIME_GROUP=1 for the dedicated Discovery-only database");
+    }
+    const report = model === "shared" ? await prepareDomainLogin(pool, login, precisionLogin) : await prepareRuntimeLogin(pool, login);
     for (const c of report.checks) console.log(JSON.stringify({ severity: c.ok ? "INFO" : "ERROR", message: `${c.ok ? "ok" : "FAILED"}: ${c.check}` }));
-    if (report.checks.some((c) => !c.ok)) throw new Error("the runtime login violates the least-privilege contract");
-    console.log(JSON.stringify({ severity: "INFO", message: "discovery runtime login prepared", login }));
+    if (report.checks.some((c) => !c.ok)) throw new Error(model === "shared" ? "the data-domain isolation contract does not hold" : "the runtime login violates the least-privilege contract");
+    console.log(JSON.stringify({ severity: "INFO", message: "discovery runtime login prepared", login, model }));
   } finally { await pool.end(); }
 }
 if (require.main === module) main().catch((e: unknown) => { console.error(e instanceof Error ? e.message : String(e)); process.exit(1); });

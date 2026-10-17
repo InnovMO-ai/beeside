@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Database preparation for Discovery production: backend image → migrations → runtime-login membership + least-privilege verification → catalog seed.
 # Touches ONLY the production database schema/catalog (no customer data exists). Idempotent. DRY_RUN=1 default.
+# Shared canonical database (migrations 0050/0051): the prepare job puts the runtime login in its OWN group and verifies the isolation contract.
+# The dedicated legacy Discovery database (24 migrations, no domain roles) needs ALLOW_LEGACY_RUNTIME_GROUP=1 explicitly; the job refuses otherwise.
 #   IMAGE_TAG=<sha> DRY_RUN=0 bash deploy/production/prepare-database.sh        (SKIP_BUILD=1 when the image already exists)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -16,7 +18,7 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
 fi
 job() { # name script secretsSpec
   run g run jobs deploy "discovery-$1" --region "$REGION" --image "${REPO}/discovery-backend:${IMAGE_TAG}" --command node --args "$2" \
-    --set-cloudsql-instances "$SQL_CONN" --service-account "$SA" --set-secrets "$3" --set-env-vars "NODE_ENV=production,RUNTIME_LOGIN_ROLE=discovery_runtime" --max-retries 0 --task-timeout 600
+    --set-cloudsql-instances "$SQL_CONN" --service-account "$SA" --set-secrets "$3" --set-env-vars "NODE_ENV=production,RUNTIME_LOGIN_ROLE=discovery_runtime,ALLOW_LEGACY_RUNTIME_GROUP=${ALLOW_LEGACY_RUNTIME_GROUP:-0},PRECISION_RUNTIME_LOGIN=${PRECISION_RUNTIME_LOGIN:-}" --max-retries 0 --task-timeout 600
   run g run jobs execute "discovery-$1" --region "$REGION" --wait
 }
 job migrate dist/scripts/migrate.js "MIGRATION_DATABASE_URL=${SECRET_MIGRATION_DATABASE_URL}:latest"

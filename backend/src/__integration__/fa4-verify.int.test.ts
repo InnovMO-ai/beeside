@@ -58,9 +58,13 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
 
   describe("B1 — least privilege: the app works as beeside_runtime_role with no broad DELETE", () => {
     it("the login role is really the runtime role: not owner, not superuser, no DELETE anywhere", async () => {
-      const who = (await rt.query("SELECT current_user AS u, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS su, pg_has_role(current_user, 'beeside_runtime_role', 'member') AS member")).rows[0];
+      // Shared canonical database: the login belongs ONLY to beeside_discovery_rw (and not to the Precision group). Legacy dedicated database: beeside_runtime_role.
+      const shared = (await q("SELECT (to_regclass('public.db_domain_registry') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'beeside_discovery_rw')) AS s"))[0].s as boolean;
+      const group = shared ? "beeside_discovery_rw" : "beeside_runtime_role";
+      const who = (await rt.query("SELECT current_user AS u, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS su, pg_has_role(current_user, $1, 'member') AS member, pg_has_role(current_user, 'beeside_runtime_role', 'member') AS in_runtime_group", [group])).rows[0];
       expect(who.su).toBe(false); expect(who.member).toBe(true);
-      const del = await q("SELECT count(*)::int AS n FROM information_schema.role_table_grants WHERE grantee = 'beeside_runtime_role' AND privilege_type = 'DELETE' AND table_name LIKE 'fa4_%'");
+      if (shared) expect(who.in_runtime_group).toBe(false);
+      const del = await q("SELECT count(*)::int AS n FROM information_schema.role_table_grants WHERE grantee IN ('beeside_runtime_role', 'beeside_discovery_rw') AND privilege_type = 'DELETE' AND table_name LIKE 'fa4_%'");
       expect(del[0].n).toBe(0);
       await expect(rt.query("DELETE FROM fa4_demand_signal")).rejects.toMatchObject({ code: "42501" });
     });
