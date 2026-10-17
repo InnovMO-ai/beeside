@@ -132,10 +132,12 @@ export interface CardInput {
   variantEn?: { title: string; body: string; claims?: string[] } | null;
   country?: string;
   specialistCategory?: string;
+  permittedUse?: string;
+  categoryKeys?: string[];
 }
 
 export async function createCardVersion(w: World, c: CardInput, who: Person = w.editor): Promise<{ versionId: string; unitKey: string }> {
-  await run(w, who, ["SELECT kl.create_unit($1, 'card', $2, NULL, $3, ARRAY['logistics'], ARRAY[]::text[], ARRAY[]::text[], 'provisional-1', $4)", [c.key, c.country ?? "MX", c.topic ?? "logistics.rail", c.risk ?? "low"]]);
+  await run(w, who, ["SELECT kl.create_unit($1, 'card', $2, NULL, $3, $5::text[], ARRAY[]::text[], ARRAY[]::text[], 'provisional-1', $4)", [c.key, c.country ?? "MX", c.topic ?? "logistics.rail", c.risk ?? "low", c.categoryKeys ?? ["logistics"]]]);
   const content = {
     card_type: c.cardType ?? "context",
     title_es: c.titleEs ?? "Ficha sintética",
@@ -143,8 +145,8 @@ export async function createCardVersion(w: World, c: CardInput, who: Person = w.
     claims_es: c.claimsEs ?? ["Afirmación sintética de prueba."],
     primary_source_publication_key: c.publication ?? null,
   };
-  const row = await one(w, who, "SELECT kl.create_version($1, 'team', NULL, 'new_period', 'paraphrase_and_cite', ARRAY['Límite sintético'], ARRAY['Synthetic limit'], now(), NULL, NULL, false, $4, $2::jsonb, $3::jsonb) AS v", [
-    c.key, JSON.stringify(content), c.variantEn === null ? null : JSON.stringify(c.variantEn ?? { title: "Synthetic card", body: "Synthetic test content.", claims: ["Synthetic test claim."] }), c.specialistCategory ?? null,
+  const row = await one(w, who, "SELECT kl.create_version($1, 'team', NULL, 'new_period', $5, ARRAY['Límite sintético'], ARRAY['Synthetic limit'], now(), NULL, NULL, false, $4, $2::jsonb, $3::jsonb) AS v", [
+    c.key, JSON.stringify(content), c.variantEn === null ? null : JSON.stringify(c.variantEn ?? { title: "Synthetic card", body: "Synthetic test content.", claims: ["Synthetic test claim."] }), c.specialistCategory ?? null, c.permittedUse ?? "paraphrase_and_cite",
   ]);
   return { versionId: row.v as string, unitKey: c.key };
 }

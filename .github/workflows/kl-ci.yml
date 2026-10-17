@@ -1,6 +1,6 @@
 name: KL CI (aislado)
 
-# CI aislado de Knowledge Layer 1.0: PostgreSQL 16 efímero, datos sintéticos, sin secretos, sin despliegue y sin tocar
+# CI aislado de Knowledge Layer 1.0: PostgreSQL 16 efímero, Chromium fijado para el generador de PDF, datos sintéticos, sin secretos, sin despliegue y sin tocar
 # ninguna base compartida (CR-KL-002 Handoff §4 y §7). Solo corre para la rama feat/kl-1.0-code.
 on:
   push:
@@ -37,11 +37,13 @@ jobs:
         run: |
           npm run build --workspace=shared/canonical-fields
           npm run build --workspace=shared/fa-public-engine
+      - name: Chromium for the PDF generator (B6; pinned by the playwright-core version in the lockfile)
+        run: npx playwright-core install --with-deps chromium
       - name: Typecheck and lint (KL and the files it touches)
         working-directory: backend
         run: |
           npx tsc --noEmit -p tsconfig.json
           npx eslint "src/kl/**/*.ts" "src/admin/kl/**/*.ts" src/index.ts
-      - name: KL tests (X01-X18, X20-X22, X28, X29 and rehearsal of E1-E10)
+      - name: KL tests (R1 X01-X22/X28/X29, R2 X30, R3 AC-10/X19, rehearsal of E1-E10)
         working-directory: backend
         run: npx jest -c src/kl/jest.kl.config.js --ci

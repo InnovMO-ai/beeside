@@ -103,7 +103,7 @@ describeKl("KL-0002/0003 · integridad del esquema §5", () => {
         }
       }
       const readerViews = (await q("SELECT c.relname FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace WHERE s.nspname = 'kl' AND c.relkind = 'v' AND has_table_privilege('kl_reader_precision', c.oid, 'SELECT')")).map((r) => r.relname);
-      expect(readerViews.sort()).toEqual(["v_consumable", "v_consumable_card", "v_consumable_package", "v_consumable_stat", "v_edition_current", "v_flags", "v_package_status"]);
+      expect(readerViews.sort()).toEqual(["v_consumable", "v_consumable_card", "v_consumable_package", "v_consumable_stat", "v_edition_current", "v_edition_file", "v_flags", "v_package_status"]);
     });
 
     it("CONNECT: PUBLIC no se conecta; solo los cinco roles; el dueño de la base y de los objetos es kl_owner", async () => {

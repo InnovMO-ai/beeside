@@ -199,12 +199,12 @@ describeKl("R2 · periodicidad (PO-6), planificador sobre kl.job y acciones manu
     it("sin agentes los jobs de recolección esperan en cola: el worker los deja intactos aunque corra el mantenimiento", async () => {
       const wp = workerPools({ agentUrl: roleUrl("kl_agent"), knowledgeUrl: roleUrl("kl_knowledge") });
       try {
-        const before = await q("SELECT count(*)::int AS n FROM kl.job WHERE kind IN ('collect', 'review_now') AND status = 'queued'");
         const r = await runCycle(wp);
         expect(r.maintenance).toBeDefined();
-        const after = await q("SELECT count(*)::int AS n FROM kl.job WHERE kind IN ('collect', 'review_now') AND status = 'queued'");
-        expect(after[0]?.n).toBe(before[0]?.n);
-        expect((await q("SELECT count(*)::int AS n FROM kl.job WHERE kind IN ('collect', 'review_now') AND status <> 'queued'"))[0]?.n).toBe(0);
+        // ningún job de agente se reclamó, se ejecutó ni falló; los descartados por el control de atrasados/inelegibles quedan «obsolete»
+        const touched = await q("SELECT count(*)::int AS n FROM kl.job WHERE kind IN ('collect', 'review_now') AND (status NOT IN ('queued', 'obsolete') OR attempts > 0)");
+        expect(touched[0]?.n).toBe(0);
+        expect((await q("SELECT count(*)::int AS n FROM kl.job WHERE kind IN ('collect', 'review_now') AND status = 'queued'"))[0]?.n).toBeGreaterThan(0);
       } finally {
         await wp.close();
       }

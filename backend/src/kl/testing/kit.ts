@@ -56,7 +56,10 @@ export async function expectSqlState(promise: Promise<unknown>, code: string): P
     caught = error;
   }
   if (!caught) throw new Error(`se esperaba SQLSTATE ${code} y no hubo error`);
-  expect((caught as { code?: string }).code).toBe(code);
+  // La capa TypeScript traduce BVnnn a KlError (FORBIDDEN, CONFLICT…): se acepta cualquiera de las dos formas del mismo error.
+  const KL: Record<string, string> = { BV403: "FORBIDDEN", BV404: "NOT_FOUND", BV409: "CONFLICT", BV422: "INVALID", BV601: "IMMUTABLE" };
+  const got = (caught as { code?: string }).code;
+  expect(got === code || (KL[code] !== undefined && got === KL[code])).toBe(true);
 }
 
 export async function expectDenied(promise: Promise<unknown>): Promise<void> {

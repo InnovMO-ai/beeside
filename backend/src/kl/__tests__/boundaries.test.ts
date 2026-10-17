@@ -70,7 +70,7 @@ describe("rechazo al arrancar: cada proceso rechaza variables que no le correspo
 describe("frontera web: ningún cliente HTTP ni salida a red en kl/read ni en kl-worker (defensa adicional a B9)", () => {
   // La salida de red de R2 solo existirá en el agente recolector de kl-worker, sin código en R1.
   const FORBIDDEN = /from\s+["'](node:)?(https?|net|tls|dns|dgram|http2)["']|require\(["'](node:)?(https?|net|tls|dns)["']\)|\bfetch\s*\(|\baxios\b|\bundici\b|node-fetch|\bXMLHttpRequest\b|\bWebSocket\b|\bgot\s*\(|\bsuperagent\b|\bhttp\.request\b/;
-  it.each(["read", "worker", "packages", "service", "ingest", "seed", "contract"])("kl/%s no importa ni usa clientes de red", (dir) => {
+  it.each(["read", "worker", "packages", "service", "ingest", "seed", "contract", "products"])("kl/%s no importa ni usa clientes de red", (dir) => {
     for (const f of files(dir)) expect({ f, hit: FORBIDDEN.test(fs.readFileSync(path.join(SRC, f), "utf8")) }).toEqual({ f, hit: false });
   });
   it("el worker de KL no importa nada de la plataforma compartida (sin credenciales ni módulos de beeside)", () => {
@@ -108,7 +108,9 @@ describeKl("kl-worker con los agentes apagados (B6)", () => {
 
   it("sin manejadores de agentes, un job de recolección encolado por una persona sigue en cola", async () => {
     const { asPerson } = await import("../testing/kit");
-    const jobId = await asPerson(w.k.app, w.editor, async () => (await w.k.app.query("SELECT kl.enqueue_job('review_now', '{\"publication_key\":\"inegi.enoe\"}') AS j")).rows[0].j);
+    const { seedSource } = await import("../testing/world");
+    const src = await seedSource(w); // fuente aprobada: el job es elegible y no lo descarta el control de jobs atrasados
+    const jobId = await asPerson(w.k.app, w.editor, async () => (await w.k.app.query("SELECT kl.enqueue_job('review_now', $1::jsonb) AS j", [JSON.stringify({ publication_key: src.publication })])).rows[0].j);
     const pools2 = wp();
     try {
       const r = await runCycle(pools2);
