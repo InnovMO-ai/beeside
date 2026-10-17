@@ -1,17 +1,28 @@
 # CR-KL-003 · Instancia Cloud SQL dedicada para `beeside_kl` y desviaciones de implementación verificadas
 
-> **BORRADOR v0.1 — NO APROBADO.** Propuesto a partir de la evidencia real de G1–G2 en dev (16 y 17-oct-2026). No tiene vigencia normativa hasta la aprobación expresa del PO. **No modifica CR-KL-002**, que sigue íntegro y vigente salvo en lo que este documento, una vez aprobado, sustituya de forma explícita (§5).
+> **BORRADOR v0.2 — NO APROBADO.** Propuesto a partir de la evidencia real de G1–G2 en dev (16 y 17-oct-2026); incorpora las decisiones del PO sobre el borrador v0.1 (17-oct-2026, §0). No tiene vigencia normativa hasta la aprobación expresa del PO. **No modifica CR-KL-002**, que sigue íntegro y vigente salvo en lo que este documento, una vez aprobado, sustituya de forma explícita (§5).
 
 | Campo | Valor |
 |---|---|
-| Identificador | CR-KL-003 · versión 0.1 (borrador) |
+| Identificador | CR-KL-003 · versión 0.2 (borrador) |
 | Tipo | Cambio arquitectónico y de infraestructura (precisa y corrige CR-KL-002) |
-| Estado | **Borrador, pendiente de aprobación del PO** |
+| Estado | **Borrador v0.2, pendiente de la aprobación final del PO** |
 | Plataforma | Knowledge Layer 1.0 · MVP1 |
 | Base de referencia (sin modificar) | CR-KL-002 v1.0, manifiesto `08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b` · diseño congelado `kl-design-1.0-frozen` (`69f211a`), manifiesto `8901ecfa25db28acde1445399774ab614f9e046fbefb935a86214d17ad5f4afe` |
 | Decisión del PO que lo origina | Opción A «instancia dedicada `beeside-dev-kl-db`», 16-oct-2026, tras el ensayo D2 de G1 |
 | Evidencia | `docs/knowledge-layer/kl-1.0-code/` — `G1_G2_PLAN.md` §9–§10 y §12, `G2_FASE5_PROCEDIMIENTO.md`, `G2_FASE7_WORKER_Y_PRUEBAS.md`, `G2_D9_CLOUD_SCHEDULER.md`, `G1_G2_ESTADO_GENERAL.md`, y `evidence/G1-*`, `evidence/X24-*` |
 | Código y rama | `feat/kl-1.0-code`, commit de referencia `e0e3931` |
+| Documentos de este cambio | `CR-KL-003.md` (este, reglas normativas C1–C6) · `CR-KL-003_Anexo_Implementacion.md` (AI-1…AI-3, antes C7–C9) · `CR-KL-003_Recomendacion_Plataforma.md` (recomendación a Plataforma, no normativa para KL) |
+
+## 0. Decisiones del PO sobre el borrador v0.1 (17-oct-2026)
+
+| # | Pregunta | Decisión | Dónde se refleja |
+|---|---|---|---|
+| 1 | ¿C7–C9 en el cuerpo o aparte? | **Separar C7–C9 en un anexo de implementación** | Ahora `CR-KL-003_Anexo_Implementacion.md` como **AI-1** (Cloud Scheduler), **AI-2** (almacén local fuera de producción) y **AI-3** (conexión del worker en frío); el cuerpo conserva C1–C6 |
+| 2 | ¿Autorización de C4 por operación o marco? | **Autorización por operación** | C4: cada operación privilegiada exige autorización expresa del PO; no hay autorización marco por entorno |
+| 3 | Nivel de staging y producción | **Alta disponibilidad regional** | C1: `availability_type = REGIONAL` y núcleos dedicados en staging y producción (dev sigue ZONAL) |
+| 4 | ¿Trasladar a Plataforma la degradación de `beeside_app`? | **Sí, como recomendación** | `CR-KL-003_Recomendacion_Plataforma.md` (documento preparado; **no** se ha enviado ni ejecutado nada) |
+| 5 | ¿Fijar el CR en el preflight? | **No por ahora** | §10: sin cambios en `preflight.sh` ni `kl.fingerprint` |
 
 ## 1. Decisión propuesta
 
@@ -40,15 +51,14 @@ CR-KL-002 §2 completo; reglas B1–B6, B8–B10; el contrato `kl.v1`; la base `
 
 | # | Regla |
 |---|---|
-| **C1** | **Instancia dedicada por entorno.** `beeside-<entorno>-kl-db`, PostgreSQL 16, acceso solo por conector/Auth Proxy con certificado de cliente (`TRUSTED_CLIENT_CERTIFICATE_REQUIRED`), respaldos automáticos y recuperación a un punto en el tiempo propios, protección contra borrado activa en Terraform (`deletion_protection`). La instancia solo aloja `beeside_kl` (y bases de restauración efímeras). |
+| **C1** | **Instancia dedicada por entorno.** `beeside-<entorno>-kl-db`, PostgreSQL 16, acceso solo por conector/Auth Proxy con certificado de cliente (`TRUSTED_CLIENT_CERTIFICATE_REQUIRED`), respaldos automáticos y recuperación a un punto en el tiempo propios, protección contra borrado activa en Terraform (`deletion_protection`). La instancia solo aloja `beeside_kl` (y bases de restauración efímeras). **Dev:** zonal, `db-g1-small`. **Staging y producción (decisión del PO):** `availability_type = REGIONAL` (alta disponibilidad regional) y nivel de núcleos dedicados, dimensionado aparte antes de crearlos. |
 | **C2** | **Aislamiento de `cloudsqlsuperuser` (control continuo de G1).** En esa instancia los únicos miembros de `cloudsqlsuperuser` son `postgres` (**sin contraseña**: no puede iniciar sesión) y los roles internos de Cloud SQL. **Está prohibido crear usuarios por API o IAM de base de datos** salvo los temporales de C4. Se verifica con `SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` después de cada operación privilegiada y se vigila en Cloud Audit Logs `cloudsql.users.create/update/delete`. Quien tenga `cloudsql.users.update` en el proyecto puede restablecer la contraseña de `postgres` o crear usuarios: es un riesgo de plano IAM ya aceptado en CR-KL-002 §12 y se mantiene acotado al propietario del proyecto. |
 | **C3** | **Roles por SQL, no por la API.** Los cinco roles `kl_*` se crean por SQL (`backend/src/kl/db/bootstrap/roles.sql`) como `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE`, con un **aprovisionador de un solo uso** que se elimina al terminar; Terraform gestiona sus contraseñas y sus secretos (una conexión `/cloudsql` por rol) pero **no** declara `google_sql_user` para ellos (la API los haría `cloudsqlsuperuser`). La base `beeside_kl` se crea con dueño `kl_owner` (concesión temporal de `kl_owner` al aprovisionador, retirada de inmediato). Topes de conexión de referencia: `kl_owner 4`, `kl_app 12`, `kl_reader_precision 12`, `kl_agent 4`, `kl_knowledge 4` (suma 36 de las 47 conexiones utilizables con `max_connections = 50` del nivel `db-g1-small`). |
-| **C4** | **Operaciones privilegiadas acotadas.** Cualquier cambio que exija `CREATEROLE`/`cloudsqlsuperuser` (ajustar límites, crear una base de restauración, aprovisionamiento inicial) se hace con un **usuario de API de vida corta**, con autorización expresa del PO, en una ventana de segundos, con eliminación **verificada** del usuario y de cualquier membresía, y con registro en la evidencia. |
+| **C4** | **Operaciones privilegiadas acotadas.** Cualquier cambio que exija `CREATEROLE`/`cloudsqlsuperuser` (ajustar límites, crear una base de restauración, aprovisionamiento inicial) se hace con un **usuario de API de vida corta**, con **autorización expresa del PO para esa operación concreta (no hay autorización marco por entorno)**, en una ventana de segundos, con eliminación **verificada** del usuario y de cualquier membresía, y con registro en la evidencia. |
 | **C5** | **G1 se verifica por entorno y se repite.** El protocolo E1–E15 (E11–E15 son ampliaciones de CR-KL-003: `DROP DATABASE`, terminar sesiones, `GRANT CONNECT`, privilegios de los `kl_*` y lectura de `pg_authid`) se ejecuta con un **rol simple** ajeno a KL antes de la primera migración y se **repite tras toda migración que cambie privilegios**, con la salida archivada. Script: `scripts/kl/g1/run-e.sh`. |
 | **C6** | **Exportación programada y restauración probada (G2).** Exportación SQL diaria de `beeside_kl` a un bucket privado versionado (`gs://<proyecto>-beeside-<entorno>-kl-exports/daily/`) por Cloud Scheduler con una cuenta de servicio de **un solo permiso** (`cloudsql.instances.export`, condicionado a la instancia de KL) y exportación previa a cada migración. La restauración (X24) se prueba importando como `kl_owner` en `beeside_kl_restore` y **comparando** recuento y huella por tabla, columnas, funciones, vistas, ACL, triggers, índices, restricciones (por tabla) y diario; un error en cualquier consulta de comparación invalida la prueba. Se admite únicamente la normalización de paréntesis de expresiones `AND` en restricciones `CHECK`, documentada. Script: `scripts/kl/g2/x24-restore.sh`. |
-| **C7** | **Ubicación de Cloud Scheduler.** Los schedules de KL pueden vivir en una región distinta de la del destino cuando la del entorno no está soportada (los destinos son APIs HTTPS). En dev (`northamerica-south1`, Querétaro, no soportada por Cloud Scheduler) se usa **`us-south1`**. Solo residen allí metadatos del schedule (nombre, cron, URL de la API); ningún dato de KL. Se revisa si Google añade la región. |
-| **C8** | **Almacén de objetos del worker fuera de producción.** Con `NODE_ENV ≠ production` el worker usa el almacén local de desarrollo (`KL_STORAGE_DIR=/tmp/kl-storage`, efímero): sirve para verificar el arranque y la tubería, **no** para publicar ediciones. Con `NODE_ENV = production` el worker se niega a renderizar (`KlConfigError`) hasta que exista el adaptador de almacenamiento de Cloud Storage con retención (B9/D8). **Ninguna edición se publica en un entorno sin ese adaptador.** |
-| **C9** | **Conexión del worker en frío.** Los pools de `kl-worker` esperan hasta 10 s la primera conexión por el socket de Cloud SQL (el backend interactivo mantiene 2 s). El job conserva `max_retries = 1`, pero un intento fallido por conexión debe tratarse como defecto observable (`retriedCount`). |
+
+**Reglas de implementación (antes C7–C9):** AI-1 *Ubicación de Cloud Scheduler*, AI-2 *Almacén de objetos del worker fuera de producción* y AI-3 *Conexión del worker en frío* viven ahora en `CR-KL-003_Anexo_Implementacion.md` (decisión 1 del PO). Se aprueban junto con este CR pero se pueden revisar sin reabrir C1–C6.
 
 ## 5. Secciones de CR-KL-002 que se sustituyen (una vez aprobado)
 | Documento | Sección | Texto vigente según CR-KL-003 |
@@ -56,7 +66,7 @@ CR-KL-002 §2 completo; reglas B1–B6, B8–B10; el contrato `kl.v1`; la base `
 | `CR-KL-002.md` | §1 Decisión | «…una base PostgreSQL propia, `beeside_kl`, **en una instancia Cloud SQL dedicada de cada entorno** (C1)…» |
 | `CR-KL-002.md` | §3 · B7 | «Base `beeside_kl` **en la instancia dedicada de KL**, cinco roles con secretos propios, job de migración, journal y exportación programada.» |
 | `CR-KL-002.md` | §5 · G1 y G2 | G1 se cumple **por construcción de la instancia dedicada** y se verifica con C2/C5. G2: instancia, secretos, cuentas, buckets, jobs y schedules por Terraform; **roles y base por SQL de un solo uso (C3)**; exportación programada y restauración probada (C6). |
-| `CR-KL-002.md` | §6 «Instancia separada … Diferida» y «Base de datos: sin servidor nuevo» | **Adoptada.** Costo incremental: una instancia `db-g1-small` en dev (orden de 28 USD/mes según un agregador público para `northamerica-south1`; **sin verificar** contra la calculadora oficial) más almacenamiento y respaldos; para staging/producción se dimensionará aparte (nivel dedicado y alta disponibilidad). |
+| `CR-KL-002.md` | §6 «Instancia separada … Diferida» y «Base de datos: sin servidor nuevo» | **Adoptada.** Costo incremental: una instancia `db-g1-small` en dev (orden de 28 USD/mes según un agregador público para `northamerica-south1`; **sin verificar** contra la calculadora oficial) más almacenamiento y respaldos; para staging/producción, **alta disponibilidad regional y núcleos dedicados** (decisión del PO): el costo de instancia es del orden del doble por la réplica en espera y se estimará con la calculadora oficial antes de crearlas. |
 | `CR-KL-002.md` | §6 «Credenciales IAM de base de datos … se recomienda evaluarlo en G2» | **Evaluado y descartado como remedio** (C2): los usuarios IAM también los controla `cloudsqlsuperuser`. |
 | `CR-KL-002_Contratos_seguridad.md` | §8.1 «Todos los roles son usuarios de Cloud SQL» | «Los roles son roles de PostgreSQL **creados por SQL** (C3), con un secreto propio por rol en Secret Manager.» |
 | `CR-KL-002_Contratos_seguridad.md` | §8.3 (párrafo final) | El riesgo se resuelve con la **instancia dedicada (C1/C2)**; no se elige «usuarios IAM» ni «recrear `app`». |
@@ -68,8 +78,8 @@ CR-KL-002 §2 completo; reglas B1–B6, B8–B10; el contrato `kl.v1`; la base `
 | # | Desviación | Estado |
 |---|---|---|
 | 1 | Roles y base creados por SQL y no por Terraform | Normativa (C3) |
-| 2 | Cloud Scheduler en `us-south1` | Normativa (C7) |
-| 3 | Almacén local en dev; sin adaptador GCS | Normativa (C8); **abierta** hasta D8 |
+| 2 | Cloud Scheduler en `us-south1` | Anexo AI-1 |
+| 3 | Almacén local en dev; sin adaptador GCS | Anexo AI-2; **abierta** hasta D8 |
 | 4 | El backend compartido de dev despliega una imagen de la rama KL (`main` + KL + 8 archivos compartidos aprobados) y mantiene habilitado el Admin API con Google como IdP de dev | Operativa; decisión de Plataforma, **no** forma parte de este CR |
 | 5 | Importación con `gcloud sql import sql --user=kl_owner` | Verificada en X24; sin conceder nada a `cloudsqlimportexport` |
 
@@ -97,13 +107,11 @@ CR-KL-002 §2 completo; reglas B1–B6, B8–B10; el contrato `kl.v1`; la base `
 | Elemento | Referencia |
 |---|---|
 | Este documento | `docs/knowledge-layer/kl-1.0-addenda/CR-KL-003/CR-KL-003.md` en la rama `feat/kl-1.0-code` (borrador) |
-| Integridad | **Pendiente:** al aprobarse se generará `MANIFEST.sha256` de la carpeta y se decidirá si se fija su huella en `scripts/kl/preflight.sh` y `scripts/kl/kl.fingerprint` (archivos de guarda: requieren su propia aprobación y huella declarada). **No se ha tocado ningún archivo de guarda ni CR-KL-002.** |
+| Integridad | Al aprobarse se generará `MANIFEST.sha256` de la carpeta. **Decisión del PO: no se fija el CR en el preflight por ahora**; no se toca ningún archivo de guarda (`scripts/kl/preflight.sh`, `scripts/kl/kl.fingerprint`) ni CR-KL-002. Se podrá fijar más adelante con su propia aprobación. |
 | Modificaciones | Cualquier cambio posterior exige CR-KL-003 v1.1 o un CR nuevo aprobado por el PO |
 | **Aprobación del PO** | **Pendiente** — fecha: ____ · decisión: ____ |
 
-### Preguntas abiertas para el PO al revisar este borrador
-1. ¿Se aprueba C1–C9 tal como están o se separan C7–C9 (operativas) en un anexo de implementación?
-2. ¿La regla C4 (usuarios de API de vida corta) requiere autorización por operación o una autorización marco por entorno?
-3. ¿Qué nivel y alta disponibilidad se exigen para la instancia dedicada de staging y producción?
-4. ¿Se traslada a Plataforma, como recomendación formal, la degradación de `beeside_app` en la instancia canónica?
-5. ¿Se fija este CR en el preflight (huella en `kl.fingerprint`) al aprobarlo?
+### Pendiente para la aprobación final
+1. Revisión del PO de esta v0.2 y del anexo (la aprobación se registra arriba: fecha y decisión).
+2. Dimensionar el nivel dedicado y la alta disponibilidad de staging y producción antes de crear esas instancias (costo con la calculadora oficial).
+3. Decidir quién entrega a Plataforma `CR-KL-003_Recomendacion_Plataforma.md` (KL no lo envía por su cuenta).
