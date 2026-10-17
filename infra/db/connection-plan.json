@@ -1,12 +1,24 @@
 {
-  "_comment": "Worst-case connection budget of the shared canonical database. Values must match the deployed env vars (DB_POOL_MAX / PRECISION_DB_POOL_MAX) and Cloud Run max instances. max_connections: measured 100 on db-custom-1-3840 (Part B, Q11); re-measure after the resize to db-custom-2-7680 and edit here.",
+  "_comment": "Worst-case connection budget of the shared canonical database. Values must match the deployed env vars (DB_POOL_MAX / PRECISION_DB_POOL_MAX) and Cloud Run max instances. max_connections: measured 100 on db-custom-1-3840 (Part B, Q11); re-measure after the resize to db-custom-2-7680 and edit here. Pools are shared inside a process (one core pool, one Precision pool), so a Precision instance with the Control Center enabled holds at most DB_POOL_MAX + PRECISION_DB_POOL_MAX connections.",
   "maxConnections": 100,
   "reserved": 7,
   "other": 10,
   "ceiling": 0.7,
   "services": [
-    { "name": "discovery-backend (DB_POOL_MAX=4)", "maxInstances": 5, "poolMax": 4 },
-    { "name": "discovery-worker (DB_POOL_MAX=3)", "maxInstances": 2, "poolMax": 3 },
-    { "name": "precision-backend (PRECISION_DB_POOL_MAX=8)", "maxInstances": 2, "poolMax": 8 }
+    {
+      "name": "discovery-backend (DB_POOL_MAX=4)",
+      "maxInstances": 5,
+      "poolMax": 4
+    },
+    {
+      "name": "discovery-worker (DB_POOL_MAX=3)",
+      "maxInstances": 2,
+      "poolMax": 3
+    },
+    {
+      "name": "precision-backend (DB_POOL_MAX=3 for the admin/core pool + PRECISION_DB_POOL_MAX=8)",
+      "maxInstances": 2,
+      "poolMax": 11
+    }
   ]
 }

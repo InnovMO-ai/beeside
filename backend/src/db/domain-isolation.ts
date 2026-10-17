@@ -91,6 +91,10 @@ export async function verifyDomainIsolation(db: Queryable, opts: { discoveryLogi
   return out;
 }
 
+async function isMember(db: Queryable, group: string, login: string): Promise<boolean> {
+  return (await db.query("SELECT 1 FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid JOIN pg_roles u ON u.oid = m.member WHERE g.rolname = $1 AND u.rolname = $2", [group, login])).rows.length > 0;
+}
+
 /**
  * EXPAND → MOVE → CONTRACT, idempotent, run with the migration/owner credential after the migrations:
  *  1. refresh the Discovery group's privileges from the registry (refuses while a table is unregistered);
@@ -115,20 +119,25 @@ export async function bindDomainRoles(db: Queryable, opts: { discoveryLogin: str
   if ((await db.query("SELECT 1 FROM pg_roles r WHERE r.rolname = 'cloudsqlsuperuser' AND pg_has_role($1, r.oid, 'MEMBER')", [opts.discoveryLogin])).rows.length) {
     await db.query(`REVOKE cloudsqlsuperuser FROM ${d}`);
   }
-  await db.query(`ALTER ROLE ${d} NOCREATEROLE NOCREATEDB`);
+  // only when needed: a migration role without CREATEROLE (the canonical `beeside_migrate`) cannot ALTER another role, and has no reason to
+  if ((await db.query("SELECT 1 FROM pg_roles WHERE rolname = $1 AND (rolcreaterole OR rolcreatedb)", [opts.discoveryLogin])).rows.length) {
+    await db.query(`ALTER ROLE ${d} NOCREATEROLE NOCREATEDB`);
+  }
   await db.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
   await db.query(`REVOKE CREATE ON SCHEMA public FROM ${d}`);
   if ((await db.query("SELECT 1 FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid JOIN pg_roles u ON u.oid = m.member WHERE g.rolname = $1 AND u.rolname = $2", [PRECISION_GROUP, opts.discoveryLogin])).rows.length) {
     await db.query(`REVOKE ${ident(PRECISION_GROUP)} FROM ${d}`);
   }
-  await db.query(`GRANT ${ident(DISCOVERY_GROUP)} TO ${d}`);
+  // GRANT only when the membership is missing: in the canonical database the memberships are granted by the admin connection (the migration role holds
+  // no membership row in the groups on purpose, see canonical-provision.ts) and GRANT without ADMIN OPTION would be refused even for a no-op.
+  if (!(await isMember(db, DISCOVERY_GROUP, opts.discoveryLogin))) await db.query(`GRANT ${ident(DISCOVERY_GROUP)} TO ${d}`);
 
   if (opts.precisionLogin) {
     const p = ident(opts.precisionLogin);
     if ((await db.query("SELECT 1 FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid JOIN pg_roles u ON u.oid = m.member WHERE g.rolname = $1 AND u.rolname = $2", [DISCOVERY_GROUP, opts.precisionLogin])).rows.length) {
       await db.query(`REVOKE ${ident(DISCOVERY_GROUP)} FROM ${p}`);
     }
-    await db.query(`GRANT ${ident(PRECISION_GROUP)} TO ${p}`);
+    if (!(await isMember(db, PRECISION_GROUP, opts.precisionLogin))) await db.query(`GRANT ${ident(PRECISION_GROUP)} TO ${p}`);
   }
 
   await db.query("SELECT db_domain_close_precision_on_discovery($1)", [opts.discoveryLogin]);

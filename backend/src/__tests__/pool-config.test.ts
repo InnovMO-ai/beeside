@@ -35,7 +35,7 @@ describe("connection budget", () => {
   it("accepts the committed plan (infra/db/connection-plan.json) and keeps headroom for overlapping revisions", () => {
     const plan = JSON.parse(readFileSync(path.resolve(__dirname, "../../../infra/db/connection-plan.json"), "utf8"));
     const r = connectionBudget(plan);
-    expect(r.worstCase).toBe(5 * 4 + 2 * 3 + 2 * 8 + 10);
+    expect(r.worstCase).toBe(5 * 4 + 2 * 3 + 2 * (3 + 8) + 10);
     expect(r.ok).toBe(true);
     expect(r.ratio).toBeLessThanOrEqual(0.7);
   });

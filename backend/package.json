@@ -37,7 +37,8 @@
     "fa4:seed-catalog": "tsx src/scripts/seed-fa4-catalog.ts",
     "precision:seed-demo": "tsx src/scripts/seed-precision-demo.ts",
     "rehearsal:real-model": "PRECISION_REHEARSAL=1 jest -c jest.integration.config.js --runInBand real-model-rehearsal",
-    "discovery:acceptance": "jest -c jest.integration.config.js --runInBand discovery-real"
+    "discovery:acceptance": "jest -c jest.integration.config.js --runInBand discovery-real",
+    "db:provision": "node dist/scripts/canonical-db-provision.js"
   },
   "dependencies": {
     "@beeside/canonical-fields": "0.1.0",
