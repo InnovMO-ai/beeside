@@ -251,3 +251,11 @@ Incidencias del apply (corregidas en el módulo y registradas): (1) la instancia
 Verificación de no impacto (solo lectura): `beeside-dev-canonical-db` conserva sus mismos usuarios (`beeside_app`, `fa4_staging_runtime`, `postgres`) y bases (`beeside`, `fa4_staging`, `postgres`); los jobs `beeside-dev-migrate` y `fa4-staging-prepare` y el estado `dev/` no se modificaron.
 
 **Siguiente (requiere autorización):** Fase 2 (roles y `beeside_kl` por SQL), Fase 3 (retirar `kl_provisioner`) y Fase 4 (G1 / E1–E15). Hasta entonces `beeside_kl` **no existe** y G1 sigue **NO APROBADO**.
+
+### Fase 2 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase
+En `beeside-dev-kl-db`, como `kl_provisioner` por Cloud SQL Auth Proxy (contraseñas leídas en memoria desde Secret Manager, nunca impresas): `roles.sql` (cinco roles `LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB`, límites de conexión 4/8/8/4/4 y tiempos por rol), contraseñas fijadas desde cada secreto, `CREATE DATABASE beeside_kl OWNER kl_owner` (con `GRANT/REVOKE kl_owner` temporal del aprovisionador) y `REVOKE ALL … FROM PUBLIC`. Verificación (solo lectura):
+- `pg_auth_members`: ninguna fila con un `kl_*` como rol o como miembro; **ningún `ADMIN OPTION`**; `kl_provisioner` solo aparece en `cloudsqlsuperuser`.
+- Dueño de `beeside_kl`: `kl_owner`; ACL `{kl_owner=CTc/kl_owner}` (nada para PUBLIC).
+- Los cinco roles se autentican con su secreto; `kl_app` aún **no** tiene CONNECT a `beeside_kl` (lo concede KL-0001 al migrar).
+- Miembros de `cloudsqlsuperuser`: `postgres` (sin contraseña), `kl_provisioner` y los roles internos de Cloud SQL. **`kl_provisioner` sigue existiendo** hasta la Fase 3.
+No se ejecutó ninguna migración KL, ni G1/E1–E15, ni se tocó la instancia canónica. G1 sigue **NO APROBADO**. Nota: los `kl_*` pueden conectarse a la base `postgres` de esta instancia (CONNECT de PUBLIC por defecto); sin tablas ni datos allí.
