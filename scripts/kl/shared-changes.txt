@@ -8,6 +8,6 @@
 # Ejemplo:
 #   backend/src/reports/report-model.ts | builder knowledge_guide (Design §PDF, DD-13) |
 scripts/kl/preflight.sh | Protege el addendum CR-KL-002 (inmutable) y fija beeside_kl y su huella (CR-KL-002 §7) | PO 16-oct-2026 · CR-KL-002 aprobado | sha256=a637cddb94a86c4e80a0fc7302f7199fbd829ba02d03592f2dc8ca231e6cad92
-scripts/kl/kl.fingerprint | Agrega database=beeside_kl, migraciones propias y huella de CR-KL-002 (CR-KL-002 §7, B10) | PO 16-oct-2026 · CR-KL-002 aprobado | sha256=c934a8055179c02b4138b81cebc8ce707b16c4bd82e4f8115b388433ac089f37
-backend/src/index.ts | Registro del router /api/admin/kl/* (KL Admin API) antes del router admin genérico y arranque opcional del módulo KL; solo se activa con KL_DB_URL_APP y KL_DB_URL_READER (CR-KL-002 Handoff §5) |
-backend/package.json | Scripts kl:* (runner, lint, arranque de KL_ADMIN, worker, pruebas) (CR-KL-002 Handoff §5) |
+scripts/kl/kl.fingerprint | Agrega database=beeside_kl, migraciones propias y huella de CR-KL-002 (CR-KL-002 §7, B10); module_status pasa a active al existir backend/src/kl (R1) | PO 16-oct-2026 · CR-KL-002 aprobado; module_status=active aprobado por el PO en sesión R1 | sha256=75593e6cfe73345ca8b13eaaf7c4f4ff33c9c68c5e0e5c26da5a8bd5a7776136
+backend/src/index.ts | Registro del router /api/admin/kl/* (KL Admin API) antes del router admin genérico y arranque opcional del módulo KL; solo se activa con KL_DB_URL_APP y KL_DB_URL_READER (CR-KL-002 Handoff §5) | PO 16-oct-2026 · aprobado en sesión R1
+backend/package.json | Scripts kl:* (runner, lint, arranque de KL_ADMIN, worker, pruebas) (CR-KL-002 Handoff §5) | PO 16-oct-2026 · aprobado en sesión R1
