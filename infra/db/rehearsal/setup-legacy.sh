@@ -34,5 +34,19 @@ await migrate(drizzle(pool),{migrationsFolder:process.argv[2],migrationsTable:"_
 console.log(JSON.stringify((await pool.query("SELECT count(*)::int n FROM drizzle.__drizzle_migrations")).rows[0]));await pool.end();})().catch(e=>{console.error(e.message);process.exit(1)});
 JS
 MIGRATION_DATABASE_URL="postgres://discovery_migrate:sim_migrate_password_00000@127.0.0.1:5433/discovery" node $S/sim/migrate-n.js $S/sim/mig24
-# what the platform did in production: runtime login is a member of the legacy Precision group (granted by the creator, discovery_migrate)
-PGPASSWORD=sim_migrate_password_00000 psql -qX -h 127.0.0.1 -p 5433 -U discovery_migrate -d discovery -v ON_ERROR_STOP=1 -c "GRANT beeside_runtime_role TO discovery_runtime"
+# Production evidence Q13: the legacy database is owned by cloudsqlsuperuser (tables stay owned by discovery_migrate).
+su postgres -c "psql -v ON_ERROR_STOP=1 -qX -p 5433 -U postgres -d postgres -c 'ALTER DATABASE discovery OWNER TO cloudsqlsuperuser'"
+# Role mechanics. SIM_Q13=prod (default) reproduces the PRODUCTION evidence (Part B Q13, 2026-10-17): discovery_migrate has NO membership row in beeside_runtime_role,
+# discovery_runtime is a member whose grantor is the platform (here the bootstrap superuser, in production cloudsqladmin). ASSUMPTION (to be confirmed on the clone): the platform
+# lets cloudsqlsuperuser members administer the group, modelled as ADMIN OPTION on beeside_runtime_role held by cloudsqlsuperuser (INHERIT FALSE, SET FALSE: no privileges).
+# SIM_Q13=creator-row keeps the earlier hazard model: PostgreSQL 16 creator ADMIN row left on discovery_migrate (used as the negative control of the privacy-bypass check).
+su postgres -c "psql -v ON_ERROR_STOP=1 -qX -p 5433 -U postgres -d discovery" <<SQL
+GRANT beeside_runtime_role TO discovery_runtime;
+SQL
+if [ "${SIM_Q13:-prod}" = prod ]; then
+su postgres -c "psql -v ON_ERROR_STOP=1 -qX -p 5433 -U postgres -d discovery" <<'SQL'
+REVOKE beeside_runtime_role FROM discovery_migrate CASCADE;
+GRANT beeside_runtime_role TO discovery_runtime;
+GRANT beeside_runtime_role TO cloudsqlsuperuser WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+SQL
+fi

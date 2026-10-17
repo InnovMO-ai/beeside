@@ -71,11 +71,14 @@ expect_ok "Precision runtime can read its own tables" brt "select count(*) from 
 expect_fail "Precision runtime cannot create objects" brt "create table x(i int)"
 expect_fail "legacy discovery_runtime cannot enter beeside" sql discovery_runtime $LRT beeside "select 1"
 
-echo "== C6  privacy bypass (erasure/anonymisation) in beeside vs the legacy creator-row hazard"
-R=$(bm "begin; set local fa4.erasure='on'; update fa4_result set model='{\"erased\":true}' where result_seq=(select min(result_seq) from fa4_result); select 'bypass-active'; rollback" 2>&1 | grep -c bypass-active)
-eq "$R" 1 "migrator in beeside can run the anonymisation bypass"
-R=$(dm "begin; set local fa4.erasure='on'; update fa4_result set model='{\"erased\":true}' where result_seq=(select min(result_seq) from fa4_result); select 'bypass-active'; rollback" 2>&1 | grep -c bypass-active)
-eq "$R" 0 "legacy discovery_migrate CANNOT (creator ADMIN row in beeside_runtime_role) — hazard to confirm in production with Q13"
+echo "== C6  privacy bypass (erasure/anonymisation) in beeside, in the legacy database, and the creator-row hazard as a NEGATIVE CONTROL"
+BYP="begin; set local fa4.erasure='on'; update fa4_result set model='{\"erased\":true}' where result_seq=(select min(result_seq) from fa4_result); select 'bypass-active'; rollback"
+eq "$(bm "$BYP" 2>&1 | grep -c bypass-active)" 1 "migrator in beeside can run the anonymisation bypass"
+eq "$(dm "$BYP" 2>&1 | grep -c bypass-active)" 1 "legacy discovery_migrate can run it (production evidence Q13: no membership row)"
+su postgres -c "psql -qX -p 5433 -d discovery -c 'GRANT beeside_runtime_role TO discovery_migrate WITH ADMIN TRUE, INHERIT FALSE, SET FALSE'" >/dev/null 2>&1
+eq "$(dm "$BYP" 2>&1 | grep -c bypass-active)" 0 "control: with a creator ADMIN-only row the bypass is OFF (the hazard the design avoids for beeside_migrate)"
+su postgres -c "psql -qX -p 5433 -d discovery -c 'REVOKE beeside_runtime_role FROM discovery_migrate'" >/dev/null 2>&1
+eq "$(dm "$BYP" 2>&1 | grep -c bypass-active)" 1 "control reverted"
 
 echo "== C7  rollback: writes made on beeside after the cutover are replayed into discovery"
 bdr "insert into fa4_project (email,locale,step_key,answers) select 'post'||g||'@beeside.you','es','S1','{\"post\":true}' from generate_series(1,3) g" >/dev/null

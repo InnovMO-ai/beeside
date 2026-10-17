@@ -9,3 +9,13 @@ Simulates the production Cloud SQL instance on a throw-away PostgreSQL 16 cluste
     bash infra/db/rehearsal/rehearse-cutover.sh     # data copy, reconcile, runtime permissions, privacy bypass, rollback, legacy hardening  (41 checks)
 
 Everything is local and destructive only to the simulation cluster. Passwords are random per run and never printed.
+
+## Rehearsal on a TEMPORARY Cloud SQL clone (requires written approval; see `RUNBOOK-clone-rehearsal.md`)
+
+    bash infra/db/rehearsal/clone-rehearsal.sh plan                # prints the whole procedure; executes nothing
+    RUN=1 bash infra/db/rehearsal/clone-rehearsal.sh preflight     # read-only
+    RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED bash infra/db/rehearsal/clone-rehearsal.sh create|harden|mark|resize|teardown
+    CLONE=discovery-db-rehearsal-<TAG> bash infra/db/rehearsal/rehearse-on-clone.sh   # SQL side; refuses any server without the marker role
+
+The simulator is aligned with the production evidence of Part B Q13 (no creator-ADMIN row on `discovery_migrate`, legacy database owned by `cloudsqlsuperuser`).
+`SIM_Q13=creator-row` restores the earlier hazard model (used as a negative control). `rehearse-on-clone.sh` is itself tested against this simulator (97/97).

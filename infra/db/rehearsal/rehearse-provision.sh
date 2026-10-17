@@ -52,8 +52,9 @@ echo "== R4  MIGRATE beeside to 52 as beeside_migrate"
 ( cd $B && MIGRATION_DATABASE_URL="postgres://beeside_migrate:$MIGRATE_DB_PASSWORD@127.0.0.1:5433/beeside" node dist/scripts/migrate.js --check ) >/tmp/mig.out 2>&1 && ok "migrate --check safe" || bad "migrate --check"
 
 echo "== R5  POST"
-expect_fail "post without LEGACY_GROUP_ADMIN_URL is refused (admin lacks ADMIN on the legacy Precision group), no change" env -u LEGACY_GROUP_ADMIN_URL MODE=apply PHASE=post CANONICAL_DB_PROVISION_APPROVED=yes bash -c "cd $B && node dist/scripts/canonical-db-provision.js"
-[ "$(sql sqladmin $ADMIN_PW postgres "select count(*) from pg_roles where rolname='beeside_runtime'")" = "0" ] && ok "precision login still absent after refused post" || bad "precision login created by a refused post"
+[ "${SIM_Q13:-prod}" = creator-row ] && expect_fail "post without LEGACY_GROUP_ADMIN_URL is refused (admin lacks ADMIN on the legacy Precision group), no change" env -u LEGACY_GROUP_ADMIN_URL MODE=apply PHASE=post CANONICAL_DB_PROVISION_APPROVED=yes bash -c "cd $B && node dist/scripts/canonical-db-provision.js"
+[ "${SIM_Q13:-prod}" = prod ] && expect_ok "post without LEGACY_GROUP_ADMIN_URL works: the admin administers the group through cloudsqlsuperuser (production-faithful model)" env -u LEGACY_GROUP_ADMIN_URL MODE=apply PHASE=post CANONICAL_DB_PROVISION_APPROVED=yes bash -c "cd $B && node dist/scripts/canonical-db-provision.js"
+[ "${SIM_Q13:-prod}" = creator-row ] && { [ "$(sql sqladmin $ADMIN_PW postgres "select count(*) from pg_roles where rolname='beeside_runtime'")" = "0" ] && ok "precision login still absent after refused post" || bad "precision login created by a refused post"; }
 expect_ok "apply post" env MODE=apply PHASE=post CANONICAL_DB_PROVISION_APPROVED=yes bash -c "cd $B && node dist/scripts/canonical-db-provision.js"
 expect_ok "verify post" env MODE=verify PHASE=post bash -c "cd $B && node dist/scripts/canonical-db-provision.js"
 
