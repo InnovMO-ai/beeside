@@ -6,7 +6,7 @@ Cada fase requiere aprobación expresa del PO. Estado de cada fase: pendiente. P
 ```bash
 cd infra/terraform/envs/dev-kl
 terraform init            # estado propio: prefijo dev-kl; no toca el estado de envs/dev
-terraform plan -lock=false -var provisioner_enabled=true     # esperado: solo adiciones (38; 48 con scheduler_enabled), 0 cambios, 0 destrucciones
+terraform plan -lock=false -var provisioner_enabled=true     # esperado: solo adiciones (38; 42 con provisioner_enabled; 48 con además scheduler_enabled), 0 cambios, 0 destrucciones
 ```
 Si el plan muestra cualquier cambio o destrucción: **parar**.
 

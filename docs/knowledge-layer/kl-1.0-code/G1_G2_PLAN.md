@@ -239,3 +239,6 @@ Palanca: `db-f1-micro` (variable `tier`) cuesta una fracción, pero su `max_conn
 
 ### Pendiente de aprobación antes de ejecutar (Fase 0 en adelante)
 D3 (SA del backend), D8 (`GcsObjectStore` y su dependencia), D9 (habilitar Cloud Scheduler) y autorización expresa de cada fase del RUNBOOK. Los archivos de `infra/` son componentes compartidos: quedan declarados en `scripts/kl/shared-changes.txt` como **preparados, sin autorización de aplicar**.
+
+### Fase 0 ejecutada (2026-10-16, solo lectura)
+`terraform init` (backend GCS, prefijo `dev-kl`) y `terraform plan -lock=false` contra el estado real: **`provisioner_enabled=false` → 38 a crear; `=true` → 42 a crear; en ambos 0 a cambiar y 0 a destruir.** No se aplicó nada, no se guardó el plan, no se modificó el estado de `envs/dev`. Los 48 de la comprobación anterior corresponden además a `scheduler_enabled=true`.
