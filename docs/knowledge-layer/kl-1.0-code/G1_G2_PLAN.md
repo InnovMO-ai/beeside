@@ -242,3 +242,12 @@ D3 (SA del backend), D8 (`GcsObjectStore` y su dependencia), D9 (habilitar Cloud
 
 ### Fase 0 ejecutada (2026-10-16, solo lectura)
 `terraform init` (backend GCS, prefijo `dev-kl`) y `terraform plan -lock=false` contra el estado real: **`provisioner_enabled=false` → 38 a crear; `=true` → 42 a crear; en ambos 0 a cambiar y 0 a destruir.** No se aplicó nada, no se guardó el plan, no se modificó el estado de `envs/dev`. Los 48 de la comprobación anterior corresponden además a `scheduler_enabled=true`.
+
+### Fase 1 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase
+`terraform apply` en `envs/dev-kl` con `provisioner_enabled=true` (autorizado por el PO). Resultado: **42 recursos creados**, estado en `gs://beeside-terraform-state-dev-508220/dev-kl/`, plan final sin cambios (`-detailed-exitcode` = 0). Creados: instancia `beeside-dev-kl-db` (PG16 ENTERPRISE, `db-g1-small`, ZONAL, PITR, `sslMode=TRUSTED_CLIENT_CERTIFICATE_REQUIRED`, `deletion_protection` de Terraform activo), usuarios `postgres` (sin contraseña) y `kl_provisioner`, 6 secretos (`beeside-dev-kl-{owner,app,reader-precision,agent,knowledge}-url` y `-provisioner-password`) con acceso por secreto, 3 cuentas de servicio, 2 buckets, jobs `beeside-dev-kl-migrate` y `beeside-dev-kl-worker` (imagen de marcador, **sin ejecutar**). **Sin schedules, sin Cloud Scheduler, sin agentes.**
+
+Incidencias del apply (corregidas en el módulo y registradas): (1) la instancia falló por `require_ssl=false` implícito del proveedor frente a `ssl_mode`; se agregó `require_ssl = true` y la instancia se creó en el reintento; (2) los jobs fallaron porque `latest` de los secretos aún no existía; se agregó `depends_on = [module.kl_database]` y los dos jobs fallidos (marcados *tainted*) se reemplazaron, que son los 2 únicos destruidos. Ninguno de los dos defectos afectó a recursos existentes.
+
+Verificación de no impacto (solo lectura): `beeside-dev-canonical-db` conserva sus mismos usuarios (`beeside_app`, `fa4_staging_runtime`, `postgres`) y bases (`beeside`, `fa4_staging`, `postgres`); los jobs `beeside-dev-migrate` y `fa4-staging-prepare` y el estado `dev/` no se modificaron.
+
+**Siguiente (requiere autorización):** Fase 2 (roles y `beeside_kl` por SQL), Fase 3 (retirar `kl_provisioner`) y Fase 4 (G1 / E1–E15). Hasta entonces `beeside_kl` **no existe** y G1 sigue **NO APROBADO**.

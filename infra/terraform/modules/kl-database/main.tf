@@ -110,6 +110,7 @@ resource "google_sql_database_instance" "kl" {
       # Same access model as the canonical instance: public IP with no authorized networks; only Cloud Run's managed
       # connector and the Cloud SQL Auth Proxy (operator) can reach it, and client certificates are required.
       ipv4_enabled = true
+      require_ssl  = true # provider 5.x sends require_ssl=false unless set; it must agree with ssl_mode
       ssl_mode     = "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"
     }
 

@@ -111,7 +111,8 @@ module "kl_runtime" {
   scheduler_enabled         = var.scheduler_enabled
   scheduler_paused          = var.scheduler_paused
 
-  depends_on = [google_project_service.scheduler]
+  # Jobs reference secret versions ("latest"), which must exist first.
+  depends_on = [google_project_service.scheduler, module.kl_database]
 }
 
 output "kl_instance_connection_name" {
