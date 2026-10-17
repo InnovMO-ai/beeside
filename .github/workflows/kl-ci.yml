@@ -79,8 +79,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build both Dockerfile targets and smoke-test them
         env:
-          # Set to "1" once ac10-smoke-baseline.json has the linux key: the container render must then equal the host's.
-          KL_SMOKE_REQUIRE_BASELINE: "0"
+          # "1": the container render must equal the host fingerprint in ac10-smoke-baseline.json (recorded 2026-10-17).
+          KL_SMOKE_REQUIRE_BASELINE: "1"
         run: bash scripts/kl/smoke/images.sh
       - uses: actions/upload-artifact@v4
         if: always()

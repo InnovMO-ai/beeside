@@ -2,5 +2,9 @@
   "darwin-arm64-chromium-153.0.8010.12-lato": {
     "pdfSha256": "2564f37457d55c0e43e4ef5be283dbe8cf0e8cfcb5ce7d632a6d32985badb923",
     "pages": 3
+  },
+  "linux-x64-chromium-153.0.8010.12-lato": {
+    "pdfSha256": "62b5a1508ebb5db94f1fa61411579f5b3402152738963b9cb0a3aa039962f942",
+    "pages": 3
   }
 }
