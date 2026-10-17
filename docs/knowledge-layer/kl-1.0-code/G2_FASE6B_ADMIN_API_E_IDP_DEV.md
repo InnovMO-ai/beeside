@@ -195,3 +195,10 @@ Dos filas `admin.login · DENIED` a las 15:23:45 UTC (`code_rejected` e `invalid
 
 ### Cuándo repetir el inicio de sesión
 Solo después de que se despliegue la corrección (X o Y) y se verifique; con la imagen actual volvería a fallar igual.
+
+### 10.1 Corrección DESPLEGADA (2026-10-17) · excepción X aprobada por el PO
+- Parche aplicado en `feat/kl-1.0-code` (commit `8f82c58`) y declarado en `shared-changes.txt` (`admin-session.ts`, `admin-router.ts`, `admin-cookies.test.ts`). Backend: 402 pruebas pasan; KL: 351/351; `kl-ci` y `kl-preflight` verdes.
+- Imagen publicada con la etiqueta `kl-publish-dev-8f82c58`: `kl-backend:8f82c58effde2a822ff1b3f845f758e02b4cc55b` (`sha256:eb535f2f98ddba95ff9a8354c56146d748430f763995f106c9f745c0f9be8cb4`), tras los 19 controles de humo.
+- `beeside-dev-backend-api` actualizado a esa imagen conservando las variables y secretos de S2: revisión **`beeside-dev-backend-api-00009-cm2`** (100 % del tráfico); **rollback** disponible a `00008-l7p` (imagen `main` con Admin API) o `00007-gtk` (sin Admin API).
+- Verificación: `/health` y `/health/ready` 200; `/api/admin/me` sin sesión 401; `/api/admin/auth/login` → Google con `client_id` y `redirect_uri` correctos y PKCE S256; **la cookie de estado ahora se emite `SameSite=Lax`** (`Path=/api/admin/auth; HttpOnly; Secure; Max-Age=600`). KL sigue **inerte** (sin `KL_DB_URL_*`): la ruta pública de ediciones y `/api/admin/kl/*` no están montadas/operativas. Los demás servicios no cambiaron.
+- Pendiente: que el titular repita el inicio de sesión (S3) y verificación posterior en solo lectura (`auth_subject`, sesión, auditoría).
