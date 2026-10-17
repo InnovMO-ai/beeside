@@ -46,6 +46,14 @@ export interface ReadServiceOptions {
 
 class BudgetExceeded extends Error {}
 
+/** El archivo almacenado de una edición publicada no coincide con su huella: incidente, nunca «no hay edición». */
+export class EditionIntegrityError extends Error {
+  constructor() {
+    super("el archivo almacenado no coincide con su huella");
+    this.name = "EditionIntegrityError";
+  }
+}
+
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const DEGRADING: ReadonlySet<CoverageReason> = new Set<CoverageReason>(["locale_fallback", "validation_expired", "latest_available_only", "series_break"]);
@@ -440,7 +448,8 @@ export class KlReadService {
       if (!file) return { status: "no_current_edition" };
       await this.rows("SELECT kl.record_distribution($1, $2)", [ref, req.locale]).catch(() => undefined);
       return { status: "ok", editionRef: ref, filename: file.filename, contentType: "application/pdf", sha256: file.sha256, byteLength: file.byteLength, stream: file.stream };
-    } catch {
+    } catch (error) {
+      if (error instanceof EditionIntegrityError) throw error; // se propaga: el llamador responde 500 y registra el incidente
       return { status: "no_current_edition" };
     }
   }

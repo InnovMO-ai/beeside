@@ -53,6 +53,24 @@ export const klAdmin = {
   setValidatorStatus: async (tx: KlTx, id: string, status: "active" | "inactive", reason?: string) => void (await tx.query("SELECT kl.set_validator_status($1, $2, $3)", [id, status, reason ?? null])),
   recordValidation: (tx: KlTx, r: { versionId: string; validatorId: string; locale: "es" | "en"; domain: string; scopeStatement: string; verdict: "approved" | "approved_with_changes_required" | "rejected"; validatedAt: string; expiresAt: string }) =>
     one<string>(tx, "SELECT kl.record_validation($1, $2, $3, $4, $5, $6, NULL, $7, $8) AS v", [r.versionId, r.validatorId, r.locale, r.domain, r.scopeStatement, r.verdict, r.validatedAt, r.expiresAt], "v"),
+  // ---- R3 · Knowledge Products
+  registerCatalogEntries: (tx: KlTx, version: string, kind: "category" | "service" | "industry", keys: string[]) => one<number>(tx, "SELECT kl.register_catalog_entries($1, $2, $3) AS v", [version, kind, keys], "v"),
+  addPrivateTerm: (tx: KlTx, term: string, kind: "client" | "partner") => one<string>(tx, "SELECT kl.add_private_term($1, $2) AS v", [term, kind], "v"),
+  setProductConfig: (tx: KlTx, productKey: string, config: { fixedBlocks: { blockId: string; version: string }[]; links: string[] }) => one<number>(tx, "SELECT kl.set_product_config($1, $2::jsonb) AS v", [productKey, JSON.stringify(config)], "v"),
+  registerFixedBlock: (tx: KlTx, blockId: string, version: string, locale: "es" | "en", content: object) => one<string>(tx, "SELECT kl.register_fixed_block($1, $2, $3, $4::jsonb) AS v", [blockId, version, locale, JSON.stringify(content)], "v"),
+  approveFixedBlock: async (tx: KlTx, id: string) => void (await tx.query("SELECT kl.approve_fixed_block($1)", [id])),
+  addSection: (tx: KlTx, s: { productKey: string; sectionKey: string; chapter: string; part: string | null; slot: string; sort: number; titleEs: string; titleEn: string; contentType: string; categoryKeys?: string[]; validationDomain?: string | null }) =>
+    one<string>(tx, "SELECT kl.add_product_section($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) AS v", [s.productKey, s.sectionKey, s.chapter, s.part, s.slot, s.sort, s.titleEs, s.titleEn, s.contentType, s.categoryKeys ?? [], s.validationDomain ?? null], "v"),
+  composeUnit: (tx: KlTx, productKey: string, sectionKey: string, unitKey: string, sort: number) => one<string>(tx, "SELECT kl.compose_unit($1, $2, $3, $4) AS v", [productKey, sectionKey, unitKey, sort], "v"),
+  decideChangeNotice: async (tx: KlTx, id: string, decision: "approved_for_next" | "dismissed", reason?: string) => void (await tx.query("SELECT kl.decide_change_notice($1, $2, $3)", [id, decision, reason ?? null])),
+  openEdition: (tx: KlTx, productKey: string, code: string, cutoff: string) => one<string>(tx, "SELECT kl.open_edition($1, $2, $3::date) AS v", [productKey, code, cutoff], "v"),
+  refreshPins: (tx: KlTx, editionId: string) => one<number>(tx, "SELECT kl.refresh_pins($1) AS v", [editionId], "v"),
+  returnEdition: async (tx: KlTx, editionId: string, reason: string) => void (await tx.query("SELECT kl.return_edition_to_composing($1, $2)", [editionId, reason])),
+  approveEdition: (tx: KlTx, editionId: string) => one<string>(tx, "SELECT kl.approve_edition($1) AS v", [editionId], "v"),
+  requestPreview: (tx: KlTx, editionId: string) => one<string>(tx, "SELECT kl.request_preview($1) AS v", [editionId], "v"),
+  unpublishEdition: async (tx: KlTx, editionId: string, reason: string) => void (await tx.query("SELECT kl.unpublish_edition($1, $2)", [editionId, reason])),
+  revokeEdition: async (tx: KlTx, editionId: string, reason: string) => void (await tx.query("SELECT kl.revoke_edition($1, $2)", [editionId, reason])),
+  editionControls: async (tx: KlTx, editionId: string) => (await tx.query<{ code: string; ok: boolean; detail: string }>("SELECT code, ok, detail FROM kl.edition_controls($1)", [editionId])).rows,
   beginCorrelationRun: async (tx: KlTx) => void (await tx.query("SELECT kl.begin_correlation_run()")),
 
   proposeInstitution: (tx: KlTx, i: { key: string; name: string; country: string; authorityClass: "A" | "B" | "C" | "D"; kind: string }) =>

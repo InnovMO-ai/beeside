@@ -8,6 +8,10 @@ import { ADMIN_SESSION_COOKIE, AdminPrincipal, AdminSessionConfig, parseCookies,
 import { AttestedPrincipal, KlTx, withAttestation } from "../../kl/db/attested-tx";
 import { KlError, translateDbError } from "../../kl/db/errors";
 import { correlateAudit, CorrelationIncomplete } from "../../kl/audit/correlation";
+import { ObjectStore } from "../../kl/ingest/object-store";
+import { submitEdition } from "../../kl/products/manifest";
+import { FontFamily } from "../../kl/products/render/compose";
+import { createHash } from "node:crypto";
 import { CADENCES, FREQUENCIES, KL_ROLES, KlCadence, KlRole, klAdmin } from "../../kl/service/admin-service";
 
 /**
@@ -24,6 +28,10 @@ export interface KlAdminDeps {
   platform: Db;
   session: AdminSessionConfig;
   klApp: Pool;
+  /** Almacén de PDF para la descarga autenticada de vistas previas de revisión (no es distribución). */
+  store?: ObjectStore;
+  /** Tipografía que se fija en el manifiesto al enviar una edición a aprobación (Lato por defecto; Public Sans como respaldo). */
+  pdfFont?: FontFamily;
   now?: () => Date;
   log?: (level: "info" | "warn" | "error", message: string, fields?: Record<string, unknown>) => void;
 }
@@ -48,6 +56,11 @@ const READ_VIEWS: Record<string, { view: string; order: string }> = {
   "validation-queue": { view: "kl.v_admin_validation_queue", order: "approved_at, unit_version_id" },
   "audit-correlation": { view: "kl.v_admin_audit_correlation", order: "report_id DESC" },
   schedule: { view: "kl.v_admin_publication_schedule", order: "key" },
+  editions: { view: "kl.v_admin_editions", order: "product_key, code DESC" },
+  composition: { view: "kl.v_admin_composition", order: "product_key, section_key, unit_key" },
+  "change-notices": { view: "kl.v_admin_change_notices", order: "created_at DESC, id" },
+  "fixed-blocks": { view: "kl.v_admin_fixed_blocks", order: "block_id, version, locale" },
+  "edition-previews": { view: "kl.v_admin_edition_previews", order: "created_at DESC, id" },
 };
 
 export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: RateLimiter } = {}): Router {
@@ -154,7 +167,7 @@ export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: Rat
     return { body: { email: p.email, platformRole: p.role, klRoles: grants.rows } };
   }));
 
-  router.get("/:resource(principals|role-grants|jobs|audit|publications|unit-versions|batches|demand-groups|packages|products|validators|validation-queue|audit-correlation|schedule)", op("kl.read", async (req, tx) => {
+  router.get("/:resource(principals|role-grants|jobs|audit|publications|unit-versions|batches|demand-groups|packages|products|validators|validation-queue|audit-correlation|schedule|editions|composition|change-notices|fixed-blocks|edition-previews)", op("kl.read", async (req, tx) => {
     const resource = String(req.params.resource);
     const spec = READ_VIEWS[resource] as { view: string; order: string };
     // La cola de validación filtra por dominio en la propia vista (un SPECIALIST_VALIDATOR solo ve la suya).
@@ -336,6 +349,142 @@ export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: Rat
       throw error;
     }
   }));
+
+  // ------------------------------------------------------------------ R3 · Knowledge Products
+  const strArr = (v: unknown, pattern: RegExp): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && pattern.test(x)) : []);
+
+  router.put("/products/:key/config", op("kl.product.config", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const b = body(req);
+    const fixedBlocks = Array.isArray(b.fixedBlocks) ? b.fixedBlocks.filter((x): x is { blockId: string; version: string } => typeof x === "object" && x !== null && typeof (x as { blockId?: unknown }).blockId === "string" && typeof (x as { version?: unknown }).version === "string") : [];
+    const version = await klAdmin.setProductConfig(tx, key, { fixedBlocks, links: strArr(b.links, /^kl\.links\.[a-z0-9_]{2,60}$/) });
+    return { body: { version }, target: { type: "kl_product", id: key } };
+  }));
+  router.post("/catalog", op("kl.catalog.register", async (req, tx) => {
+    const b = body(req);
+    const kind = b.kind === "category" || b.kind === "service" || b.kind === "industry" ? b.kind : null;
+    const version = text(b.catalogVersion, 60);
+    const keys = strArr(b.keys, /^[a-z0-9_.:-]{1,120}$/);
+    if (!kind || !version || keys.length === 0) throw new KlError("INVALID", "catalogVersion, kind and keys are required");
+    const added = await klAdmin.registerCatalogEntries(tx, version, kind, keys);
+    return { status: 201, body: { added }, target: { type: "kl_catalog", id: version } };
+  }));
+  router.post("/private-terms", op("kl.private_term.add", async (req, tx) => {
+    const b = body(req);
+    const term = text(b.term, 120);
+    if (!term || (b.kind !== "client" && b.kind !== "partner")) throw new KlError("INVALID", "term and kind are required");
+    const id = await klAdmin.addPrivateTerm(tx, term, b.kind);
+    return { status: 201, body: { id }, target: { type: "kl_private_term", id } };
+  }));
+  router.post("/fixed-blocks", op("kl.fixed_block.register", async (req, tx) => {
+    const b = body(req);
+    const blockId = text(b.blockId, 60);
+    const version = text(b.version, 20);
+    if (!blockId || !version || (b.locale !== "es" && b.locale !== "en") || typeof b.content !== "object" || b.content === null) throw new KlError("INVALID", "blockId, version, locale and content are required");
+    const id = await klAdmin.registerFixedBlock(tx, blockId, version, b.locale, b.content);
+    return { status: 201, body: { id }, target: { type: "kl_fixed_block", id } };
+  }));
+  router.post("/fixed-blocks/:id/approve", op("kl.fixed_block.approve", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    await klAdmin.approveFixedBlock(tx, id);
+    return { body: { approved: true }, target: { type: "kl_fixed_block", id } };
+  }));
+  router.post("/products/:key/sections", op("kl.section.add", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const b = body(req);
+    const s = { sectionKey: text(b.sectionKey, 60), chapter: text(b.chapter, 10), slot: text(b.slot, 20), titleEs: text(b.titleEs, 200), titleEn: text(b.titleEn, 200), contentType: text(b.contentType, 20) };
+    if (!s.sectionKey || !s.chapter || !s.slot || !s.titleEs || !s.titleEn || !s.contentType) throw new KlError("INVALID", "sectionKey, chapter, slot, titles and contentType are required");
+    const id = await klAdmin.addSection(tx, { productKey: key, sectionKey: s.sectionKey, chapter: s.chapter, part: text(b.part, 60) ?? null, slot: s.slot, sort: Number.isInteger(b.order) ? (b.order as number) : 0, titleEs: s.titleEs, titleEn: s.titleEn, contentType: s.contentType, categoryKeys: strArr(b.categoryKeys, /^[a-z0-9_.:-]{1,120}$/), validationDomain: text(b.validationDomain, 60) ?? null });
+    return { status: 201, body: { id }, target: { type: "kl_product", id: key } };
+  }));
+  router.post("/products/:key/composition", op("kl.composition.add", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const b = body(req);
+    const sectionKey = text(b.sectionKey, 60);
+    const unitKey = text(b.unitKey, 160);
+    if (!sectionKey || !unitKey) throw new KlError("INVALID", "sectionKey and unitKey are required");
+    const id = await klAdmin.composeUnit(tx, key, sectionKey, unitKey, Number.isInteger(b.order) ? (b.order as number) : 0);
+    return { status: 201, body: { id }, target: { type: "kl_product", id: key } };
+  }));
+  router.post("/change-notices/:id/decision", op("kl.change_notice.decide", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const decision = body(req).decision;
+    if (decision !== "approved_for_next" && decision !== "dismissed") throw new KlError("INVALID", "decision must be approved_for_next or dismissed");
+    await klAdmin.decideChangeNotice(tx, id, decision, reasonOf(req, false));
+    return { body: { decision }, target: { type: "kl_change_notice", id } };
+  }));
+  router.post("/editions", op("kl.edition.open", async (req, tx) => {
+    const b = body(req);
+    const productKey = text(b.productKey, 60);
+    const code = text(b.code, 10);
+    const cutoff = text(b.cutoffDate, 10);
+    if (!productKey || !code || !cutoff || !/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) throw new KlError("INVALID", "productKey, code and cutoffDate (YYYY-MM-DD) are required");
+    const id = await klAdmin.openEdition(tx, productKey, code, cutoff);
+    return { status: 201, body: { id }, target: { type: "kl_edition", id } };
+  }));
+  router.get("/editions/:id/controls", op("kl.edition.controls.read", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const controls = await klAdmin.editionControls(tx, id);
+    return { body: { ready: controls.every((c) => c.ok), controls } };
+  }));
+  router.post("/editions/:id/refresh-pins", op("kl.edition.refresh", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    return { body: { pinned: await klAdmin.refreshPins(tx, id) }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/submit", op("kl.edition.submit", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const sha = await submitEdition(tx, id, deps.pdfFont ?? "lato");
+    return { body: { manifestSha256: sha }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/return", op("kl.edition.return", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    await klAdmin.returnEdition(tx, id, reasonOf(req, true) as string);
+    return { body: { status: "composing" }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/approve", op("kl.edition.approve", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const jobId = await klAdmin.approveEdition(tx, id);
+    return { status: 202, body: { renderJobId: jobId }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/preview", op("kl.edition.preview", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const jobId = await klAdmin.requestPreview(tx, id);
+    return { status: 202, body: { renderJobId: jobId }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/unpublish", op("kl.edition.unpublish", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    await klAdmin.unpublishEdition(tx, id, reasonOf(req, true) as string);
+    return { body: { status: "unpublished" }, target: { type: "kl_edition", id } };
+  }));
+  router.post("/editions/:id/revoke", op("kl.edition.revoke", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    await klAdmin.revokeEdition(tx, id, reasonOf(req, true) as string);
+    return { body: { status: "revoked" }, target: { type: "kl_edition", id } };
+  }));
+
+  // Descarga autenticada de una vista previa de revisión (PDF de PRUEBA con marca visible; no cuenta como distribución).
+  router.get("/editions/:id/preview/:locale/pdf", (req, res, next) => {
+    const r = req as KlRequest;
+    void (async () => {
+      let file: { storage_key: string; sha256: string; byte_length: string } | undefined;
+      try {
+        const id = param(req, "id", UUID);
+        const locale = param(req, "locale", /^(es|en)$/);
+        file = await withAttestation(deps.klApp, attested(r), r.requestId as string, async (tx) => (await tx.query<{ storage_key: string; sha256: string; byte_length: string }>("SELECT * FROM kl.preview_file($1, $2)", [id, locale])).rows[0]);
+        if (!file || !deps.store) throw new KlError("NOT_FOUND", "no preview available");
+        const bytes = await deps.store.get(file.storage_key);
+        if (createHash("sha256").update(bytes).digest("hex") !== file.sha256) throw new KlError("UNAVAILABLE", "stored preview failed its integrity check");
+        await audit(r, "kl.edition.preview.read", "ALLOWED", {}, { type: "kl_edition", id });
+        res.set({ "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="preview.pdf"', "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Length": String(bytes.length) });
+        res.send(bytes);
+      } catch (raw) {
+        const error = raw instanceof KlError ? raw : translateDbError(raw);
+        if (!(error instanceof KlError)) throw error;
+        if (error.code === "FORBIDDEN") await audit(r, "kl.edition.preview.read", "DENIED", { reason: "permission" });
+        res.status(error.status).json({ error: error.code, message: error.message });
+      }
+    })().catch(next);
+  });
 
   return router;
 }

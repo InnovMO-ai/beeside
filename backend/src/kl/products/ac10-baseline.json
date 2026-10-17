@@ -1,0 +1,14 @@
+{
+  "darwin-arm64-chromium-153.0.8010.12-lato": {
+    "es": {
+      "pdfSha256": "998731fe3d2e2262691880ab20112c66b110e0cd7162fb6f0c030055e7fddcda",
+      "pages": 7,
+      "documentSha256": "c55d4e7fd4b0d4d86aadaefe800180a82108c83a86448a1e37e05094af70b79c"
+    },
+    "en": {
+      "pdfSha256": "935b76deb4bc2766531b9ba731a99f9b0183cf8643b35460ad92856505a431f1",
+      "pages": 7,
+      "documentSha256": "d74bd431f7d0876d8c5041beed7dcb3885627530f30f12ade7dad222c60411c8"
+    }
+  }
+}
