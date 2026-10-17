@@ -15,8 +15,8 @@ END $$;
 
 -- Límite de conexiones por rol (pools pequeños en dev, CR-KL-002 §10: backend 3 + 3, kl-worker 2 + 2, kl-migrate 1).
 ALTER ROLE kl_owner CONNECTION LIMIT 4;
-ALTER ROLE kl_app CONNECTION LIMIT 8;
-ALTER ROLE kl_reader_precision CONNECTION LIMIT 8;
+ALTER ROLE kl_app CONNECTION LIMIT 12;
+ALTER ROLE kl_reader_precision CONNECTION LIMIT 12;
 ALTER ROLE kl_agent CONNECTION LIMIT 4;
 ALTER ROLE kl_knowledge CONNECTION LIMIT 4;
 
