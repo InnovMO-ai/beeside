@@ -32,6 +32,8 @@ Después, los únicos miembros de `cloudsqlsuperuser` son `postgres` (sin contra
 ## Fase 4 · G1 (X23): E1–E15
 Con el protocolo de `docs/knowledge-layer/kl-1.0-code/G1_G2_PLAN.md` §4 contra la instancia dedicada, **antes de migrar**: como `postgres` es imposible (sin contraseña), la prueba de un principal con privilegios se hace creando temporalmente un usuario por API (`gcloud sql users create g1_probe`), ejecutando E1–E15 con él y borrándolo. Se espera que, como en el ensayo, ese principal *sí* escale: por eso la evidencia que cierra G1 es **la ausencia de cualquier otro miembro de `cloudsqlsuperuser`** (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` → solo `postgres` y `cloudsql*`) más E1–E15 limpios para un usuario simple. Evidencia en `docs/knowledge-layer/kl-1.0-code/evidence/G1-<fecha>/`. Sin evidencia, no se migra.
 
+> **Fase 5 detallada (comandos exactos, riesgos, rollback): `docs/knowledge-layer/kl-1.0-code/G2_FASE5_PROCEDIMIENTO.md`.** Lo de abajo es el resumen original.
+
 ## Fase 5 · exportación previa y migración
 1. `gcloud sql export sql beeside-dev-kl-db gs://<bucket exports>/pre-migration/<sha>.sql.gz --database=beeside_kl` (base vacía la primera vez).
 2. `gcloud run jobs update beeside-dev-kl-migrate --image <imagen runtime del sha> --region northamerica-south1` y `gcloud run jobs execute beeside-dev-kl-migrate --wait`.
