@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router } from "express";
 import { Pool } from "pg";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { KlAdminDeps, createKlAdminRouter } from "./admin/kl/router";
@@ -45,6 +45,8 @@ export interface AppOptions {
   admin?: AdminDeps;
   /** Knowledge Layer admin API (/api/admin/kl/*); mounted only when KL_DB_URL_APP / KL_DB_URL_READER are configured. */
   kl?: KlAdminDeps;
+  /** Knowledge Layer public edition-status route (PO-2); mounted only when KL is configured. */
+  klPublic?: Router;
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
   readiness?: { db: Db; expectedMigrations: number };
   security?: SecurityOptions;
@@ -68,6 +70,7 @@ export function createApp(options: AppOptions = {}) {
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
   // KL goes first: /api/admin/kl/* resolves its own session and certification before the generic admin router sees the path.
   if (options.kl) app.use("/api/admin/kl", createKlAdminRouter(options.kl, { limiter: security.limiter }));
+  if (options.klPublic) app.use("/api/public/editions", options.klPublic);
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   app.use(notFoundJson());
   app.use(errorHandler(log));
@@ -245,13 +248,14 @@ if (require.main === module) {
   const klRuntime = klRuntimeFromEnv(process.env, admin);
   const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
   const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
+  const security = securityOptionsFromEnv(process.env, db);
   const app = createApp({
     fa,
     fa4,
     billing,
     admin,
-    ...(klRuntime ? { kl: klRuntime.admin } : {}),
-    security: securityOptionsFromEnv(process.env, db),
+    ...(klRuntime ? { kl: klRuntime.admin, klPublic: klRuntime.publicEditions(security.limiter) } : {}),
+    security,
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
   const port = Number(process.env.PORT ?? 8080);

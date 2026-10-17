@@ -18,7 +18,7 @@ COPY shared/fa-public-engine shared/fa-public-engine
 COPY backend backend
 RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=backend
 
-FROM node:20-slim AS runtime
+FROM node:20-slim AS runtime-base
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
@@ -34,7 +34,23 @@ COPY --from=build /repo/shared/fa-public-engine/dist shared/fa-public-engine/dis
 COPY --from=build /repo/backend/dist backend/dist
 # Migrations travel with the image: the migration job applies them and the readiness probe counts them.
 COPY backend/db/migrations backend/db/migrations
+# Knowledge Layer: its own migrations and PDF assets (theme, fonts, logo, paginator) travel with the image (read by the kl-migrate job and kl-worker).
+COPY backend/src/kl/db/migrations backend/dist/kl/db/migrations
+COPY backend/src/kl/products/assets backend/dist/kl/products/assets
 WORKDIR /repo/backend
+
+# kl-worker only: Chromium for the PDF generator (B6). The API and the other jobs keep the lean image above.
+FROM runtime-base AS runtime-kl-worker
+USER root
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx --no-install playwright-core install --with-deps chromium \
+ && chmod -R a+rX /ms-playwright \
+ && rm -rf /var/lib/apt/lists/*
+USER node
+CMD ["node", "dist/kl/worker/kl-worker.js"]
+
+# Default target (unchanged behavior for every existing deployment): the API image.
+FROM runtime-base AS runtime
 EXPOSE 8080
 USER node
 CMD ["node", "dist/index.js"]
