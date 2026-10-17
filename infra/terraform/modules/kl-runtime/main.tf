@@ -85,6 +85,12 @@ variable "scheduler_enabled" {
   default     = false
 }
 
+variable "scheduler_region" {
+  description = "Cloud Scheduler is not available in northamerica-south1 (Querétaro); the schedule can live in another region because the targets are HTTPS APIs. us-south1 (Dallas) is the closest supported region."
+  type        = string
+  default     = "us-south1"
+}
+
 variable "scheduler_paused" {
   description = "Schedules are created paused; unpausing is a separate, explicit act."
   type        = bool
@@ -417,7 +423,7 @@ resource "google_project_iam_member" "scheduler_export" {
 resource "google_cloud_scheduler_job" "worker_tick" {
   count     = var.scheduler_enabled ? 1 : 0
   name      = "${local.prefix}-worker-tick"
-  region    = var.region
+  region    = var.scheduler_region
   schedule  = "*/5 * * * *"
   time_zone = "Etc/UTC"
   paused    = var.scheduler_paused
@@ -435,7 +441,7 @@ resource "google_cloud_scheduler_job" "worker_tick" {
 resource "google_cloud_scheduler_job" "daily_export" {
   count     = var.scheduler_enabled ? 1 : 0
   name      = "${local.prefix}-daily-export"
-  region    = var.region
+  region    = var.scheduler_region
   schedule  = "30 8 * * *"
   time_zone = "Etc/UTC"
   paused    = var.scheduler_paused
