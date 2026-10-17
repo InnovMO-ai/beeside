@@ -7,7 +7,8 @@ import { RATE_LIMITS, RateLimiter, rateLimit } from "../../security/rate-limit";
 import { ADMIN_SESSION_COOKIE, AdminPrincipal, AdminSessionConfig, parseCookies, resolveAdminSession } from "../admin-session";
 import { AttestedPrincipal, KlTx, withAttestation } from "../../kl/db/attested-tx";
 import { KlError, translateDbError } from "../../kl/db/errors";
-import { KL_ROLES, KlRole, klAdmin } from "../../kl/service/admin-service";
+import { correlateAudit, CorrelationIncomplete } from "../../kl/audit/correlation";
+import { CADENCES, FREQUENCIES, KL_ROLES, KlCadence, KlRole, klAdmin } from "../../kl/service/admin-service";
 
 /**
  * KL Admin API (Contratos kl.v1 §7, CR-KL-002 §4): `/api/admin/kl/*`, con la misma sesión OIDC, origen y límite de tasa del
@@ -42,6 +43,11 @@ const READ_VIEWS: Record<string, { view: string; order: string }> = {
   batches: { view: "kl.v_admin_batches", order: "created_at DESC, id" },
   "demand-groups": { view: "kl.v_admin_demand_groups", order: "signal_count DESC, id" },
   packages: { view: "kl.v_admin_packages", order: "package_key, version DESC" },
+  products: { view: "kl.v_admin_products", order: "key" },
+  validators: { view: "kl.v_admin_validators", order: "display_name, id" },
+  "validation-queue": { view: "kl.v_admin_validation_queue", order: "approved_at, unit_version_id" },
+  "audit-correlation": { view: "kl.v_admin_audit_correlation", order: "report_id DESC" },
+  schedule: { view: "kl.v_admin_publication_schedule", order: "key" },
 };
 
 export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: RateLimiter } = {}): Router {
@@ -148,10 +154,14 @@ export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: Rat
     return { body: { email: p.email, platformRole: p.role, klRoles: grants.rows } };
   }));
 
-  router.get("/:resource(principals|role-grants|jobs|audit|publications|unit-versions|batches|demand-groups|packages)", op("kl.read", async (req, tx) => {
-    const spec = READ_VIEWS[String(req.params.resource)] as { view: string; order: string };
-    const allowed = await tx.query<{ ok: boolean }>("SELECT kl.can_read() AS ok");
-    if (!allowed.rows[0]?.ok) throw new KlError("FORBIDDEN", "kl.read permission required");
+  router.get("/:resource(principals|role-grants|jobs|audit|publications|unit-versions|batches|demand-groups|packages|products|validators|validation-queue|audit-correlation|schedule)", op("kl.read", async (req, tx) => {
+    const resource = String(req.params.resource);
+    const spec = READ_VIEWS[resource] as { view: string; order: string };
+    // La cola de validación filtra por dominio en la propia vista (un SPECIALIST_VALIDATOR solo ve la suya).
+    if (resource !== "validation-queue") {
+      const allowed = await tx.query<{ ok: boolean }>("SELECT kl.can_read() AS ok");
+      if (!allowed.rows[0]?.ok) throw new KlError("FORBIDDEN", "kl.read permission required");
+    }
     const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? "100"), 10) || 100, 1), 500);
     const rows = await tx.query(`SELECT * FROM ${spec.view} ORDER BY ${spec.order} LIMIT $1`, [limit]);
     return { body: { items: rows.rows } };
@@ -212,6 +222,119 @@ export function createKlAdminRouter(deps: KlAdminDeps, security: { limiter?: Rat
     // La base ya dejó el evento de auditoría del rechazo: se confirma y se responde 422 (no se lanza, para no revertirlo).
     if (!result.ok) return { status: 422, body: { error: "REJECTED", message: "the acceptance reference of CR-KL-001 is required to enable approved claims" }, target, outcome: "FAILED", reason: result.reason };
     return { body: { enabled: b.enabled }, target };
+  }));
+
+  // ------------------------------------------------------------------ R2 · periodicidad y acciones manuales (PO-6)
+  const cadence = (v: unknown): KlCadence => {
+    if (typeof v !== "string" || !(CADENCES as readonly string[]).includes(v)) throw new KlError("INVALID", "unknown cadence (there is no daily value)");
+    return v as KlCadence;
+  };
+  const reasonOf = (req: Request, required: boolean): string | undefined => {
+    const r = text(body(req).reason, 300);
+    if (required && (!r || r.length < 3)) throw new KlError("INVALID", "reason is required");
+    return r;
+  };
+
+  router.post("/products", op("kl.product.create", async (req, tx) => {
+    const b = body(req);
+    const key = text(b.key, 60);
+    const country = text(b.country, 2);
+    if (!key || !/^[a-z0-9_]{2,60}$/.test(key) || !country || !/^[A-Z]{2}$/.test(country)) throw new KlError("INVALID", "key and country are required");
+    const id = await klAdmin.createProduct(tx, key, country, b.reviewPeriodicity === undefined ? "semiannual" : cadence(b.reviewPeriodicity));
+    return { status: 201, body: { id }, target: { type: "kl_product", id: key } };
+  }));
+
+  router.patch("/products/:key", op("kl.product.periodicity", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const nextCycleAt = await klAdmin.setProductPeriodicity(tx, key, cadence(body(req).reviewPeriodicity), reasonOf(req, false));
+    return { body: { nextCycleAt }, target: { type: "kl_product", id: key } };
+  }));
+
+  router.patch("/publications/:key", op("kl.publication.frequency", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const f = body(req).checkFrequency;
+    if (typeof f !== "string" || !(FREQUENCIES as readonly string[]).includes(f)) throw new KlError("INVALID", "unknown frequency (there is no daily value)");
+    const nextCheckAt = await klAdmin.setPublicationFrequency(tx, key, f as (typeof FREQUENCIES)[number], reasonOf(req, false));
+    return { body: { nextCheckAt }, target: { type: "kl_publication", id: key } };
+  }));
+
+  router.put("/settings/ram-cadence", op("kl.ram.cadence", async (req, tx) => {
+    const version = await klAdmin.setRamCadence(tx, cadence(body(req).cadence), reasonOf(req, false));
+    return { body: { version }, target: { type: "kl_setting", id: "kl.ram.check_cadence" } };
+  }));
+
+  // «Revisar ahora» (KL_EDITOR o KL_ADMIN) y «Edición extraordinaria» (KL_ADMIN): siempre con motivo y auditadas.
+  router.post("/publications/:key/check-now", op("kl.check_now", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const jobs = await klAdmin.checkNow(tx, "publication", key, reasonOf(req, true) as string);
+    return { status: 202, body: { jobs }, target: { type: "kl_publication", id: key } };
+  }));
+  router.post("/products/:key/check-now", op("kl.check_now", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const jobs = await klAdmin.checkNow(tx, "product", key, reasonOf(req, true) as string);
+    return { status: 202, body: { jobs }, target: { type: "kl_product", id: key } };
+  }));
+  router.post("/products/:key/extraordinary-edition", op("kl.extraordinary_edition", async (req, tx) => {
+    const key = param(req, "key", KEY);
+    const code = text(body(req).reasonCode, 40);
+    if (!code) throw new KlError("INVALID", "reasonCode is required");
+    const jobId = await klAdmin.extraordinaryEdition(tx, key, code, reasonOf(req, true) as string);
+    return { status: 202, body: { jobId }, target: { type: "kl_product", id: key } };
+  }));
+
+  // ------------------------------------------------------------------ R2 · validadores y validación especializada
+  router.post("/validators", op("kl.validator.register", async (req, tx) => {
+    const b = body(req);
+    const kind = b.kind === "internal" || b.kind === "external" ? b.kind : null;
+    const displayName = text(b.displayName, 120);
+    const domains = Array.isArray(b.domains) ? b.domains.filter((d): d is string => typeof d === "string" && /^[a-z0-9_.]{2,60}$/.test(d)) : [];
+    if (!kind || !displayName || domains.length === 0) throw new KlError("INVALID", "kind, displayName and domains are required");
+    let adminUserId: string | null = null;
+    if (kind === "internal") {
+      adminUserId = text(b.adminUserId, 40) ?? null;
+      if (!adminUserId || !UUID.test(adminUserId)) throw new KlError("INVALID", "an internal validator is an admin user");
+      const found = await deps.platform.query<{ active: boolean; login_enabled: boolean }>("SELECT active, login_enabled FROM admin_user WHERE admin_user_id = $1", [adminUserId]);
+      if (!found.rows[0]?.active || !found.rows[0].login_enabled) throw new KlError("INVALID", "the admin user is not eligible");
+    }
+    const id = await klAdmin.registerValidator(tx, { kind, adminUserId, displayName, organization: text(b.organization, 120) ?? null, domains, engagementRef: text(b.engagementRef, 120) ?? null });
+    return { status: 201, body: { id }, target: { type: "kl_validator", id } };
+  }));
+
+  router.patch("/validators/:id", op("kl.validator.status", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const status = body(req).status;
+    if (status !== "active" && status !== "inactive") throw new KlError("INVALID", "status must be active or inactive");
+    await klAdmin.setValidatorStatus(tx, id, status, reasonOf(req, false));
+    return { body: { status }, target: { type: "kl_validator", id } };
+  }));
+
+  router.post("/unit-versions/:id/validations", op("kl.validation.record", async (req, tx) => {
+    const id = param(req, "id", UUID);
+    const b = body(req);
+    const validatorId = text(b.validatorId, 40);
+    const domain = text(b.domain, 60);
+    const scope = text(b.scopeStatement, 500);
+    const verdict = b.verdict;
+    const locale = b.locale === "en" ? "en" : b.locale === "es" ? "es" : null;
+    const validatedAt = typeof b.validatedAt === "string" ? b.validatedAt : "";
+    const expiresAt = typeof b.expiresAt === "string" ? b.expiresAt : "";
+    if (!validatorId || !UUID.test(validatorId) || !domain || !scope || !locale || (verdict !== "approved" && verdict !== "approved_with_changes_required" && verdict !== "rejected") || Number.isNaN(Date.parse(validatedAt)) || Number.isNaN(Date.parse(expiresAt))) {
+      throw new KlError("INVALID", "validatorId, domain, scopeStatement, locale, verdict, validatedAt and expiresAt are required");
+    }
+    const result = await klAdmin.recordValidation(tx, { versionId: id, validatorId, locale, domain, scopeStatement: scope, verdict, validatedAt, expiresAt });
+    return { status: 201, body: { result }, target: { type: "kl_unit_version", id } };
+  }));
+
+  // ------------------------------------------------------------------ R2 · correlación de auditoría (B5)
+  router.post("/audit-correlation/run", op("kl.audit_correlation.run", async (_req, tx) => {
+    await klAdmin.beginCorrelationRun(tx);
+    try {
+      const r = await correlateAudit({ platform: deps.platform, kl: deps.klApp, now });
+      return { status: r.skipped ? 202 : 201, body: { skipped: r.skipped, reportId: r.reportId ?? null, status: r.status ?? null, klOnly: r.klOnly.length, adminOnly: r.adminOnly.length }, target: { type: "kl_audit_correlation", id: r.reportId ?? "none" } };
+    } catch (error) {
+      if (error instanceof CorrelationIncomplete) throw new KlError("UNAVAILABLE", `audit correlation incomplete (${error.side})`);
+      throw error;
+    }
   }));
 
   return router;

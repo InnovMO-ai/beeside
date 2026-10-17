@@ -20,11 +20,30 @@ export interface ClaimedJob {
 
 export type JobHandler = (job: ClaimedJob, pools: WorkerKlPools) => Promise<void>;
 
+export interface MaintenanceResult {
+  planner: Record<string, number>;
+  validations: Record<string, number>;
+  expiredVersions: number;
+}
+
+/**
+ * Mantenimiento determinista de R2, sin red ni IA: (1) planificador por calendario (`kl.plan_due`: encola jobs `collect`
+ * para fuentes y productos vencidos; los agentes siguen apagados, así que esos jobs esperan en cola), (2) aviso y vencimiento
+ * de validaciones especializadas, (3) versiones publicadas con `valid_to` vencido. Todo en una transacción certificada.
+ */
+export async function runMaintenance(pools: WorkerKlPools): Promise<MaintenanceResult> {
+  return withServiceAttestation(pools.knowledge, async (tx) => {
+    const planner = (await tx.query<{ r: Record<string, number> }>("SELECT kl.plan_due() AS r")).rows[0]?.r ?? {};
+    const validations = (await tx.query<{ r: Record<string, number> }>("SELECT kl.expire_validations() AS r")).rows[0]?.r ?? {};
+    const expired = (await tx.query<{ n: number }>("SELECT kl.expire_due_versions() AS n")).rows[0]?.n ?? 0;
+    return { planner, validations, expiredVersions: Number(expired) };
+  });
+}
+
 export const DEFAULT_HANDLERS: Record<string, JobHandler> = {
   noop: async () => undefined,
-  // Housekeeping determinista del planificador: las versiones vencidas pasan a «expired» y sus paquetes se invalidan.
   schedule_tick: async (_job, pools) => {
-    await withServiceAttestation(pools.knowledge, (tx) => tx.query("SELECT kl.expire_due_versions()"));
+    await runMaintenance(pools);
   },
 };
 
@@ -35,12 +54,14 @@ export interface CycleResult {
   claimed: number;
   succeeded: number;
   failed: number;
+  maintenance?: MaintenanceResult;
 }
 
 const KIND_POOL: Record<string, "agent" | "knowledge"> = { noop: "knowledge", schedule_tick: "knowledge" };
 
-export async function runCycle(pools: WorkerKlPools, handlers: Record<string, JobHandler> = DEFAULT_HANDLERS, options: { limit?: number; leaseSeconds?: number } = {}): Promise<CycleResult> {
+export async function runCycle(pools: WorkerKlPools, handlers: Record<string, JobHandler> = DEFAULT_HANDLERS, options: { limit?: number; leaseSeconds?: number; maintenance?: boolean } = {}): Promise<CycleResult> {
   const result: CycleResult = { claimed: 0, succeeded: 0, failed: 0 };
+  if (options.maintenance !== false) result.maintenance = await runMaintenance(pools);
   for (const poolName of ["agent", "knowledge"] as const) {
     const pool: Pool = pools[poolName];
     const kinds = Object.keys(handlers).filter((k) => (KIND_POOL[k] ?? "knowledge") === poolName);

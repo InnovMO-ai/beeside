@@ -36,7 +36,25 @@ export interface CardVersionInput {
   specialistRequired?: boolean;
 }
 
+export const CADENCES = ["weekly", "monthly", "quarterly", "semiannual", "annual", "none"] as const;
+export type KlCadence = (typeof CADENCES)[number];
+export const FREQUENCIES = [...CADENCES, "inherit"] as const;
+
 export const klAdmin = {
+  // ---- R2 · periodicidad, acciones manuales y gobierno
+  createProduct: (tx: KlTx, key: string, country: string, cadence: KlCadence = "semiannual") => one<string>(tx, "SELECT kl.create_product($1, $2, $3::kl.cadence) AS v", [key, country, cadence], "v"),
+  setProductPeriodicity: (tx: KlTx, key: string, cadence: KlCadence, reason?: string) => one<string>(tx, "SELECT kl.set_product_periodicity($1, $2::kl.cadence, $3) AS v", [key, cadence, reason ?? null], "v"),
+  setPublicationFrequency: (tx: KlTx, key: string, frequency: (typeof FREQUENCIES)[number], reason?: string) => one<string | null>(tx, "SELECT kl.set_publication_frequency($1, $2, $3) AS v", [key, frequency, reason ?? null], "v"),
+  setRamCadence: (tx: KlTx, cadence: KlCadence, reason?: string) => one<number>(tx, "SELECT kl.set_ram_cadence($1::kl.cadence, $2) AS v", [cadence, reason ?? null], "v"),
+  checkNow: (tx: KlTx, target: "publication" | "product", key: string, reason: string) => one<string[]>(tx, "SELECT kl.check_now($1, $2, $3) AS v", [target, key, reason], "v"),
+  extraordinaryEdition: (tx: KlTx, productKey: string, reasonCode: string, reason: string) => one<string>(tx, "SELECT kl.extraordinary_edition($1, $2, $3) AS v", [productKey, reasonCode, reason], "v"),
+  registerValidator: (tx: KlTx, v: { kind: "internal" | "external"; adminUserId: string | null; displayName: string; organization: string | null; domains: string[]; engagementRef: string | null }) =>
+    one<string>(tx, "SELECT kl.register_validator($1, $2, $3, $4, $5, $6) AS v", [v.kind, v.adminUserId, v.displayName, v.organization, v.domains, v.engagementRef], "v"),
+  setValidatorStatus: async (tx: KlTx, id: string, status: "active" | "inactive", reason?: string) => void (await tx.query("SELECT kl.set_validator_status($1, $2, $3)", [id, status, reason ?? null])),
+  recordValidation: (tx: KlTx, r: { versionId: string; validatorId: string; locale: "es" | "en"; domain: string; scopeStatement: string; verdict: "approved" | "approved_with_changes_required" | "rejected"; validatedAt: string; expiresAt: string }) =>
+    one<string>(tx, "SELECT kl.record_validation($1, $2, $3, $4, $5, $6, NULL, $7, $8) AS v", [r.versionId, r.validatorId, r.locale, r.domain, r.scopeStatement, r.verdict, r.validatedAt, r.expiresAt], "v"),
+  beginCorrelationRun: async (tx: KlTx) => void (await tx.query("SELECT kl.begin_correlation_run()")),
+
   proposeInstitution: (tx: KlTx, i: { key: string; name: string; country: string; authorityClass: "A" | "B" | "C" | "D"; kind: string }) =>
     one<string>(tx, "SELECT kl.propose_institution($1, $2, $3, $4, $5) AS v", [i.key, i.name, i.country, i.authorityClass, i.kind], "v"),
   proposePublication: (tx: KlTx, p: { key: string; institutionKey: string; title: string; jurisdiction: string; topics?: string[]; officialUrl: string; permittedUse: string; defaultContentRisk: string; matrixCode?: string }) =>

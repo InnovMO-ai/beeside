@@ -2,6 +2,7 @@ import { AdminDeps } from "../admin/admin-router";
 import { KlAdminDeps } from "../admin/kl/router";
 import { backendKlConfig } from "./config/env";
 import { backendPools, BackendKlPools } from "./db/pools";
+import { startAuditCorrelation } from "./audit/correlation";
 import { startReconciler } from "./identity/reconcile";
 import { KlReadService } from "./read/read-service";
 
@@ -27,7 +28,13 @@ export function klRuntimeFromEnv(env: NodeJS.ProcessEnv, admin: AdminDeps | unde
     admin: { platform: admin.fa.db, session: admin.session, klApp: pools.app, now: admin.fa.config.now },
     pools,
     read: new KlReadService(pools.reader),
-    startBackground: (log) => startReconciler({ beeside: admin.fa.db, kl: pools.app, ...(log ? { log } : {}) }),
+    startBackground: (log) => {
+      const stops = [
+        startReconciler({ beeside: admin.fa.db, kl: pools.app, ...(log ? { log } : {}) }),
+        startAuditCorrelation({ platform: admin.fa.db, kl: pools.app, ...(log ? { log } : {}) }),
+      ];
+      return () => stops.forEach((stop) => stop());
+    },
   };
   return runtime;
 }
