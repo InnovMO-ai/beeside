@@ -31,8 +31,10 @@ CREATE VIEW kl.v_consumable_stat AS
 WITH s AS (
   SELECT c.*, sv.indicator_key, ind.name_es AS indicator_name_es, ind.name_en AS indicator_name_en, ind.direction, sv.geo_code, sv.period_label, sv.period_start, sv.period_end,
          sv.period_confidence, sv.value_numeric, sv.value_status, sv.display_es, sv.display_en, sv.unit_label, sv.source_published_at, sv.locator,
-         p.key AS publication_key, p.title AS publication_title, i.name AS institution_name, i.authority_class,
+         p.key AS publication_key, p.title AS publication_title, p.expected_periodicity AS publication_periodicity, i.name AS institution_name, i.authority_class,
          pu.unit_key || '@' || pv.version AS primary_ref,
+         psv.value_numeric AS primary_value_numeric, psv.value_status AS primary_value_status, psv.display_es AS primary_display_es, psv.display_en AS primary_display_en,
+         psv.unit_label AS primary_unit_label, psv.period_label AS primary_period_label,
          sv.rank_position, sv.rank_of, sv.tie_group, sv.series_break_note, sv.estimated,
          row_number() OVER (PARTITION BY sv.indicator_key, sv.geo_code ORDER BY sv.period_end DESC, c.version DESC) = 1 AS is_current_period
     FROM kl.v_consumable c
@@ -42,6 +44,7 @@ WITH s AS (
     JOIN kl.institution i ON i.id = p.institution_id
     LEFT JOIN kl.unit_version pv ON pv.id = sv.primary_unit_version_id
     LEFT JOIN kl.unit pu ON pu.id = pv.unit_id
+    LEFT JOIN kl.stat_value psv ON psv.unit_version_id = sv.primary_unit_version_id
    WHERE c.kind = 'statistic'
 )
 SELECT s.*, (s.is_current_period AND s.next_review_at IS NOT NULL AND s.next_review_at < now()) AS latest_available FROM s;
@@ -74,7 +77,7 @@ SELECT pr.key AS product_key, pr.country, e.code, pr.key || '@' || e.code AS edi
 
 -- Banderas de lectura para Precision: solo la compuerta de afirmaciones aprobadas (CR-KL-001).
 CREATE VIEW kl.v_flags AS
-SELECT coalesce((kl._setting('kl.r10_claims_enabled'))::text::boolean, false) AS r10_claims_enabled;
+SELECT kl.r10_claims_enabled() AS r10_claims_enabled;
 
 -- Lista de salida derivada de las publicaciones aprobadas (la exporta Plataforma al firewall; CR-KL-002 §11).
 CREATE VIEW kl.v_egress_allowlist AS
@@ -115,9 +118,12 @@ SELECT id, package_key, version, level, hash, estimated_tokens, budget_tokens, s
 -- ---------------------------------------------------------------------------------------------------------------
 -- Permisos (CR-KL-002 §8.1). El patrón es: nada para PUBLIC, solo lo que cada rol necesita.
 -- ---------------------------------------------------------------------------------------------------------------
+REVOKE ALL ON FUNCTION kl.r10_claims_enabled() FROM PUBLIC;
 REVOKE ALL ON FUNCTION kl._invalidate_packages(uuid[], text), kl._withdraw_versions(uuid[], text), kl._publish_version(uuid, uuid), kl._text_array(jsonb), kl._setting(text) FROM PUBLIC;
 
 -- kl_app · funciones de administración (cada una exige certificación y permiso) y vistas de lectura de administración.
+-- El permiso EXECUTE de las funciones que usa una vista se comprueba contra quien consulta, no contra el dueño de la vista.
+GRANT EXECUTE ON FUNCTION kl.can_read() TO kl_app;
 GRANT EXECUTE ON FUNCTION
   kl.propose_institution(text, text, text, text, text),
   kl.propose_publication(text, text, text, text, text[], text, text, text, text, text, text, text),
@@ -140,7 +146,7 @@ GRANT SELECT ON kl.v_admin_principals, kl.v_admin_role_grants, kl.v_admin_jobs, 
 
 -- kl_reader_precision · solo vistas publicadas y las funciones de señales.
 GRANT SELECT ON kl.v_consumable, kl.v_consumable_stat, kl.v_consumable_card, kl.v_consumable_package, kl.v_package_status, kl.v_edition_current, kl.v_flags TO kl_reader_precision;
-GRANT EXECUTE ON FUNCTION kl.record_signal(jsonb), kl.record_usage(jsonb), kl.record_distribution(text, text), kl.edition_public_status(text) TO kl_reader_precision;
+GRANT EXECUTE ON FUNCTION kl.r10_claims_enabled(), kl.record_signal(jsonb, integer), kl.record_usage(jsonb), kl.record_distribution(text, text), kl.edition_public_status(text) TO kl_reader_precision;
 
 -- kl_knowledge · compila RAM; lee lo publicado.
 GRANT SELECT ON kl.v_consumable, kl.v_consumable_stat, kl.v_consumable_card, kl.v_consumable_package TO kl_knowledge;

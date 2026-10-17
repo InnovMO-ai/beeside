@@ -156,3 +156,16 @@ export async function publishCard(w: World, c: CardInput, approveEn = true): Pro
   if (to !== "published" && to !== "awaiting_validation") throw new Error(`estado inesperado ${String(to)}`);
   return versionId;
 }
+
+// ------------------------------------------------------------------------------------------------ capa TypeScript
+import { Pool } from "pg";
+import { AttestedPrincipal } from "../db/attested-tx";
+import { roleUrl } from "./env";
+
+export const attestedOf = (p: Person, role: "ADMIN" | "SUPERVISOR" = "ADMIN"): AttestedPrincipal => ({ adminUserId: p.id, email: p.email, role, sessionId: randomUUID() });
+
+export function pools(): { app: Pool; reader: Pool; knowledge: Pool; agent: Pool; closeAll(): Promise<void> } {
+  const mk = (role: "kl_app" | "kl_reader_precision" | "kl_knowledge" | "kl_agent") => new Pool({ connectionString: roleUrl(role), max: 3 });
+  const set = { app: mk("kl_app"), reader: mk("kl_reader_precision"), knowledge: mk("kl_knowledge"), agent: mk("kl_agent") };
+  return { ...set, closeAll: async () => void (await Promise.all(Object.values(set).map((p) => p.end()))) };
+}

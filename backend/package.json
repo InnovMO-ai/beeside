@@ -27,7 +27,13 @@
     "jobs:run": "tsx src/scripts/run-job.ts",
     "admin:provision": "tsx src/scripts/provision-admin.ts",
     "dev:oidc": "tsx src/scripts/dev-oidc-provider.ts",
-    "fa4:seed-catalog": "tsx src/scripts/seed-fa4-catalog.ts"
+    "fa4:seed-catalog": "tsx src/scripts/seed-fa4-catalog.ts",
+    "kl:test": "jest -c src/kl/jest.kl.config.js",
+    "kl:migrate": "tsx src/kl/db/migrate-cli.ts",
+    "kl:migrate:check": "tsx src/kl/db/migrate-cli.ts --dry-run",
+    "kl:migrate:job": "node dist/kl/db/migrate-cli.js",
+    "kl:bootstrap-admin": "tsx src/kl/identity/bootstrap-admin.ts",
+    "kl:worker": "node dist/kl/worker/kl-worker.js"
   },
   "dependencies": {
     "@beeside/canonical-fields": "0.1.0",

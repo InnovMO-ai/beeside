@@ -20,6 +20,12 @@ LANGUAGE sql STABLE SET search_path = kl, pg_temp AS $$
   SELECT value FROM kl.setting_version WHERE key = p_key ORDER BY version DESC LIMIT 1;
 $$;
 
+-- Compuerta de afirmaciones aprobadas (CR-KL-001): la lee Precision a través de kl.v_flags. Apagada por defecto.
+CREATE FUNCTION kl.r10_claims_enabled() RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = kl, pg_temp AS $$
+  SELECT coalesce((SELECT value FROM kl.setting_version WHERE key = 'kl.r10_claims_enabled' ORDER BY version DESC LIMIT 1) = 'true'::jsonb, false);
+$$;
+
 -- ---------------------------------------------------------------------------------------------------------------
 -- Efectos compartidos: retiro, invalidación de paquetes y publicación
 -- ---------------------------------------------------------------------------------------------------------------
@@ -618,7 +624,7 @@ END $$;
 -- I7 · Señales de demanda y uso (las invoca Precision con kl_reader_precision, sin bloquear el turno).
 -- Lista blanca de campos: lo demás se descarta y solo se cuenta el descarte. Nada del cliente entra aquí.
 -- ---------------------------------------------------------------------------------------------------------------
-CREATE FUNCTION kl.record_signal(p_signal jsonb) RETURNS text
+CREATE FUNCTION kl.record_signal(p_signal jsonb, p_discarded integer DEFAULT 0) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = kl, pg_temp AS $$
 DECLARE
   allowed constant text[] := ARRAY['contract', 'destinationCountry', 'region', 'topic', 'categoryKey', 'serviceId', 'informationType', 'coverage', 'partialUnitRefs', 'stage', 'locale', 'candidate', 'projectRef', 'occurredAt'];
@@ -631,6 +637,8 @@ BEGIN
     RETURN 'invalid';
   END IF;
   SELECT count(*) INTO v_extras FROM jsonb_object_keys(p_signal) k WHERE NOT (k = ANY (allowed));
+  -- Los campos que el llamador ya descartó antes de cruzar la frontera solo se cuentan (nunca viajan).
+  v_extras := v_extras + least(greatest(coalesce(p_discarded, 0), 0), 100);
   IF v_extras > 0 THEN
     INSERT INTO kl.signal_discard_daily (day, fields_discarded) VALUES (current_date, v_extras) ON CONFLICT (day) DO UPDATE SET fields_discarded = kl.signal_discard_daily.fields_discarded + v_extras;
   END IF;

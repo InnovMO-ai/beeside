@@ -10,7 +10,15 @@ import { foreignTablesFromMigrations, lintMigration, LintFinding } from "./lint"
  * menor que el último aplicado. Nunca omite una migración por su fecha (comportamiento observado en el
  * migrador de Drizzle). Toda la validación ocurre antes de ejecutar nada.
  */
-export const MIGRATIONS_DIR = path.join(__dirname, "migrations");
+/** Las migraciones viajan junto al código; en la imagen compilada se buscan también en src/ o en KL_MIGRATIONS_DIR. */
+export function resolveMigrationsDir(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.KL_MIGRATIONS_DIR) return env.KL_MIGRATIONS_DIR;
+  const local = path.join(__dirname, "migrations");
+  if (fs.existsSync(local)) return local;
+  const fromDist = path.resolve(__dirname, "../../../src/kl/db/migrations");
+  return fs.existsSync(fromDist) ? fromDist : local;
+}
+export const MIGRATIONS_DIR = resolveMigrationsDir();
 export const EXPECTED_DATABASE = "beeside_kl";
 export const EXPECTED_ROLE = "kl_owner";
 const FILE_RE = /^KL-(\d{4})_([a-z0-9]+(?:_[a-z0-9]+)*?)(_integrity)?\.sql$/;

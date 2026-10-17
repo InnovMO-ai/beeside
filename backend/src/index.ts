@@ -1,6 +1,7 @@
 import express from "express";
 import { Pool } from "pg";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
+import { KlAdminDeps, createKlAdminRouter } from "./admin/kl/router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
@@ -11,6 +12,7 @@ import { LegalConfig } from "./fa4/repository";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
+import { klRuntimeFromEnv } from "./kl/wiring";
 import { BillingDeps, createBillingRouter } from "./premium/billing-router";
 import { devSimulatedCheckout } from "./premium/premium-service";
 import { healthRouter } from "./routes/health";
@@ -41,6 +43,8 @@ export interface AppOptions {
   billing?: BillingDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
   admin?: AdminDeps;
+  /** Knowledge Layer admin API (/api/admin/kl/*); mounted only when KL_DB_URL_APP / KL_DB_URL_READER are configured. */
+  kl?: KlAdminDeps;
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
   readiness?: { db: Db; expectedMigrations: number };
   security?: SecurityOptions;
@@ -62,6 +66,8 @@ export function createApp(options: AppOptions = {}) {
   if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
   if (options.fa4) app.use("/api/fa4", createFa4Router(options.fa4, { limiter: security.limiter }));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
+  // KL goes first: /api/admin/kl/* resolves its own session and certification before the generic admin router sees the path.
+  if (options.kl) app.use("/api/admin/kl", createKlAdminRouter(options.kl, { limiter: security.limiter }));
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   app.use(notFoundJson());
   app.use(errorHandler(log));
@@ -236,6 +242,7 @@ if (require.main === module) {
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
+  const klRuntime = klRuntimeFromEnv(process.env, admin);
   const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
   const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
   const app = createApp({
@@ -243,11 +250,13 @@ if (require.main === module) {
     fa4,
     billing,
     admin,
+    ...(klRuntime ? { kl: klRuntime.admin } : {}),
     security: securityOptionsFromEnv(process.env, db),
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
   const port = Number(process.env.PORT ?? 8080);
   const server = app.listen(port, () => jsonLogger("info", "beeside backend listening", { port }));
+  klRuntime?.startBackground((message, fields) => jsonLogger("info", message, fields));
   // Slow-request protections (a request may not hold a connection open indefinitely).
   server.requestTimeout = 30_000;
   server.headersTimeout = 35_000;
