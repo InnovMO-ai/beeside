@@ -38,6 +38,8 @@ case "${1:-}" in
     "$0" verify ;;
   run-now)
     need; j="$(job "${2:-}")"; [[ -n "$j" ]] || { echo "uso: $0 run-now worker|export" >&2; exit 2; }
+    st="$(gcloud scheduler jobs describe "$j" --location "$LOC" --project "$P" --format='value(state)')"
+    [[ "$st" == "ENABLED" ]] || { echo "STOP: $j está en $st. La API de Cloud Scheduler solo permite ejecutar (RunJob) un schedule ENABLED, de modo que probarlo exige reanudarlo (resume): decisión del PO" >&2; exit 3; }
     gcloud scheduler jobs run "$j" --location "$LOC" --project "$P"; echo "disparado; revisa el resultado en Cloud Run (executions) o en el bucket de exportaciones" ;;
   rollback)
     need; init; tf destroy -input=false -no-color -auto-approve "${FLAGS[@]}" -target=module.kl_runtime.google_cloud_scheduler_job.worker_tick -target=module.kl_runtime.google_cloud_scheduler_job.daily_export -target=module.kl_runtime.google_project_iam_member.scheduler_export -target=module.kl_runtime.google_project_iam_custom_role.kl_export -target=module.kl_runtime.google_cloud_run_v2_job_iam_member.scheduler_runs_worker | grep -E "Destroy complete|Error" ;;

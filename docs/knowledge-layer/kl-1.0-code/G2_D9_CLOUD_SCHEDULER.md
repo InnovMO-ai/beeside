@@ -51,3 +51,19 @@ Un tick que ya se disparó termina solo (el worker es idempotente y reclama con 
 
 ## Qué necesito
 Autorización expresa de: (1) `apply` (habilita la API y crea los 2 schedules **en pausa**), (2) las pruebas `run-now export` y `run-now worker`, y (3) por separado, `resume` (activación periódica).
+
+---
+
+## RESULTADO (2026-10-17, 17:1x UTC) · apply y verify HECHOS; pruebas `run-now` NO realizables en pausa
+
+**`apply` ejecutado (autorizado):** `Plan: 6 to add, 0 to change, 0 to destroy` → `Apply complete! Resources: 6 added, 0 changed, 0 destroyed`. Creados: API `cloudscheduler.googleapis.com` habilitada; `beeside-dev-kl-worker-tick` (`*/5 * * * *` UTC) y `beeside-dev-kl-daily-export` (`30 8 * * *` UTC) en **`us-south1`**, ambos **`PAUSED`**; `roles/run.invoker` de `beeside-dev-kl-scheduler@` solo sobre el job del worker; rol `klExportOnlyDev` (un permiso: `cloudsql.instances.export`) y su asignación condicionada a `beeside-dev-kl-db`.
+**`verify`:** ambos schedules `PAUSED` sin intento previo (`lastAttemptTime` vacío); rol correcto; `terraform plan` con D9 activo **sin deriva** (exit 0). Ningún otro recurso cambió.
+
+**Pruebas `run-now export` y `run-now worker`: NO se pudieron ejecutar.** La API respondió `FAILED_PRECONDITION: Job.state must be ENABLED for RunJob`: **Cloud Scheduler solo permite ejecutar de forma forzada un schedule habilitado**. Probar el camino real (cuenta del scheduler → API de Cloud Run/Cloud SQL con la condición IAM) exige, por tanto, reanudar el schedule, y el PO prohibió `resume`. Se respetó: no se reanudó nada; los schedules nunca se han disparado (el objeto `daily/` no existe y la última ejecución del worker sigue siendo la manual de las 16:59). El script `run-now` ahora lo informa con claridad (`exit 3`).
+
+**Consecuencia:** la condición IAM del export (`resource.name == "projects/…/instances/beeside-dev-kl-db"`) y el permiso `run.jobs.run` del scheduler **siguen sin probarse empíricamente**; están correctos por documentación y por el plan, pero sin evidencia real.
+
+**Opciones (decisión del PO):**
+- **A.** `resume export` y, en cuanto se confirme el objeto y la identidad en los registros, `pause export` (ventana de unos minutos; el siguiente disparo programado sería a las 08:30 UTC, no inmediato). Igual con `worker`, cuyo tick de 5 min dispararía a lo sumo 1–2 ciclos antes de pausarlo.
+- **B.** Fixtures de prueba **fuera de Terraform**: dos schedules temporales habilitados con un cron que casi nunca dispara (p. ej. `0 0 29 2 *`), `run-now`, verificación y borrado. Es lo que más se acerca a «probar sin reanudar», pero crea y destruye recursos que no están en el plan aprobado.
+- **C.** No probar ahora: activar con `resume` cuando el PO decida y verificar con las primeras ejecuciones reales (`retriedCount`, objeto en `daily/`, identidad en los registros); si fallara, `pause`.
