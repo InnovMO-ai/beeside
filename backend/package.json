@@ -15,6 +15,7 @@
     "pretest": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "test": "jest --runInBand",
     "pretest:integration": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
+    "db:connection-budget": "node dist/scripts/connection-budget.js",
     "test:integration": "jest --runInBand -c jest.integration.config.js",
     "pretypecheck": "npm run build --prefix ../shared/canonical-fields && npm run build --prefix ../shared/fa-public-engine",
     "typecheck": "tsc --noEmit -p tsconfig.json",

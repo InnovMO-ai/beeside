@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { Pool } from "pg";
+import { corePoolConfig, precisionPoolConfig } from "./db/pool-config";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
@@ -94,7 +95,7 @@ export function createApp(options: AppOptions = {}) {
  */
 export function baseDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps {
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("DATABASE_URL and APP_BASE_URL are required");
-  const db = createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = createPoolDb(new Pool(corePoolConfig(env)));
   const cooldown = Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5);
   return {
     db,
@@ -138,7 +139,7 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
   if (env.FA4_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
   const staging = fa4IsInternalStaging(env);
-  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = shared ?? createPoolDb(new Pool(corePoolConfig(env)));
   return {
     db,
     email: fa4EmailTransportFromEnv(env, staging),
@@ -278,7 +279,7 @@ export function billingDepsFromEnv(env: NodeJS.ProcessEnv = process.env): Billin
   if (env.BILLING_EVENTS_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL) throw new Error("BILLING_EVENTS_ENABLED requires DATABASE_URL");
   if (!env.BILLING_WEBHOOK_SECRET || env.BILLING_WEBHOOK_SECRET.length < 32) throw new Error("BILLING_EVENTS_ENABLED requires a BILLING_WEBHOOK_SECRET of at least 32 characters");
-  const db = createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = createPoolDb(new Pool(corePoolConfig(env)));
   return { db, bundles: new BundleStore(db), secret: env.BILLING_WEBHOOK_SECRET };
 }
 
@@ -290,7 +291,7 @@ export function stripeDepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?:
   if (env.STRIPE_CHECKOUT_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL) throw new Error("STRIPE_CHECKOUT_ENABLED requires DATABASE_URL");
   const config = stripeConfigFromEnv(env);
-  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = shared ?? createPoolDb(new Pool(corePoolConfig(env)));
   return { db, bundles: new BundleStore(db), webhookSecrets: config.webhookSecrets, livemode: stripeLivemodeExpected(config), policy: premiumPolicyFromEnv(env), log: jsonLogger };
 }
 
@@ -364,7 +365,7 @@ export function securityOptionsFromEnv(env: NodeJS.ProcessEnv = process.env, db:
 export function precisionPoolFromEnv(env: NodeJS.ProcessEnv = process.env): Pool | undefined {
   if (env.PRECISION_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL) throw new Error("PRECISION_API_ENABLED requires DATABASE_URL");
-  return new Pool({ connectionString: env.DATABASE_URL, max: Number(env.PRECISION_DB_POOL_MAX ?? 10) });
+  return new Pool(precisionPoolConfig(env));
 }
 
 export async function precisionFromEnv(env: NodeJS.ProcessEnv = process.env, limiter?: RateLimiter, existingPool?: Pool): Promise<{ router: Router } | undefined> {
