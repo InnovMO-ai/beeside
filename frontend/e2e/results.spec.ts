@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { journeyA, journeyB, journeyC } from '@beeside/fa-public-engine/testing';
+import { journeyA, journeyB, journeyC, journeyNewBusiness } from '@beeside/fa-public-engine/testing';
+import { UI } from '../src/fa4/copy/ui';
 import { axeViolations, FORBIDDEN, noHorizontalOverflow, open, seed, touchTargetsOk } from './helpers';
+import { API } from "./paths";
 
 const cases = [
   { name: 'A', build: journeyA, h1: /3 a 5 personas en México/ },
@@ -131,13 +133,34 @@ test('Help opens the Help Center in a new tab and the assessment stays intact', 
   await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
 });
 
-test('Ineligible (no existing business) exits early and respectfully', async ({ page, request }) => {
+test('No business operating today is a VALID case: the same journey continues (no exit), current-operation questions are skipped', async ({ page, request }) => {
   const a = journeyA(); a.company = { ...a.company, hasExistingBusiness: false };
   const token = await seed(request, a, 'company');
   await open(page, token);
   await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
-  await page.getByLabel('Sí', { exact: true }).check(); await page.getByLabel('No', { exact: true }).check();
+  await page.getByLabel('Sí', { exact: true }).check();
+  await expect(page.getByText('¿En qué países tiene hoy actividad tu empresa?')).toBeVisible();          // «yes» asks the current-operation questions
+  await page.getByLabel('No', { exact: true }).check();
+  await expect(page.getByText('¿En qué países tiene hoy actividad tu empresa?')).toHaveCount(0);        // «no» skips them (sector, size, countries of activity)
+  await expect(page.getByLabel(/sector/i)).toHaveCount(0);
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: /Discovery es para negocios en marcha/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '¿A qué país o países quieres expandirte?' })).toBeVisible();   // the project journey, not an exit
+  await expect(page.locator('body')).not.toContainText(/negocios en marcha|operating businesses/);
 });
+
+for (const loc of ['es', 'en'] as const) {
+  test(`New business (${loc}): preview → email-result delivery → locked; YEV makes no existing-company claims`, async ({ page, request }) => {
+    const a = journeyNewBusiness(loc); a.identity.email = `nb.${loc}.${Date.now()}@example.test`;
+    const token = await seed(request, a, 'extra');
+    await open(page, token);
+    await page.getByRole('button', { name: new RegExp(`^(${UI.next[loc]}|${UI.seeResult[loc]})$`) }).click();
+    await expect(page.getByTestId('result-screen')).toBeVisible({ timeout: 20_000 });
+    const text = await page.locator('body').innerText();
+    expect(text).not.toMatch(/Fabricación de envases|51[–-]250|undefined|null/);
+    await expect(page.getByRole('button', { name: 'Start Your Expansion' })).toBeVisible();
+    await page.getByRole('button', { name: UI.emailResult[loc] }).click();
+    await expect(page.getByRole('button', { name: UI.fixSomething[loc] })).toHaveCount(0);
+    expect((await request.put(`${API}/session`, { headers: { 'X-Fa4-Session': token }, data: { answers: a, step: 'decision' } })).status()).toBe(409);
+    const sealed = await request.get(`${API}/session/result`, { headers: { 'X-Fa4-Session': token } }); expect(sealed.status()).toBe(200);
+  });
+}

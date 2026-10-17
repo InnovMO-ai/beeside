@@ -50,7 +50,6 @@ export async function deliverResult(db: Db, projectId: string, now: Date, opts: 
     if (!row || row.status === "ANONYMIZED") throw new FaError("NOT_FOUND", "no such project");
     const existing = await latestResult(tx, projectId);
     if (existing) return { ...existing, alreadyDelivered: true };                                   // idempotent: a double click never creates a second delivery
-    if (row.answers.company.hasExistingBusiness === false) throw new FaError("NOT_APPLICABLE", "this First Assessment is for existing businesses");
     const answers = row.answers;
     const catalog = await loadPublishedCatalog(tx);
     if (opts.previewToken !== undefined && opts.previewToken !== previewTokenFor(answers, catalog.version)) throw new FaError("STALE_PREVIEW", "the result changed since it was shown");

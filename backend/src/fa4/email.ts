@@ -32,7 +32,23 @@ export interface Fa4EmailDeps {
     premiumCommercialContentAllowed?: boolean;
     /** Validity of the YEV email's private link (one token serves both "View" and "Talk to beeside"). */
     yevLinkDays?: number;
+    /** CLOSED TEST mode (no final Privacy version yet): e-mail goes ONLY to these domains, so a real prospect can never be mailed from a test deployment. */
+    closedTest?: ClosedTestConfig;
   };
+}
+
+/** CLOSED TEST recipients: whole domains (internal) and/or individual addresses (e.g. two named external reviewers). Both empty = nobody is mailed. */
+export interface ClosedTestConfig { emailDomains: string[]; emailAddresses?: string[] }
+
+/**
+ * Closed test: an address is mailed only if its DOMAIN is allowed or the exact ADDRESS is allowed. Fails closed: anything that is not ONE plain address
+ * (several addresses, display names, quoted/escaped forms) is refused, and an alias such as «name+tag@…» is NOT the authorized address. Nothing is logged here.
+ */
+export function closedTestRecipientAllowed(address: string, closedTest?: ClosedTestConfig): boolean {
+  if (!closedTest) return true;
+  const a = address.trim().toLowerCase();
+  if (!/^[^\s@,;<>"'()\\]+@[^\s@,;<>"'()\\]+$/.test(a)) return false;
+  return (closedTest.emailAddresses ?? []).includes(a) || closedTest.emailDomains.includes(a.slice(a.lastIndexOf("@") + 1));
 }
 
 export interface Fa4EmailLimits { cooldownMinutes: number; recipientDailyQuota: number }
@@ -212,9 +228,9 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
     "SELECT email, locale, answers, step_key FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [d.project_id])).rows[0];
   const base = deps.config.appBaseUrl.replace(/\/$/, "");
   // Public path of Discovery in links: /discovery in production (FA4_PUBLIC_PATH), /fa4 by default; both are served by the app.
-  const publicPath = /^\/[a-z0-9-]+$/.test(deps.config.publicPath ?? "") ? deps.config.publicPath! : "/fa4";
-  // Official full lockup (wordmark + bee) rendered from the brand asset and served by the web app; without a usable https/localhost base the header falls back to the text wordmark.
-  const logoUrl = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/i.test(base) ? `${base}/brand/beeside-lockup.png` : "";
+  const publicPath = deps.config.publicPath === "/" || /^\/[a-z0-9-]+$/.test(deps.config.publicPath ?? "") ? deps.config.publicPath! : "/fa4";   // "/" = dedicated host
+  // Official full lockup (wordmark + bee) rendered from the brand asset and served by the web app (under the public path in production: /discovery/brand/…, which the access gate never blocks); without a usable https/localhost base the header falls back to the text wordmark.
+  const logoUrl = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/i.test(base) ? `${base}${/^\/[a-z0-9-]+$/.test(deps.config.publicPath ?? "") ? deps.config.publicPath : ""}/brand/beeside-lockup.png` : "";
 
   if (d.template === "fa4_contact_request") {
     const c = (await tx.query<{ name: string; company: string; email: string; message: string; share_progress: boolean; language: Locale; origin_stage: "FA" | "YEV" }>(
@@ -236,18 +252,19 @@ async function prepare(tx: Db, deps: Fa4EmailDeps, d: Due, now: Date): Promise<E
   }
 
   if (!p || !d.project_id) return null;
+  if (!closedTestRecipientAllowed(p.email, deps.config.closedTest)) return null;     // closed test: never mail an address outside the allowed test domains (the delivery is CANCELLED, reported as not sent)
   const locale = p.locale;
   const name = firstName(p.answers.identity?.name ?? "");
   if (d.template === "fa4_resume_link") {
     const token = await issueToken(tx, d.project_id, "RESUME", new Date(now.getTime() + deps.config.resumeLinkDays * 86_400_000));
-    const url = `${base}${publicPath}#r=${token}`;
+    const url = `${base}${publicPath === "/" ? "/" : publicPath}#r=${token}`;
     const r = renderFa4Email("resume", locale, { first_name: name, resume_url: url, logo_url: logoUrl }, { has_first_name: !!name, has_logo: !!logoUrl });
     return { template: d.template, to: p.email, locale, subject: r.subject, html: r.html, text: r.text, body: r.text, ctaLabel: "", ctaUrl: url, projectId: d.project_id };
   }
 
   // YEV email: ONE private access token serves both actions (View / Talk to beeside): opening one never invalidates the other while it is valid.
   const token = await issueToken(tx, d.project_id, "YEV_LINK", new Date(now.getTime() + (deps.config.yevLinkDays ?? 14) * 86_400_000));
-  const yevUrl = `${base}${publicPath}#r=${token}&view=result`;
+  const yevUrl = `${base}${publicPath === "/" ? "/" : publicPath}#r=${token}&view=result`;
   const talkUrl = `${yevUrl}&contact=open&origin=yev_email`;
   const premiumUrl = deps.config.premiumResourceUrl?.[locale];
   const hasPremium = ((await tx.query<{ shown: boolean }>("SELECT (model->'premium'->>'shown')::boolean AS shown FROM fa4_result WHERE project_id = $1 AND NOT legacy_unsealed ORDER BY result_seq DESC LIMIT 1", [d.project_id])).rows[0]?.shown) === true;

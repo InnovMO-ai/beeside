@@ -1,6 +1,7 @@
 import { fa4DepsFromEnv } from "../index";
 import { deliverDueFa4Emails } from "./email";
 import { ORPHAN_CONTACT_RETENTION_DAYS, purgeExpiredOrphanContacts } from "./retention";
+import http from "node:http";
 import { jsonLogger } from "../security/redact";
 
 /**
@@ -15,14 +16,27 @@ import { jsonLogger } from "../security/redact";
 export async function runFa4OutboxOnce(env: NodeJS.ProcessEnv = process.env): Promise<{ sent: number; failed: number; dead: number }> {
   const fa4 = fa4DepsFromEnv({ ...env, FA4_API_ENABLED: "true" });
   if (!fa4) throw new Error("FA4 is not configured");
-  return deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
+  return deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, closedTest: fa4.config.closedTest, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
+}
+
+/**
+ * Cloud Run runs the worker as a service, and a service must answer on $PORT or its revision never becomes healthy. This listener answers /health only (no data, no
+ * routes): the poll loop below is the real work. Local runs without PORT do not open it.
+ */
+export function startHealthServer(port: number, isBusyOrStopping: () => boolean = () => false): http.Server {
+  const server = http.createServer((req, res) => {
+    if (req.method === "GET" && (req.url === "/" || req.url === "/health")) { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify({ status: "ok", service: "discovery-worker", busy: isBusyOrStopping() })); return; }
+    res.writeHead(404); res.end();
+  });
+  server.listen(port);
+  return server;
 }
 
 /* istanbul ignore next -- process entry point */
 if (require.main === module) {
   const fa4 = fa4DepsFromEnv({ ...process.env, FA4_API_ENABLED: "true" });
   if (!fa4) throw new Error("FA4 is not configured");
-  const emailDeps = { db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } };
+  const emailDeps = { db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, publicPath: fa4.config.publicPath, closedTest: fa4.config.closedTest, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } };
   const pollMs = Number(process.env.FA4_WORKER_POLL_MS ?? 5_000);
   let busy = false; let stopping = false;
   const tick = async () => {
@@ -45,5 +59,6 @@ if (require.main === module) {
   const timer = setInterval(() => void tick(), pollMs);
   void tick();
   const stop = () => { stopping = true; clearInterval(timer); clearInterval(purgeTimer); const w = setInterval(() => { if (!busy) { clearInterval(w); process.exit(0); } }, 200); };
-  process.on("SIGTERM", stop); process.on("SIGINT", stop);
+  const health = process.env.PORT ? startHealthServer(Number(process.env.PORT), () => busy) : null;
+  process.on("SIGTERM", () => { health?.close(); stop(); }); process.on("SIGINT", () => { health?.close(); stop(); });
 }

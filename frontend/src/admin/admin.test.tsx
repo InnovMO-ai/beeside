@@ -38,8 +38,6 @@ describe("Control Center", () => {
     expect(parseAdminRoute("/admin")).toEqual({ name: "projects" });
     expect(parseAdminRoute("/admin/projects/abc/premium")).toEqual({ name: "project", id: "abc", tab: "premium" });
     expect(parseAdminRoute("/admin/audit/")).toEqual({ name: "audit" });
-    expect(parseAdminRoute("/ops-control")).toEqual({ name: "projects" });
-    expect(parseAdminRoute("/ops-control/projects/abc/premium")).toEqual({ name: "project", id: "abc", tab: "premium" });
   });
 
   it("asks for an organization sign-in when there is no session, and explains a denied sign-in", async () => {

@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildFlow, emptyAnswers, isStepComplete, lastProjectStep, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
-  type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel,
-} from '@beeside/fa-public-engine';
+  buildFlow, emptyAnswers, lastProjectStep, missingRequired, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
+  type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel, isLikelyPersonalEmail } from '@beeside/fa-public-engine';
 import { api, ApiError, confirmSend, sessionStore, track } from './api';
 import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
+import { PersonalEmailDialog } from './components/PersonalEmailDialog';
+import { StabilizationNotice } from './components/StabilizationNotice';
+import { loadRuntimeConfig } from './runtimeConfig';
 import { Logo } from './components/Logo';
 import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
 import { ContactDialog, HelpTalkLinks, TopActions } from './components/HelpContact';
 import { RecoveryScreen } from './components/Recovery';
+import { focusBlock, ReqContext } from './components/required';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
 const TOKEN = /^[A-Za-z0-9_-]{40,64}$/;
@@ -42,8 +45,28 @@ export function Fa4App() {
   const [previewToken, setPreviewToken] = useState<string | null>(null);
   const [delivered, setDelivered] = useState(false);          // D-156: a delivered YEV is final (no «Corregir algo», no regeneration)
   const [busy, setBusy] = useState(false);
+  // Stabilization (closed test): the deployment says so at runtime; the visitor must confirm the notice once per browser session before entering project information.
+  const [closedTest, setClosedTest] = useState(false);
+  const [stabAck, setStabAck] = useState(() => { try { return sessionStorage.getItem('beeside.fa4.stabilization-ack') === '1'; } catch { return false; } });
+  useEffect(() => { let live = true; void loadRuntimeConfig().then((c) => { if (live) setClosedTest(c.closedTest); }); return () => { live = false; }; }, []);
+  const confirmStabilization = () => { try { sessionStorage.setItem('beeside.fa4.stabilization-ack', '1'); } catch { /* the notice simply shows again */ } setStabAck(true); };
+  // Personal e-mail: advisory warning once per address (never a blocker).
+  const [personalWarn, setPersonalWarn] = useState(false);
+  // «Continue» pressed with required answers missing: which screen, and the labels of what is missing (the blocks themselves show the message and take the focus).
+  const [reqAttempt, setReqAttempt] = useState<{ key: string; n: number } | null>(null);
+  const [reqLabels, setReqLabels] = useState<string[]>([]);
+  useEffect(() => {
+    if (!reqAttempt) { setReqLabels([]); return; }
+    const bad = [...document.querySelectorAll<HTMLElement>('[data-req-bad="true"]')];
+    setReqLabels(bad.map((b) => b.getAttribute('data-req-label') ?? '').filter(Boolean));
+    if (bad[0]) focusBlock(bad[0]);
+  }, [reqAttempt]);
+  const personalOk = useRef('');
   const [toast, setToast] = useState<string | null>(null);
   const [toastRetry, setToastRetry] = useState<null | (() => void)>(null);   // set only for a failed send: renders «Intentar de nuevo»
+  // Notices never trap the screen: they close by themselves (a failed send with a retry action stays a little longer) and by a click anywhere except their own button.
+  const dismissToast = (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest('button')) return; setToast(null); setToastRetry(null); };
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => { setToast(null); setToastRetry(null); }, toastRetry ? 12000 : 6000); return () => clearTimeout(t); }, [toast, toastRetry]);
   const [booting, setBooting] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -122,7 +145,7 @@ export function Fa4App() {
   // Capability / coverage resolution is server-side (privacy boundary): the browser only receives the coarse facts for THIS project.
   const resSeq = useRef(0);
   useEffect(() => {
-    if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company', 'exit'].includes(step.id)) return;
+    if (!hasSession || step.id === 'result' || ['cover', 'identity', 'company'].includes(step.id)) return;
     const seq = ++resSeq.current;
     const t = setTimeout(() => { api.resolution(a).then((r) => { if (seq === resSeq.current) { setRes(r); setResolveFailed(false); } }).catch((e) => { if (seq !== resSeq.current) return; if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); }); }, 200);
     return () => clearTimeout(t);
@@ -149,14 +172,19 @@ export function Fa4App() {
 
   async function onNext() {
     if (!catalog) return;
-    if (step.id === 'identity' && !(await ensureSession())) return;
+    if (missingRequired(step, a, { cargoRouteDestinations: res.cargoRouteDestinations, desktop }).length) { setReqAttempt((p) => ({ key: stepKey(step), n: (p?.n ?? 0) + 1 })); return; }
+    if (step.id === 'identity') {
+      const email = a.identity.email.trim().toLowerCase();
+      if (isLikelyPersonalEmail(email) && personalOk.current !== email) { setPersonalWarn(true); return; }
+      if (!(await ensureSession())) return;
+    }
     // leaving the LAST project screen confirms the project; an unanswered clarity question behaves as NO (what confirming the old checkpoint did)
     const lp = lastProjectStep(a);
     const base = stepKey(step) === stepKey(lp) && !a.projectConfirmed ? { ...a, projectConfirmed: true, knowsNeeds: a.knowsNeeds ?? false } : a;
     if (base !== a) setA(base);
     // The next step depends on the server-side resolution of THESE answers (e.g. the cargo-route question): never navigate on a stale one.
     let ctxFlow = flow;
-    if (hasSession && !['cover', 'identity', 'company', 'exit'].includes(step.id)) {
+    if (hasSession && !['cover', 'identity', 'company'].includes(step.id)) {
       try { const fresh = await api.resolution(base); setRes(fresh); setResolveFailed(false); ctxFlow = { cargoRouteDestinations: fresh.cargoRouteDestinations }; }
       catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setResolveFailed(true); return; }   // stay on this step; the alert offers «Intentar de nuevo»
     }
@@ -187,6 +215,14 @@ export function Fa4App() {
     try { await confirmSend(api.contact({ ...p, stage: step.id === 'result' ? 'YEV' : 'FA' }), null); return true; } catch { return false; }
   };
   const contactPrefill = { name: a.identity.name, company: a.identity.company, email: a.identity.email };
+
+  const focusEmailField = () => (document.querySelector('input[type=email]') as HTMLInputElement | null)?.focus();
+  const stabNotice = closedTest && !stabAck ? <StabilizationNotice locale={locale} onConfirm={confirmStabilization} /> : null;
+  const personalDialog = personalWarn ? (
+    <PersonalEmailDialog locale={locale}
+      onUseAnother={() => { setPersonalWarn(false); setTimeout(focusEmailField, 0); }}
+      onContinue={() => { personalOk.current = a.identity.email.trim().toLowerCase(); setPersonalWarn(false); void onNext(); }} />
+  ) : null;
 
   if (pendingResume) {
     const loc: Locale = typeof navigator !== 'undefined' && /^en/i.test(navigator.language) ? 'en' : 'es';
@@ -231,7 +267,8 @@ export function Fa4App() {
               footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}
-        {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+        {stabNotice}
+        {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
       </div></div>
     );
   }
@@ -244,7 +281,9 @@ export function Fa4App() {
   }
 
   const stage = STAGE_OF[step.id];
-  const complete = isStepComplete(step, a);
+  const missing = new Set(missingRequired(step, a, { cargoRouteDestinations: res.cargoRouteDestinations, desktop }));
+  const showReq = reqAttempt?.key === stepKey(step) && missing.size > 0;
+  const reqState = { show: showReq, missing, message: UI.reqField[locale] };
   const isLastBeforeResult = nextStep(a, flow, step).id === 'result';
   const label = step.id === 'identity' ? UI.acceptContinue[locale] : isLastBeforeResult ? UI.seeResult[locale] : UI.next[locale];
   const wide = ['fronts_status', 'fronts_support', 'fronts_mark', 'fronts_critical'].includes(step.id);
@@ -263,15 +302,17 @@ export function Fa4App() {
         {resolveFailed && (
           <div className="state err" role="alert"><b>{UI.topicsErrorTitle[locale]}</b> {UI.resolveErrorBody[locale]} <button type="button" className="toast-btn" onClick={() => { setResolveFailed(false); setResolveTick((n) => n + 1); }}>{UI.tryAgain[locale]}</button></div>
         )}
-        <StepBody step={step} ctx={ctx}  desktop={desktop} />
+        {showReq && reqLabels.length > 0 && <div className="req-summary" role="alert"><b>{UI.reqSummary[locale]}</b> {reqLabels.join(' · ')}</div>}
+        <ReqContext.Provider value={reqState}><StepBody step={step} ctx={ctx}  desktop={desktop} /></ReqContext.Provider>
       </main>
       <div className="navbar"><div className={`inner ${wide ? 'wide' : ''}`}>
         <button type="button" className="linkbtn nav-save" onClick={saveLater}>{UI.saveLater[locale]}</button>
         <button className="btn" onClick={onBack}>{UI.back[locale]}</button>
-        {step.id !== 'exit' && <button className="btn primary" disabled={!complete || busy} onClick={onNext}>{label}</button>}
+        <button className="btn primary" disabled={busy} onClick={onNext}>{label}</button>
       </div></div>
       {!wide && <aside className="deco" aria-hidden />}
-      {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={() => { if (!toastRetry) setToast(null); }}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+      {toast && <div role={toastRetry ? 'alert' : 'status'} className={`toast ${toastRetry ? 'err' : ''}`} onClick={dismissToast}><span>{toast}</span>{toastRetry && <button type="button" className="toast-btn" onClick={() => toastRetry()}>{UI.tryAgain[locale]}</button>}</div>}
+      {stabNotice}{personalDialog}
       <span className="sr-only" data-testid="flow-length">{buildFlow(a, flow).length}</span>
     </div></div>
   );
@@ -282,7 +323,6 @@ function StepBody({ step, ctx, desktop }: { step: StepRef; ctx: S.StepCtx; deskt
   switch (step.id) {
     case 'identity': return <S.IdentityStep {...ctx} />;
     case 'company': return <S.CompanyStep {...ctx} />;
-    case 'exit': return <S.ExitStep {...ctx} />;
     case 'destinations': return <S.DestinationsStep {...ctx} />;
     case 'activity': return <S.ActivityStep {...ctx} compId={c} />;
     case 'presence': return <S.PresenceStep {...ctx} compId={c} />;

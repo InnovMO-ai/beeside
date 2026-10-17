@@ -269,17 +269,15 @@ export async function exchangeLinkToken(db: Db, rawToken: string, now: Date, ses
 }
 
 /**
- * Saves answers. Status is NORMALIZED from facts, never sticky: INELIGIBLE iff the answers say there is no existing business,
- * otherwise DELIVERED iff a SEALED (explicitly delivered) result exists, else IN_PROGRESS. The captured email never changes here.
+ * Saves answers. Status is NORMALIZED from facts, never sticky: DELIVERED iff a SEALED (explicitly delivered) result exists, else IN_PROGRESS.
+ * There is no eligibility status any more (a project without a business operating today is valid); `INELIGIBLE` remains only as a legacy value that a save heals. The captured email never changes here.
  */
 export async function saveProject(db: Db, projectId: string, answers: Answers, stepKey: string): Promise<void> {
-  const ineligible = answers.company.hasExistingBusiness === false;
   await db.query(
     `UPDATE fa4_project SET answers = $2::jsonb, step_key = $3, locale = $4, updated_at = now(),
-            status = CASE WHEN $5::boolean THEN 'INELIGIBLE'
-                          WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1 AND NOT r.legacy_unsealed) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
+            status = CASE WHEN EXISTS (SELECT 1 FROM fa4_result r WHERE r.project_id = $1 AND NOT r.legacy_unsealed) THEN 'DELIVERED' ELSE 'IN_PROGRESS' END
       WHERE project_id = $1 AND status <> 'ANONYMIZED'`,
-    [projectId, JSON.stringify(answers), stepKey, answers.locale, ineligible],
+    [projectId, JSON.stringify(answers), stepKey, answers.locale],
   );
 }
 

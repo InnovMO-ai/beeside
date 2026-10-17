@@ -1,16 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-// Three experiences share one build but not one stylesheet or bundle entry:
-//  - /admin (alias /ops-control) -> internal Control Center,
-//  - /fa4 (alias /discovery)    -> Discovery / FA Public v1.0 (isolated module; its own CSS, never mixed with the legacy styles),
-//  - /precision -> Precision Center V2.0 (isolated module; its own CSS and tokens),
-//  - the rest -> the existing First Assessment.
+// Experiences that share one build but not one stylesheet or bundle entry:
+//  - /discovery (alias /fa4) -> Discovery / FA Public v1.0 (isolated module; its own CSS, never mixed with the legacy styles),
+//  - /admin                  -> the LEGACY internal Control Center (not part of Discovery),
+//  - /ops-control            -> RESERVED for the Discovery administration surface: never the legacy console, never the public app,
+//  - /precision              -> Precision Center V2.0 (isolated module; its own CSS and tokens; NOT part of a Discovery-only build),
+//  - the rest                -> the legacy First Assessment.
+// A DISCOVERY-ONLY build (production under beeside.you/discovery, VITE_DISCOVERY_ONLY=true) contains nothing but Discovery: every other path is
+// "not available", so neither the legacy First Assessment nor the legacy Control Center can ever render under the Discovery identity.
 const path = window.location.pathname;
-// Canonical public/internal routes: /discovery (public Discovery = the /fa4 module) and /ops-control (internal administration = the /admin module).
-// The technical paths keep working. /ops-control is never linked from Discovery.
-const isControlCenter = /^\/(admin|ops-control)(\/|$)/.test(path);
-const isFa4 = /^\/(fa4|discovery)(\/|$)/.test(path);
+const discoveryOnly = import.meta.env.VITE_DISCOVERY_ONLY === "true";
+const isFa4 = /^\/(fa4|discovery)(\/|$)/.test(path) || (discoveryOnly && !/^\/ops-control(\/|$)/.test(path));   // a dedicated-host build owns "/"
+const isReserved = /^\/ops-control(\/|$)/.test(path);
+const isControlCenter = path === "/admin" || path.startsWith("/admin/");
 const isPrecision = path === "/precision" || path.startsWith("/precision/");
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
@@ -19,6 +22,10 @@ async function boot() {
     await import("./fa4/fa4.css");
     const { Fa4App } = await import("./fa4/Fa4App");
     root.render(<React.StrictMode><Fa4App /></React.StrictMode>);
+    return;
+  }
+  if (discoveryOnly || isReserved) {
+    root.render(<main style={{ fontFamily: "system-ui, sans-serif", padding: "48px 24px", color: "#17181B" }}><p>Not available.</p></main>);
     return;
   }
   if (isPrecision) {

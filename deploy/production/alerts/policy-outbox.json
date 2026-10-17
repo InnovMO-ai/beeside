@@ -1,0 +1,49 @@
+{
+  "displayName": "Discovery \u2014 e-mail outbox failing or DEAD",
+  "combiner": "OR",
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "conditions": [
+    {
+      "displayName": "an e-mail reached DEAD",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/discovery_outbox_dead\" AND resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    },
+    {
+      "displayName": "the worker cannot complete a cycle",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/discovery_outbox_tick_failed\" AND resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "documentation": {
+    "content": "See deploy/production/RUNBOOK.md (alerts section).",
+    "mimeType": "text/markdown"
+  }
+}

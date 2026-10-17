@@ -450,11 +450,12 @@ describeRt("FA Public v1.0 — runtime role, publish isolation, resume security,
       }
     });
 
-    it("project status is normalized after an eligibility correction (INELIGIBLE is not sticky)", async () => {
+    it("project status is normalized from facts: «no business operating today» is valid (never INELIGIBLE) and a legacy INELIGIBLE row is healed by a save", async () => {
       const e = email("st"); const p = await start(e);
       const no = answersFor(e); no.company.hasExistingBusiness = false;
       await app().put("/api/fa4/session").set(auth(p.token)).send({ answers: no, step: "company" });
-      expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("INELIGIBLE");
+      expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("IN_PROGRESS");
+      await q("UPDATE fa4_project SET status = 'INELIGIBLE' WHERE project_id = $1", [p.pid]);          // a row written by the pre-fix code
       await app().put("/api/fa4/session").set(auth(p.token)).send({ answers: answersFor(e), step: "company" });
       expect((await q("SELECT status FROM fa4_project WHERE project_id = $1", [p.pid]))[0].status).toBe("IN_PROGRESS");
       await app().post("/api/fa4/session/result").set(auth(p.token));

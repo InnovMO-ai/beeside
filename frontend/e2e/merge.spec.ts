@@ -20,7 +20,8 @@ test("Multi-country: destinations + «same project?» is ONE screen; presence pe
   for (const [q, n] of [["Ind", "India"], ["Espa", "España"]]) { await page.getByPlaceholder(UI.searchCountry.es).fill(q!); await page.getByRole("button", { name: n!, exact: true }).click(); }
   // the merged block appears with 2+ destinations and gates Continuar (as the old step did)
   await expect(page.getByRole("heading", { name: UI.sameTitle.es })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continuar", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();                  // gates Continuar: it does not move on and says what is missing
+  await expect(page.getByRole("heading", { name: UI.sameTitle.es })).toBeVisible(); await expect(page.getByRole("alert").filter({ hasText: UI.reqSummary.es })).toBeVisible();
   await page.getByRole("radio", { name: UI.sameNo.es }).check();
   await expect(page.getByRole("button", { name: "Continuar", exact: true })).toBeEnabled();
   await noHorizontalOverflow(page);

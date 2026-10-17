@@ -541,15 +541,13 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
 .band { background: transparent; }
 
 /* 2 · YEV Hero: full-bleed editorial photograph, headline on open sky, glance card as the project signal */
-.res-hero.photo { position: relative; overflow: hidden; isolation: isolate; background: #1d4a9e; color: #fff; }
+.res-hero.photo { position: relative; overflow: hidden; isolation: isolate; background: #e4e4e4; color: #2f3138; --hero-ink: #2f3138; }   /* light architectural photograph: dark-grey text */
 .res-hero.photo .hero-photo { position: absolute; inset: 0; z-index: -2; display: block; }
-.res-hero.photo .hero-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 21%; display: block; }
-.res-hero.photo::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(100deg, rgba(9, 20, 58, .46) 0%, rgba(9, 20, 58, .22) 42%, rgba(9, 20, 58, 0) 66%); }
-.res-hero.photo .eyebrow { color: #fff; opacity: .92; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 700; }
-.res-hero.photo h1 { color: #fff; }
-.res-hero.photo .sub { color: rgba(255, 255, 255, .94); font-size: 15px; max-width: 46ch; }
-.res-hero.photo .glance { box-shadow: 0 18px 44px rgba(9, 20, 58, .28); border: 0; }
+.res-hero.photo .hero-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 84%; display: block; }
+.res-hero.photo .eyebrow { color: var(--hero-ink); opacity: 1; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 700; }
+.res-hero.photo h1 { color: var(--hero-ink); }
+.res-hero.photo .sub { color: var(--hero-ink); font-size: 15px; max-width: 46ch; }
+.res-hero.photo .glance { box-shadow: 0 14px 36px rgba(23, 24, 27, .16); border: 0; color: var(--ink); }
 @media (min-width: 900px) {
   .res-hero.photo .in { min-height: clamp(520px, 44vw, 700px); align-content: space-between; padding-top: 28px; padding-bottom: 40px; }
   .res-hero.photo h1 { font-size: clamp(40px, 3.6vw, 56px); line-height: 1.06; max-width: 15ch; margin-top: clamp(16px, 2vw, 32px); }
@@ -559,11 +557,12 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
 /* Phone: art-directed crop (pre-cropped right/top of the same photograph) under the headline; the glance card overlaps onto the paper */
 @media (max-width: 899px) {
   .res-hero.photo { display: grid; grid-template-areas: "hero" "glance"; background: var(--paper); }
-  .res-hero.photo .hero-photo, .res-hero.photo::before { grid-area: hero; position: relative; inset: auto; }
+  .res-hero.photo .hero-photo { grid-area: hero; position: relative; inset: auto; }
   .res-hero.photo .hero-photo { z-index: 0; }
   .res-hero.photo .hero-photo { align-self: stretch; overflow: hidden; }
-  .res-hero.photo .hero-photo img { position: absolute; inset: 0; object-position: 50% 60%; }
-  .res-hero.photo::before { z-index: 1; background: linear-gradient(180deg, rgba(9, 20, 58, .5) 0%, rgba(9, 20, 58, .36) 52%, rgba(9, 20, 58, 0) 78%); }
+  .res-hero.photo .hero-photo img { position: absolute; inset: 0; object-position: 50% 100%; }
+  /* legibility wash (phone/tablet): keeps the railing from running through the text; fades out before the stair */
+  .res-hero.photo .hero-photo::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(238, 238, 238, .9) 0%, rgba(238, 238, 238, .78) 42%, rgba(238, 238, 238, 0) 74%); }
   .res-hero.photo .in { display: contents; }
   .res-hero.photo .in > div:first-child { grid-area: hero; z-index: 2; padding: 18px var(--gutter) 64px; min-height: 470px; }
   .res-hero.photo .in > div:last-child { grid-area: glance; z-index: 3; padding: 0 var(--gutter); margin-top: -40px; }
@@ -672,19 +671,10 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
 .vc-cx-label { display: none; }
 @media (max-width: 759px) { .vc-cx-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-bottom: 4px; } }
 
-/* ---------- Discovery v1.0 · final Hero crop (PO, 2026-10-14): tablet + desktop only ----------
-   More architecture anchors the bottom of the Hero; open sky stays behind the headline. Same photograph (wide crop asset), same Hero size,
-   same overlay, same text and card. Each range has its own framing: --hz = visible share of the asset width, --hx / --hy = offset (share of the image). */
-@media (min-width: 768px) {
-  .res-hero.photo .hero-photo img { position: absolute; inset: auto; left: 0; top: 0; width: calc(100% / var(--hz)); height: auto; max-width: none; object-fit: fill;
-    transform: translate(calc(var(--hx) * -100%), calc(var(--hy) * -100%)); }
-}
-@media (min-width: 768px) and (max-width: 899px) { .res-hero.photo { --hz: .632; --hx: .168; --hy: .10; } }
-@media (min-width: 900px) and (max-width: 1199px) { .res-hero.photo { --hz: .737; --hx: .211; --hy: .14; } }
-@media (min-width: 1200px) and (max-width: 1439px) { .res-hero.photo { --hz: .737; --hx: .179; --hy: .15; } }
-@media (min-width: 1440px) and (max-width: 1679px) { .res-hero.photo { --hz: .737; --hx: .084; --hy: .16; } }
-@media (min-width: 1680px) and (max-width: 1919px) { .res-hero.photo { --hz: .737; --hx: .074; --hy: .18; } }
-@media (min-width: 1920px) { .res-hero.photo { --hz: .737; --hx: .042; --hy: .24; } }
+/* ---------- Discovery v1.0 · Hero photograph (PO, 2026-10-15): light staircase photograph, shown at its natural scale (cover, never zoomed) ----------
+   2000 px wide asset used 1:1 on desktop (no enlargement = no pixelation). The stair sits low-right; the text column and the card keep the open wall. */
+@media (min-width: 768px) and (max-width: 1199px) { .res-hero.photo .hero-photo img { object-position: 78% 86%; } }
+@media (min-width: 1200px) { .res-hero.photo .hero-photo img { object-position: 70% 84%; } }
 
 /* Discovery v1.0 — root cause of the ~17px overflow at 320: the nowrap «save for later» label + logo + 44px icon (211px of actions) exceeded the 288px content box.
    The label now wraps (2 lines) and every header item may shrink; nothing is clipped and no overflow rule is used. */
@@ -694,3 +684,39 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
   .topbar .logo { max-width: 100%; min-width: 0; object-fit: contain; }
   .topbar .linkbtn.ta-save { white-space: normal; text-align: right; line-height: 1.2; min-width: 0; max-width: 118px; }
 }
+
+/* ---------- Discovery v1.0 · header breathing room + non-blocking notices (PO review of staging) ---------- */
+/* Logo row, progress line and the title were packed together at the top: more air between the three, on every question screen. */
+.topbar { padding-top: 20px; padding-bottom: 18px; }
+.progress { padding-bottom: 10px; }
+.main { padding-top: 34px; }
+/* roomy only where the height allows it; a laptop-height window (≤ 820 px) keeps the company screen inside one viewport */
+@media (min-width: 900px) { .topbar { padding-top: 18px; padding-bottom: 16px; } .progress { padding-bottom: 6px; } .main { padding-top: 24px; } }
+@media (min-width: 900px) and (min-height: 821px) { .topbar { padding-top: 28px; padding-bottom: 26px; } .progress { padding-bottom: 14px; } .main { padding-top: 48px; } }
+@media (max-width: 479px) { .topbar { padding-top: 16px; padding-bottom: 14px; } .main { padding-top: 28px; } }
+/* A notice must never sit on top of the action bar (it hid «Continuar» on desktop): it floats above it at every width. */
+.toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+@media (min-width: 900px) { .toast { bottom: calc(96px + env(safe-area-inset-bottom)); } }
+
+/* ---------- Stabilization notice + personal e-mail warning (dialogs on the existing «sheet» pattern) ---------- */
+dialog.stab-notice .sheet-body p, dialog.personal-email .sheet-body p { margin: 0 0 12px; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+dialog.stab-notice .sheet-body p.stab-confirm { font-weight: 600; color: var(--ink); }
+dialog.stab-notice .sheet-head h2, dialog.personal-email .sheet-head h2 { font-size: 22px; line-height: 1.2; }
+dialog.stab-notice, dialog.personal-email { max-height: calc(100dvh - 32px); overflow: auto; }
+dialog.personal-email .sheet-actions { flex-wrap: wrap; }
+dialog.personal-email .sheet-actions .btn { flex: 1 1 200px; }
+
+/* a choice that is unavailable (mutually exclusive with another answer) */
+.choice.is-disabled { opacity: .5; cursor: not-allowed; background: #f6f6f9; }
+.choice.is-disabled:hover { border-color: var(--control-line); }
+.choice.is-disabled input { cursor: not-allowed; }
+/* Stabilization notice: the single action keeps a normal button size (not a full-width bar that dominates the dialog) */
+dialog.stab-notice .sheet-actions { justify-content: flex-end; }
+dialog.stab-notice .sheet-actions .btn.primary { flex: 0 0 auto; min-width: 200px; min-height: 44px; padding: 0 28px; font-size: 15px; }
+@media (max-width: 599px) { dialog.stab-notice .sheet-actions { justify-content: center; } dialog.stab-notice .sheet-actions .btn.primary { min-width: 220px; } }
+
+/* required answers missing after «Continue» (accessible: message under the block, aria-invalid, focus on the first one, summary as an alert) */
+.req-summary { margin: 0 0 16px; padding: 12px 14px; border: 1.5px solid #a1261b; border-radius: 10px; background: #fdf3f2; color: #7a1c14; font-size: 15px; line-height: 1.45; }
+.req-bad { position: relative; }
+.req-bad::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: #a1261b; }   /* no border/padding: nothing shifts when it appears */
+.req-msg { margin: 6px 0 0; color: #a1261b; font-size: 14px; font-weight: 600; }

@@ -38,7 +38,7 @@ for (const [w, h] of WIDTHS) {
     test.skip(info.project.name !== "desktop-1440", "viewport is set inside the test; run once");
     await page.setViewportSize({ width: w, height: h });
     const sources: Record<string, string[]> = {};
-    await page.goto("/discovery"); await page.waitForTimeout(300);
+    await page.goto("/fa4"); await page.waitForTimeout(300);
     sources.cover = await checkLogos(page, "cover", w, "dark"); await shot(page, `logo-cover-${w}`);
     await page.getByRole("button", { name: UI.coverCta.es }).click(); await page.waitForTimeout(300);
     sources.identity = await checkLogos(page, "identity", w, "dark");
@@ -53,7 +53,7 @@ for (const [w, h] of WIDTHS) {
     await page.getByRole("button", { name: "Start Your Expansion" }).click(); await page.waitForTimeout(300);
     sources.confirmation = await checkLogos(page, "confirmation", w, "any"); await shot(page, `logo-confirmation-${w}`);
     // intermediate / error surfaces rendered by the same component: stale-session recovery and the «for operating businesses» exit
-    await page.addInitScript(() => sessionStorage.setItem("beeside.fa4.session", "x".repeat(43))); await page.goto("/discovery"); await page.waitForTimeout(800);
+    await page.addInitScript(() => sessionStorage.setItem("beeside.fa4.session", "x".repeat(43))); await page.goto("/fa4"); await page.waitForTimeout(800);
     sources.recovery = await checkLogos(page, "recovery", w, "dark"); await shot(page, `logo-recovery-${w}`);
     // one consolidated statement of the assets in use
     const all = new Set(Object.values(sources).flat().map((s) => s.replace(/^data:image\/svg\+xml.*/, "svg-data-uri").replace(/.*\/(lockup-[a-z]+)[-.\w]*\.svg.*/, "$1")));

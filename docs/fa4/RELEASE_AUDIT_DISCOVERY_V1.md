@@ -40,7 +40,7 @@ Open: no approved destination exists → blocker. How the payment system correla
 ## 5. Commercial comparison — **RELEASE BLOCKER (pending Product/Legal)**
 
 A. Visible claims (EN reference / ES as shown), `UI.cmp*` in `frontend/src/fa4/copy/ui.ts`:
-- Title «Funding a fragmented process, or buying coordinated capability».
+- Title (PO copy, 2026-10-15; replaces the earlier «Funding a fragmented process…»): ES «Entrar es solo el comienzo; crecer viene con beeside.» · EN «Entering a market is a milestone. Building a presence takes beeside.»; subtitle «Continuar con beeside significa mantener integrada la estrategia, coordinación y red local que tu proyecto necesita para avanzar.» (EN subtitle = translation proposal pending PO sign-off). The wording about *funding* is gone, so the comparison no longer suggests beeside finances anything.
 - Option A **beeside Premium — Coordinated system — 8 of 8 capabilities**; B Hire one local person — «One skillset, one point of view» — **0 of 8**; C Office + one person — «Fixed overhead added» — **0 of 8**; D Office + person + travel — «Highest cost, still fragmented» — **0 of 8**.
 - Eight dimensions: Multi-service activation, Specialist access, Project visibility, Coordination, Curated ecosystem, Continuity, **24/7 digital platform access**, Centralized documentation.
 - Relative «Complexity» bars (0.18 / 0.45 / 0.70 / 0.97) and the note: dimensions of coordinated capability only, not a judgment of people/offices nor a cost figure, no amounts shown, illustrative, not a guaranteed-price claim.

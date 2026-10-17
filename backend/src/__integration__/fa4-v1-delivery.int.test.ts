@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import request from "supertest";
 import { SEED_CATALOG } from "@beeside/fa-public-engine/seed";
-import { journeyA, journeyNortica } from "@beeside/fa-public-engine/testing";
+import { journeyA, journeyNewBusiness, journeyNortica } from "@beeside/fa-public-engine/testing";
 import { Answers, buildSourceSnapshot, canonicalJson } from "@beeside/fa-public-engine";
 import { Db, createPoolDb } from "../db/database";
 import { createApp } from "../index";
@@ -18,6 +18,7 @@ const adminUrl = process.env.TEST_RUNTIME_ADMIN_DATABASE_URL;
 const runtimeUrl = process.env.TEST_RUNTIME_DATABASE_URL;
 const describeRt = adminUrl && runtimeUrl ? describe : describe.skip;
 const legal = { termsVersion: "T", termsUrl: { es: "https://t", en: "https://t" }, privacyVersion: "P", privacyUrl: { es: "https://p", en: "https://p" } };
+const legalClosed = { ...legal, privacyVersion: "CLOSED-TEST-NOT-LEGAL" };
 let n = 0;
 const uniq = () => `${Date.now().toString(36)}${(n++).toString(36)}`;
 
@@ -27,9 +28,11 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   const adminDb: Db = createPoolDb(admin); const rtDb: Db = createPoolDb(rt);
   const mail = new CaptureEmailTransport();
   let publicPath: string | undefined;
+  let closedTest: { emailDomains: string[]; emailAddresses?: string[] } | undefined;
+  let edgeDiagnostic: boolean | undefined;
   const deps = (): Fa4Deps => ({
     db: rtDb, email: mail, emailDispatch: "inline",
-    config: { appBaseUrl: "https://fa.test", publicPath, sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
+    config: { appBaseUrl: "https://fa.test", publicPath, closedTest, edgeDiagnostic, legalMode: closedTest ? "closed-test" : "final", sessionTtlHours: 24, resumeLinkDays: 30, emailCooldownMinutes: 0, emailRecipientDailyQuota: 100, resumeProjectsPerRequest: 3, legal: closedTest ? legalClosed : legal, now: () => new Date(), emailConfirmWaitMs: 2000, contactAddress: "contact@beeside.you" },
   });
   const app = () => request(createApp({ fa4: deps() }));
   const q = async (sql: string, v: unknown[] = []) => (await admin.query(sql, v)).rows;
@@ -238,8 +241,90 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
       const links = mail.messages.map((m) => m.ctaUrl).filter(Boolean);
       expect(links.length).toBeGreaterThan(0);
       for (const l of links) expect(l!.startsWith(expected)).toBe(true);
+      const html = mail.messages.map((m) => m.html ?? "").join("\n");                      // the e-mail header logo is hosted under the same public path (never gated)
+      expect(html).toContain(expected.startsWith("https://fa.test/discovery") ? "https://fa.test/discovery/brand/beeside-lockup.png" : "https://fa.test/brand/beeside-lockup.png");
     }
     publicPath = undefined;
+  });
+
+  describe.each(["es", "en"] as const)("new business without an operating company (%s)", (loc) => {
+    it("same journey end to end: preview → explicit delivery → sealed → Precision context (operatingBusiness=false) → continuation; nothing is rejected as ineligible", async () => {
+      const { token, pid } = await start(journeyNewBusiness(loc));
+      expect((await app().put("/api/fa4/session").set(auth(token)).send({ answers: journeyNewBusiness(loc), step: "company" })).status).toBe(200);
+      expect(await status(pid)).toBe("IN_PROGRESS");                                                         // never INELIGIBLE
+      const preview = await app().post("/api/fa4/session/result").set(auth(token));
+      expect(preview.status).toBe(200); expect(preview.body.preview).toBe(true); expect(preview.body.model.premium.shown).toBe(true);
+      expect(JSON.stringify(preview.body.model)).not.toMatch(/undefined|null null/);
+      const e = await app().post("/api/fa4/session/result/email").set(auth(token)).send({ previewToken: preview.body.previewToken });
+      expect(e.status).toBe(200); expect(await sealedCount(pid)).toBe(1); expect(await status(pid)).toBe("DELIVERED");
+      const ctx = await getFa4PrecisionContext(rtDb, pid, e.body.resultId);
+      expect(ctx.declared.company).toMatchObject({ operatingBusiness: false, sector: "", size: null, operatesIn: [] });      // distinguishable, nothing fabricated
+      expect(ctx.declared.destinations.list.map((d) => d.country)).toEqual(["MX"]);
+      const c = await app().post("/api/fa4/session/continue").set(auth(token));                                  // Precision / Premium continuation is open
+      expect(c.status).toBe(200); expect(c.body.resultId).toBe(e.body.resultId);
+      expect(await q("SELECT result_id FROM fa4_continuation_request WHERE project_id = $1", [pid])).toEqual([{ result_id: e.body.resultId }]);
+      const row = (await q("SELECT source_snapshot FROM fa4_result WHERE project_id = $1", [pid]))[0];
+      expect(row.source_snapshot.company).toEqual({ hasExistingBusiness: false, sector: "", size: null, operatesIn: [] });
+    });
+    it("the Continue-with-beeside path delivers a new-business result as well (delivery via the CTA)", async () => {
+      const { token, pid } = await start(journeyNewBusiness(loc));
+      const c = await app().post("/api/fa4/session/continue").set(auth(token));
+      expect(c.status).toBe(200); expect(await sealedCount(pid)).toBe(1); expect(await status(pid)).toBe("DELIVERED");
+    });
+  });
+  it("an operating-business journey still reports operatingBusiness=true (regression)", async () => {
+    const { token, pid } = await start(journeyNortica());
+    const e = await app().post("/api/fa4/session/result/email").set(auth(token));
+    expect((await getFa4PrecisionContext(rtDb, pid, e.body.resultId)).declared.company.operatingBusiness).toBe(true);
+  });
+
+  describe("CLOSED TEST mode (no final Privacy version): identifiable, e-mail restricted to test domains", () => {
+    beforeAll(() => { closedTest = { emailDomains: ["beeside.you"], emailAddresses: [] }; });
+    afterAll(() => { closedTest = undefined; });
+    it("reports its legal regime, records the non-legal marker as the acceptance evidence, and keeps everything else working", async () => {
+      expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "closed-test" });
+      const { pid } = await start();
+      expect(await q("SELECT DISTINCT document_version FROM fa4_legal_acceptance WHERE project_id = $1 AND document = 'PRIVACY'", [pid])).toEqual([{ document_version: "CLOSED-TEST-NOT-LEGAL" }]);
+    });
+    it("never mails an address outside the allowed test domains: the delivery is CANCELLED and the person is told it was not sent; the result is still delivered", async () => {
+      const outside = await start(); mail.messages.length = 0;
+      const r = await app().post("/api/fa4/session/result/email").set(auth(outside.token));
+      expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+      expect((await q("SELECT status FROM fa4_email_delivery WHERE project_id = $1 AND template = 'fa4_result_link'", [outside.pid]))[0].status).toBe("CANCELLED");
+      expect(await status(outside.pid)).toBe("DELIVERED");
+      const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = `ok.${uniq()}@beeside.you`;
+      const inside = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" });
+      const mailed = await app().post("/api/fa4/session/result/email").set(auth(inside.body.sessionToken as string));
+      expect(mailed.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
+    });
+  });
+  describe("CLOSED TEST mode: individually authorized e-mail address (no domain opened)", () => {
+    const reviewer = () => `reviewer.${uniq()}@hive-reviewers.example`;
+    it("mails ONLY the authorized address; the same domain and an alias of it are CANCELLED; the domain list can be empty", async () => {
+      const addr = reviewer(); closedTest = { emailDomains: [], emailAddresses: [addr] };
+      try {
+        const mk = async (email: string) => { const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = email; const r = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" }); return { token: r.body.sessionToken as string, pid: r.body.projectId as string | undefined }; };
+        mail.messages.length = 0;
+        const ok = await mk(addr); const sent = await app().post("/api/fa4/session/result/email").set(auth(ok.token));
+        expect(sent.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
+        for (const other of [`someone.else.${uniq()}@hive-reviewers.example`, addr.replace("@", "+tag@"), `x.${uniq()}@beeside.you`]) {
+          mail.messages.length = 0; const o = await mk(other); const r = await app().post("/api/fa4/session/result/email").set(auth(o.token));
+          expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+        }
+        expect(JSON.stringify((await app().get("/api/fa4/legal-mode")).body)).not.toContain("hive-reviewers");   // the list is never exposed
+      } finally { closedTest = undefined; }
+    });
+  });
+  it("edge-check (TRUST_PROXY_HOPS measurement aid) exists only when enabled and returns just the caller's own address and the X-Forwarded-For entry count", async () => {
+    expect((await app().get("/api/fa4/edge-check")).status).toBe(404);
+    edgeDiagnostic = true;
+    try {
+      const r = await app().get("/api/fa4/edge-check").set("X-Forwarded-For", "203.0.113.7, 10.0.0.1"); expect(r.status).toBe(200);
+      expect(r.body.xffEntries).toBe(2); expect(Object.keys(r.body).sort()).toEqual(["ip", "trustProxy", "xffEntries"]);
+    } finally { edgeDiagnostic = undefined; }
+  });
+  it("outside test mode the legal regime is final and e-mail is unrestricted", async () => {
+    expect((await app().get("/api/fa4/legal-mode")).body).toEqual({ legalMode: "final" });
   });
 
   it("journey A also delivers through the explicit action and its envelope is complete", async () => {

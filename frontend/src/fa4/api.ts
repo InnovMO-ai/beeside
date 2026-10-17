@@ -1,7 +1,8 @@
 import type { Answers, ClientResolution, PublicCatalog, YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /** FA Public v1.0 API client (module fa4). The working session token lives only in this tab; returning later uses the emailed link. */
-const BASE = '/api/fa4';
+/** Under the production path the build's base is `/discovery/` and the API is reached at `/discovery/api/fa4` (the edge only routes that prefix); at the root it is `/api/fa4`. */
+const BASE = `${import.meta.env.BASE_URL}api/fa4`.replace(/\/{2,}/g, '/');
 const SESSION_KEY = 'beeside.fa4.session';
 
 export class ApiError extends Error {

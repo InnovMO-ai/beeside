@@ -56,7 +56,7 @@ describe('copy gate', () => {
     expect(UI.sizes['251-1000'].es).toBe('251–1,000'); expect(UI.sizes['1000+'].es).toBe('Más de 1,000');   // PO decision: comma for thousands in both languages
     expect(UI.noPremiumTitle.en).toBe('Your project, with more clarity');
     expect(UI.catalogErrorBody.en).not.toMatch(/lost/i);
-    expect(UI.exitBody.es).not.toMatch(/anónim/i);
+    expect('exitTitle' in UI || 'exitBody' in UI).toBe(false);                                                     // the «only for operating businesses» screen/copy no longer exists
     expect(UI.headAppliesN.es).toBe('{applies} temas aplican a tu proyecto');
   });
   it('date placeholder examples are inputs the date formatter accepts', () => {

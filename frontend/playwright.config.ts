@@ -9,6 +9,9 @@ import { defineConfig } from "@playwright/test";
 const DB = process.env.E2E_DATABASE_URL ?? "";
 // The API runs as the least-privilege runtime login role when E2E_RUNTIME_DATABASE_URL is set (CI does); migrations always use E2E_DATABASE_URL.
 const APP_DB = process.env.E2E_RUNTIME_DATABASE_URL ?? DB;
+// E2E_PREFIX=/discovery runs the WHOLE suite against the production-style build: base path, discovery-only bundle, discovery-mode static server, API under the prefix.
+const PREFIX = process.env.E2E_PREFIX ?? "";   // "" | "/discovery" | "/" (dedicated host)
+const BASE_PATH = PREFIX === "/" ? "/" : `${PREFIX}/`;
 const WEB = 4177;
 const API = 8087;
 export default defineConfig({
@@ -28,14 +31,14 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   webServer: [
     {
-      command: `FA4_API_ENABLED=true FA4_EMAIL_DISPATCH=inline FA4_EMAIL_RECIPIENT_DAILY_QUOTA=1000 DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false PORT=${API} node ../backend/dist/index.js`,
+      command: `FA4_API_ENABLED=true FA4_EMAIL_DISPATCH=inline FA4_EMAIL_RECIPIENT_DAILY_QUOTA=1000 DATABASE_URL=${APP_DB} APP_BASE_URL=http://localhost:${WEB} RATE_LIMITING_ENABLED=false ${PREFIX ? `FA4_PUBLIC_PATH=${PREFIX} ` : ""}PORT=${API} node ../backend/dist/index.js`,
       url: `http://localhost:${API}/health`,
       timeout: 60_000,
       reuseExistingServer: !!process.env.E2E_REUSE,
     },
     {
       // Same layout as the production image: static-server.mjs next to ./dist.
-      command: `VITE_FA4_ALLOW_PURCHASE_FALLBACK=true npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
+      command: `VITE_FA4_ALLOW_PURCHASE_FALLBACK=true ${PREFIX ? `VITE_BASE_PATH=${BASE_PATH} VITE_DISCOVERY_ONLY=true ` : ""}npx vite build && rm -rf .e2e-site && mkdir .e2e-site && cp -R dist .e2e-site/dist && cp server/static-server.mjs .e2e-site/ && ${PREFIX ? `SERVE_MODE=discovery PUBLIC_PATH=${PREFIX} ACCESS_GATE_MODE=off ` : ""}API_UPSTREAM_URL=http://localhost:${API} PORT=${WEB} node .e2e-site/static-server.mjs`,
       url: `http://localhost:${WEB}/health`,
       timeout: 120_000,
       reuseExistingServer: !!process.env.E2E_REUSE,

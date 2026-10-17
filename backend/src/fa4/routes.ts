@@ -37,6 +37,11 @@ export interface Fa4Deps {
     premiumResourceUrl?: { es?: string; en?: string };
     /** Commercial-content policy gate of the YEV email's Premium block (LEGAL-1, external; fail-closed). */
     premiumCommercialContentAllowed?: boolean;
+    /** CLOSED TEST mode: no final Privacy version, non-commercial, fictitious data only, e-mail restricted to these domains. */
+    closedTest?: import("./email").ClosedTestConfig;
+    legalMode?: "final" | "closed-test";
+    /** Temporary measurement aid for TRUST_PROXY_HOPS (closed test only): GET /api/fa4/edge-check answers the caller's own address as the server sees it. */
+    edgeDiagnostic?: boolean;
     /** Validity (days) of the YEV email's private link. */
     yevLinkDays?: number;
     /** How long an interactive request waits for the provider's answer before it reports `pending` (the UI then polls). */
@@ -90,7 +95,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
 
   const emailDeps: Fa4EmailDeps = {
     db: deps.db, email: deps.email,
-    config: { appBaseUrl: deps.config.appBaseUrl, publicPath: deps.config.publicPath, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
+    config: { appBaseUrl: deps.config.appBaseUrl, publicPath: deps.config.publicPath, closedTest: deps.config.closedTest, resumeLinkDays: deps.config.resumeLinkDays, now: deps.config.now, contactAddress: deps.config.contactAddress, premiumResourceUrl: deps.config.premiumResourceUrl, premiumCommercialContentAllowed: deps.config.premiumCommercialContentAllowed, yevLinkDays: deps.config.yevLinkDays },
   };
   const emailLimits = { cooldownMinutes: deps.config.emailCooldownMinutes, recipientDailyQuota: deps.config.emailRecipientDailyQuota };
   const dispatch = async () => { if (deps.emailDispatch === "inline") await deliverDueFa4Emails(emailDeps); };
@@ -125,6 +130,16 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (!project) throw new FaError("UNAUTHENTICATED", "a valid working session is required");
     return project;
   };
+
+  // Which legal regime this deployment runs under (non-sensitive). The web tier reads it before it will ever open access: an open deployment must be "final".
+  router.get("/legal-mode", (_req, res) => { res.set("Cache-Control", "no-store").json({ legalMode: deps.config.legalMode ?? "final" }); });
+
+  // Measurement of the real edge: N such that req.ip is the REAL client = the number of X-Forwarded-For entries (the client is entry 0). Returns only the caller's own address.
+  router.get("/edge-check", (req, res) => {
+    if (!deps.config.edgeDiagnostic) { res.status(404).json({ error: "NOT_FOUND" }); return; }
+    const entries = String(req.headers["x-forwarded-for"] ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    res.set("Cache-Control", "no-store").json({ ip: req.ip ?? null, xffEntries: entries.length, trustProxy: req.app.get("trust proxy") });
+  });
 
   router.get("/catalog", handle(async (_req, res) => {
     res.set("Cache-Control", "no-store").json(toPublicCatalog(await loadPublishedCatalog(deps.db)));
@@ -209,7 +224,6 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   // PREVIEW (D-156): computes the YEV from the current answers. Nothing historical is stored and the project is NOT delivered. «Corregir algo» + regenerate stay available.
   router.post("/session/result", handle(async (req, res) => {
     const p = await session(req);
-    if (p.answers.company.hasExistingBusiness === false) throw new FaError("NOT_APPLICABLE", "this First Assessment is for existing businesses");
     const done = await latestResult(deps.db, p.projectId);
     if (done) throw new FaError("ALREADY_DELIVERED", "this First Assessment was delivered", { resultId: done.resultId });
     const { model, previewToken } = await previewResult(deps.db, p.projectId, p.answers, deps.config.now());

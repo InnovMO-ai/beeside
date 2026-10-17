@@ -24,7 +24,7 @@ export const UI = {
   coverSideBottom: [L('EXPANDE TU NEGOCIO', 'EXPAND YOUR BUSINESS'), L('CON CONFIANZA', 'WITH TRUST')],   // approved tagline: «EXPANDE TU NEGOCIO CON CONFIANZA» / «EXPAND YOUR BUSINESS WITH TRUST»
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
-  idTitle: L('Déjame conocerte.', 'Let me get to know you.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
+  idTitle: L('Cuéntanos un poco sobre ti.', 'Tell us a little about yourself.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
   name: L('Nombre', 'Name'), company: L('Empresa', 'Company'), email: L('Correo de trabajo', 'Work email'),
   emailHelp: L('Lo usaremos para guardar tu avance y enviarte tu resultado.', "We'll use it to save your progress and send you your result."),
   emailInvalid: L('Revisa el email', 'Check the email address'),
@@ -40,10 +40,8 @@ export const UI = {
   size: L('Aproximadamente, ¿cuántas personas trabajan hoy en tu empresa?', 'Roughly how many people work at your company today?'),
   sizes: { '1-10': L('1–10', '1–10'), '11-50': L('11–50', '11–50'), '51-250': L('51–250', '51–250'), '251-1000': L('251–1,000', '251–1,000'), '1000+': L('Más de 1,000', 'More than 1,000') },
   operatesIn: L('¿En qué países tiene hoy actividad tu empresa?', 'In which countries is your company active today?'), operatesInHelp: L('Donde tienes oficinas, plantas o equipo. Si ya vendes en el país al que quieres ir, lo indicarás más adelante.', 'Where you have offices, plants or staff. If you already sell in the country you want to expand to, you will tell us later.'), searchCountry: L('Busca un país', 'Search for a country'), none: L('Sin resultados', 'No results'),
-  exitTitle: L('Por ahora, Discovery es para negocios en marcha', 'For now, Discovery is for operating businesses'),
-  exitBody: L('Discovery está pensado para empresas o negocios que ya operan y quieren expandirse.', 'Discovery is designed for businesses that already operate and want to expand.'),
 
-  destTitle: L('¿A qué país o países quieres expandir tu empresa?', 'Which country or countries do you want to expand your company to?'), destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
+  destTitle: L('¿A qué país o países quieres expandirte?', 'Which country or countries do you want to expand to?')   /* neutral: valid for an operating company and for a new business */, destLead: L('Puede ser uno o varios países.', 'It can be one or several countries.'),
   destLabel: L('Destino', 'Destination'), destOpen: L('Aún no lo tengo decidido', "I haven't decided yet"), region: L('Región o estado (opcional)', 'Region or state (optional)'),
   sameTitle: L('¿Tu proyecto será el mismo en todos estos países?', 'Will your project be the same in all these countries?'), sameLead: L('Por ejemplo, producir en uno y vender en otro', 'For example, produce in one and sell in another'),
   sameYes: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameYesMany: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameNo: L('No, es distinto en cada país', 'No, it differs by country'),
@@ -132,11 +130,12 @@ export const UI = {
 
   valuesTitle: L('¿Qué es lo más importante para ti al recibir apoyo?', 'What matters most to you when getting support?'), valuesLead: L('Elige lo que más valoras. Puedes saltar este paso.', 'Choose what you value most. You can skip this step.'),
   values: { speed: L('Velocidad', 'Speed'), no_network: L('No construir red desde cero', "Not building a network from scratch"), single_contact: L('Un solo interlocutor', 'A single point of contact'), local_validation: L('Validación local', 'Local validation'), comparable_options: L('Alternativas comparables', 'Comparable options'), coordination: L('Coordinación', 'Coordination'), cost: L('Costo', 'Cost'), keep_control: L('Mantener el control de mi equipo', 'Keeping control of my team') },
-  valueWords: L('En tus palabras (opcional)', 'In your own words (optional)'), keepQ: L('¿Qué prefieres seguir haciendo con tu propio equipo?', 'What would you rather keep doing with your own team?'),
+  keepQ: L('¿Qué prefieres seguir haciendo con tu propio equipo?', 'What would you rather keep doing with your own team?'),
   extraTitle: L('Algo más', 'Anything else'), extraLead: L('Nada depende de este paso.', 'Nothing depends on this step.'),
   success: L('¿Cómo sabrás que la expansión salió bien?', 'How will you know the expansion went well?'), successHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'), constraints: L('¿Hay algo que hoy frene o limite el proyecto?', 'Is anything holding back or limiting the project today?'), constraintsHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'),
   descr: L('¿Quieres contarnos algo más con tus propias palabras?', "Anything else you'd like to tell us in your own words?"), experience: L('¿Has intentado antes expandirte a otro país?', 'Have you tried expanding to another country before?'), experienceHelp: L('Cuéntanos brevemente qué pasó y qué fue difícil.', 'Tell us briefly what happened and what was hard.'),
   personal: L('¿Hay alguna necesidad personal, tuya o de alguien de tu equipo, relacionada con este proyecto?', 'Is there a personal need, for you or someone on your team, related to this project?'), personalHelp: L('Solo queremos saber si existe; no necesitamos detalles.', 'We only need to know it exists; no details needed.'),
+  reqField: L('Falta responder esto para continuar.', 'This is needed to continue.'), reqSummary: L('Para continuar, completa:', 'To continue, please complete:'),
   seeResult: L('Ver mi resultado', 'See my result'),
   generating: L('Preparando tu resultado…', 'Preparing your result…'), resultError: L('No pudimos preparar el resultado. Inténtalo de nuevo.', "We couldn't prepare your result. Please try again."),
 
@@ -172,8 +171,9 @@ export const UI = {
   vsHeadline: L('Piensa en grande.\nNosotros nos ocupamos del resto.', 'Think bigger.\nExpand smarter.'),
   // Value of Continuing — commercial comparison (PO, 2026-10-14). EN = approved reference copy; ES = translation proposal for PO copy sign-off.
   cmpEyebrow: L('Por qué continuar con beeside', 'Why continue with beeside'),
-  cmpTitle: L('Financiar un proceso fragmentado o contar con una capacidad coordinada', 'Funding a fragmented process, or buying coordinated capability'),
-  cmpLead: L('Cuanto más abajo en la lista, más costo y complejidad asumes directamente, sin ganar por ello la misma amplitud de capacidad.', 'The further down this list you go, the more cost and complexity you take on directly, without automatically gaining the same breadth of capability.'),
+  // PO copy (2026-10-15): fixed institutional text, identical for every result (never project data). EN subtitle = translation proposal pending PO sign-off.
+  cmpTitle: L('Entrar es solo el comienzo; crecer viene con beeside.', 'Entering a market is a milestone. Building a presence takes beeside.'),
+  cmpLead: L('Continuar con beeside significa mantener integrada la estrategia, coordinación y red local que tu proyecto necesita para avanzar.', 'Continuing with beeside means keeping integrated the strategy, coordination and local network your project needs to move forward.'),
   cmpOption: L('Opción', 'Option'), cmpComplexity: L('Complejidad', 'Complexity'),
   cmpIncluded: L('Incluido', 'Included'), cmpNotIncluded: L('No incluido', 'Not included'),
   cmpOf: L('{n} de {total} capacidades', '{n} of {total} capabilities'),
@@ -220,6 +220,18 @@ export const UI = {
   emailSending: L('Enviando…', 'Sending…'),
   emailSent: L('Te enviamos tu Your Expansion View a {email}. Si no lo ves en unos minutos, revisa la carpeta de correo no deseado.', "We've sent your Your Expansion View to {email}. If you don't see it in a few minutes, check your spam folder."),
   emailFailed: L('No pudimos enviarlo ahora. Tu resultado sigue aquí; inténtalo de nuevo en un momento.', "We couldn't send it right now. Your result is still here; please try again in a moment."),
+  // Stabilization notice (closed test only; PO copy, 2026-10-16)
+  stabTitle: L('Discovery está en etapa de Estabilización', 'Discovery is in the Stabilization phase'),
+  stabP1: L('Esta versión está siendo utilizada para validar su funcionamiento antes de su apertura comercial.', 'This version is being used to validate the platform before its commercial launch.'),
+  stabP2: L('Por favor, utiliza únicamente información ficticia o de prueba. No ingreses datos reales, confidenciales, personales o comerciales.', 'Please use only fictitious or test information. Do not enter real, confidential, personal, or commercial data.'),
+  stabP3: L('La información que ingreses será procesada únicamente para generar tu Your Expansion View (YEV) durante esta prueba. No será utilizada para procesos internos, comerciales ni operativos de beeside.', 'The information you enter will be processed solely to generate your Your Expansion View (YEV) during this test. It will not be used for beeside\u2019s internal, commercial, or operational processes.'),
+  stabP4: L('Toda la información registrada durante esta etapa será eliminada antes de pasar a Producción.', 'All information recorded during this stage will be deleted before the platform moves to Production.'),
+  stabP5: L('Al continuar, confirmas que utilizarás únicamente datos ficticios o de prueba.', 'By continuing, you confirm that you will use only fictitious or test data.'),
+  stabConfirm: L('Entendido, continuar', 'I understand, continue'),
+  // Personal e-mail warning (advisory; PO copy, 2026-10-16)
+  personalEmailTitle: L('Parece que estás usando un correo personal.', "It looks like you're using a personal email address."),
+  personalEmailBody: L('Recomendamos utilizar tu correo corporativo para identificar mejor tu proyecto y facilitar la continuidad con beeside.', 'We recommend using your work email so we can better identify your project and support continuity with beeside.'),
+  personalEmailOther: L('Usar otro correo', 'Use another email'), personalEmailKeep: L('Continuar con este correo', 'Continue with this email'),
   tryAgain: L('Intentar de nuevo', 'Try again'),
   savedOk: L('Guardado. Te enviamos a {email} un enlace para continuar donde lo dejaste.', "Saved. We've sent {email} a link to continue where you left off."),
   linkSending: L('Guardando tu avance y enviando tu enlace…', 'Saving your progress and sending your link…'),
