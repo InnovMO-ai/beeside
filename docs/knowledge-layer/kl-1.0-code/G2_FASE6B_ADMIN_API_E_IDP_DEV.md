@@ -130,3 +130,22 @@ Con el ID de cliente y los secretos listos, S2 (habilitar el Admin API sobre la 
 - El servicio `beeside-dev-backend-api` **no cambió** (revisión `beeside-dev-backend-api-00007-gtk`); no se tocó ninguna base, ni KL, ni el Admin API sigue deshabilitado.
 
 **Pendiente del Owner (no lo hace KL):** (1) crear el cliente OAuth en la consola (§8.1) y compartir **solo el ID de cliente**; (2) `S1_CONFIRM=yes bash scripts/kl/g2/s1-idp-secrets.sh client-secret` en su terminal (el secreto se teclea oculto) y `bash scripts/kl/g2/s1-idp-secrets.sh verify`, que debe mostrar la versión 1 del secreto SSO habilitada. Hasta entonces `beeside-dev-sso-client-secret` sigue sin versión y S2 no puede ejecutarse.
+
+---
+
+## 9. S2 preparado (2026-10-17) · NO ejecutado — dos datos faltan
+
+### Discrepancias detectadas al preparar S2 (solo lectura)
+1. **El ID de cliente no llegó:** el mensaje del PO trajo el marcador literal `[PEGAR]`.
+2. **`beeside-dev-sso-client-secret` sigue sin ninguna versión.** `gcloud secrets versions list` devuelve 0 elementos (dos lecturas) y el registro de auditoría de Secret Manager (actividad de administración) solo muestra, en las últimas 3 h, `AddSecretVersion` sobre `beeside-dev-admin-session-secret/versions/1` hecho por KL; **no hay ningún `AddSecretVersion` sobre el secreto SSO**. Posibles causas: el subcomando `client-secret` no llegó a completarse (p. ej. se canceló o rechazó por tener menos de 20 caracteres), se ejecutó con otra cuenta/proyecto de `gcloud`, o se ejecutó en otro secreto. Hay que repetirlo en el terminal del Owner y comprobar con `verify`.
+
+### Estado actual relevante del servicio (valores no secretos)
+`NODE_ENV=development`, `APP_BASE_URL` = URL del frontend (`https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app`), `ALLOWED_ORIGINS` incluye esa URL y la forma `…-640247497574.northamerica-south1.run.app`, `TRUST_PROXY_HOPS=2` (frontend → backend). El frontend tiene `API_UPSTREAM_URL` apuntando al backend; `GET /admin` → 200 y `GET /api/admin/me` vía frontend → 404 (Admin API apagado). Observación aparte: `SECURITY_HASH_SECRET` está como variable literal, no como referencia a Secret Manager (ajeno a KL; conviene corregirlo en Plataforma).
+Nota: el navegador debe usar **una sola** de las dos URLs del frontend; `ADMIN_APP_ORIGIN` y la URI de redireccionamiento registrada en Google deben corresponder a esa misma (aquí se usa la forma `…-amwsj4v5uq-pv.a.run.app`).
+
+### Script de S2: `scripts/kl/g2/s2-enable-admin-api.sh`
+```bash
+OIDC_CLIENT_ID=<id>.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh plan      # solo lectura
+S2_CONFIRM=yes OIDC_CLIENT_ID=<id>.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh apply
+```
+Precondiciones que comprueba y que **hoy fallan en la segunda** (probado): formato del ID de cliente; secreto SSO con una versión habilitada; secreto de sesión habilitado; `secretAccessor` de la cuenta del backend en ambos; `ADMIN_API_ENABLED` aún no definido. `apply` crea **una** revisión de `beeside-dev-backend-api` con la **misma imagen** (`main`, sin KL) añadiendo los dos secretos montados y `ADMIN_API_ENABLED=true`, `ADMIN_APP_ORIGIN`, `ADMIN_OIDC_ISSUER=https://accounts.google.com`, `ADMIN_OIDC_CLIENT_ID`, `ADMIN_OIDC_REDIRECT_URI=<origen>/api/admin/auth/callback`, `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`. Verifica `/health`, `/health/ready`, `/api/admin/me` sin sesión (401/403), y que `/api/admin/auth/login` redirige a Google con el `client_id`, `code_challenge_method=S256` y la `redirect_uri` esperados; **si algo falla, devuelve el 100 % del tráfico a la revisión previa** (`beeside-dev-backend-api-00007-gtk`). Después queda **S3**: el inicio de sesión real lo hace el titular de `mo@beeside.you` en su navegador.
