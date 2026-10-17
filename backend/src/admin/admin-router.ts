@@ -123,7 +123,7 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
       const verifier = randomUrlToken(48);
       const sealed = sealLoginState(deps.session.sessionSecret, { state, nonce, verifier, returnTo: safeReturnTo(req.query.returnTo), exp: now().getTime() + 10 * 60_000 });
       const url = await deps.identity.authorizationUrl({ state, nonce, codeChallenge: pkceChallenge(verifier) });
-      res.set("Set-Cookie", cookieHeader(ADMIN_LOGIN_COOKIE, sealed, { secure: deps.session.cookieSecure, maxAgeSeconds: 600, path: `${API_PATH}/auth` }));
+      res.set("Set-Cookie", cookieHeader(ADMIN_LOGIN_COOKIE, sealed, { secure: deps.session.cookieSecure, maxAgeSeconds: 600, path: `${API_PATH}/auth`, sameSite: "Lax" }));
       res.redirect(302, url);
     })().catch((error: unknown) => {
       if (error instanceof AdminAuthError) loginRedirect(res, "unavailable");
@@ -133,7 +133,7 @@ export function createAdminRouter(deps: AdminDeps, security: { limiter?: RateLim
 
   router.get("/auth/callback", (req: AdminRequest, res, next) => {
     void (async () => {
-      const clearLogin = cookieHeader(ADMIN_LOGIN_COOKIE, "", { secure: deps.session.cookieSecure, maxAgeSeconds: 0, path: `${API_PATH}/auth` });
+      const clearLogin = cookieHeader(ADMIN_LOGIN_COOKIE, "", { secure: deps.session.cookieSecure, maxAgeSeconds: 0, path: `${API_PATH}/auth`, sameSite: "Lax" });
       const cookies = parseCookies(req.header("cookie"));
       const pending = openLoginState(deps.session.sessionSecret, cookies[ADMIN_LOGIN_COOKIE], now());
       const code = typeof req.query.code === "string" ? req.query.code : null;

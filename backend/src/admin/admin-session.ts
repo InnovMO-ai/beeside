@@ -90,8 +90,11 @@ export function parseCookies(header: string | undefined): Record<string, string>
   return out;
 }
 
-export function cookieHeader(name: string, value: string, options: { secure: boolean; maxAgeSeconds: number; path: string }): string {
-  const attributes = [`${name}=${encodeURIComponent(value)}`, `Path=${options.path}`, "HttpOnly", "SameSite=Strict", `Max-Age=${options.maxAgeSeconds}`];
+export function cookieHeader(name: string, value: string, options: { secure: boolean; maxAgeSeconds: number; path: string; sameSite?: "Strict" | "Lax" }): string {
+  // The sign-in state cookie must be "Lax": the identity provider returns the browser to /auth/callback through a cross-site top-level
+  // navigation, and browsers do not send SameSite=Strict cookies on that request (the callback would always see "invalid_login_state").
+  // The session cookie stays "Strict".
+  const attributes = [`${name}=${encodeURIComponent(value)}`, `Path=${options.path}`, "HttpOnly", `SameSite=${options.sameSite ?? "Strict"}`, `Max-Age=${options.maxAgeSeconds}`];
   if (options.secure) attributes.push("Secure");
   return attributes.join("; ");
 }
