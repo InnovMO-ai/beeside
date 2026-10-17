@@ -23,6 +23,9 @@ FROZEN_DIRS="docs/knowledge-layer/kl-1.0-design-frozen docs/knowledge-layer/kl-1
 GUARD_FILES="scripts/kl/preflight.sh scripts/kl/kl.fingerprint .github/workflows/kl-preflight.yml"
 FP="scripts/kl/kl.fingerprint"
 DECL="scripts/kl/shared-changes.txt"
+DATABASE="beeside_kl"                                   # CR-KL-002
+ADDENDUM_DIR="docs/knowledge-layer/kl-1.0-addenda/CR-KL-002"
+ADDENDUM_MANIFEST_SHA="08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b"
 
 MODE="dev"; REMOTE=0; CI=0
 for a in "$@"; do
@@ -119,11 +122,20 @@ VS="docs/knowledge-layer/kl-1.0-freeze-meta/verify.sh"
 if [ -f "$VS" ] && bash "$VS" >/dev/null 2>&1; then ok "verify.sh: manifiesto 8901ecfa… y 88 archivos versionados idénticos"
 else stop "verify.sh falló (ejecuta: bash $VS)"; fi
 
+# P7b · Addendum aprobado CR-KL-002 (inmutable; cambios = nuevo CR aprobado por el PO)
+if [ -d "$ADDENDUM_DIR" ]; then
+  got="$(sha "$ADDENDUM_DIR/MANIFEST.sha256" 2>/dev/null | cut -d' ' -f1)"
+  extra="$(cd "$ADDENDUM_DIR" && find . -type f ! -name MANIFEST.sha256 | sed 's#^\./##' | LC_ALL=C sort | comm -23 - <(awk '{print $2}' MANIFEST.sha256 | LC_ALL=C sort))"
+  if [ "$got" = "$ADDENDUM_MANIFEST_SHA" ] && ( cd "$ADDENDUM_DIR" && if command -v sha256sum >/dev/null 2>&1; then sha256sum -c --quiet MANIFEST.sha256; else shasum -a 256 -c --quiet MANIFEST.sha256; fi ) >/dev/null 2>&1 && [ -z "$extra" ]; then
+    ok "CR-KL-002 íntegro (manifiesto ${ADDENDUM_MANIFEST_SHA:0:12})"
+  else stop "CR-KL-002 alterado o con archivos ajenos ($ADDENDUM_DIR)"; fi
+else stop "falta el addendum aprobado $ADDENDUM_DIR"; fi
+
 # P8 · Fingerprint KL
 if [ -f "$FP" ]; then
   fpv() { awk -F= -v k="$1" '$1==k{sub(/^[^=]*=/,""); print; exit}' "$FP"; }
   bad=""
-  for kv in "code_platform=$PLATFORM" "repo=$REPO_SLUG" "branch=$BRANCH" "worktree=~/$WORKTREE_REL" "design_tag=$TAG" "design_tag_object=$TAG_OBJ" "design_commit=$DESIGN_COMMIT"; do
+  for kv in "code_platform=$PLATFORM" "repo=$REPO_SLUG" "branch=$BRANCH" "worktree=~/$WORKTREE_REL" "design_tag=$TAG" "design_tag_object=$TAG_OBJ" "design_commit=$DESIGN_COMMIT" "database=$DATABASE" "addendum_cr_kl_002_manifest_sha256=$ADDENDUM_MANIFEST_SHA"; do
     k="${kv%%=*}"; v="${kv#*=}"; [ "$(fpv "$k")" = "$v" ] || bad="$bad $k"
   done
   [ -z "$bad" ] && ok "fingerprint $(sha "$FP" | cut -c1-12) coherente con el preflight" || stop "fingerprint no coincide en:$bad"
@@ -139,6 +151,7 @@ else stop "falta $FP"; fi
 classify() {
   case "$1" in
     docs/knowledge-layer/kl-1.0-design-frozen/*|docs/knowledge-layer/kl-1.0-freeze-meta/*) echo FROZEN ;;
+    docs/knowledge-layer/kl-1.0-addenda/CR-KL-002/*) echo ADDENDUM ;;
     backend/db/migrations/*) echo MIGRATION ;;
     backend/src/precision/*|backend/src/precision-context/*|frontend/src/precision/*|frontend/e2e/precision*|frontend/playwright.precision*|docs/f5/*|scripts/*precision*|backend/scripts/precision*|backend/scripts/clickup-*|backend/scripts/stripe-*) echo PRECISION ;;
     backend/src/fa4/*|frontend/src/fa4/*|backend/src/fa/*|frontend/src/fa/*|shared/fa-public-engine/*|deploy/*|frontend/e2e-production/*|docs/deployment/*) echo DISCOVERY ;;
@@ -152,7 +165,8 @@ declared() {  # $1 = ruta → imprime la referencia de aprobación si está decl
     /^[[:space:]]*#/ || NF<3 {next}
     { r=$1; gsub(/^[ \t]+|[ \t]+$/,"",r); j=$2; gsub(/^[ \t]+|[ \t]+$/,"",j); a=$3; gsub(/^[ \t]+|[ \t]+$/,"",a)
       if (j=="") next
-      if (p==r || (substr(r,length(r))=="/" && index(p,r)==1)) { print (a==""?"pendiente":a); found=1; exit } }
+      h=""; if (NF>=4) { h=$4; gsub(/^[ \t]+|[ \t]+$/,"",h); sub(/^sha256=/,"",h) }
+      if (p==r || (substr(r,length(r))=="/" && index(p,r)==1)) { print (a==""?"pendiente":a) "\t" h; found=1; exit } }
     END { exit found?0:1 }' "$DECL"
 }
 BOOT="$(git log --diff-filter=A --format=%H "$DESIGN_COMMIT..HEAD" -- scripts/kl/preflight.sh 2>/dev/null | tail -1)"
@@ -176,12 +190,17 @@ while IFS= read -r f; do
   case "$c" in
     KL) n_kl=$((n_kl+1)) ;;
     FROZEN) n_blk=$((n_blk+1)) ;;   # ya reportado en P7
-    MIGRATION) n_blk=$((n_blk+1)); cap && stop "migración compartida (prohibido; usar backend/src/kl/db/provisional/KLP-*): $f" ;;
+    ADDENDUM) n_kl=$((n_kl+1)) ;;   # integridad verificada en P7b
+    MIGRATION) n_blk=$((n_blk+1)); cap && stop "migración compartida (prohibido; KL migra solo a beeside_kl desde backend/src/kl/db/migrations, CR-KL-002 B10): $f" ;;
     PRECISION) n_blk=$((n_blk+1)); cap && stop "ruta de Precision (no autorizada desde KL): $f" ;;
     DISCOVERY) n_blk=$((n_blk+1)); cap && stop "ruta de Discovery (no autorizada desde KL): $f" ;;
     SHARED|GUARD)
       n_sh=$((n_sh+1)); lbl="componente compartido"; [ "$c" = GUARD ] && lbl="archivo de guarda del preflight"
-      if ap="$(declared "$f")"; then review "$lbl declarado en $DECL (aprobación: $ap): $f"
+      dec=""; if d="$(declared "$f")"; then dec="$d"; fi
+      ap="${dec%%	*}"; dh="${dec#*	}"
+      # Una guarda solo cuenta como declarada si la declaración fija la huella exacta de su contenido actual
+      if [ -n "$dec" ] && [ "$c" = GUARD ] && { [ ! -f "$f" ] || [ "$dh" != "$(sha "$f" | cut -d' ' -f1)" ]; }; then dec=""; fi
+      if [ -n "$dec" ]; then review "$lbl declarado en $DECL (aprobación: $ap): $f"
       elif [ "$MODE" = gate ]; then stop "$lbl sin declarar en $DECL: $f"
       else review "$lbl sin declarar (declararlo antes de commit): $f"; fi ;;
   esac

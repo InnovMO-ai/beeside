@@ -1,7 +1,11 @@
 # Cambios propuestos por KL Code en componentes compartidos o en archivos de guarda del preflight.
 # Formato (una línea por ruta o prefijo terminado en "/"):
 #   ruta | justificación (obligatoria) | aprobación del PO (referencia) o vacío = pendiente
+# Para archivos de guarda (preflight.sh, kl.fingerprint, kl-preflight.yml) se exige un 4.º campo sha256=<huella del contenido>;
+# la declaración solo vale para esa versión exacta.
 # Declarar NO autoriza: solo permite que el preflight los deje pasar como REVISAR.
 # Precision, Discovery, backend/db/migrations y el Design congelado nunca son declarables: siempre STOP.
 # Ejemplo:
 #   backend/src/reports/report-model.ts | builder knowledge_guide (Design §PDF, DD-13) |
+scripts/kl/preflight.sh | Protege el addendum CR-KL-002 (inmutable) y fija beeside_kl y su huella (CR-KL-002 §7) | PO 16-oct-2026 · CR-KL-002 aprobado | sha256=a637cddb94a86c4e80a0fc7302f7199fbd829ba02d03592f2dc8ca231e6cad92
+scripts/kl/kl.fingerprint | Agrega database=beeside_kl, migraciones propias y huella de CR-KL-002 (CR-KL-002 §7, B10) | PO 16-oct-2026 · CR-KL-002 aprobado | sha256=c934a8055179c02b4138b81cebc8ce707b16c4bd82e4f8115b388433ac089f37

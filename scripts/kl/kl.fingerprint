@@ -17,4 +17,10 @@ module_path=backend/src/kl
 module_status=planned
 schema=kl
 port_flag=PRECISION_KNOWLEDGE_PROVIDER
-provisional_migrations=backend/src/kl/db/provisional
+# Persistencia (CR-KL-002): base propia en la instancia Cloud SQL existente
+database=beeside_kl
+migrations=backend/src/kl/db/migrations
+migrations_journal=beeside_kl:kl.__kl_migrations
+# Addenda aprobados (prevalecen solo dentro de su alcance)
+addenda=CR-KL-002
+addendum_cr_kl_002_manifest_sha256=08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b

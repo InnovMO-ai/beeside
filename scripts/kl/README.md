@@ -3,7 +3,7 @@
 | Archivo | Función |
 |---|---|
 | `preflight.sh` | Verifica identidad (plataforma, repo, worktree, rama), referencia de Design y ancestría, Design congelado, fingerprint y límites entre plataformas. Exit 1 = STOP. |
-| `kl.fingerprint` | Fingerprint KL: referencia congelada de Design + módulo de implementación (`backend/src/kl`, `planned`). |
+| `kl.fingerprint` | Fingerprint KL: referencia congelada de Design, addendum CR-KL-002, base `beeside_kl` y módulo de implementación (`backend/src/kl`, `planned`). |
 | `shared-changes.txt` | Declaración de cambios propuestos en componentes compartidos (requiere justificación; la aprobación es del PO). |
 
 ## Uso obligatorio en Code
@@ -16,5 +16,8 @@
 - **Compartido** (REVISAR; en `--gate` exige declaración): cualquier otra ruta, p. ej. `backend/src/reports/`, `backend/src/admin/`, `package.json`, `backend/db/schema/`.
 - **Guarda** (REVISAR; exige declaración): cambios a `preflight.sh`, `kl.fingerprint` o `kl-preflight.yml` después del commit de instalación.
 - **Bloqueado** (STOP siempre): Precision, Discovery, `backend/db/migrations/` y `docs/knowledge-layer/kl-1.0-design-frozen|kl-1.0-freeze-meta`.
+- **Addendum CR-KL-002** (`docs/knowledge-layer/kl-1.0-addenda/CR-KL-002/`): inmutable; el preflight verifica su manifiesto y da STOP ante cualquier cambio o archivo ajeno.
+
+Especificación vigente para Code: Design congelado + CR-KL-002 (ver `CR-KL-002_Code_Handoff.md`).
 
 No se instalan git hooks: los hooks y la config son compartidos entre worktrees y afectarían a Discovery.
