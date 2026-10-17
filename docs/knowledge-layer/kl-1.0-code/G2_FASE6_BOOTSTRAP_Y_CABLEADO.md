@@ -169,3 +169,20 @@ Una revisión nueva del servicio compartido (rollback inmediato a `00009-cm2`); 
 **Pendiente (titular):** comprobación autenticada abriendo `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. La sesión vigente es del 15:37 UTC (hasta 23:37 UTC).
 **Limitación vigente:** reconciliador de identidades (5 min) y correlación de auditoría diaria dependen de un proceso que escala a cero (ver arriba): sin resolver, X30 y la desactivación por reconciliación no se dan por cumplidos en dev.
 **Rollback:** `gcloud run services update-traffic beeside-dev-backend-api --region northamerica-south1 --project beeside-dev-508220 --to-revisions beeside-dev-backend-api-00009-cm2=100` (y el comando de retiro descrito arriba).
+
+---
+
+## S3 VERIFIED y S4 VERIFIED (2026-10-17, 16:37 UTC) · lectura independiente
+
+El titular abrió `/api/admin/kl/me` desde Safari con su sesión y obtuvo `HTTP 200` con `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN","editorial":false,"domains":[]}]}`. Contraste en solo lectura (sin cookies ni tokens):
+| Comprobación | Resultado |
+|---|---|
+| Petición en el backend | `GET /api/admin/kl/me` **200**, 684 bytes, 16:37:55, revisión `beeside-dev-backend-api-00010-5q2` (la cableada), navegador Safari. Antes solo constaba mi sonda sin sesión (401) |
+| `auth_subject` | **Enlazado** (`mo@beeside.you`: `ADMIN`, `active`, `login_enabled`) |
+| Sesión | 2 filas: la de 15:37:50 se revocó a las 16:34:19 por **`idle_timeout`** (política de 30 min de inactividad, comportamiento esperado); la de **16:34:25 vigente**, sin revocar, última actividad 16:37:55, expira 00:34 UTC, rol `ADMIN` |
+| Auditoría de la plataforma | `kl.me.read · ALLOWED · ADMIN_USER` a las **16:37:56**, un segundo después de la petición; además `admin.login ALLOWED` a las 15:37:50 y 16:34:25 y `kl.bootstrap_admin ALLOWED SYSTEM` (13:51:44). **0** eventos `kl.*` DENIED/FAILED |
+| Camino a la base de KL | `kl.principal` de mo: `active`, **`last_attested_at = 16:37:56`** (la atestación transaccional de esa petición, hecha con `kl_app`); `KL_ADMIN` vigentes = 1; `kl.audit_event` solo contiene `kl.bootstrap_admin` (las lecturas se auditan solo en `admin_audit_event`, CR-KL-002 §6) |
+| Errores | Ninguno ≥ ERROR en el backend desde las 15:40; los únicos avisos son los 401 de sondas sin sesión y el aviso de privilegios del usuario de runtime de la plataforma, preexistente |
+| Privilegios | `cloudsqlsuperuser` de `beeside-dev-kl-db` = `postgres` y roles internos de Cloud SQL; `kl_*` privilegiados = 0; topes `kl_app=12`, `kl_reader_precision=12`, `kl_agent=4`, `kl_knowledge=4`, `kl_owner=4` |
+
+**S3 = VERIFIED** (acceso real del KL_ADMIN extremo a extremo: Google → Control Center → KL). **S4 = VERIFIED** (cableado y consulta autenticada a `beeside_kl` desde el backend). Notas: el Admin API sigue con la limitación de procesos de fondo (escala a cero) descrita arriba; `padmin@beeside.you` sigue sin aprovisionar.
