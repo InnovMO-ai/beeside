@@ -19,6 +19,7 @@ const CLONE = "discovery-db-rehearsal-t1";
 const SRC_CONN = "beeside-discovery-prod:northamerica-south1:discovery-db";
 const CLONE_CONN = `beeside-discovery-prod:northamerica-south1:${CLONE}`;
 // State flags (files in stateDir): clone_exists labeled rotated | no_label open_net src_open_net ssl_weak bad_conn extra_user rot_fail ep_override | expires
+// Failure injection: clone_fail (clone command errors after creating the instance) label_fail (the label patch errors) patch_fail (any other patch errors) dp_fail (clearing deletion protection errors) list_fail delete_fail
 const GCLOUD = `#!/bin/sh
 S="${stateDir}"
 echo "$*" >> "$S/calls.log"
@@ -51,15 +52,21 @@ case "$args" in
       esac
     fi;;
   *"sql instances list"*)
+    if f list_fail; then echo "list failed" >&2; exit 1; fi
     if f clone_exists; then
       case "$args" in
         *csv*) echo "${CLONE},$(f labeled && echo rehearsal),$(f rotated && echo yes),$(cat "$S/expires" 2>/dev/null)";;
         *) echo "${CLONE}";;
       esac
     fi;;
-  *"sql instances delete"*) rm -f "$S/clone_exists";;
-  *"sql instances clone"*) touch "$S/clone_exists";;
-  *"sql instances patch"*) case "$args" in *"--update-labels"*) touch "$S/labeled"; case "$args" in *pw_rotated=yes*) touch "$S/rotated";; esac;; esac;;
+  *"sql instances delete"*) if f delete_fail; then echo "delete failed" >&2; exit 1; fi; rm -f "$S/clone_exists";;
+  *"sql instances clone"*) touch "$S/clone_exists"; if f clone_fail; then echo "clone operation timed out" >&2; exit 1; fi;;
+  *"sql instances patch"*)
+    case "$args" in
+      *"--update-labels"*) if f label_fail; then echo "label patch failed" >&2; exit 1; fi; touch "$S/labeled"; case "$args" in *pw_rotated=yes*) touch "$S/rotated";; esac;;
+      *"--no-deletion-protection"*) if f dp_fail; then echo "cannot patch" >&2; exit 1; fi;;
+      *) if f patch_fail; then echo "patch failed" >&2; exit 1; fi;;
+    esac;;
 esac
 exit 0
 `;
@@ -290,5 +297,108 @@ describe("clone-rehearsal.sh — teardown", () => {
     const ok = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE, UNLABELED_OK: "yes" });
     expect(ok.code).toBe(0);
     expect(callLog()).toMatch(/instances delete discovery-db-rehearsal-t1 --quiet/);
+  });
+});
+
+describe("clone-rehearsal.sh — a failure at any stage never deletes anything, tells the state and offers a controlled teardown", () => {
+  const TEARDOWN_HINT = `CONFIRM_DELETE=${CLONE}`;
+  const noDelete = () => expect(callLog()).not.toMatch(/instances delete/);
+  it("fails right after the clone command (the instance exists, the operation reported an error): says it holds PRODUCTION passwords and prints the unlabeled teardown", () => {
+    flag("clone_fail");
+    const r = run("create", APPROVED);
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("PHASE 'create' STOPPED");
+    expect(r.out).toContain("stage 'started'");
+    expect(r.out).toContain("PRODUCTION passwords");
+    expect(r.out).toContain(`${TEARDOWN_HINT} UNLABELED_OK=yes`);
+    expect(r.out).toContain("NOTHING was deleted");
+    expect(callLog()).not.toMatch(/set-password/);
+    noDelete();
+  });
+  it("fails during the rotation: stage 'rotating', production passwords still on the clone, unlabeled teardown offered, nothing deleted", () => {
+    flag("rot_fail");
+    const r = run("create", APPROVED);
+    expect(r.code).toBe(4);
+    expect(r.out).toContain("stage 'rotating'");
+    expect(r.out).toContain("still holds PRODUCTION passwords");
+    expect(r.out).toContain(`${TEARDOWN_HINT} UNLABELED_OK=yes`);
+    noDelete();
+  });
+  it("fails before the labels are assigned (rotation done): says passwords were rotated, labels missing, and offers the unlabeled teardown", () => {
+    flag("label_fail");
+    const r = run("create", APPROVED);
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("stage 'rotated'");
+    expect(r.out).toContain("passwords were rotated");
+    expect(r.out).toContain(`${TEARDOWN_HINT} UNLABELED_OK=yes`);
+    expect(existsSync(path.join(DIR, "netcheck_ok"))).toBe(false);
+    noDelete();
+    // and that clone can then be removed in a controlled way: exact name + UNLABELED_OK, nothing else
+    expect(run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE }).code).toBe(2);
+    expect(run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE, UNLABELED_OK: "yes" }).code).toBe(0);
+    expect(callLog()).toMatch(/instances delete discovery-db-rehearsal-t1 --quiet/);
+    expect(existsSync(DIR)).toBe(false);
+  });
+  it("fails in the final verification (stage 'labeled'): labelled clone, plain teardown offered (no UNLABELED_OK)", () => {
+    flag("extra_user");
+    const r = run("create", APPROVED);
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("stage 'labeled'");
+    expect(r.out).toContain(TEARDOWN_HINT);
+    expect(r.out).not.toContain("UNLABELED_OK=yes TAG");
+    noDelete();
+  });
+  it("fails during the hardening: the clone is untouched by deletion, teardown is offered, and it still works afterwards", () => {
+    createdClone(); flag("patch_fail");
+    const r = run("harden", APPROVED);
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("PHASE 'harden' STOPPED");
+    expect(r.out).toContain(TEARDOWN_HINT);
+    noDelete();
+    rmSync(path.join(stateDir, "patch_fail"));
+    expect(run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE }).code).toBe(0);
+  });
+  it("no phase other than teardown ever calls instances delete, whatever fails", () => {
+    for (const fl of ["clone_fail", "rot_fail", "label_fail", "extra_user", "ssl_weak", "open_net", "bad_conn", "patch_fail"]) {
+      reset(); flag(fl);
+      run("create", APPROVED); run("harden", APPROVED); run("mark", APPROVED); run("resize", APPROVED); run("netcheck", { RUN: "1" }); run("status", { RUN: "1" });
+      noDelete();
+    }
+  });
+  it("teardown keeps requiring the exact confirmation, the exact identity and approval, even after a failure", () => {
+    createdClone();
+    expect(run("teardown", { RUN: "1", CONFIRM_DELETE: CLONE }).code).toBe(3);                         // no approval
+    expect(run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE.toUpperCase() }).code).toBe(3);        // wrong confirmation
+    expect(run("teardown", { ...APPROVED }).code).toBe(3);                                             // none
+    flag("bad_conn");
+    const r = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE });
+    expect(r.code).toBe(2); expect(r.out).toContain("identity check failed");
+    expect(existsSync(DIR)).toBe(true);
+    noDelete();
+  });
+  it("teardown goes on when deletion protection cannot be cleared (the delete itself reports), and keeps the secrets if the delete fails", () => {
+    createdClone(); flag("dp_fail"); flag("delete_fail");
+    const r = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE });
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("could not clear deletion protection");
+    expect(existsSync(path.join(DIR, "netcheck_ok"))).toBe(true);        // secrets kept: the operator can retry
+    rmSync(path.join(stateDir, "delete_fail"));
+    const ok = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE });
+    expect(ok.code).toBe(0); expect(existsSync(DIR)).toBe(false);
+  });
+  it("teardown of a clone that no longer exists destroys only the local secrets and calls neither patch nor delete", () => {
+    mkdirSync(DIR, { recursive: true, mode: 0o700 }); writeFileSync(path.join(DIR, "pw_postgres"), "secret");
+    const r = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("only the local secrets will be destroyed");
+    expect(callLog()).not.toMatch(/instances (patch|delete)/);
+    expect(existsSync(DIR)).toBe(false);
+  });
+  it("teardown cannot verify the deletion or list the instances: it stops and KEEPS the local secrets (never guesses the clone is gone)", () => {
+    createdClone(); flag("list_fail");
+    const r = run("teardown", { ...APPROVED, CONFIRM_DELETE: CLONE });
+    expect(r.code).not.toBe(0);
+    expect(existsSync(DIR)).toBe(true);
+    noDelete();
   });
 });

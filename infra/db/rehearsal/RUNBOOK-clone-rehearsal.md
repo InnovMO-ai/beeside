@@ -8,8 +8,8 @@ Herramientas (en el repositorio, rama `integration/reconcile-discovery-precision
 
 | Archivo | Para qué | Prueba |
 |---|---|---|
-| `infra/db/rehearsal/clone-rehearsal.sh` | ciclo de vida del clon: `plan`, `preflight`, `create`, `netcheck`, `harden`, `mark`, `resize`, `status`, `teardown`. **Destino fijo** (sin variables de redirección) | 33 pruebas con `gcloud` simulado |
-| `infra/db/rehearsal/rehearse-on-clone.sh` | todo el lado SQL (aprovisionar, migrar, 17/17, sync, permisos, bypass de privacidad, endurecimiento, rollback, re-aprovisionar). Host, puerto, bases, administrador y directorio **fijos**; exige la evidencia `netcheck_ok` | 97/97 contra el simulador alineado con Q13 |
+| `infra/db/rehearsal/clone-rehearsal.sh` | ciclo de vida del clon: `plan`, `preflight`, `create`, `netcheck`, `harden`, `mark`, `resize`, `status`, `teardown`. **Destino fijo** (sin variables de redirección) | 43 pruebas con `gcloud` simulado |
+| `infra/db/rehearsal/rehearse-on-clone.sh` | todo el lado SQL (aprovisionar, migrar, 17/17, sync, permisos, bypass de privacidad, endurecimiento, rollback, re-aprovisionar). Host, puerto, bases, administrador y directorio **fijos**; exige la evidencia `netcheck_ok`; **se detiene** ante cualquier fallo crítico antes de pasos destructivos; prueba funcional de privacidad | 25 pruebas estáticas + 184/184 contra el simulador alineado con Q13 (con la corrección candidata F1) |
 | `infra/db/provision-beeside.sh`, `canonical-db-provision`, `domain-data-sync`, `domain-roles-prepare` | las mismas herramientas de producción | ya probadas (27/27 y 43/43 locales, 21 y 8 unitarias) |
 
 ## 1. Qué prueba el clon que el simulador no pudo
@@ -86,6 +86,55 @@ Quién podría usar esas contraseñas durante esos segundos: solo quien llegue a
 | Marca | `mark` crea el rol `rehearsal_marker_<aleatorio>`; `rehearse-on-clone.sh` aborta antes de cualquier SQL si el servidor no lo tiene |
 | Un clon a la vez | `preflight` aborta si ya existe uno |
 | Alcance | cero cambios de IAM, Cloud Run, secretos, red de la fuente, respaldos de la fuente o datos |
+
+### 5.1 Parada inmediata ante fallos críticos (el ensayo SQL no continúa si algo falla)
+
+`rehearse-on-clone.sh` ya no sigue contando fallos hasta el final. Cada paso destructivo o irreversible pasa antes por `identity_gate`: exige **cero comprobaciones fallidas hasta ese punto** y que el rol marca esté presente en **todas** las conexiones que el paso va a usar (administrador, `discovery_migrate`, `beeside_migrate`); fuera del simulador revalida además que la evidencia de identidad del clon (`netcheck_ok`) sea de ese clon y tenga menos de 24 h. Las comprobaciones de identidad, aislamiento e integridad son `must_*`: si fallan, el ensayo se detiene en ese instante.
+
+| Paso | Qué protege | Compuerta / parada |
+|---|---|---|
+| S0 | marca, versión, base canónica inexistente, **los roles que S7 borrará no existían antes** | `must_eq`: se detiene antes de crear nada |
+| S1 (PRE → migrar → POST) | no migra sobre un PRE incorrecto ni hace POST sobre una migración fallida | `crit_gate` entre fases |
+| S2 copia de datos hacia `beeside` | escritura de datos | `identity_gate` |
+| S3 permisos de los dos runtimes | aislamiento | cada negativa debe fallar por `permission denied` (una conexión rota ya no cuenta como control); `must_fail_like` detiene |
+| S4 privacidad (funcional, reversible) | efectos de la anonimización y restricciones | `crit_gate`: nada de lo siguiente corre si falla |
+| S5 reconciliación inversa hacia `discovery` | escritura en la base legacy del clon | `identity_gate` |
+| S6 endurecimiento legacy (REVOKE/GRANT sobre `discovery`) | cambio de permisos | `identity_gate`; su reversión siempre se ejecuta |
+| S6b anonimización confirmada en `beeside` | irreversible dentro del clon | `identity_gate` |
+| S7 `DROP DATABASE`, `DROP ROLE` | borrado | `identity_gate` + comprobaciones propias: la base a borrar es exactamente `beeside`, no la legacy, su dueño es el rol creado por la corrida; ningún rol a borrar existía antes; cada `DROP` es `must_ok`; la instantánea de la base legacy debe quedar idéntica |
+
+Al detenerse: imprime `HALT`, la sección y el resumen, y (fuera del simulador) el comando de eliminación controlada con el nombre exacto; **no borra nada ni toca el clon**. Probado en el simulador con defectos inyectados: un permiso de más detiene en S3 (la base `beeside`, los roles y `discovery` quedan intactos, sin sincronización inversa ni endurecimiento); una anonimización defectuosa detiene en S4; un defecto que solo aparece al confirmar (disparador diferido) lo detecta la corrida confirmada de S6b y la compuerta de S7 impide el `DROP`.
+
+### 5.2 Prueba de privacidad funcional (S4 y S6b)
+
+Ejecuta la función real del producto, `fa4_anonymize_project`, como rol dueño, sobre un proyecto que es una **copia en el clon** (con resultado, de preferencia sellado, con tokens y dominio interno) y un segundo proyecto de control. Solo se usan datos del clon; se añade además una solicitud de contacto sintética en el propio clon para ejercitar siempre esa ruta. Verifica en la misma sesión:
+
+- **Se borra lo que debe**: correo (`anonymized+<id>@invalid.invalid`), respuestas vacías, estado `ANONYMIZED`, `model` y las dos instantáneas del resultado, payload de señales de demanda, nombre/empresa/correo/mensaje de la solicitud de contacto, y todos los tokens quedan revocados.
+- **Se conserva lo que debe, idéntico**: identificadores, secuencia, versión de catálogo y fecha de los resultados; evidencia legal; eventos analíticos; consentimientos de marketing; y exactamente **una** fila nueva en el registro de borrado.
+- **Sin rastro**: el correo original, su parte local y los textos libres de las respuestas no aparecen en ninguna fila del proyecto (11 tablas).
+- **Restricciones de privacidad intactas**: el proyecto de control no cambia ni un byte (suma de verificación), solo el objetivo queda anonimizado, el permiso para saltarse la guarda no sobrevive a la función (un `UPDATE` de resultados en la misma transacción falla con `BV601`; el registro de borrado sigue siendo de solo anexar), el actor vacío y el proyecto inexistente se rechazan con `BV603`, y ningún runtime (Discovery ni Precision) puede llamar a la función, abrir la guarda con la bandera ni reescribir respuestas de un proyecto entregado. En Precision: ninguna política de privacidad está aprobada por defecto, `privacy_erase_project` es alcanzable solo por el runtime de Precision y el runtime no puede abrir la ruta de borrado con la bandera del proyecto (sin permiso DELETE).
+- Se corre **dos veces**: reversible en `beeside` y en la base legacy `discovery` (compuerta S4, con el modelo real de roles de producción), y **confirmada** en `beeside` (S6b), porque las restricciones diferidas solo se evalúan al confirmar. Tras confirmar, desde conexiones nuevas: ambos runtimes ven el proyecto `ANONYMIZED`, el correo original ya no resuelve a ningún proyecto, no queda token vivo, los resultados vuelven a ser de solo anexar, y una segunda anonimización del mismo proyecto es inofensiva. El log de evidencia solo imprime recuentos y sumas: un análisis final falla si aparece cualquier dirección de correo.
+
+### 5.3 Hallazgos de la prueba reforzada (decisiones de Mike antes de autorizar el clon)
+
+**F1 (bloqueante del ensayo, defecto real).** En la base canónica el login de Discovery (`beeside_discovery_runtime`, miembro de `beeside_discovery_rw` y no de `beeside_runtime_role`) puede ejecutar `set_config('fa4.erasure','on',true)` y reescribir las respuestas de un proyecto **entregado**: las guardas `fa4_project_delivered_guard` (0023) y `fa4_result_guard` (0016) solo niegan el atajo a miembros de `beeside_runtime_role`. En la base legacy está cerrado (ahí `discovery_runtime` sí es miembro). `fa4_result` sigue protegido solo porque ese login no tiene UPDATE. Reproducido en el simulador. Corrección candidata verificada: `infra/db/proposals/0053_guard_runtime_groups.sql` (las dos guardas niegan el atajo a miembros de cualquiera de los dos grupos; el operador y `fa4_anonymize_project` siguen funcionando). **No** está en el linaje de migraciones: adoptarla es una migración nueva (renumerar, espejar en Discovery, ajustar los 52 fijados). Sin ella, el ensayo SQL se detiene en S4 por diseño; no tiene sentido pagar el clon para repetir lo que el simulador ya demuestra.
+
+**F2 (limitación de rollback, no bloquea el ensayo).** Tras una anonimización en `beeside`, la reconciliación inversa hacia `discovery` falla (`delivered projects are closed to editing`): el proyecto anonimizado no se puede reproducir sobre uno entregado en la base legacy, que conserva el dato personal. Para un rollback posterior a una solicitud de borrado hace falta un paso previo: ejecutar `fa4_anonymize_project` también en la base legacy sobre los proyectos del registro de borrado de `beeside`. El ensayo mantiene S5 antes de S6b para no mezclar ambas cosas; debe resolverse antes de T8.
+
+### 5.4 Si falla una fase: eliminación controlada del clon
+
+Ninguna fase borra nada por sí sola. Cuando `create`, `harden`, `mark` o `resize` se detienen, el script imprime la etapa alcanzada, el estado probable del clon y el comando exacto de `teardown`; `rehearse-on-clone.sh` imprime el mismo comando al detenerse. Tú decides si lo ejecutas.
+
+| Momento del fallo | Etapa | Estado del clon | Qué hacer |
+|---|---|---|---|
+| Justo después de crearlo (la operación de clonado reporta error o se corta) | `started` | puede existir y **conserva las contraseñas de producción** | `status`; si existe, `teardown` con `UNLABELED_OK=yes` |
+| Durante la rotación (falla `set-password`, código 4) | `rotating` | existe; las contraseñas de producción siguen en al menos un usuario | `teardown` con `UNLABELED_OK=yes` (sin etiqueta todavía) |
+| Antes de asignar las etiquetas (rotación terminada) | `rotated` | existe, contraseñas rotadas, sin etiquetas (`status` lo muestra `UNROTATED` porque falta la etiqueta) | `teardown` con `UNLABELED_OK=yes` |
+| En la verificación final (usuario inesperado, TLS, redes) | `labeled` | existe, rotado y etiquetado, **sin** `netcheck_ok` (ningún paso posterior corre) | `teardown` normal |
+| Durante el endurecimiento (`harden`) | — | existe; cambios parciales dentro del clon | reintentar `harden` o `teardown` |
+| Durante las pruebas SQL | — | no se tocó el clon por GCP; el contenido SQL puede estar a medias | `HALT` indica la sección; `teardown` (borra todo, incluida `beeside`) |
+
+`teardown` sigue exigiendo: `APPROVAL=CLONE_REHEARSAL_APPROVED`, `CONFIRM_DELETE=<nombre exacto>`, la identidad exacta `beeside-discovery-prod:northamerica-south1:<clon>` y la etiqueta `purpose=rehearsal` (o `UNLABELED_OK=yes` para un clon que falló antes de etiquetarse). Además: si no puede listar las instancias, se detiene y **conserva** los secretos locales (nunca supone que el clon ya no existe); si no puede quitar la protección contra borrado, lo avisa y deja que el borrado informe; si el clon ya no existe, destruye solo los secretos locales y no llama a `patch` ni a `delete`; si el borrado falla, los secretos se conservan para reintentar.
 
 ## 6. Procedimiento operativo exacto
 
@@ -181,13 +230,13 @@ Si algo falla a mitad de camino: `status` (marca `UNROTATED` y `EXPIRED`) y `tea
 |---|---|---|
 | R1 | Restauración por clon | el clon queda RUNNABLE en ≤ 60 min (RTO medido y registrado), con las tres contraseñas rotadas (`pw_rotated=yes`), sin redes autorizadas y con TLS obligatorio; se registra el tiempo entre clon y rotación |
 | R2 | Ensayo SQL | `rehearse-on-clone.sh` sale con código 0, `fail=0`; cada WARN revisado y explicado |
-| R3 | Contrato | migraciones = 52 y `--check` seguro; 17/17 en `domain-roles-prepare`; GN6 (el migrador no es superusuario ni miembro de `cloudsqlsuperuser`, sin CREATEROLE ni CREATEDB, sin fila en los grupos); los logins legacy no entran a `beeside`; bypass de privacidad operativo en `beeside` y en `discovery` |
+| R3 | Contrato | migraciones = 52 y `--check` seguro; 17/17 en `domain-roles-prepare`; GN6 (el migrador no es superusuario ni miembro de `cloudsqlsuperuser`, sin CREATEROLE ni CREATEDB, sin fila en los grupos); los logins legacy no entran a `beeside`; **anonimización funcional** (§5.2) correcta en `beeside` y en `discovery`, con F1 resuelto |
 | R4 | Datos y rollback | checksums iguales en las 14 tablas; segunda corrida sin cambios; replay inverso devuelve lo escrito en `beeside`; tras el rollback del aprovisionamiento `discovery` y la membresía de `discovery_runtime` quedan idénticos y `beeside` se reaprovisiona limpio |
 | R5 | Desconocidos resueltos y registrados | quién administra `beeside_runtime_role` (si POST requiere al dueño legacy), collation y codificación, dueño de `discovery`, el endurecimiento legacy funciona con ese dueño, `max_connections` y reinicio del tier de 2 vCPU (si se hizo el paso 7) |
 | R6 | Seguridad | escaneo de fugas sin hallazgos; la fuente `discovery-db` sigue RUNNABLE y sin cambios |
 | R7 | Cierre | clon eliminado y verificado; directorio de secretos destruido; costo ≤ 5 USD; duración ≤ 8 h |
 
-**NO-GO inmediato (detener, `teardown`, informar):** cualquier FAIL; falta la marca; el clon tiene redes autorizadas, `sslMode` débil, un usuario inesperado o `UNROTATED`; cualquier comando que apunte a `discovery-db` con escritura; un valor secreto en la evidencia; el RTO supera 60 min sin explicación.
+**NO-GO inmediato (detener, `teardown`, informar):** cualquier FAIL o `HALT` del ensayo SQL; falta la marca; el clon tiene redes autorizadas, `sslMode` débil, un usuario inesperado o `UNROTATED`; cualquier comando que apunte a `discovery-db` con escritura; un valor secreto en la evidencia; el RTO supera 60 min sin explicación.
 
 **Qué desbloquea un ensayo en verde:** GN3 (parte de restauración por clon), GN5 y GN6 quedan cerrados con evidencia real; R5 fija el diseño definitivo de T4/T6. **No equivale a GO de ESTABILIZACIÓN**: siguen GN4 (decidir el resize), GN9 (auditoría y cuenta de emergencia) y GN10 (decisiones de Mike), más las autorizaciones de T2–T7.
 

@@ -17,6 +17,10 @@
 #      users are exactly the expected ones. `harden`, `mark` and `resize` refuse to run without the gate evidence written by `create`.
 #   6. A marker ROLE (NOLOGIN, rehearsal_marker_<random>) is created on the clone. Every SQL step (rehearse-on-clone.sh) refuses to run unless the server has it.
 #   7. Secrets live only in $HOME/.beeside-rehearsal/<clone> (0700) and are overwritten and removed by `teardown`. Nothing goes to Secret Manager.
+#   8. CONTROLLED DELETION AFTER ANY FAILURE. No phase ever deletes anything by itself: when create/harden/mark/resize stops, the script prints the stage reached, what state the
+#      clone may be in (e.g. "exists, still holds PRODUCTION passwords") and the exact `teardown` command. `teardown` is the ONLY place that deletes, and always demands the exact
+#      clone name (CONFIRM_DELETE), the exact connectionName <project>:<region>:<clone> and the label purpose=rehearsal. A clone that failed before it was labelled needs the extra
+#      UNLABELED_OK=yes. A clone that no longer exists (or whose deletion protection cannot be cleared) is handled without guessing.
 #
 #   plan        print the whole procedure (all phases) and the cost envelope. Executes nothing.
 #   preflight   RUN=1                       read-only: gcloud overrides, source identity/state/PITR, source network+TLS posture, no leftover clone.
@@ -32,6 +36,35 @@ PHASE=${1:-plan}
 
 die() { echo "STOP: $*" >&2; exit "${2:-2}"; }
 note() { echo "-- $*" >&2; }
+STAGE=none   # create: none -> started -> cloned -> rotating -> rotated -> labeled -> verified
+on_exit() { # prints, never deletes
+  local rc=$?; trap - EXIT
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ] && [ "${RUN:-0}" = 1 ] && [ "${HELP_DONE:-0}" != 1 ] && [ "${TARGET_OK:-0}" = 1 ]; then
+    case "${PHASE:-}" in create|harden|mark|resize) failure_help "$rc";; esac
+  fi
+  exit "$rc"
+}
+trap on_exit EXIT
+failure_help() { # $1 exit code
+  HELP_DONE=1
+  local un=""; local state
+  case "$PHASE:$STAGE" in
+    create:none|create:started) state="the clone was NOT created yet, or gcloud stopped while the clone operation was in flight: check whether the instance exists (status). If it exists it still holds PRODUCTION passwords";;
+    create:cloned|create:rotating) state="the clone EXISTS and still holds PRODUCTION passwords (rotation did not finish)";;
+    create:rotated) state="the clone EXISTS, its passwords were rotated, but its labels were not set (status will show UNROTATED because the label is missing)";;
+    create:labeled) state="the clone EXISTS, rotated and labelled, but the final identity / users / network / TLS verification failed or was interrupted";;
+    create:verified) state="the clone EXISTS and passed every check; only the evidence file could not be written";;
+    *) state="the clone EXISTS; phase '$PHASE' stopped part-way (its changes are partial but contained in the clone)";;
+  esac
+  case "$PHASE:$STAGE" in create:none|create:started|create:cloned|create:rotating|create:rotated) un="UNLABELED_OK=yes ";; esac
+  {
+    echo "== PHASE '$PHASE' STOPPED (exit $1) at stage '$STAGE'"
+    echo "== State: $state."
+    echo "== NOTHING was deleted. To inspect:  RUN=1 TAG=$TAG bash $0 status"
+    echo "== To remove the clone (needs your explicit confirmation; run it only if you decide so):"
+    echo "==   RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED CONFIRM_DELETE=$CLONE ${un}TAG=$TAG bash $0 teardown"
+  } >&2
+}
 
 # ---- 1. fixed target: no variable can redirect this script ---------------------------------------------------------------------------------------------------------
 for v in PROJECT REGION SOURCE_INSTANCE SOURCE CLONE ALLOW_OTHER_PROJECT SQL_INSTANCE PROXY_PORT REHEARSAL_DIR; do
@@ -52,6 +85,7 @@ case "$PITR_LAG_MIN" in ''|*[!0-9]*) die "PITR_LAG_MIN must be a whole number";;
 [ "$PITR_LAG_MIN" -ge 1 ] && [ "$PITR_LAG_MIN" -le 60 ] || die "PITR_LAG_MIN must be between 1 and 60"
 [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] || die "HOME is not set"
 readonly REHEARSAL_DIR="$HOME/.beeside-rehearsal/$CLONE"
+TARGET_OK=1   # from here on the target is validated: failure_help may name the clone
 RUN=${RUN:-0}; MUTATE=0; [ "${APPROVAL:-}" = "CLONE_REHEARSAL_APPROVED" ] && MUTATE=1
 
 # ---- execution helpers: print-only unless RUN=1 -------------------------------------------------------------------------------------------------------------------
@@ -132,11 +166,12 @@ phase_preflight() {
 
 rotate_all_passwords() { # immediate: every expected user of the clone gets a new random password
   local u
+  if [ "$RUN" = 1 ]; then STAGE=rotating; fi
   for u in $EXPECTED_USERS; do
     if [ "$RUN" = 1 ]; then
       newpw > "$REHEARSAL_DIR/pw_$u"; chmod 600 "$REHEARSAL_DIR/pw_$u"
       if ! gcloud --project "$PROJECT" sql users set-password "$u" --instance "$CLONE" --password "$(cat "$REHEARSAL_DIR/pw_$u")" --quiet >/dev/null; then
-        echo "!! ROTATION FAILED for $u: the clone still holds PRODUCTION passwords. Run teardown NOW:  RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED CONFIRM_DELETE=$CLONE UNLABELED_OK=yes TAG=$TAG bash $0 teardown" >&2; exit 4
+        echo "!! ROTATION FAILED for $u: the clone still holds PRODUCTION passwords (users already rotated in this run are listed in $REHEARSAL_DIR/pw_*; $u and any later user were NOT). Decide now: remove the clone (command below)." >&2; exit 4
       fi
       echo "password of $u on the clone replaced by a new random value (stored only in $REHEARSAL_DIR)"
     else
@@ -152,19 +187,23 @@ phase_create() {
     [ "$(dv "$SOURCE" connectionName)" = "$SRC_CONN" ] || die "the source's connectionName is not $SRC_CONN"
     netcheck_instance "$SOURCE"   # a clone inherits the source's exposure: refuse to clone an exposed source
     secret_dir
+    date -u +%s > "$REHEARSAL_DIR/create_started"; STAGE=started
   fi
   g W sql instances clone "$SOURCE" "$CLONE" --point-in-time "$(ts_pitr)"
   if [ "$RUN" = 1 ]; then
+    STAGE=cloned
     assert_identity basic
     date -u +%s > "$REHEARSAL_DIR/created_epoch"; echo "$CLONE" > "$REHEARSAL_DIR/clone_name"
   fi
   rotate_all_passwords                                   # <- first action after the clone exists
+  if [ "$RUN" = 1 ]; then STAGE=rotated; fi
   g W sql instances patch "$CLONE" --update-labels "purpose=rehearsal,pw_rotated=yes,expires_utc=$(expiry_label),owner=product-owner" --quiet
   if [ "$RUN" = 1 ]; then
+    STAGE=labeled
     assert_identity rotated
     users_gate
     netcheck_instance "$CLONE"
-    printf '%s %s\n' "$(date -u +%s)" "$PROJECT:$REGION:$CLONE" > "$REHEARSAL_DIR/netcheck_ok"
+    printf '%s %s\n' "$(date -u +%s)" "$PROJECT:$REGION:$CLONE" > "$REHEARSAL_DIR/netcheck_ok"; STAGE=verified
     echo "create complete: passwords rotated, network and TLS verified"
   else
     echo "+ (verify) identity=$PROJECT:$REGION:$CLONE, label pw_rotated=yes, users exactly [$EXPECTED_USERS], no authorized networks, sslMode ENCRYPTED_ONLY or stricter -> write netcheck_ok"
@@ -226,19 +265,28 @@ phase_status() {
 
 phase_teardown() {
   need_approval
+  local exists=1 lst
   if [ "$RUN" = 1 ]; then
     [ "${CONFIRM_DELETE:-}" = "$CLONE" ] || die "to delete set CONFIRM_DELETE=$CLONE (exact name of the clone)" 3
-    assert_identity basic
-    if [ "$(dv "$CLONE" settings.userLabels.purpose)" != rehearsal ]; then
-      [ "${UNLABELED_OK:-}" = yes ] || die "refusing: $CLONE does not carry the label purpose=rehearsal (a clone whose creation failed before labelling needs UNLABELED_OK=yes)"
-      note "deleting an UNLABELED clone because UNLABELED_OK=yes; its identity matched $PROJECT:$REGION:$CLONE"
+    lst=$(gcloud --project "$PROJECT" sql instances list --filter="name=$CLONE" --format='value(name)') || die "cannot list the instances: nothing was deleted and the local secrets were kept"
+    if [ -z "$lst" ]; then
+      exists=0; note "no instance named $CLONE exists in $PROJECT (already deleted, or never created): only the local secrets will be destroyed"
+    else
+      assert_identity basic
+      if [ "$(dv "$CLONE" settings.userLabels.purpose)" != rehearsal ]; then
+        [ "${UNLABELED_OK:-}" = yes ] || die "refusing: $CLONE does not carry the label purpose=rehearsal (a clone whose creation failed before labelling needs UNLABELED_OK=yes)"
+        note "deleting an UNLABELED clone because UNLABELED_OK=yes; its identity matched $PROJECT:$REGION:$CLONE"
+      fi
     fi
   fi
-  g W sql instances patch "$CLONE" --no-deletion-protection --quiet
-  g W sql instances delete "$CLONE" --quiet
-  g R sql instances list --filter="name~^discovery-db-rehearsal" --format="value(name)"
+  if [ "$exists" = 1 ]; then
+    g W sql instances patch "$CLONE" --no-deletion-protection --quiet || note "could not clear deletion protection on $CLONE (it may be busy or unprotected): the delete below reports if it is still blocked"
+    g W sql instances delete "$CLONE" --quiet
+    g R sql instances list --filter="name~^discovery-db-rehearsal" --format="value(name)"
+  fi
   if [ "$RUN" = 1 ]; then
-    [ -z "$(gcloud --project "$PROJECT" sql instances list --filter="name=$CLONE" --format='value(name)')" ] || die "the clone still exists"
+    lst=$(gcloud --project "$PROJECT" sql instances list --filter="name=$CLONE" --format='value(name)') || die "cannot verify the deletion: local secrets kept"
+    [ -z "$lst" ] || die "the clone still exists: local secrets kept so that you can retry teardown"
     echo "clone $CLONE deleted; the source $SOURCE untouched: $(dv "$SOURCE" state)"
     if [ -d "$REHEARSAL_DIR" ]; then
       local f
