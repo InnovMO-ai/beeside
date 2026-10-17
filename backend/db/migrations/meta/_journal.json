@@ -351,6 +351,20 @@
       "when": 1792115902763,
       "tag": "0049_country_resource_type",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792200887663,
+      "tag": "0050_db_domain_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792200929278,
+      "tag": "0051_db_domain_registry_integrity",
+      "breakpoints": true
     }
   ]
 }

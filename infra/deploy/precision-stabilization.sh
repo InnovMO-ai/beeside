@@ -9,6 +9,12 @@
 # Read-only / non-destructive without approval: check, build, smoke, audit.
 # Everything that writes to the database or changes a service (backup, migrate, prepare, seed, deploy, admin, baseline) refuses to run unless
 #   APPROVAL=STABILIZATION_DEPLOYMENT_APPROVAL
+# SHARED CANONICAL DATABASE (Option A): this database is the ONE canonical PostgreSQL for Discovery and Precision Center, with logical domain separation
+#   (db_domain_registry; migrations 0050/0051). `prepare` therefore also runs the `domain-roles-prepare` job: Discovery's runtime login leaves
+#   beeside_runtime_role for its own group beeside_discovery_rw, Precision's login becomes read-only on Discovery's 14 tables, and the isolation contract is
+#   verified (the job fails if anything differs). It needs DISCOVERY_RUNTIME_LOGIN (the Cloud SQL user Discovery connects with); without it the step is
+#   SKIPPED with a notice, which is only correct while Discovery is NOT yet attached to this database. Discovery is its own service: FA4_API_ENABLED stays
+#   false here — this backend never writes Discovery's tables (the Discovery->Precision hand-off is read-only, in process).
 # NOTE: `deploy` replaces the backend's env vars/secrets; run `admin` AFTER every `deploy` (it re-applies the Control Center sign-in configuration).
 # DRY_RUN=1 prints every gcloud command instead of running it. Secret VALUES are generated inside Secret Manager and never printed.
 set -euo pipefail
@@ -46,6 +52,8 @@ S_PW=precision-${ENVN}-db-runtime-password
 S_HASH=precision-${ENVN}-hash-secret
 S_URL=precision-${ENVN}-database-url
 RT_USER=${RT_USER:-beeside_runtime}
+DOMAIN_JOB=${DOMAIN_JOB:-beeside-${ENVN}-domain-roles}
+DISCOVERY_RUNTIME_LOGIN=${DISCOVERY_RUNTIME_LOGIN:-}               # Discovery's runtime login in THIS database; empty = Discovery not attached yet (the domain step is skipped)
 DRY_RUN=${DRY_RUN:-0}
 
 g() { if [ "$DRY_RUN" = 1 ]; then echo "+ gcloud --project $PROJECT $*"; else gcloud --project "$PROJECT" "$@"; fi; }
@@ -76,7 +84,7 @@ bad = [k for k, v in checks.items() if not v]
 sys.exit("NOT production-grade: " + ", ".join(bad)) if bad else print("instance hardening OK")'
   fi
   g artifacts repositories describe "$AR_REPO" --location "$REGION" --format='value(name)'
-  echo "== read-only migration state of the TARGET database (expects safe=true; expected=50; pending = what this build adds)"
+  echo "== read-only migration state of the TARGET database (expects safe=true; expected=52; pending = what this build adds)"
   g run jobs deploy "$CHECK_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/migrate.js,--check \
     --set-secrets "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest" --set-cloudsql-instances "$SQL_CONN" --service-account "$MIG_SA" --max-retries 0 --task-timeout 120
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
@@ -98,7 +106,7 @@ migrate)
   echo "== apply migrations (migration identity). The job itself refuses an unsafe state before writing anything."
   g run jobs update "$MIGRATE_JOB" --region "$REGION" --image "${REPO}/backend-api:${TAG}" --command node --args dist/scripts/migrate.js
   g run jobs execute "$MIGRATE_JOB" --region "$REGION" --wait
-  echo "== verify: expected applied=50 pending=[]"
+  echo "== verify: expected applied=52 pending=[]"
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
   ;;
 prepare)
@@ -116,6 +124,12 @@ prepare)
   g projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:${RT_SA}" --role roles/cloudsql.client --condition=None >/dev/null
   echo "== runtime login role (outside the migrations), verified by the job itself"
   run_job "$ROLE_JOB" "${REPO}/backend-api:${TAG}" dist/scripts/runtime-role-prepare.js "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest,RUNTIME_DB_PASSWORD=${S_PW}:latest" "RUNTIME_DB_USER=${RT_USER}" "$MIG_SA"
+  if [ -n "$DISCOVERY_RUNTIME_LOGIN" ]; then
+    echo "== data-domain roles (shared canonical database): Discovery login -> beeside_discovery_rw, Precision read-only on Discovery tables, contract verified by the job"
+    run_job "$DOMAIN_JOB" "${REPO}/backend-api:${TAG}" dist/scripts/domain-roles-prepare.js "MIGRATION_DATABASE_URL=${MIG_SECRET}:latest" "DISCOVERY_RUNTIME_LOGIN=${DISCOVERY_RUNTIME_LOGIN},PRECISION_RUNTIME_LOGIN=${RT_USER}" "$MIG_SA"
+  else
+    echo "== data-domain roles: SKIPPED (DISCOVERY_RUNTIME_LOGIN not set = Discovery not attached to this database yet). Run 'prepare' again with it BEFORE Discovery connects."
+  fi
   ;;
 seed)
   need_approval
@@ -135,7 +149,7 @@ deploy)
   COMMON=(--region "$REGION" --service-account "$RT_SA" --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1)
   echo "== backend: private (no unauthenticated access, no public invoker), runtime identity only, NO migration credential"
   g run deploy "$BACKEND" "${COMMON[@]}" --image "${REPO}/backend-api:${TAG}" --no-allow-unauthenticated --add-cloudsql-instances "$SQL_CONN" \
-    --set-env-vars "NODE_ENV=production,APP_BASE_URL=${WEB_URL},TRUST_PROXY_HOPS=2,PRECISION_API_ENABLED=true,PRECISION_ENTITLEMENT_PROVIDER=core,PRECISION_FA_CONTEXT_PROVIDER=discovery,PRECISION_UNDERSTANDING_INTERPRETER=rules,PRECISION_MODEL_PROVIDER=scripted,PRECISION_OH_PROVIDER=simulator,PRECISION_PUBLISH_MANIFESTS_ON_BOOT=true,PRECISION_KNOWLEDGE_SEED_ON_BOOT=true,PRECISION_REQUIRE_KNOWLEDGE_SEED=true,PRECISION_REQUIRED_KNOWLEDGE_COUNTRIES=${REQUIRED_COUNTRIES},FA4_API_ENABLED=true,FA4_ENV=staging,FA4_EMAIL_TRANSPORT=log" \
+    --set-env-vars "NODE_ENV=production,APP_BASE_URL=${WEB_URL},TRUST_PROXY_HOPS=2,PRECISION_API_ENABLED=true,PRECISION_ENTITLEMENT_PROVIDER=core,PRECISION_FA_CONTEXT_PROVIDER=discovery,PRECISION_UNDERSTANDING_INTERPRETER=rules,PRECISION_MODEL_PROVIDER=scripted,PRECISION_OH_PROVIDER=simulator,PRECISION_PUBLISH_MANIFESTS_ON_BOOT=true,PRECISION_KNOWLEDGE_SEED_ON_BOOT=true,PRECISION_REQUIRE_KNOWLEDGE_SEED=true,PRECISION_REQUIRED_KNOWLEDGE_COUNTRIES=${REQUIRED_COUNTRIES},FA4_API_ENABLED=false" \
     --set-secrets "DATABASE_URL=${S_URL}:latest,SECURITY_HASH_SECRET=${S_HASH}:latest"
   echo "== web: private, calls the backend with a Google ID token, never indexed"
   g run deploy "$WEB" "${COMMON[@]}" --image "${REPO}/frontend-app:${TAG}" --no-allow-unauthenticated \
@@ -195,7 +209,7 @@ smoke)
   echo "S3 anonymous API:      $(code "$WEB_URL/api/precision/center")  (expect 302/401/403)"
   echo "S4 backend ready (authenticated as the invoker): $(curl -s --max-time 20 -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences="$BACKEND_URL")" "$BACKEND_URL/health/ready")  (expect {\"status\":\"ready\"})"
   g run jobs execute "$CHECK_JOB" --region "$REGION" --wait
-  echo "S5 migration state must read: applied=50 pending=[] safe=true (see the job log)"
+  echo "S5 migration state must read: applied=52 pending=[] safe=true (see the job log)"
   echo "S6 knowledge layer is not empty (read-only):"
   g run jobs update "$SEED_JOB" --region "$REGION" --args dist/scripts/kl-seed.js,--check,--countries,"$REQUIRED_COUNTRIES"
   g run jobs execute "$SEED_JOB" --region "$REGION" --wait
