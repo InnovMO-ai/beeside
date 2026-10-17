@@ -122,3 +122,11 @@ y borrar el cliente OAuth `beeside-dev-control-center` en la consola. Mientras S
 
 ### 8.5 Siguiente
 Con el ID de cliente y los secretos listos, S2 (habilitar el Admin API sobre la imagen actual de `main`) y S3 (inicio de sesión real de `mo@beeside.you`) requieren su propia autorización expresa.
+
+### 8.6 S1 ejecutado parcialmente (2026-10-17) · lo que hizo KL por autorización del PO
+`S1_CONFIRM=yes … session` e `iam` (cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`):
+- Creado `beeside-dev-admin-session-secret` (replicación automática; etiquetas `environment=dev`, `purpose=admin-session-signing`) con **versión 1 habilitada**, 48 bytes aleatorios generados y subidos por tubería (no se leyeron ni se imprimieron).
+- `roles/secretmanager.secretAccessor` concedido a `640247497574-compute@developer.gserviceaccount.com` **solo** sobre `beeside-dev-sso-client-secret` y `beeside-dev-admin-session-secret` (verificado con `verify`: un único miembro en cada uno).
+- El servicio `beeside-dev-backend-api` **no cambió** (revisión `beeside-dev-backend-api-00007-gtk`); no se tocó ninguna base, ni KL, ni el Admin API sigue deshabilitado.
+
+**Pendiente del Owner (no lo hace KL):** (1) crear el cliente OAuth en la consola (§8.1) y compartir **solo el ID de cliente**; (2) `S1_CONFIRM=yes bash scripts/kl/g2/s1-idp-secrets.sh client-secret` en su terminal (el secreto se teclea oculto) y `bash scripts/kl/g2/s1-idp-secrets.sh verify`, que debe mostrar la versión 1 del secreto SSO habilitada. Hasta entonces `beeside-dev-sso-client-secret` sigue sin versión y S2 no puede ejecutarse.
