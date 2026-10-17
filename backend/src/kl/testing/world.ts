@@ -131,6 +131,7 @@ export interface CardInput {
   claimsEs?: string[];
   variantEn?: { title: string; body: string; claims?: string[] } | null;
   country?: string;
+  specialistCategory?: string;
 }
 
 export async function createCardVersion(w: World, c: CardInput, who: Person = w.editor): Promise<{ versionId: string; unitKey: string }> {
@@ -142,8 +143,8 @@ export async function createCardVersion(w: World, c: CardInput, who: Person = w.
     claims_es: c.claimsEs ?? ["Afirmación sintética de prueba."],
     primary_source_publication_key: c.publication ?? null,
   };
-  const row = await one(w, who, "SELECT kl.create_version($1, 'team', NULL, 'new_period', 'paraphrase_and_cite', ARRAY['Límite sintético'], ARRAY['Synthetic limit'], now(), NULL, NULL, false, NULL, $2::jsonb, $3::jsonb) AS v", [
-    c.key, JSON.stringify(content), c.variantEn === null ? null : JSON.stringify(c.variantEn ?? { title: "Synthetic card", body: "Synthetic test content.", claims: ["Synthetic test claim."] }),
+  const row = await one(w, who, "SELECT kl.create_version($1, 'team', NULL, 'new_period', 'paraphrase_and_cite', ARRAY['Límite sintético'], ARRAY['Synthetic limit'], now(), NULL, NULL, false, $4, $2::jsonb, $3::jsonb) AS v", [
+    c.key, JSON.stringify(content), c.variantEn === null ? null : JSON.stringify(c.variantEn ?? { title: "Synthetic card", body: "Synthetic test content.", claims: ["Synthetic test claim."] }), c.specialistCategory ?? null,
   ]);
   return { versionId: row.v as string, unitKey: c.key };
 }

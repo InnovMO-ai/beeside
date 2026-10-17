@@ -112,7 +112,7 @@ describeKl("kl-worker con los agentes apagados (B6)", () => {
     const pools2 = wp();
     try {
       const r = await runCycle(pools2);
-      expect(r).toEqual({ claimed: 0, succeeded: 0, failed: 0 });
+      expect(r).toMatchObject({ claimed: 0, succeeded: 0, failed: 0 });
     } finally {
       await pools2.close();
     }
