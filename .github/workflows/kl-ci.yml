@@ -53,6 +53,9 @@ jobs:
         run: |
           KL_AC10_DUMP_DIR="$RUNNER_TEMP/ac10-pdfs" KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
           cp src/kl/products/ac10-baseline.json "$RUNNER_TEMP/ac10-candidate.json"
+          # reference document of the container smoke: host fingerprint candidate (compared with the image's in kl-images)
+          KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci src/kl/__tests__/r3-smoke-reference.test.ts
+          cp src/kl/products/ac10-smoke-baseline.json "$RUNNER_TEMP/ac10-smoke-host.json"
           # second pass in normal mode: the rewritten baseline must match a fresh render, and an immediate repeat must be identical
           npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
       - uses: actions/upload-artifact@v4
@@ -61,6 +64,7 @@ jobs:
           name: ac10-linux-candidate
           path: |
             ${{ runner.temp }}/ac10-candidate.json
+            ${{ runner.temp }}/ac10-smoke-host.json
             ${{ runner.temp }}/ac10-pdfs/
           if-no-files-found: ignore
 
@@ -74,6 +78,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build both Dockerfile targets and smoke-test them
+        env:
+          # Set to "1" once ac10-smoke-baseline.json has the linux key: the container render must then equal the host's.
+          KL_SMOKE_REQUIRE_BASELINE: "0"
         run: bash scripts/kl/smoke/images.sh
       - uses: actions/upload-artifact@v4
         if: always()

@@ -69,8 +69,13 @@ docker logs "$cid" 2>&1 | grep -qi 'KL_DB_URL' && die "api: el log menciona cred
 cleanup; cid=""
 
 echo "== worker: render real con la red BLOQUEADA"
-docker run --rm --network none -v "$SMOKE_DIR:/smoke:ro" --entrypoint node "$TAG-worker" /smoke/render-smoke.js | tee "$OUT/render-smoke.json" \
+# La huella del documento de referencia dentro del contenedor se compara con la del host de CI (ac10-smoke-baseline.json). Con
+# KL_SMOKE_REQUIRE_BASELINE=1 (CI, una vez registrada la línea base) la ausencia o la diferencia es un fallo.
+docker run --rm --network none -e KL_SMOKE_BASELINE=/ref/ac10-smoke-baseline.json -e KL_SMOKE_REQUIRE_BASELINE="${KL_SMOKE_REQUIRE_BASELINE:-0}" \
+  -v "$SMOKE_DIR:/smoke:ro" -v "$PWD/backend/src/kl/products:/ref:ro" --entrypoint node "$TAG-worker" /smoke/render-smoke.js | tee "$OUT/render-smoke.json" \
   && pass "worker: Chromium arranca sin red, Lato verificada, PDF determinista, petición remota bloqueada (X19)" || die "worker: render-smoke falló"
+grep -q '"versusHost":"coincide"' "$OUT/render-smoke.json" && pass "worker: la huella del render dentro del contenedor COINCIDE con la del host (ac10-smoke-baseline.json)" \
+  || echo "AVISO huella del contenedor frente al host: $(python3 -c 'import json,sys;print(json.loads(open(sys.argv[1]).read().strip().splitlines()[-1]).get("versusHost"))' "$OUT/render-smoke.json")"
 
 echo "== worker: se niega a arrancar sin configuración (no hace nada por omisión)"
 if docker run --rm "$TAG-worker" >/dev/null 2>"$OUT/worker-noconfig.err"; then die "worker: terminó con éxito sin configuración"; else pass "worker: sale con error sin KL_DB_URL_* (agentes nunca se activan por omisión)"; fi

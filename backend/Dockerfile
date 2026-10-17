@@ -5,7 +5,8 @@
 #   docker build -f backend/Dockerfile .
 # The image runs the API by default; the same image runs the background worker
 # (node dist/worker.js) and the migration job (node dist/scripts/migrate.js).
-FROM node:20-slim AS build
+# Base image pinned by digest (multi-arch index of node:20-slim, 2026-10-17) so builds and the AC-10 render are reproducible; bump deliberately.
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY shared/canonical-fields/package.json shared/canonical-fields/
@@ -18,7 +19,7 @@ COPY shared/fa-public-engine shared/fa-public-engine
 COPY backend backend
 RUN npm run build --workspace=shared/canonical-fields && npm run build --workspace=shared/fa-public-engine && npm run build --workspace=backend
 
-FROM node:20-slim AS runtime-base
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runtime-base
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
