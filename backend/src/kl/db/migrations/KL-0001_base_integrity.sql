@@ -6,7 +6,6 @@ CREATE TRIGGER kl_b_append_only BEFORE UPDATE OR DELETE ON kl.request_attestatio
 CREATE TRIGGER kl_b_append_only BEFORE UPDATE OR DELETE ON kl.audit_event FOR EACH ROW EXECUTE FUNCTION kl.guard_append_only();
 CREATE TRIGGER kl_b_append_only BEFORE UPDATE OR DELETE ON kl.permission_role FOR EACH ROW EXECUTE FUNCTION kl.guard_append_only();
 CREATE TRIGGER kl_b_append_only BEFORE UPDATE OR DELETE ON kl.job_kind FOR EACH ROW EXECUTE FUNCTION kl.guard_append_only();
-CREATE TRIGGER kl_b_no_delete BEFORE DELETE ON kl.job FOR EACH ROW EXECUTE FUNCTION kl.guard_no_delete();
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Payload de jobs: lista blanca de claves por tipo; valores escalares cortos y sin texto libre.

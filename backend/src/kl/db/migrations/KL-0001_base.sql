@@ -77,6 +77,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = format('kl.%I', t.relname)::regclass AND tgname = 'kl_a_guard_dml') THEN
       EXECUTE format('CREATE TRIGGER kl_a_guard_dml BEFORE INSERT OR UPDATE OR DELETE ON kl.%I FOR EACH ROW EXECUTE FUNCTION kl.guard_dml()', t.relname);
       EXECUTE format('CREATE TRIGGER kl_a_no_truncate BEFORE TRUNCATE ON kl.%I FOR EACH STATEMENT EXECUTE FUNCTION kl.guard_no_truncate()', t.relname);
+      EXECUTE format('CREATE TRIGGER kl_c_no_delete BEFORE DELETE ON kl.%I FOR EACH ROW EXECUTE FUNCTION kl.guard_no_delete()', t.relname);
       n := n + 1;
     END IF;
   END LOOP;
