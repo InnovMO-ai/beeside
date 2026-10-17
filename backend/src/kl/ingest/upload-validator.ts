@@ -86,7 +86,7 @@ export function validateUpload(bytes: Uint8Array, options: { maxBytes: number })
   }
   if (text.includes("\u0000")) return reject("invalid_text_encoding");
   const trimmed = text.replace(/^\uFEFF/, "").trimStart();
-  if (/^<\s*(script|html|!doctype|\?php)/i.test(trimmed)) return reject("active_content_pdf" as UploadRejection) && reject("unsupported_type");
+  if (/^<\s*(script|html|!doctype|\?php)/i.test(trimmed)) return reject("active_content_text");
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       JSON.parse(trimmed);

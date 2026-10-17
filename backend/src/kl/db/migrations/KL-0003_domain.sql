@@ -129,6 +129,11 @@ BEGIN
   v_to := CASE p_decision WHEN 'approve' THEN 'approved' WHEN 'resume' THEN 'approved' WHEN 'suspend' THEN 'suspended' WHEN 'reject' THEN 'rejected'
                           WHEN 'revoke' THEN 'revoked' WHEN 'discontinue' THEN 'discontinued' END;
   IF v_to IS NULL THEN RAISE EXCEPTION 'BV422: decisión no válida' USING ERRCODE = 'BV422'; END IF;
+  -- «aprobar» parte de propuesta o bloqueada; «reanudar» solo de suspendida; una decisión que no cambia el estado se rechaza.
+  IF (p_decision = 'approve' AND pub.status NOT IN ('proposed', 'blocked_pending_verification'))
+     OR (p_decision = 'resume' AND pub.status <> 'suspended') OR v_to = pub.status THEN
+    RAISE EXCEPTION 'BV409: la decisión % no aplica a una fuente en estado %', p_decision, pub.status USING ERRCODE = 'BV409';
+  END IF;
   UPDATE kl.publication SET status = v_to, updated_at = now() WHERE id = pub.id;
   IF v_to = 'revoked' THEN
     SELECT array_agg(DISTINCT uv.id) INTO v_ids
