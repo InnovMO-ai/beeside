@@ -14,8 +14,9 @@ Everything is local and destructive only to the simulation cluster. Passwords ar
 
     bash infra/db/rehearsal/clone-rehearsal.sh plan                # prints the whole procedure; executes nothing
     RUN=1 bash infra/db/rehearsal/clone-rehearsal.sh preflight     # read-only
-    RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED bash infra/db/rehearsal/clone-rehearsal.sh create|harden|mark|resize|teardown
-    CLONE=discovery-db-rehearsal-<TAG> bash infra/db/rehearsal/rehearse-on-clone.sh   # SQL side; refuses any server without the marker role
+    RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED bash infra/db/rehearsal/clone-rehearsal.sh create|harden|mark|resize|teardown   # create = clone + immediate password rotation + network/TLS gate
+    TAG=<tag> bash infra/db/rehearsal/rehearse-on-clone.sh   # SQL side; FIXED target (no host/port/db/dir/project variables), refuses any server without the marker role
+    # both scripts STOP if PROJECT, REGION, SOURCE_INSTANCE, SOURCE, CLONE, ALLOW_OTHER_PROJECT, SQL_INSTANCE, PROXY_PORT or REHEARSAL_DIR is set
 
 The simulator is aligned with the production evidence of Part B Q13 (no creator-ADMIN row on `discovery_migrate`, legacy database owned by `cloudsqlsuperuser`).
-`SIM_Q13=creator-row` restores the earlier hazard model (used as a negative control). `rehearse-on-clone.sh` is itself tested against this simulator (97/97).
+`SIM_Q13=creator-row` restores the earlier hazard model (used as a negative control). `rehearse-on-clone.sh` is itself tested against this simulator (97/97; REHEARSAL_SIMULATOR=1 REHEARSAL_DIR=<dir> selects the simulator on port 5433).

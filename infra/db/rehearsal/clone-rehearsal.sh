@@ -2,84 +2,124 @@
 # PRECISION V2.0 — lifecycle of the TEMPORARY Cloud SQL clone used for the canonical-database rehearsal.
 # RUN BY THE PRODUCT OWNER in his own Terminal, only after WRITTEN approval of the clone. NOTHING here has been executed against GCP.
 #
-# Safety model (why this cannot reach production by accident):
-#   1. Default = PRINT ONLY. Nothing is executed (not even a read) unless RUN=1; every mutating phase additionally needs APPROVAL=CLONE_REHEARSAL_APPROVED.
-#   2. The only gcloud commands that write are on the CLONE name, which must match ^discovery-db-rehearsal-[0-9a-z-]+$ and may never equal the source instance.
-#   3. The clone is a point-in-time clone of the source (read-only on the source; same project is mandatory for Cloud SQL clones).
-#   4. Immediately after creation the clone gets NEW random passwords for every user it inherited from production (postgres, discovery_migrate, discovery_runtime). Production
-#      credentials are never read, typed or used for the rehearsal, and the clone's credentials open nothing in production.
-#   5. A marker ROLE (NOLOGIN, rehearsal_marker_<random>) is created on the clone. Every later SQL step (rehearse-on-clone.sh) refuses to run unless the connected server has it.
-#      A Cloud SQL Auth Proxy accidentally pointed at production would fail twice: wrong password, and no marker.
-#   6. The clone gets labels purpose=rehearsal and an expiry (default 8 h, hard maximum 24 h) that `status` checks; `teardown` refuses anything without purpose=rehearsal.
-#   7. Secrets live only in a 0700 directory on this Mac ($REHEARSAL_DIR) and are overwritten and removed by `teardown`. Nothing goes to Secret Manager.
+# Safety model (why this cannot reach another project or the production instance by accident):
+#   1. FIXED TARGET. Project, region, source instance, proxy port and secrets directory are CONSTANTS of this file. They cannot be changed by environment variables: if PROJECT,
+#      REGION, SOURCE_INSTANCE, SOURCE, CLONE, ALLOW_OTHER_PROJECT, SQL_INSTANCE, PROXY_PORT or REHEARSAL_DIR is set, or gcloud has an API-endpoint override, the script STOPS.
+#      The only inputs are TAG (^[0-9a-z]{1,12}$), TTL_HOURS (1..24), PITR_LAG_MIN, RUN, APPROVAL, CONFIRM_DELETE. Every gcloud call carries an explicit --project.
+#   2. IDENTITY CHECK before every write: the instance's connectionName must be exactly <project>:<region>:<clone> and, after creation, carry the label purpose=rehearsal.
+#   3. Default = PRINT ONLY. Nothing is executed (not even a read) unless RUN=1; every mutating phase additionally needs APPROVAL=CLONE_REHEARSAL_APPROVED.
+#   4. CREDENTIAL WINDOW. The clone inherits the production users WITH their production passwords. `create` is ONE atomic phase: clone -> rotate EVERY user's password
+#      (new random values) -> label pw_rotated=yes -> verify network and TLS. There is no human step between the clone becoming RUNNABLE and the rotation (seconds). Production
+#      passwords are never read, typed or used. `status` flags any rehearsal clone that lacks pw_rotated=yes as UNROTATED. The inherited password could only be used through
+#      the Cloud SQL Auth Proxy by a principal holding cloudsql.client (the same principals that can already reach production), because the source has no authorized networks;
+#      `preflight` and `create` refuse to proceed if the SOURCE had them (the clone would inherit them).
+#   5. NETWORK / TLS GATE. Before any later step the script re-reads the clone and STOPS unless: no authorized networks, sslMode is ENCRYPTED_ONLY (or stricter), and the
+#      users are exactly the expected ones. `harden`, `mark` and `resize` refuse to run without the gate evidence written by `create`.
+#   6. A marker ROLE (NOLOGIN, rehearsal_marker_<random>) is created on the clone. Every SQL step (rehearse-on-clone.sh) refuses to run unless the server has it.
+#   7. Secrets live only in $HOME/.beeside-rehearsal/<clone> (0700) and are overwritten and removed by `teardown`. Nothing goes to Secret Manager.
 #
 #   plan        print the whole procedure (all phases) and the cost envelope. Executes nothing.
-#   preflight   RUN=1                       read-only: source state, PITR window, no leftover clone.
-#   create      RUN=1 APPROVAL=...          point-in-time clone of the source (the restore drill: its duration is the RTO of a restore by clone).
-#   harden      RUN=1 APPROVAL=...          assert no authorized networks, ZONAL, no PITR/automatic backups, labels, new random passwords.
-#   mark        RUN=1 APPROVAL=...          needs the Auth Proxy on the clone (port 5435): creates the marker role and checks the clone is not production.
+#   preflight   RUN=1                       read-only: gcloud overrides, source identity/state/PITR, source network+TLS posture, no leftover clone.
+#   create      RUN=1 APPROVAL=...          point-in-time clone -> immediate rotation of every password -> labels -> network/TLS gate.
+#   netcheck    RUN=1                       read-only: re-run the network/TLS/users gate on the clone at any time.
+#   harden      RUN=1 APPROVAL=...          ZONAL, PITR off, automatic backups off (cost).
+#   mark        RUN=1 APPROVAL=...          needs the Auth Proxy on the clone (port 5435): creates the marker role.
 #   resize      RUN=1 APPROVAL=...          optional drill: db-custom-2-7680, measure restart time and max_connections, revert.
-#   status      RUN=1                       read-only: every instance labelled purpose=rehearsal, age, expiry, EXPIRED flag.
+#   status      RUN=1                       read-only: every rehearsal clone, age, expiry, EXPIRED / UNROTATED flags.
 #   teardown    RUN=1 APPROVAL=... CONFIRM_DELETE=<clone name>    disable deletion protection on the CLONE, delete it, verify, shred the local secrets.
 set -euo pipefail
 PHASE=${1:-plan}
-PROJECT=${PROJECT:-beeside-discovery-prod}; REGION=${REGION:-northamerica-south1}; SOURCE=${SOURCE_INSTANCE:-discovery-db}
-TAG=${TAG:-$(date -u +%m%d%H%M)}; CLONE=${CLONE:-discovery-db-rehearsal-$TAG}
-TTL_HOURS=${TTL_HOURS:-8}; PROXY_PORT=${PROXY_PORT:-5435}; PITR_LAG_MIN=${PITR_LAG_MIN:-15}
-REHEARSAL_DIR=${REHEARSAL_DIR:-$HOME/.beeside-rehearsal/$CLONE}
-RUN=${RUN:-0}; MUTATE=0; [ "${APPROVAL:-}" = "CLONE_REHEARSAL_APPROVED" ] && MUTATE=1
-EXPECTED_PROJECT=beeside-discovery-prod
 
 die() { echo "STOP: $*" >&2; exit "${2:-2}"; }
 note() { echo "-- $*" >&2; }
-# ---- static guards (evaluated before anything else, in every mode) ------------------------------------------------------------------------------------------------
-[ "$PROJECT" = "$EXPECTED_PROJECT" ] || [ "${ALLOW_OTHER_PROJECT:-0}" = 1 ] || die "project must be $EXPECTED_PROJECT"
-case "$CLONE" in discovery-db-rehearsal-*) ;; *) die "the clone name must start with discovery-db-rehearsal- (got '$CLONE')";; esac
-printf '%s' "$CLONE" | grep -Eq '^discovery-db-rehearsal-[0-9a-z-]+$' || die "invalid clone name '$CLONE'"
+
+# ---- 1. fixed target: no variable can redirect this script ---------------------------------------------------------------------------------------------------------
+for v in PROJECT REGION SOURCE_INSTANCE SOURCE CLONE ALLOW_OTHER_PROJECT SQL_INSTANCE PROXY_PORT REHEARSAL_DIR; do
+  [ -z "${!v-}" ] || die "the variable $v is set: this script has a FIXED target and accepts no redirection (unset it: env -u $v ...)"
+done
+if env | grep -q '^CLOUDSDK_API_ENDPOINT_OVERRIDES_'; then die "a CLOUDSDK_API_ENDPOINT_OVERRIDES_* variable is set: gcloud could talk to another API endpoint"; fi
+readonly PROJECT=beeside-discovery-prod REGION=northamerica-south1 SOURCE=discovery-db PROXY_PORT=5435
+readonly SRC_CONN="$PROJECT:$REGION:$SOURCE"
+readonly EXPECTED_USERS="postgres discovery_migrate discovery_runtime"
+TAG=${TAG:-$(date -u +%m%d%H%M)}
+printf '%s' "$TAG" | grep -Eq '^[0-9a-z]{1,12}$' || die "TAG must match ^[0-9a-z]{1,12}$ (got '$TAG')"
+readonly CLONE="discovery-db-rehearsal-$TAG"
 [ "$CLONE" != "$SOURCE" ] || die "the clone cannot be the source instance"
+TTL_HOURS=${TTL_HOURS:-8}; PITR_LAG_MIN=${PITR_LAG_MIN:-15}
 case "$TTL_HOURS" in ''|*[!0-9]*) die "TTL_HOURS must be a whole number";; esac
 [ "$TTL_HOURS" -ge 1 ] && [ "$TTL_HOURS" -le 24 ] || die "TTL_HOURS must be between 1 and 24 (hard maximum life of the clone: 24 h)"
-case "$PROXY_PORT" in 5434) die "port 5434 is the production proxy port used by the other operator scripts: use another one (default 5435)";; esac
+case "$PITR_LAG_MIN" in ''|*[!0-9]*) die "PITR_LAG_MIN must be a whole number";; esac
+[ "$PITR_LAG_MIN" -ge 1 ] && [ "$PITR_LAG_MIN" -le 60 ] || die "PITR_LAG_MIN must be between 1 and 60"
+[ -n "${HOME:-}" ] && [ "$HOME" != "/" ] || die "HOME is not set"
+readonly REHEARSAL_DIR="$HOME/.beeside-rehearsal/$CLONE"
+RUN=${RUN:-0}; MUTATE=0; [ "${APPROVAL:-}" = "CLONE_REHEARSAL_APPROVED" ] && MUTATE=1
 
 # ---- execution helpers: print-only unless RUN=1 -------------------------------------------------------------------------------------------------------------------
-g() { # gcloud; mutating commands (first arg 'W') need approval
+g() { # gcloud; 'W' = writes (needs approval), 'R' = read
   local kind=$1; shift
   if [ "$RUN" != 1 ]; then echo "+ gcloud --project $PROJECT $*"; return 0; fi
   if [ "$kind" = W ] && [ "$MUTATE" != 1 ]; then die "'$PHASE' changes GCP: set APPROVAL=CLONE_REHEARSAL_APPROVED after the written approval" 3; fi
   gcloud --project "$PROJECT" "$@"
 }
 need_approval() { [ "$RUN" != 1 ] || [ "$MUTATE" = 1 ] || die "'$PHASE' changes GCP: set APPROVAL=CLONE_REHEARSAL_APPROVED after the written approval" 3; }
-describe_val() { gcloud --project "$PROJECT" sql instances describe "$1" --format="value($2)"; }
+dv() { gcloud --project "$PROJECT" sql instances describe "$1" --format="value($2)"; }
 secret_dir() { ( umask 077; mkdir -p "$REHEARSAL_DIR" ); chmod 700 "$REHEARSAL_DIR"; }
 newpw() { openssl rand -hex 24; }
-expiry_label() { # UTC yyyymmddthhmm of now+TTL (label values: lowercase letters, digits, - _)
-  if date -u -d "+${TTL_HOURS} hours" +%Y%m%dt%H%M >/dev/null 2>&1; then date -u -d "+${TTL_HOURS} hours" +%Y%m%dt%H%M; else date -u -v+"${TTL_HOURS}"H +%Y%m%dt%H%M; fi
-}
+expiry_label() { if date -u -d "+${TTL_HOURS} hours" +%Y%m%dt%H%M >/dev/null 2>&1; then date -u -d "+${TTL_HOURS} hours" +%Y%m%dt%H%M; else date -u -v+"${TTL_HOURS}"H +%Y%m%dt%H%M; fi; }
 ts_pitr() { if date -u -d "-${PITR_LAG_MIN} minutes" +%Y-%m-%dT%H:%M:%S.000Z >/dev/null 2>&1; then date -u -d "-${PITR_LAG_MIN} minutes" +%Y-%m-%dT%H:%M:%S.000Z; else date -u -v-"${PITR_LAG_MIN}"M +%Y-%m-%dT%H:%M:%S.000Z; fi; }
-psql_clone() { # user db sql   (password from the 0700 directory; connects ONLY through the local proxy port)
-  PGPASSWORD=$(cat "$REHEARSAL_DIR/pw_$1") psql -qXAt -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PROXY_PORT" -U "$1" -d "$2" -c "$3"
+psql_clone() { PGPASSWORD=$(cat "$REHEARSAL_DIR/pw_$1") psql -qXAt -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PROXY_PORT" -U "$1" -d "$2" -c "$3"; }
+
+# identity: the instance we are about to touch is exactly the clone (never the source), in the fixed project and region
+assert_identity() { # level: basic | labeled | rotated
+  local cn; cn=$(dv "$CLONE" connectionName) || die "cannot describe $CLONE"
+  [ "$cn" = "$PROJECT:$REGION:$CLONE" ] || die "identity check failed: connectionName is '$cn', expected '$PROJECT:$REGION:$CLONE'"
+  [ "$cn" != "$SRC_CONN" ] || die "identity check failed: the target is the production instance"
+  if [ "$1" != basic ]; then [ "$(dv "$CLONE" settings.userLabels.purpose)" = rehearsal ] || die "$CLONE does not carry the label purpose=rehearsal"; fi
+  if [ "$1" = rotated ]; then [ "$(dv "$CLONE" settings.userLabels.pw_rotated)" = yes ] || die "$CLONE is UNROTATED (label pw_rotated=yes missing): its production passwords were not replaced. Run teardown"; fi
+}
+# network / TLS gate for any instance (the source before cloning, the clone after)
+netcheck_instance() { # name
+  local n=$1 an ssl
+  an=$(dv "$n" settings.ipConfiguration.authorizedNetworks) || die "cannot read the network settings of $n"
+  [ -z "$an" ] || die "$n has authorized networks ($an): a clone inherits exposure. Nothing was changed"
+  ssl=$(dv "$n" settings.ipConfiguration.sslMode)
+  case "$ssl" in ENCRYPTED_ONLY|TRUSTED_CLIENT_CERTIFICATE_REQUIRED) ;; *) die "$n sslMode is '${ssl:-unknown}': TLS enforcement cannot be confirmed (need ENCRYPTED_ONLY or stricter)";; esac
+  echo "netcheck $n: authorizedNetworks=none sslMode=$ssl ipv4Enabled=$(dv "$n" settings.ipConfiguration.ipv4Enabled) privateNetwork=$(dv "$n" settings.ipConfiguration.privateNetwork)"
+}
+users_gate() { # the clone has exactly the expected users
+  local u bad=""
+  for u in $(gcloud --project "$PROJECT" sql users list --instance "$CLONE" --format='value(name)'); do case " $EXPECTED_USERS " in *" $u "*) ;; *) bad="$bad $u";; esac; done
+  [ -z "$bad" ] || die "the clone inherited unexpected users:$bad. Their production passwords were NOT rotated by this script. Run teardown"
+}
+gcloud_config_gate() {
+  if gcloud config list --format=json 2>/dev/null | grep -q '"api_endpoint_overrides"'; then die "gcloud has api_endpoint_overrides configured: remove them (gcloud config unset api_endpoint_overrides/sql) before continuing"; fi
+  echo "gcloud account: $(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -1)"
 }
 
 phase_plan() {
   RUN=0
   cat <<EOF
-== Rehearsal clone: $CLONE (source $SOURCE, project $PROJECT, region $REGION) · life ≤ ${TTL_HOURS} h (hard max 24 h) · secrets in $REHEARSAL_DIR
+== Rehearsal clone: $CLONE (source $SRC_CONN) · fixed target, no redirection by variables · life ≤ ${TTL_HOURS} h (hard max 24 h) · secrets in $REHEARSAL_DIR
 -- 1 preflight (read-only)
 EOF
-  phase_preflight; echo "-- 2 create (restore drill)"; phase_create; echo "-- 3 harden"; phase_harden; echo "-- 4 mark (needs: cloud-sql-proxy $PROJECT:$REGION:$CLONE --port $PROXY_PORT)"; phase_mark
+  phase_preflight; echo "-- 2 create = clone + IMMEDIATE rotation + labels + network/TLS gate (one atomic phase, no human step in between)"; phase_create
+  echo "-- 3 harden"; phase_harden; echo "-- 4 mark (needs: cloud-sql-proxy $SRC_CONN --port $PROXY_PORT with the CLONE connection name: $PROJECT:$REGION:$CLONE)"; phase_mark
   echo "-- 5 rehearse (SQL side, no GCP):  bash infra/db/rehearsal/rehearse-on-clone.sh"
   echo "-- 6 resize drill (optional)"; phase_resize; echo "-- 7 status (any time)"; phase_status; echo "-- 8 teardown"; phase_teardown
   echo "Cost envelope (list prices of Iowa, México not verified): 1 vCPU/3.75 GB regional 0.144 USD/h, zonal about half; 8 h ≈ 0.6–1.2 USD; 24 h hard max ≈ 3.5 USD (4.5 with a 30 % regional premium)."
 }
 
 phase_preflight() {
-  g R sql instances describe "$SOURCE" --format="value(name,state,databaseVersion,region,settings.tier,settings.availabilityType,settings.backupConfiguration.pointInTimeRecoveryEnabled)"
+  if [ "$RUN" = 1 ]; then gcloud_config_gate; fi
+  g R sql instances describe "$SOURCE" --format="value(connectionName,state,databaseVersion,region,settings.tier,settings.availabilityType,settings.backupConfiguration.pointInTimeRecoveryEnabled,settings.ipConfiguration.sslMode)"
   g R sql instances get-latest-recovery-time "$SOURCE"
   g R sql instances list --filter="name~^discovery-db-rehearsal" --format="table(name,state,createTime)"
   if [ "$RUN" = 1 ]; then
-    local v; v=$(describe_val "$SOURCE" state); [ "$v" = RUNNABLE ] || die "the source is not RUNNABLE ($v)"
-    v=$(describe_val "$SOURCE" databaseVersion); [ "$v" = POSTGRES_16 ] || die "the source is not POSTGRES_16 ($v)"
-    v=$(describe_val "$SOURCE" settings.backupConfiguration.pointInTimeRecoveryEnabled); [ "$v" = True ] || [ "$v" = true ] || die "point-in-time recovery is not enabled on the source: the restore drill cannot run"
+    local v; v=$(dv "$SOURCE" connectionName); [ "$v" = "$SRC_CONN" ] || die "the source's connectionName is '$v', expected '$SRC_CONN'"
+    v=$(dv "$SOURCE" state); [ "$v" = RUNNABLE ] || die "the source is not RUNNABLE ($v)"
+    v=$(dv "$SOURCE" databaseVersion); [ "$v" = POSTGRES_16 ] || die "the source is not POSTGRES_16 ($v)"
+    v=$(dv "$SOURCE" settings.backupConfiguration.pointInTimeRecoveryEnabled); [ "$v" = True ] || [ "$v" = true ] || die "point-in-time recovery is not enabled on the source: the restore drill cannot run"
+    netcheck_instance "$SOURCE"
     local h f; h=$(gcloud sql instances patch --help 2>&1 || true)
     for f in update-labels no-backup enable-point-in-time-recovery availability-type deletion-protection tier; do printf '%s' "$h" | grep -q -- "$f" || die "the installed gcloud does not document the flag '$f' of 'sql instances patch': update gcloud (gcloud components update) before continuing"; done
     printf '%s' "$(gcloud sql instances clone --help 2>&1 || true)" | grep -q -- "point-in-time" || die "the installed gcloud does not document --point-in-time for 'sql instances clone': update gcloud"
@@ -90,41 +130,70 @@ phase_preflight() {
   fi
 }
 
-phase_create() {
-  need_approval
-  g W sql instances clone "$SOURCE" "$CLONE" --point-in-time "$(ts_pitr)"
-  if [ "$RUN" = 1 ]; then secret_dir; date -u +%s > "$REHEARSAL_DIR/created_epoch"; echo "$CLONE" > "$REHEARSAL_DIR/clone_name"; fi
-}
-
-phase_harden() {
-  need_approval
-  if [ "$RUN" = 1 ]; then
-    [ "$(describe_val "$CLONE" state)" = RUNNABLE ] || die "the clone is not RUNNABLE yet"
-    local an; an=$(describe_val "$CLONE" settings.ipConfiguration.authorizedNetworks)
-    [ -z "$an" ] || die "the clone has authorized networks ($an): remove them before continuing (the source has none; a clone must not widen exposure)"
-    echo "clone sslMode: $(describe_val "$CLONE" settings.ipConfiguration.sslMode)"
-    secret_dir
-  fi
-  g W sql instances patch "$CLONE" --availability-type ZONAL --quiet
-  g W sql instances patch "$CLONE" --no-enable-point-in-time-recovery --quiet   # PITR needs automatic backups: switch it off first
-  g W sql instances patch "$CLONE" --no-backup --quiet
-  g W sql instances patch "$CLONE" --update-labels "purpose=rehearsal,expires_utc=$(expiry_label),owner=product-owner" --quiet
-  for u in postgres discovery_migrate discovery_runtime; do
+rotate_all_passwords() { # immediate: every expected user of the clone gets a new random password
+  local u
+  for u in $EXPECTED_USERS; do
     if [ "$RUN" = 1 ]; then
       newpw > "$REHEARSAL_DIR/pw_$u"; chmod 600 "$REHEARSAL_DIR/pw_$u"
-      gcloud --project "$PROJECT" sql users set-password "$u" --instance "$CLONE" --password "$(cat "$REHEARSAL_DIR/pw_$u")" --quiet >/dev/null
+      if ! gcloud --project "$PROJECT" sql users set-password "$u" --instance "$CLONE" --password "$(cat "$REHEARSAL_DIR/pw_$u")" --quiet >/dev/null; then
+        echo "!! ROTATION FAILED for $u: the clone still holds PRODUCTION passwords. Run teardown NOW:  RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED CONFIRM_DELETE=$CLONE UNLABELED_OK=yes TAG=$TAG bash $0 teardown" >&2; exit 4
+      fi
       echo "password of $u on the clone replaced by a new random value (stored only in $REHEARSAL_DIR)"
     else
       echo "+ gcloud --project $PROJECT sql users set-password $u --instance $CLONE --password <new random, never printed> --quiet"
     fi
   done
-  note "the password is briefly visible in the local process list of this Mac; it only opens the throw-away clone"
+}
+
+phase_create() {
+  need_approval
+  if [ "$RUN" = 1 ]; then
+    gcloud_config_gate
+    [ "$(dv "$SOURCE" connectionName)" = "$SRC_CONN" ] || die "the source's connectionName is not $SRC_CONN"
+    netcheck_instance "$SOURCE"   # a clone inherits the source's exposure: refuse to clone an exposed source
+    secret_dir
+  fi
+  g W sql instances clone "$SOURCE" "$CLONE" --point-in-time "$(ts_pitr)"
+  if [ "$RUN" = 1 ]; then
+    assert_identity basic
+    date -u +%s > "$REHEARSAL_DIR/created_epoch"; echo "$CLONE" > "$REHEARSAL_DIR/clone_name"
+  fi
+  rotate_all_passwords                                   # <- first action after the clone exists
+  g W sql instances patch "$CLONE" --update-labels "purpose=rehearsal,pw_rotated=yes,expires_utc=$(expiry_label),owner=product-owner" --quiet
+  if [ "$RUN" = 1 ]; then
+    assert_identity rotated
+    users_gate
+    netcheck_instance "$CLONE"
+    printf '%s %s\n' "$(date -u +%s)" "$PROJECT:$REGION:$CLONE" > "$REHEARSAL_DIR/netcheck_ok"
+    echo "create complete: passwords rotated, network and TLS verified"
+  else
+    echo "+ (verify) identity=$PROJECT:$REGION:$CLONE, label pw_rotated=yes, users exactly [$EXPECTED_USERS], no authorized networks, sslMode ENCRYPTED_ONLY or stricter -> write netcheck_ok"
+  fi
+}
+
+require_gate() { # harden / mark / resize: identity + rotation + a fresh network/TLS check + evidence of the create gate
+  [ -f "$REHEARSAL_DIR/netcheck_ok" ] || die "no network/TLS gate evidence in $REHEARSAL_DIR: run create (it writes it)"
+  assert_identity rotated; users_gate; netcheck_instance "$CLONE"
+}
+
+phase_netcheck() {
+  if [ "$RUN" != 1 ]; then echo "+ gcloud --project $PROJECT sql instances describe $CLONE (identity, labels, authorizedNetworks, sslMode) and sql users list"; return 0; fi
+  assert_identity rotated; users_gate; netcheck_instance "$CLONE"; echo "network/TLS gate ok"
+}
+
+phase_harden() {
+  need_approval
+  if [ "$RUN" = 1 ]; then require_gate; fi
+  g W sql instances patch "$CLONE" --availability-type ZONAL --quiet
+  g W sql instances patch "$CLONE" --no-enable-point-in-time-recovery --quiet   # PITR needs automatic backups: switch it off first
+  g W sql instances patch "$CLONE" --no-backup --quiet
 }
 
 phase_mark() {
   need_approval
-  if [ "$RUN" != 1 ]; then echo "+ psql (through the proxy on port $PROXY_PORT, as postgres with the NEW clone password): CREATE ROLE rehearsal_marker_<random> NOLOGIN"; return 0; fi
-  [ -f "$REHEARSAL_DIR/pw_postgres" ] || die "run harden first (no clone password found in $REHEARSAL_DIR)"
+  if [ "$RUN" != 1 ]; then echo "+ (gate) then psql through the proxy on port $PROXY_PORT as postgres with the NEW clone password: CREATE ROLE rehearsal_marker_<random> NOLOGIN"; return 0; fi
+  require_gate
+  [ -f "$REHEARSAL_DIR/pw_postgres" ] || die "no clone password found in $REHEARSAL_DIR (run create)"
   psql_clone postgres postgres "select 1" >/dev/null 2>&1 || die "cannot log in through the proxy on port $PROXY_PORT with the CLONE password: start  cloud-sql-proxy $PROJECT:$REGION:$CLONE --port $PROXY_PORT  (if it points at another instance this failure is the guard working)"
   local m; m="rehearsal_marker_$(openssl rand -hex 8)"; echo "$m" > "$REHEARSAL_DIR/marker"
   psql_clone postgres postgres "CREATE ROLE $m NOLOGIN" >/dev/null
@@ -134,6 +203,7 @@ phase_mark() {
 
 phase_resize() {
   need_approval
+  if [ "$RUN" = 1 ]; then require_gate; fi
   g W sql instances patch "$CLONE" --tier db-custom-2-7680 --quiet
   if [ "$RUN" = 1 ]; then psql_clone postgres postgres "show max_connections" | sed 's/^/max_connections at db-custom-2-7680: /'; fi
   g W sql instances patch "$CLONE" --tier db-custom-1-3840 --quiet
@@ -141,12 +211,14 @@ phase_resize() {
 }
 
 phase_status() {
-  g R sql instances list --filter="labels.purpose=rehearsal" --format="table(name,state,settings.availabilityType,createTime,settings.userLabels.expires_utc)"
+  g R sql instances list --filter="name~^discovery-db-rehearsal" --format="table(name,state,settings.availabilityType,createTime,settings.userLabels.purpose,settings.userLabels.pw_rotated,settings.userLabels.expires_utc)"
   if [ "$RUN" = 1 ]; then
-    local now; now=$(date -u +%Y%m%dt%H%M); local n=0
-    for line in $(gcloud --project "$PROJECT" sql instances list --filter="labels.purpose=rehearsal" --format="csv[no-heading](name,settings.userLabels.expires_utc)"); do
-      n=$((n+1)); local nm=${line%%,*} ex=${line#*,}
-      if [ -z "$ex" ] || [ "$now" \> "$ex" ]; then echo "EXPIRED  $nm (expires_utc=${ex:-none}): run teardown now"; else echo "ok       $nm (expires_utc=$ex)"; fi
+    local now n=0 line nm pu pr ex; now=$(date -u +%Y%m%dt%H%M)
+    for line in $(gcloud --project "$PROJECT" sql instances list --filter="name~^discovery-db-rehearsal" --format="csv[no-heading](name,settings.userLabels.purpose,settings.userLabels.pw_rotated,settings.userLabels.expires_utc)"); do
+      n=$((n+1)); nm=${line%%,*}; line=${line#*,}; pu=${line%%,*}; line=${line#*,}; pr=${line%%,*}; ex=${line#*,}
+      if [ "$pr" != yes ]; then echo "UNROTATED $nm: may still hold PRODUCTION passwords. Run teardown now"
+      elif [ -z "$ex" ] || [ "$now" \> "$ex" ]; then echo "EXPIRED   $nm (expires_utc=${ex:-none}): run teardown now"
+      else echo "ok        $nm (expires_utc=$ex)"; fi
     done
     [ "$n" -gt 0 ] || echo "no rehearsal clone exists"
   fi
@@ -156,15 +228,20 @@ phase_teardown() {
   need_approval
   if [ "$RUN" = 1 ]; then
     [ "${CONFIRM_DELETE:-}" = "$CLONE" ] || die "to delete set CONFIRM_DELETE=$CLONE (exact name of the clone)" 3
-    [ "$(describe_val "$CLONE" settings.userLabels.purpose)" = rehearsal ] || die "refusing: $CLONE does not carry the label purpose=rehearsal"
+    assert_identity basic
+    if [ "$(dv "$CLONE" settings.userLabels.purpose)" != rehearsal ]; then
+      [ "${UNLABELED_OK:-}" = yes ] || die "refusing: $CLONE does not carry the label purpose=rehearsal (a clone whose creation failed before labelling needs UNLABELED_OK=yes)"
+      note "deleting an UNLABELED clone because UNLABELED_OK=yes; its identity matched $PROJECT:$REGION:$CLONE"
+    fi
   fi
   g W sql instances patch "$CLONE" --no-deletion-protection --quiet
   g W sql instances delete "$CLONE" --quiet
   g R sql instances list --filter="name~^discovery-db-rehearsal" --format="value(name)"
   if [ "$RUN" = 1 ]; then
     [ -z "$(gcloud --project "$PROJECT" sql instances list --filter="name=$CLONE" --format='value(name)')" ] || die "the clone still exists"
-    echo "clone $CLONE deleted; the source $SOURCE untouched: $(describe_val "$SOURCE" state)"
+    echo "clone $CLONE deleted; the source $SOURCE untouched: $(dv "$SOURCE" state)"
     if [ -d "$REHEARSAL_DIR" ]; then
+      local f
       for f in "$REHEARSAL_DIR"/* "$REHEARSAL_DIR"/.[!.]*; do [ -f "$f" ] || continue; if command -v shred >/dev/null 2>&1; then shred -u "$f"; else rm -P "$f"; fi; done
       rmdir "$REHEARSAL_DIR" 2>/dev/null || true; echo "local rehearsal secrets destroyed"
     fi
@@ -175,6 +252,6 @@ phase_teardown() {
 
 case "$PHASE" in
   plan) phase_plan ;;
-  preflight|create|harden|mark|resize|status|teardown) "phase_$PHASE" ;;
-  *) echo "usage: [RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED] $0 {plan|preflight|create|harden|mark|resize|status|teardown}"; exit 2 ;;
+  preflight|create|netcheck|harden|mark|resize|status|teardown) "phase_$PHASE" ;;
+  *) echo "usage: [RUN=1 APPROVAL=CLONE_REHEARSAL_APPROVED] $0 {plan|preflight|create|netcheck|harden|mark|resize|status|teardown}"; exit 2 ;;
 esac

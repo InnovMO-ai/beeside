@@ -5,15 +5,46 @@
 # real role model, plus the negative tests and the rollback drill. Everything it creates lives in the clone and disappears with it.
 #
 #   needs: the Auth Proxy running on the clone (cloud-sql-proxy beeside-discovery-prod:northamerica-south1:<clone> --port 5435), psql, node, the built backend (npm run build --workspace=backend)
-#   run:   bash infra/db/rehearsal/rehearse-on-clone.sh        (APPROVAL is implied by having created the clone; the marker is the gate)
+#   run:   TAG=<tag> bash infra/db/rehearsal/rehearse-on-clone.sh   (fixed target; the marker role and the netcheck_ok evidence are the gates; no host/port/db/dir overrides exist)
 # Output: PASS/FAIL per check, INFO lines for measurements, evidence folder with the sanitized log (no secret values; the log is scanned for them at the end).
 # Exit 0 only when every check passes (WARN and INFO do not fail the run).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); REPO=$(cd "$HERE/../../.." && pwd); B=$REPO/backend
-CLONE=${CLONE:-$(cat "${REHEARSAL_DIR:-/nonexistent}/clone_name" 2>/dev/null || true)}
-REHEARSAL_DIR=${REHEARSAL_DIR:-$HOME/.beeside-rehearsal/$CLONE}
-HOST=${CLONE_HOST:-127.0.0.1}; PORT=${PROXY_PORT:-5435}; ADMIN=${ADMIN_USER:-postgres}
-LEGDB=${LEGACY_DB:-discovery}; NEWDB=${CANONICAL_DB:-beeside}
+stop(){ echo "STOP: $*" >&2; exit 9; }
+# ---- FIXED TARGET: no variable can point this script at another host, port, database, project or instance ---------------------------------------------------------
+# Real mode: host 127.0.0.1, port 5435 (the Auth Proxy opened on the CLONE), admin postgres, legacy database discovery, canonical database beeside, secrets directory
+# $HOME/.beeside-rehearsal/discovery-db-rehearsal-<TAG>. Anything that could redirect it makes the script stop. REHEARSAL_SIMULATOR=1 (local PostgreSQL simulator only) is the single
+# switch that allows a different directory / admin / port, and even then only loopback port 5433 (never 5434, the production proxy port) is accepted.
+for v in PROJECT REGION SOURCE_INSTANCE SOURCE SQL_INSTANCE ALLOW_OTHER_PROJECT CLONE CLONE_HOST LEGACY_DB CANONICAL_DB; do
+  [ -z "${!v-}" ] || stop "the variable $v is set: this script has a FIXED target and accepts no redirection (unset it: env -u $v ...)"
+done
+if [ "${REHEARSAL_SIMULATOR:-0}" = 1 ]; then
+  [ "${PROXY_PORT:-5433}" = 5433 ] || stop "simulator mode accepts only PROXY_PORT=5433"
+  PORT=5433; ADMIN=${ADMIN_USER:-sqladmin}; REHEARSAL_DIR=${REHEARSAL_DIR:?simulator mode needs REHEARSAL_DIR}
+  CLONE=$(cat "$REHEARSAL_DIR/clone_name" 2>/dev/null || echo simulator)
+else
+  for v in PROXY_PORT ADMIN_USER REHEARSAL_DIR; do [ -z "${!v-}" ] || stop "the variable $v is set: this script has a FIXED target (unset it: env -u $v ...). The clone is selected only by TAG"; done
+  PORT=5435; ADMIN=postgres
+  TAG=${TAG:?set TAG=<the tag used with clone-rehearsal.sh create>}
+  printf '%s' "$TAG" | grep -Eq '^[0-9a-z]{1,12}$' || stop "TAG must match ^[0-9a-z]{1,12}$"
+  CLONE="discovery-db-rehearsal-$TAG"
+  [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] || stop "HOME is not set"
+  REHEARSAL_DIR="$HOME/.beeside-rehearsal/$CLONE"
+fi
+readonly HOST=127.0.0.1 LEGDB=discovery NEWDB=beeside CLONE PORT ADMIN REHEARSAL_DIR
+[ "$PORT" != 5434 ] || stop "port 5434 is the production proxy port"
+[ -d "$REHEARSAL_DIR" ] || stop "no rehearsal directory ($REHEARSAL_DIR): run clone-rehearsal.sh create/harden/mark first"
+if [ "${REHEARSAL_SIMULATOR:-0}" != 1 ]; then
+  # evidence that clone-rehearsal.sh create rotated the passwords and verified network + TLS on THIS clone, and that the clone has not outlived its 24 h maximum
+  [ -f "$REHEARSAL_DIR/netcheck_ok" ] || stop "no network/TLS gate evidence (netcheck_ok) in $REHEARSAL_DIR: the clone was not created by clone-rehearsal.sh create"
+  read -r NC_EPOCH NC_CONN < "$REHEARSAL_DIR/netcheck_ok" || stop "unreadable netcheck_ok"
+  case "$NC_EPOCH" in ''|*[!0-9]*) stop "malformed netcheck_ok";; esac
+  [ "$NC_CONN" = "beeside-discovery-prod:northamerica-south1:$CLONE" ] || stop "the gate evidence belongs to '$NC_CONN', not to $CLONE"
+  AGE=$(( $(date -u +%s) - NC_EPOCH )); [ "$AGE" -ge 0 ] && [ "$AGE" -le 86400 ] || stop "the clone is older than 24 h (age ${AGE}s): tear it down and create a new one"
+fi
+# any accidental gcloud call from the tools below fails: this script never talks to GCP
+SHIM=$(mktemp -d); printf '#!/bin/sh\necho "gcloud is disabled inside rehearse-on-clone.sh" >&2\nexit 97\n' > "$SHIM/gcloud"; chmod +x "$SHIM/gcloud"; export PATH="$SHIM:$PATH"
+trap 'rm -rf "$SHIM"' EXIT
 EVID=${EVIDENCE_DIR:-$HOME/Downloads/rehearsal-evidence-$(date -u +%Y%m%dT%H%M%SZ)}
 S="$REHEARSAL_DIR/secrets"; mkdir -p "$EVID"; ( umask 077; mkdir -p "$S" )
 exec > >(tee -a "$EVID/log.txt") 2>&1
@@ -22,7 +53,7 @@ ok(){ PASS=$((PASS+1)); echo "  PASS  $1"; }
 bad(){ FAIL=$((FAIL+1)); echo "  FAIL  $1"; }
 warn(){ WARN=$((WARN+1)); echo "  WARN  $1"; }
 info(){ echo "  INFO  $1"; }
-die(){ echo "STOP: $*" >&2; exit 9; }
+die(){ stop "$@"; }
 eq(){ [ "$1" = "$2" ] && ok "$3 ($1)" || bad "$3 (got '$1', expected '$2')"; }
 expect_ok(){ local d="$1"; shift; if "$@" >"$EVID/.last" 2>&1; then ok "$d"; else bad "$d :: $(tr '\n' ' ' <"$EVID/.last" | cut -c1-240)"; fi; }
 expect_fail(){ local d="$1"; shift; if "$@" >"$EVID/.last" 2>&1; then bad "$d (it succeeded)"; else ok "$d"; fi; }
@@ -35,7 +66,6 @@ url(){ echo "postgres://$(enc "$1"):$(enc "$2")@$HOST:$PORT/$3"; }
 
 # ---- 0. gate: only the marked clone --------------------------------------------------------------------------------------------------------------------------------
 echo "== S0  gate (marker role) and clone fidelity"
-[ -d "$REHEARSAL_DIR" ] || die "no rehearsal directory ($REHEARSAL_DIR): create/harden/mark the clone first"
 [ -f "$REHEARSAL_DIR/marker" ] || die "no marker file: run clone-rehearsal.sh mark first"
 M=$(cat "$REHEARSAL_DIR/marker"); case "$M" in rehearsal_marker_[0-9a-f]*) ;; *) die "malformed marker file";; esac
 GOT=$(admdb postgres "select count(*) from pg_roles where rolname='$M'" 2>/dev/null) || die "cannot log in as $ADMIN with the clone credentials on $HOST:$PORT"
