@@ -116,6 +116,20 @@ module "kl_runtime" {
   depends_on = [google_project_service.scheduler, module.kl_database]
 }
 
+variable "alert_email" {
+  description = "Recipient of KL operational alerts (M1). Changeable; email channel only."
+  type        = string
+  default     = "mo@beeside.you"
+}
+
+module "kl_alerting" {
+  source               = "../../modules/kl-alerting"
+  environment          = "dev"
+  alert_email          = var.alert_email
+  worker_job_name      = module.kl_runtime.worker_job_name
+  scheduler_job_prefix = "beeside-dev-kl-"
+}
+
 output "kl_instance_connection_name" {
   value = module.kl_database.instance_connection_name
 }
