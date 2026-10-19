@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
+# Códigos de salida: 0 verificada · 1 falla · 3 aún no ha disparado · 4 no se pudo consultar (sin sesión de gcloud o sin permisos).
 # Verificación de solo lectura de la PRIMERA exportación PROGRAMADA de beeside_kl (cierre de G2). Comprueba tres cosas, todas posteriores al disparo programado:
 #   (1) el intento del scheduler terminó con HTTP 200; (2) existe una versión nueva de gs://…/daily/beeside_kl.sql.gz; (3) la operación EXPORT de Cloud SQL
 #   está DONE y fue emitida por beeside-dev-kl-scheduler@… . Uso: bash scripts/kl/g2/verify-scheduled-export.sh [AAAA-MM-DDTHH:MM:SSZ del disparo esperado]
 set -uo pipefail
 P="${KL_PROJECT:-beeside-dev-508220}"; LOC=us-south1; J=beeside-dev-kl-daily-export; I=beeside-dev-kl-db
+# Sin sesión válida de gcloud NO se puede afirmar nada (antes devolvía «aún no ha disparado» por error): se aborta con código 4.
+gcloud auth print-access-token >/dev/null 2>&1 || { echo "STOP (exit 4): gcloud no tiene sesión válida; ejecuta «gcloud auth login» y repite. No se verificó nada." >&2; exit 4; }
+STATE0="$(gcloud scheduler jobs describe $J --location $LOC --project $P --format='value(state)' 2>/dev/null)"
+[[ -n "$STATE0" ]] || { echo "STOP (exit 4): no se pudo leer el schedule $J (permisos, proyecto o red). No se verificó nada." >&2; exit 4; }
 SINCE="${1:-$(gcloud scheduler jobs describe $J --location $LOC --project $P --format='value(scheduleTime)' 2>/dev/null)}"
 OBJ="gs://$P-beeside-dev-kl-exports/daily/beeside_kl.sql.gz"; EXPECT_SA="beeside-dev-kl-scheduler@$P.iam.gserviceaccount.com"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "ahora $now · estado del schedule: $(gcloud scheduler jobs describe $J --location $LOC --project $P --format='value(state)')"
