@@ -20,13 +20,13 @@ ok=1
 ST="$(gcloud logging read "resource.type=\"cloud_scheduler_job\" AND resource.labels.job_id=\"$J\" AND jsonPayload.\"@type\"=\"type.googleapis.com/google.cloud.scheduler.logging.AttemptFinished\" AND timestamp>=\"$LAST\"" --project $P --limit 1 --format='value(httpRequest.status)' 2>/dev/null)"
 [[ "$ST" == "200" ]] && echo "OK  (1) intento del scheduler: HTTP 200" || { echo "FALLA (1) intento del scheduler: '${ST:-sin registro}'"; ok=0; }
 # (2) versión nueva del objeto
-NEW="$(gcloud storage ls -a --long "$OBJ" 2>/dev/null | awk -v t="$LAST" '$2>=t {print $2, $1" bytes", $3}' | tail -1)"
+NEW="$(gcloud storage ls -a --long "$OBJ" 2>/dev/null | awk -v t="$LAST" '$2 ~ /^20[0-9][0-9]-/ && $2>=t {print $2, $1" bytes", $3}' | head -1)"
 [[ -n "$NEW" ]] && echo "OK  (2) versión nueva del objeto: $NEW" || { echo "FALLA (2) no hay versión de $OBJ posterior a $LAST"; gcloud storage ls -a --long "$OBJ" 2>&1 | tail -3; ok=0; }
 # (3) operación EXPORT posterior al disparo, hecha por la cuenta del scheduler (se busca entre las últimas operaciones; el filtro de gcloud por tipo no es fiable)
 RES="$(gcloud sql operations list --instance $I --project $P --limit 100 --format=json 2>/dev/null | python3 -c '
 import sys,json
 last,exp=sys.argv[1],sys.argv[2]
-ops=[o for o in json.load(sys.stdin) if o.get("operationType")=="EXPORT" and o.get("startTime","")>last]
+ops=sorted([o for o in json.load(sys.stdin) if o.get("operationType")=="EXPORT" and o.get("startTime","")>last], key=lambda o:o["startTime"])  # la PRIMERA tras el disparo
 good=[o for o in ops if o.get("user")==exp and o.get("status")=="DONE"]
 if good: o=good[0]; print("OK|%s|DONE|%s|%s"%(o["name"],o["user"],o["startTime"]))
 elif ops: o=ops[0]; print("BAD|%s|%s|%s|%s"%(o["name"],o.get("status"),o.get("user"),o["startTime"]))

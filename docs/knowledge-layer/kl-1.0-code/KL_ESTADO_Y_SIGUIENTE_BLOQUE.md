@@ -52,3 +52,17 @@ Escenarios A01–A10: con prueba explícita en CI A02, A03, A04, A06, A08, A09, 
 
 ## 6. Decisiones que necesita el PO
 (1) `gcloud auth login` para cerrar G2 hoy. (2) ¿Se autoriza M1 (incluye un cambio de código en KL y un despliegue de imagen de rama por la tubería ya aprobada)? (3) Titular y rol de la segunda identidad humana. (4) Canal de notificación de alertas. (5) ¿Instancia mínima con CPU asignada en el backend de dev? (6) Cuándo llevar a `main` los parches de la plataforma y la rama de KL.
+
+---
+
+## ACTUALIZACIÓN 2026-10-19 18:2x UTC · **G2 VERIFIED**
+
+Con la sesión de `gcloud` renovada se verificó con **datos crudos** (no solo con el script):
+- **Intentos del scheduler** (`beeside-dev-kl-daily-export`): **18-oct 08:30:03 UTC → HTTP 200** (el **primer** disparo programado) y **19-oct 08:30:05 UTC → HTTP 200**.
+- **Versiones de `daily/beeside_kl.sql.gz`** (bucket versionado): 17-oct 17:27 (prueba manual, 59.465 B), **18-oct 08:30:01 (75.285 B)**, **19-oct 08:30:05 (97.620 B)**.
+- **Operaciones `EXPORT` de Cloud SQL**: **18-oct 08:30:01 DONE** y **19-oct 08:30:04 DONE**, ambas con `user = beeside-dev-kl-scheduler@beeside-dev-508220.iam.gserviceaccount.com` (cuenta de un solo permiso; el permiso `cloudsql.instances.export` y su condición IAM quedan confirmados por uso programado).
+- **Integridad del respaldo:** las dos exportaciones programadas pasan `gzip -t` y contienen **51 tablas, 116 funciones, 51 bloques `COPY` y las 10 migraciones del diario**, sin credenciales (0 coincidencias de `password`/`secret`/`postgresql://`); el mismo formato se restauró idéntico en X24.
+**G2 queda VERIFICADA.** Hallazgos de la revisión del fin de semana (no bloquean G2):
+1. **Worker:** 577 ejecuciones entre el 17-oct 18:10 y el 19-oct 18:05 UTC, **577 con éxito, 0 fallidas, 0 huecos > 7 min**; **1 reintento** (18-oct 16:05 UTC): el primer intento duró ~54 s y terminó con `knowledge layer database unavailable` y el reintento del job lo resolvió; sin operaciones ni avisos de Cloud SQL en esa ventana. Tasa 1/577 (0,17 %); causa no determinada (candidata: arranque en frío con el nivel de núcleo compartido `db-g1-small`). Sin alertas, solo se vería en los registros: entra en M1.
+2. **Crecimiento de datos:** la exportación crece ~16–22 KB/día porque **`kl.request_attestation` es de solo inserción** (trigger `kl_b_append_only`) y **no tiene retención**: 1.173 filas (368 kB) en 48 h, ~2 filas por ciclo del worker y 1 por petición administrativa, ~180 kB/día (~65 MB/año a este ritmo). Es consecuencia del diseño de certificación; para producción hace falta decidir su **política de retención** (conservar como evidencia, agregar o particionar y purgar): **decisión de diseño pendiente**, no es un defecto funcional hoy.
+3. Corrección del script de verificación: elige la **primera** operación posterior al disparo (antes mostraba la más reciente) y filtra las líneas `TOTAL:` del listado del bucket.

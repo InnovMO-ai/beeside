@@ -1,4 +1,4 @@
-# KL 1.0 · Estado general G1–G2 (corte 2026-10-17, ~18:10 UTC; X24 incorporada)
+# KL 1.0 · Estado general G1–G2 (corte 2026-10-19; G2 verificada; X24 incorporada)
 
 Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes; 137 commits sobre `main`; 8 archivos compartidos fuera de KL, todos declarados). Entorno: **solo dev** (`beeside-dev-508220`). Staging y producción no existen para KL.
 
@@ -6,7 +6,7 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 | Puerta | Estado | Fundamento |
 |---|---|---|
 | **G1 · sin escalada de privilegios hacia `beeside_kl`** | **CUMPLIDA para KL-0001…0005** (aprobada condicionada por el PO; condiciones cumplidas) | En la instancia compartida el protocolo **falló** (cualquier `cloudsqlsuperuser` administra todos los roles). Con la **instancia dedicada** `beeside-dev-kl-db`: E1–E15 limpios antes y después de migrar (35 intentos de escalada, todos fallan; E7 todo `false`; E8 = 0; E9 solo `kl_owner`; E14 = 0). Evidencia en `evidence/G1-*`. Control continuo: **ningún usuario creado por API** en esa instancia (hoy solo `postgres` sin contraseña y roles internos) |
-| **G2 · infraestructura** | **CUMPLIDA (con desviaciones declaradas); queda verificar la primera exportación programada (18-oct 08:30 UTC)** | Hecho: base, roles (por SQL, no por Terraform: desviación declarada), secretos y jobs por Terraform (`dev-kl`, 45 recursos, sin deriva), migración aplicada (10/10 con huellas), exportación previa y **programada probada una vez**, plan de reversión. **X24 ejecutada (17-oct): restauración en `beeside_kl_restore` con comparación de 121 elementos — idéntica salvo una restricción equivalente por normalización de paréntesis** (ver `G2_FASE7_WORKER_Y_PRUEBAS.md`). Desviaciones: roles por SQL en lugar de Terraform e instancia dedicada |
+| **G2 · infraestructura** | **VERIFICADA (19-oct-2026), con desviaciones declaradas (CR-KL-003)** | Hecho: base, roles (por SQL, no por Terraform: desviación declarada), secretos y jobs por Terraform (`dev-kl`, 45 recursos, sin deriva), migración aplicada (10/10 con huellas), exportación previa y **programada probada una vez**, plan de reversión. **X24 ejecutada (17-oct): restauración en `beeside_kl_restore` con comparación de 121 elementos — idéntica salvo una restricción equivalente por normalización de paréntesis** (ver `G2_FASE7_WORKER_Y_PRUEBAS.md`). Desviaciones: roles por SQL en lugar de Terraform e instancia dedicada |
 | G3 · control de salida a red | **No iniciada** (fuera de alcance: sin agentes ni tráfico externo) | `kl-worker` sin firewall ni NAT; agentes apagados por base y por configuración |
 | G4 | No iniciada | — |
 
