@@ -133,6 +133,8 @@ export interface RunOptions {
   foreignMigrationsDir?: string;
   /** Solo valida y reporta lo pendiente. */
   dryRun?: boolean;
+  /** Solo para la base de ensayo (M1 opción b); el CLI de producción no lo expone y exige `beeside_kl`. */
+  expectedDatabase?: string;
 }
 
 export interface RunResult {
@@ -161,7 +163,7 @@ export async function runMigrations(options: RunOptions): Promise<RunResult> {
   await client.connect();
   try {
     const who = await client.query<{ db: string; usr: string }>("SELECT current_database() AS db, current_user AS usr");
-    if (who.rows[0]?.db !== EXPECTED_DATABASE) throw new MigrationError("WRONG_DATABASE", `la base es ${who.rows[0]?.db}, no ${EXPECTED_DATABASE}`);
+    if (who.rows[0]?.db !== (options.expectedDatabase ?? EXPECTED_DATABASE)) throw new MigrationError("WRONG_DATABASE", `la base es ${who.rows[0]?.db}, no ${options.expectedDatabase ?? EXPECTED_DATABASE}`);
     if (who.rows[0]?.usr !== EXPECTED_ROLE) throw new MigrationError("WRONG_ROLE", `el rol es ${who.rows[0]?.usr}, no ${EXPECTED_ROLE}`);
     await client.query("SELECT pg_advisory_lock($1)", [LOCK_KEY]);
     try {

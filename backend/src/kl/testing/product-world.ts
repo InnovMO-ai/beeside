@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { Pool } from "pg";
 import { withAttestation, withServiceAttestation } from "../db/attested-tx";
 import { Snapshot } from "../products/builder";
-import { LocalObjectStore } from "../ingest/object-store";
+import { LocalObjectStore, ObjectStore } from "../ingest/object-store";
 import { GuideCopy } from "../products/guide-model";
 import { submitEdition } from "../products/manifest";
 import { renderEditionJob, RenderJobDeps } from "../products/render/render-edition";
@@ -16,7 +16,7 @@ import { attestedOf, buildWorld, createCardVersion, one, pools, publishStat, run
 /** Producto sintético tipo «Doing Business»: fuentes, estadísticas, fichas (una de riesgo alto validada), bloques fijos y configuración. Todo inventado. */
 export interface ProductWorld extends World {
   p: ReturnType<typeof pools>;
-  store: LocalObjectStore;
+  store: ObjectStore;
   productKey: string;
   source: { institution: string; publication: string; indicator: string };
   units: { stats: string[]; cards: string[]; obligation: string };
@@ -50,11 +50,20 @@ export const JOURNEY = {
   en: { steps: [{ title: "Discover", text: "Synthetic step one." }, { title: "Decide", text: "Synthetic step two." }], cta: "kl.links.discovery_start" },
 };
 
-export async function buildProductWorld(): Promise<ProductWorld> {
-  const w = await buildWorld();
-  const p = pools();
-  const store = new LocalObjectStore(fs.mkdtempSync(path.join(os.tmpdir(), "kl-prod-")), { NODE_ENV: "test" });
-  const productKey = "doing_business_mx";
+export interface ProductWorldOptions {
+  /** Mundo ya construido (conexiones a una base KL migrada, p. ej. la de ensayo en la nube). */
+  world?: World;
+  pools?: ReturnType<typeof pools>;
+  store?: ObjectStore;
+  /** Clave del producto sintético; en la nube NUNCA la del producto real (las llaves del bucket son inmutables). */
+  productKey?: string;
+}
+
+export async function buildProductWorld(options: ProductWorldOptions = {}): Promise<ProductWorld> {
+  const w = options.world ?? (await buildWorld());
+  const p = options.pools ?? pools();
+  const store = options.store ?? new LocalObjectStore(fs.mkdtempSync(path.join(os.tmpdir(), "kl-prod-")), { NODE_ENV: "test" });
+  const productKey = options.productKey ?? "doing_business_mx";
   const verifyTemplate = "https://verify.sintetico.example/verificar/[edition-id]";
 
   // catálogo provisional, enlaces y producto con su configuración

@@ -21,3 +21,16 @@ Autorizado por el PO: GcsObjectStore, edición sintética de punta a punta y ale
 
 ## Pendiente verificable en cuanto exista una edición real
 La lectura de `kl/previews/` por el backend (IAM ya aplicado, no probado con un objeto real porque la ruta exige una edición), el render por el job de una edición real y la descarga autenticada de una edición publicada por el consumidor (Precision).
+
+## Ensayo de punta a punta en la nube (opción b, 19-oct-2026)
+
+Autorizado por el PO: base de ensayo `beeside_kl_e2e` en la instancia dedicada, principales de prueba, sin tocar `beeside_kl`. Script: `scripts/kl/m1/e2e-cloud.sh` (`E2E_CONFIRM=yes`); cargador: `backend/src/kl/testing/cloud-e2e.ts`.
+
+**Resultado: verificado.**
+- Ventana privilegiada de ~11 s (usuario de API temporal creó la base con dueño `kl_owner`, se eliminó antes de migrar); el borrado posterior de la base lo hizo `kl_owner`, sin segunda ventana.
+- Migración KL-0001…0005 aplicada (10/10) con `expectedDatabase` explícito (el CLI de producción sigue exigiendo `beeside_kl`).
+- Mundo sintético con personas de prueba distintas (admin, editores, revisores, revisor editorial, especialista); edición `2026.10` del producto `e2e_synthetic` compuesta y aprobada por otra persona.
+- Job `beeside-dev-kl-worker` de Cloud Run apuntado a la base de ensayo: Chromium renderizó ES y EN, `GcsObjectStore` escribió `kl/editions/e2e_synthetic/2026.10/{es,en}/<sha>.pdf` (356 346 B y 356 125 B); edición `published`, job `succeeded`, hash de cada objeto leído del bucket = `pdf_sha256` registrado, ambos con cabecera `%PDF-`.
+- Limpieza: base de ensayo eliminada, sin usuarios temporales, `beeside_kl` y los schedulers sin cambios.
+
+**Límites declarados:** no se verificó el estado público ni la descarga autenticada vía backend (el backend sigue apuntando a `beeside_kl`; probarlo exigiría reapuntarlo, un cambio de servicio compartido que no se hizo). Los dos PDF quedan en el bucket 30 días (versionado + retención). La base de ensayo ya no existe; repetir es un solo comando.

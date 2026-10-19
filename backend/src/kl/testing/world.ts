@@ -15,9 +15,10 @@ export interface World {
   close(): Promise<void>;
 }
 
-export async function buildWorld(): Promise<World> {
-  await freshKlDatabase();
-  const k = await openConns();
+/** Con `external` (conexiones ya abiertas a una base KL migrada, p. ej. la de ensayo en la nube) no se recrea la base. */
+export async function buildWorld(external?: Conns): Promise<World> {
+  if (!external) await freshKlDatabase();
+  const k = external ?? (await openConns());
   const admin = await bootstrapAdmin(k.owner);
   const mk = async (label: string, role: string, opts: { editorial?: boolean; domains?: string[] } = {}) => {
     const p = await grantTo(k.app, admin, label, role, opts);
@@ -167,8 +168,8 @@ import { roleUrl } from "./env";
 
 export const attestedOf = (p: Person, role: "ADMIN" | "SUPERVISOR" = "ADMIN"): AttestedPrincipal => ({ adminUserId: p.id, email: p.email, role, sessionId: randomUUID() });
 
-export function pools(): { app: Pool; reader: Pool; knowledge: Pool; agent: Pool; closeAll(): Promise<void> } {
-  const mk = (role: "kl_app" | "kl_reader_precision" | "kl_knowledge" | "kl_agent") => new Pool({ connectionString: roleUrl(role), max: 3 });
+export function pools(urls: Partial<Record<"kl_app" | "kl_reader_precision" | "kl_knowledge" | "kl_agent", string>> = {}): { app: Pool; reader: Pool; knowledge: Pool; agent: Pool; closeAll(): Promise<void> } {
+  const mk = (role: "kl_app" | "kl_reader_precision" | "kl_knowledge" | "kl_agent") => new Pool({ connectionString: urls[role] ?? roleUrl(role), max: 3 });
   const set = { app: mk("kl_app"), reader: mk("kl_reader_precision"), knowledge: mk("kl_knowledge"), agent: mk("kl_agent") };
   return { ...set, closeAll: async () => void (await Promise.all(Object.values(set).map((p) => p.end()))) };
 }
