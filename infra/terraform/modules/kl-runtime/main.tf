@@ -206,15 +206,15 @@ resource "google_storage_bucket_iam_member" "worker_view" {
   member = "serviceAccount:${google_service_account.worker.email}"
 }
 
-# The backend only reads PUBLISHED editions (openEdition): condition limits it to the editions prefix.
+# The backend only READS: published editions (openEdition, kl/editions/) and the admin preview PDFs (kl/previews/); never originals (kl/objects/).
 resource "google_storage_bucket_iam_member" "backend_editions_view" {
   bucket = google_storage_bucket.store.name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${var.backend_service_account}"
 
   condition {
-    title      = "kl-editions-prefix-only"
-    expression = "resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.store.name}/objects/kl/editions/\")"
+    title      = "kl-editions-and-previews-only"
+    expression = "resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.store.name}/objects/kl/editions/\") || resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.store.name}/objects/kl/previews/\")"
   }
 }
 
