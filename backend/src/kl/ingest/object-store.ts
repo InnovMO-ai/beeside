@@ -11,7 +11,9 @@ export interface ObjectStore {
   putKeyed(storageKey: string, sha256: string, bytes: Uint8Array): Promise<string>;
 }
 
-const KEYED = /^kl\/(editions|previews)\/[a-z0-9_]+(\/[A-Za-z0-9._-]+){2,3}\.pdf$/;
+/** Llaves fijas de edición o vista previa (también las valida el adaptador de Cloud Storage). */
+export const KEYED_STORAGE_KEY = /^kl\/(editions|previews)\/[a-z0-9_]+(\/[A-Za-z0-9._-]+){2,3}\.pdf$/;
+const KEYED = KEYED_STORAGE_KEY;
 
 export class LocalObjectStore implements ObjectStore {
   constructor(
@@ -54,4 +56,19 @@ export class LocalObjectStore implements ObjectStore {
     if (!ok) throw new Error("llave de almacenamiento no válida");
     return fs.readFileSync(path.join(this.root, storageKey));
   }
+}
+
+/**
+ * Elige el almacén por entorno: con `KL_STORE_BUCKET` → Cloud Storage (el de producción); sin él → almacén local **solo de desarrollo**
+ * (`KL_STORAGE_DIR`). En producción sin bucket se niega a arrancar.
+ */
+export function objectStoreFromEnv(env: NodeJS.ProcessEnv = process.env): { store: ObjectStore; kind: "gcs" | "local" } {
+  if (env.KL_STORE_BUCKET) {
+    // Import diferido: el adaptador no se carga si no se usa.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { GcsObjectStore } = require("./gcs-object-store") as typeof import("./gcs-object-store");
+    return { store: new GcsObjectStore(env.KL_STORE_BUCKET, env.KL_GCS_ENDPOINT ? { endpoint: env.KL_GCS_ENDPOINT } : {}), kind: "gcs" };
+  }
+  if (env.NODE_ENV === "production") throw new Error("KL_STORE_BUCKET es obligatorio en producción (B9: bucket privado con retención)");
+  return { store: new LocalObjectStore(env.KL_STORAGE_DIR ?? "./.kl-storage", env), kind: "local" };
 }

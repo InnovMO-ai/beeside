@@ -3,7 +3,7 @@ import { Pool } from "pg";
 import { withServiceAttestation } from "../db/attested-tx";
 import { workerPools, WorkerKlPools } from "../db/pools";
 import { KlConfigError, workerKlConfig } from "../config/env";
-import { LocalObjectStore, ObjectStore } from "../ingest/object-store";
+import { ObjectStore, objectStoreFromEnv } from "../ingest/object-store";
 import { BrowserLike, launchChromium } from "../products/render/pdf";
 import { renderEditionJob } from "../products/render/render-edition";
 
@@ -120,9 +120,10 @@ if (require.main === module) {
       let runtime: RenderRuntime | null = null;
       try {
         if (process.env.KL_RENDER_ENABLED === "true") {
-          // El almacenamiento de producción (bucket privado con retención, B9) llega con G2; en local solo el de desarrollo.
-          if (process.env.NODE_ENV === "production") throw new KlConfigError("KL_RENDER_ENABLED requiere el adaptador de almacenamiento de producción (B9, pendiente)");
-          runtime = createRenderRuntime(pools, new LocalObjectStore(process.env.KL_STORAGE_DIR ?? "./.kl-storage"));
+          // Almacén por entorno: Cloud Storage con KL_STORE_BUCKET (producción, B9); sin él, el almacén local solo de desarrollo (en producción se niega).
+          const { store, kind } = objectStoreFromEnv(process.env);
+          process.stdout.write(`${JSON.stringify({ level: "info", message: "kl-worker object store", kind })}\n`);
+          runtime = createRenderRuntime(pools, store);
         }
         const r = await runCycle(pools, runtime ? { ...DEFAULT_HANDLERS, ...runtime.handlers } : DEFAULT_HANDLERS);
         process.stdout.write(`${JSON.stringify({ level: "info", message: "kl-worker cycle", ...r })}\n`);

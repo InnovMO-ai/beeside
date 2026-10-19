@@ -7,6 +7,7 @@ import { startAuditCorrelation } from "./audit/correlation";
 import { startReconciler } from "./identity/reconcile";
 import { createPublicEditionRouter } from "./products/delivery";
 import { KlReadService } from "./read/read-service";
+import { objectStoreFromEnv } from "./ingest/object-store";
 import { RateLimiter } from "../security/rate-limit";
 
 /**
@@ -30,7 +31,8 @@ export function klRuntimeFromEnv(env: NodeJS.ProcessEnv, admin: AdminDeps | unde
   if (!admin) throw new Error("KL Admin requiere el Admin API del Control Center (ADMIN_API_ENABLED=true)");
   const pools = backendPools(config);
   const runtime: KlRuntime = {
-    admin: { platform: admin.fa.db, session: admin.session, klApp: pools.app, now: admin.fa.config.now },
+    // Con KL_STORE_BUCKET el backend lee (solo lectura por IAM) las vistas previas y las ediciones del bucket; sin él, esas rutas responden «no disponible».
+    admin: { platform: admin.fa.db, session: admin.session, klApp: pools.app, now: admin.fa.config.now, ...(env.KL_STORE_BUCKET ? { store: objectStoreFromEnv(env).store } : {}) },
     pools,
     read: new KlReadService(pools.reader),
     publicEditions: (limiter) => createPublicEditionRouter(new KlReadService(pools.reader), limiter ? { limiter } : {}),
