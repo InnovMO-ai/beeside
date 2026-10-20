@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "Which databases this build's migrator may migrate, and up to which migration. Read by dist/scripts/migrate.js before anything is applied (ADR-002). Changing this file requires Architecture review (CODEOWNERS).",
+  "targets": {
+    "discovery": { "maxMigration": "0023_fa4_public_v1_envelope_integrity", "reason": "Legacy Discovery production database: its authorized sequence ends at 0023 until the cutover to `beeside`; after the cutover it is never migrated again." },
+    "fa4_staging": { "maxMigration": "0023_fa4_public_v1_envelope_integrity", "reason": "Internal FA4 staging database (dev project): mirrors the legacy Discovery schema." },
+    "beeside": { "maxMigration": null, "reason": "Canonical shared database (Discovery + Precision): receives the full sequence." }
+  }
+}
