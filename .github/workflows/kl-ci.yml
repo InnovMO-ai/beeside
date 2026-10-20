@@ -1,0 +1,90 @@
+name: KL CI (aislado)
+
+# CI aislado de Knowledge Layer 1.0: PostgreSQL 16 efímero, Chromium fijado para el generador de PDF, datos sintéticos, sin secretos, sin despliegue y sin tocar
+# ninguna base compartida (CR-KL-002 Handoff §4 y §7). Solo corre para la rama feat/kl-1.0-code.
+on:
+  push:
+    branches: ["feat/kl-1.0-code"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kl-tests:
+    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Superusuario del servicio efímero: el arnés crea los roles kl_* y las bases beeside / beeside_kl.
+      KL_TEST_PG_URL: postgres://postgres:ci@127.0.0.1:5432/postgres
+      PRECISION_KNOWLEDGE_PROVIDER: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Build shared packages
+        run: |
+          npm run build --workspace=shared/canonical-fields
+          npm run build --workspace=shared/fa-public-engine
+      - name: Chromium for the PDF generator (B6; pinned by the playwright-core version in the lockfile)
+        run: npx playwright-core install --with-deps chromium
+      - name: Typecheck and lint (KL and the files it touches)
+        working-directory: backend
+        run: |
+          npx tsc --noEmit -p tsconfig.json
+          npx eslint "src/kl/**/*.ts" "src/admin/kl/**/*.ts" src/index.ts
+      - name: KL tests (R1 X01-X22/X28/X29, R2 X30, R3 AC-10/X19, rehearsal of E1-E10)
+        working-directory: backend
+        run: npx jest -c src/kl/jest.kl.config.js --ci
+
+      - name: AC-10 candidate baseline for this platform (artifact only, never committed by CI)
+        working-directory: backend
+        run: |
+          KL_AC10_DUMP_DIR="$RUNNER_TEMP/ac10-pdfs" KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
+          cp src/kl/products/ac10-baseline.json "$RUNNER_TEMP/ac10-candidate.json"
+          # reference document of the container smoke: host fingerprint candidate (compared with the image's in kl-images)
+          KL_UPDATE_AC10_BASELINE=1 npx jest -c src/kl/jest.kl.config.js --ci src/kl/__tests__/r3-smoke-reference.test.ts
+          cp src/kl/products/ac10-smoke-baseline.json "$RUNNER_TEMP/ac10-smoke-host.json"
+          # second pass in normal mode: the rewritten baseline must match a fresh render, and an immediate repeat must be identical
+          npx jest -c src/kl/jest.kl.config.js --ci -t "AC-10 · línea de referencia" src/kl/__tests__/r3-render.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ac10-linux-candidate
+          path: |
+            ${{ runner.temp }}/ac10-candidate.json
+            ${{ runner.temp }}/ac10-smoke-host.json
+            ${{ runner.temp }}/ac10-pdfs/
+          if-no-files-found: ignore
+
+  # Validación REAL de las imágenes (G2): construye runtime y runtime-kl-worker y ejecuta las pruebas de humo (ver scripts/kl/smoke/images.sh).
+  # Sin credenciales de GCP, sin subir imágenes, render con --network none. Su resultado es lo que cierra «validación de imagen PENDIENTE G2».
+  kl-images:
+    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
+    runs-on: ubuntu-latest
+    env:
+      PRECISION_KNOWLEDGE_PROVIDER: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build both Dockerfile targets and smoke-test them
+        env:
+          # "1": the container render must equal the host fingerprint in ac10-smoke-baseline.json (recorded 2026-10-17).
+          KL_SMOKE_REQUIRE_BASELINE: "1"
+        run: bash scripts/kl/smoke/images.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kl-image-smoke
+          path: scripts/kl/smoke/out/
+          if-no-files-found: ignore

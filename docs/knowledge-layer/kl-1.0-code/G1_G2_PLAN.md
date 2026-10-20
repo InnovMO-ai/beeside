@@ -1,0 +1,350 @@
+# KL 1.0 · Plan ejecutable G1–G2 (diagnóstico y preparación)
+
+Estado: **PREPARADO; ensayo D2 EJECUTADO en instancia desechable (ya destruida); la instancia compartida NO se tocó** (ver §9). Fecha del diagnóstico: 2026-10-16. Alcance observado: proyecto `beeside-dev-508220`, región `northamerica-south1`, con la cuenta `mo@beeside.you` (roles/owner), **solo con lecturas**. No se creó ni cambió ningún recurso. No se leyó ni se mostró ningún valor de secreto; de tres secretos de cadena de conexión se extrajo únicamente el nombre del usuario de base de datos (la contraseña nunca se imprimió).
+Staging y producción no existen como proyectos desplegados (los `envs/staging|production` de Terraform son andamios sin aplicar y con bucket de estado sin definir): este plan es para **dev**.
+
+---
+
+## 0. Resumen y limitación material
+
+**Viabilidad.** Crear `beeside_kl` en la instancia existente es técnicamente posible, pero **hoy G1 no se puede dar por cumplido ni asegurar por diseño**. Hay una limitación material que conviene decidir antes de cualquier cambio:
+
+1. **El principal `app` de la plataforma es `beeside_app`, y es a la vez el usuario de runtime del backend, el migrador y dueño de la base `beeside`.** Se creó con la API de Cloud SQL, así que es miembro de `cloudsqlsuperuser` (con CREATEROLE y CREATEDB). La evidencia es doble: `docs/deployment/README.md` §1 lo afirma y el job existente `fa4-staging-prepare` ya crea roles por SQL con esa credencial. El secreto `beeside-dev-database-url` que usa `beeside-dev-backend-api` conecta como `beeside_app` (verificado: solo el nombre de usuario).
+   Consecuencia: el mismo proceso que recibirá `kl_app` y `kl_reader_precision` es un miembro de `cloudsqlsuperuser`. El riesgo exacto que CR-KL-002 §8.3 nombra (ADMIN de `cloudsqlsuperuser` sobre roles `kl_*`) es el que hay que descartar con evidencia real.
+2. **El ensayo local de E1–E10 no cubre ese riesgo.** `privilege-rehearsal.test.ts` imita a `app` con un rol `NOSUPERUSER NOCREATEROLE`, no con un miembro de `cloudsqlsuperuser`. Su propio encabezado lo dice. Lo comprobado localmente no sustituye nada de G1.
+3. **Cómo se crean los roles decide si G1 puede pasar.** CR-KL-002 §8.1 dice "usuarios de Cloud SQL". Si los cinco `kl_*` se crean por la API (Terraform `google_sql_user`), **entran a `cloudsqlsuperuser` automáticamente** (CREATEROLE/CREATEDB: contradice `roles.sql`, que los define `NOCREATEROLE NOCREATEDB`) y pueden quedar administrados por ese grupo. Deben crearse **por SQL** con un aprovisionador de un solo uso, y eliminarse sus membresías/ADMIN después (la base es PostgreSQL 16, donde CREATEROLE ya no administra roles ajenos, y eso favorece el diseño; hay que verificarlo en Cloud SQL, no suponerlo).
+4. **Plano IAM compartido (ya aceptado en CR-KL-002 §12, pero conviene dimensionarlo):** quien tenga `cloudsql.users.update` (hoy solo el owner humano) puede restablecer la contraseña de `kl_owner` por la API. Ningún aislamiento a nivel de base lo evita. Además las cuatro Cloud Run Services corren con la **cuenta compute por defecto**, que ya lee `beeside-dev-database-url` y los secretos `fa4-*`; si `kl_app`/`kl_reader_precision` se le conceden, también los leerán `fa4-staging-*`.
+
+**Recomendación.** (a) Ensayar primero el protocolo en una **instancia desechable PostgreSQL 16** (`db-f1-micro`, horas de vida, destruida al terminar) que reproduce la semántica de `cloudsqlsuperuser` sin tocar la instancia compartida. (b) Si E2/E4/E5/E8 pasan allí, ejecutar el mismo procedimiento en la instancia compartida con DB y roles vacíos y repetir E1–E10 antes de cualquier migración. (c) Si alguno falla, **no se debilita nada**: la alternativa es una instancia dedicada `beeside-dev-kl-db` (aislamiento duro: su propio `cloudsqlsuperuser`, `max_connections`, PITR y mantenimiento) o usuarios IAM de base de datos. Es decisión de Plataforma/PO (ver §7).
+
+---
+
+## 1. Estado real de la infraestructura (dev)
+
+| Recurso | Hallazgo |
+|---|---|
+| Cloud SQL | `beeside-dev-canonical-db`, POSTGRES_16, `db-g1-small`, ZONAL, disco 10 GB, IPv4 público sin redes autorizadas, `sslMode TRUSTED_CLIENT_CERTIFICATE_REQUIRED` (solo conector/proxy), PITR activo (7 días), 7 respaldos automáticos (último 2026-10-16 09:00 UTC), sin `databaseFlags` (sin `cloudsql.iam_authentication`), `deletionProtection=false` |
+| Bases | `beeside`, `fa4_staging`, `postgres`. **`fa4_staging` no está en Terraform** |
+| Usuarios (todos BUILT_IN) | `beeside_app`, `fa4_staging_runtime`, `postgres`. Ningún usuario IAM |
+| Cloud Run Services | `beeside-dev-backend-api`, `beeside-dev-frontend-app`, `fa4-staging-backend`, `fa4-staging-web`: todos con la **cuenta compute por defecto** |
+| Cloud Run Jobs | `beeside-dev-migrate` y `fa4-staging-prepare`, ambos con `beeside-dev-migration-runner` (la SA del migrador **se comparte con FA4**) |
+| Secret Manager | `beeside-dev-db-password`, `-database-url`, `-migration-database-url`, placeholders, `fa4-*`. Acceso por secreto (sin `secretAccessor` a nivel de proyecto): compute SA → `database-url`, `fa4-*`; migration-runner → `migration-database-url` y `fa4-staging-db-runtime-password`. `beeside-dev-db-password` sin enlaces |
+| IAM de proyecto | `owner: mo@beeside.you`; `cloudsql.client`: compute SA y migration-runner (a nivel de proyecto, único alcance posible). Sin `editor` |
+| Red | `beeside-dev-vpc` + `default`. Sin routers/Cloud NAT, sin políticas de firewall de red. El backend no usa VPC (Cloud SQL por conector `/cloudsql`) |
+| Almacenamiento | Buckets: `beeside-dev-508220_cloudbuild` y el de estado de Terraform. **No hay bucket de KL** |
+| APIs | Habilitadas: sqladmin, secretmanager, storage, cloudbuild. **Cloud Scheduler no está habilitado** (error `PERMISSION_DENIED` al listar) |
+| Artifact Registry | repositorio `beeside-dev` (DOCKER) |
+| Herramientas locales | `gcloud`, `terraform`, `cloud-sql-proxy`, `psql` presentes. **Docker/Podman no** |
+| Deriva | Terraform no gestiona `fa4_*`, `beeside-dev-database-url` ni `fa4-staging-prepare`. No se ejecutó `terraform plan` (lock de estado); queda como primer paso de G2 con `-lock=false` |
+
+## 2. Credenciales y privilegios actuales (G1.1–G1.2)
+
+| Principal | Uso | Capaz de afectar `beeside_kl`? |
+|---|---|---|
+| `beeside_app` | Runtime del backend **y** migrador de `beeside`, dueño de `beeside`; miembro de `cloudsqlsuperuser` | **Sí, potencialmente** (CREATEROLE, CREATEDB). Es el principal crítico de E1–E10 |
+| `postgres` | Usuario integral de Cloud SQL (también `cloudsqlsuperuser`). Su contraseña no está en Secret Manager | Sí, igual que `beeside_app`. No hay credencial disponible para probarlo (ver decisión D6) |
+| `fa4_staging_runtime` | Runtime de FA4, rol creado por SQL | Probablemente no (rol de aplicación), debe probarse |
+| Compute SA | Runtime de 4 servicios; `cloudsql.client` + secretos de `database-url`/`fa4-*` | No puede cambiar usuarios de BD (no tiene `cloudsql.admin`); sí abrirá conexiones |
+| `beeside-dev-migration-runner` | Jobs `migrate` y `fa4-staging-prepare` | Recibe la credencial de `beeside_app` (migración) |
+| `mo@beeside.you` (owner) | Humano | Puede restablecer cualquier contraseña por API y leer todo secreto (alcance IAM aceptado) |
+
+## 3. Local vs. real
+
+| Control | Comprobado localmente | Exige Cloud SQL real |
+|---|---|---|
+| E1–E10 con rol `app` simple (NOCREATEROLE) | ✅ ensayo local | — |
+| E1–E10 con miembro de `cloudsqlsuperuser` | ❌ no reproducible | ✅ (G1, X23) |
+| Aislamiento de esquema, funciones, atestación, `NOLOGIN`/LOGIN, límites por rol | ✅ 350 pruebas | Repetir E7/E9 y límites por rol |
+| Roles creados por API vs. por SQL, ADMIN heredado de `cloudsqlsuperuser` | ❌ | ✅ |
+| `max_connections` real y margen frente a plataformas | ❌ | ✅ (`SHOW max_connections`, sesiones activas) |
+| Conector `/cloudsql` (socket Unix) con los pools de KL | ❌ (solo TCP) | ✅ (smoke de `kl-migrate`) |
+| Respaldo/restauración (X24), X26, X27, secretos por cuenta | ❌ | ✅ (G2) |
+| Imágenes `runtime` y `runtime-kl-worker`, Chromium en contenedor | ❌ (sin Docker) | ✅ builds reales |
+| Cloud Scheduler, bucket con retención, GCS como `ObjectStore` | ❌ | ✅ — **y no existe todavía implementación GCS** (solo `LocalObjectStore`; en producción lanza error) |
+
+---
+
+## 4. G1 · Procedimiento de pruebas E1–E10 (X23)
+
+Ejecución: desde el equipo del operador con `cloud-sql-proxy` (la instancia exige conector) y las credenciales de cada principal leídas en memoria; salida guardada en `docs/knowledge-layer/kl-1.0-code/evidence/G1/<fecha>/` (sin contraseñas). Se ejecuta **como `beeside_app`, `fa4_staging_runtime` y `postgres`** (ver D6). **Precondición:** `beeside_kl` y los cinco `kl_*` creados según §5.2 y **sin migrar**. Resultado exigido: todos fallan salvo E7 (`false`), E8 (0 filas), E9 (solo `kl_owner`).
+
+```sql
+-- E1 (conexión a la base): \c beeside_kl            → permission denied for database
+-- E2  GRANT kl_owner TO CURRENT_USER;  (y kl_app, kl_reader_precision, kl_agent, kl_knowledge)  → error
+-- E3  SET ROLE kl_owner;               (cada kl_*)                                               → error
+-- E4  ALTER ROLE kl_app PASSWORD 'x';  ALTER ROLE kl_app LOGIN;  DROP ROLE kl_app;  (cada kl_*)   → error
+-- E5  CREATE ROLE x_probe IN ROLE kl_owner;  CREATE ROLE x_probe ADMIN kl_owner;                 → error (si algo se creó: DROP ROLE x_probe y registrar FALLO)
+-- E6  ALTER DATABASE beeside_kl OWNER TO CURRENT_USER;                                           → error
+-- E7  SELECT r, pg_has_role(CURRENT_USER, r, 'MEMBER')
+--       FROM unnest(ARRAY['kl_owner','kl_app','kl_reader_precision','kl_agent','kl_knowledge']) r; → todo false (recursivo)
+-- E8  SELECT roleid::regrole, member::regrole, grantor::regrole, admin_option, inherit_option, set_option
+--       FROM pg_auth_members
+--      WHERE roleid::regrole::text LIKE 'kl\_%' AND (member::regrole::text IN ('cloudsqlsuperuser', CURRENT_USER) OR admin_option);
+--                                                                                                 → ninguna fila
+-- E9  SELECT datname, pg_get_userbyid(datdba) FROM pg_database WHERE datname='beeside_kl';
+--     (conectado como kl_owner) SELECT DISTINCT pg_get_userbyid(relowner) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT IN ('pg_catalog','information_schema','pg_toast');
+--     más proowner, nspowner, typowner                                                           → solo kl_owner
+-- E10 (como cada kl_* ): SELECT * FROM <tabla de beeside>; con la conexión a beeside            → permission denied / not authorized
+--     Verificar además CONNECT de PUBLIC en beeside (decisión de Plataforma, D5)
+```
+
+**Pruebas adicionales recomendadas (no exigidas por CR-KL-002; barato y relevante):** E11 `DROP DATABASE beeside_kl`; E12 `pg_terminate_backend()` sobre sesiones `kl_*`; E13 `GRANT CONNECT ON DATABASE beeside_kl TO CURRENT_USER`; E14 que ningún `kl_*` sea miembro de `cloudsqlsuperuser` ni tenga `rolcreaterole/rolcreatedb/rolsuper` (`pg_roles`); E15 lectura de `pg_authid`/`pg_shadow` (hashes) denegada.
+
+**Criterio de cierre G1:** evidencia de los tres principales, E1–E10 con el resultado exigido, E14 limpio y el SQL de salida archivado. Hasta entonces **G1 = NO APROBADO**.
+
+## 5. G2 · Preparación de infraestructura
+
+### 5.1 Cambios de Terraform a preparar (nuevo módulo `modules/kl-database`, sin tocar los existentes)
+- `google_sql_database "beeside_kl"` **creada sin dueño KL aún** (la crea el aprovisionador con `OWNER kl_owner`, ver §5.2). Si Terraform la crea, el dueño inicial sería `cloudsqladmin`/API: se evita con SQL.
+- **Sin** `google_sql_user` para los `kl_*` (evita la membresía automática de `cloudsqlsuperuser`). Contraseñas: `random_password` ×5 → un secreto por rol (`beeside-dev-kl-{owner,app,reader,agent,knowledge}-url`, cadena de conexión `/cloudsql`), sin datos de otras plataformas.
+- Cuentas de servicio nuevas: `kl-migrate@` (solo `kl-owner-url`), `kl-worker@` (solo `kl-agent-url`, `kl-knowledge-url` + bucket KL), `kl-bootstrap@` (temporal, ver CR §5). `cloudsql.client` a nivel de proyecto (único alcance posible).
+- IAM por secreto: la cuenta del backend solo `kl-app-url` y `kl-reader-url` (X26); `kl-worker` sin acceso a `beeside-*` (X27). **Depende de D3**: sin SA propia para el backend, `fa4-staging-*` también podría leerlos.
+- Job `beeside-dev-kl-migrate` (imagen `runtime`, comando `node dist/kl/db/migrate-cli.js`), Cloud Run Job `beeside-dev-kl-worker` (imagen `runtime-kl-worker`, 2 GiB, `KL_RENDER_ENABLED=true`, `KL_AGENTS_ENABLED=false`), Cloud Scheduler cada 5 min (requiere habilitar `cloudscheduler.googleapis.com`).
+- Bucket privado KL (originales + PDF publicados `kl/editions|previews/…`): retención, versionado, UBLA, y un segundo bucket para exportaciones de `beeside_kl`.
+- `PRECISION_KNOWLEDGE_PROVIDER=off`, `KL_AGENTS_ENABLED` ausente/false en todo.
+- Fuera de G2 (G3): Cloud NAT, Direct VPC egress y política de firewall; **no** se prepara tráfico externo.
+
+### 5.2 Creación de roles y base (procedimiento por SQL, un solo uso)
+1. Crear `kl_provisioner` (usuario de API, vida corta, cloudsqlsuperuser) con contraseña temporal en memoria.
+2. Como `kl_provisioner`: ejecutar `db/bootstrap/roles.sql` (ya probado localmente: LOGIN, `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, límites de conexión y tiempos por rol), luego `CREATE DATABASE beeside_kl OWNER kl_owner`, `ALTER ROLE … PASSWORD` (cada una desde Secret Manager), `REVOKE ALL ON DATABASE beeside_kl FROM PUBLIC`.
+3. Retirar el rastro del aprovisionador: `REVOKE`/`DROP OWNED` de cualquier `ADMIN OPTION` que PG16 le haya dado como creador, y **eliminar `kl_provisioner`** (`gcloud sql users delete`).
+4. Repetir E1–E10 (G1). Solo con G1 aprobado se ejecuta `kl-migrate` (KL-0001…0005).
+5. `GRANT CONNECT` y `REVOKE … PUBLIC` dentro de `beeside_kl` los hace la migración KL-0001 (§8.2).
+
+### 5.3 Respaldo, restauración y rollback
+- **Antes de cada migración:** `gcloud sql export sql` de `beeside_kl` al bucket de exportaciones (KL no guarda datos de clientes, D19). Además, exportación diaria programada.
+- **Restauración (X24):** `gcloud sql import sql` a `beeside_kl_restore` (base nueva con dueño `kl_owner`), recuento y huellas de tablas contra el origen; Precision resuelve como `unknown` lo faltante. Se prueba una vez en G2.
+- **Rollback por etapa:** (i) antes de migrar: `DROP DATABASE beeside_kl` y `DROP ROLE kl_*` (vacíos, sin riesgo para otras plataformas) + borrar secretos/SA/job (Terraform destroy del módulo); (ii) después de migrar: migración correctiva o restauración de la exportación previa; (iii) PITR de instancia **no** se usa para KL salvo desastre, porque revertiría `beeside` y `fa4_staging` (impacto cruzado).
+- El módulo nuevo no modifica recursos existentes; `terraform plan` debe mostrar solo adiciones.
+
+### 5.4 Despliegue independiente de `kl-worker`
+Imagen `runtime-kl-worker` (`backend/Dockerfile`, ya aprobada) → Cloud Run Job propio con SA `kl-worker@`, sin acceso a `beeside-*`, sin ingreso, `max_retries` bajo, tiempo de ejecución limitado, disparado por Cloud Scheduler. Despliegue **fuera** de `deploy-dev.yml` (que solo conoce API, frontend y `WORKER_SERVICE_NAME`): workflow/paso `kl-deploy` independiente y manual (`workflow_dispatch`), para que un merge a `main` no cambie nada de KL.
+
+### 5.5 Builds y smoke tests reales (sin Docker local)
+Opciones, de menor a mayor impacto: **(A)** job en `kl-ci.yml` (runner con Docker, sin credenciales de GCP, sin push de imagen): `docker build --target runtime` y `--target runtime-kl-worker`; smoke: API arranca y `/health` responde con KL desconfigurado (el backend se comporta como antes); worker: `node dist/kl/worker/kl-worker.js` con `KL_RENDER_ENABLED=true` genera el PDF de prueba en el contenedor, con red bloqueada, y compara contra la línea base AC-10 de **linux** (hay que añadir la clave `linux-x64-chromium-<ver>-lato`; la actual es `darwin-arm64`). Requiere **push de la rama** (D1). **(B)** Cloud Build ya habilitado (`gcloud builds submit`) hacia Artifact Registry `beeside-dev` solo con etiqueta `kl-g2-<sha>`, sin desplegar: crea artefactos en el proyecto compartido (D2).
+
+### 5.6 Recursos y límites adicionales
+- Conexiones previstas de KL: pools backend 3+3, worker 2+2, migrador 1 = **11**; topes por rol 4+8+8+4+4 = **28**. Con `max_instances=3` del backend el pico puede acercarse a 18+. `max_connections` real **sin verificar** (la documentación de Cloud SQL lo deriva de la memoria de `db-g1-small`, 1,7 GB; medirlo con `SHOW`, sumar sesiones de `beeside`, `fa4_staging`). Reducir topes si el margen es menor al 30 %.
+- CPU/memoria de `db-g1-small` compartida (núcleo compartido): el planificador y la compilación pueden competir con `beeside`/FA4; se recomienda `db-custom-1-3840` si el margen es bajo (cambio de instancia compartida: decisión de Plataforma).
+- Nuevos costos: Cloud Run Job (+2 GiB, 5 min), Scheduler (3 jobs gratuitos), buckets (retención), Secret Manager (5 secretos), instancia desechable de ensayo (horas). Cuantificar en la calculadora antes de aprobar; no se estimó aquí.
+- Código aún faltante para G2 (se hace tras la autorización de la fase): implementación `GcsObjectStore` (dependencia `@google-cloud/storage`, a aprobar como cambio compartido), cliente de conexión por socket `/cloudsql` en los pools de KL, clave de línea base de PDF para linux.
+
+## 6. Pasos de ejecución propuestos (cada uno con su rollback)
+
+| # | Paso | Cambia | Rollback | Aprobación |
+|---|---|---|---|---|
+| 0 | `terraform plan -lock=false` del dev actual (medir deriva) y `SHOW max_connections`/sesiones por proxy en solo lectura | nada | n/a | D4 |
+| 1 | Instancia desechable PG16: ensayo de §5.2 y E1–E15 | instancia temporal | `gcloud sql instances delete` | D2 |
+| 2 | Decisión go/no-go según resultado de 1 (misma instancia o dedicada) | — | — | PO |
+| 3 | Crear bucket(s), SA, secretos, habilitar Scheduler (Terraform módulo nuevo, `plan` solo adiciones) | proyecto dev | `terraform destroy -target` del módulo | PO |
+| 4 | Aprovisionar roles + `beeside_kl` vacía (§5.2) y correr E1–E10 como los 3 principales | instancia compartida | `DROP DATABASE beeside_kl; DROP ROLE kl_*` | PO |
+| 5 | G1: evidencia archivada y firmada; si falla, parar y escalar | — | paso 4 | PO |
+| 6 | Exportación previa + `kl-migrate` (KL-0001…0005) | `beeside_kl` | restauración / migración correctiva | PO |
+| 7 | X24 restauración, X26, X27 | `beeside_kl_restore` | `DROP DATABASE` | PO |
+| 8 | `kl-bootstrap` (una vez) y retiro de sus accesos | filas KL | migración correctiva | PO |
+| 9 | Builds `runtime`/`runtime-kl-worker` + smoke; despliegue del `kl-worker` con agentes **apagados** | Cloud Run Job | borrar job/Scheduler | PO |
+
+## 7. Riesgos de impacto sobre otras plataformas
+
+| Riesgo | Nivel | Mitigación |
+|---|---|---|
+| Agotar `max_connections` o CPU de la instancia compartida y degradar Discovery/Precision/FA4 | Medio | Topes por rol, medición previa, `statement_timeout`, tier |
+| Mantenimiento/reinicio de instancia afecta a KL y viceversa (incluido activar `cloudsql.iam_authentication`, que reinicia) | Medio | Ventana acordada; no activar el flag sin D7 |
+| Un error en el aprovisionamiento deja roles/privilegios en la instancia compartida | Alto si no se ensaya | Paso 1 (instancia desechable) y paso 4 con base vacía |
+| `beeside_app` (cloudsqlsuperuser) puede escalar sobre `kl_*` | **Alto, abierto** | G1 real; si falla E2/E4/E5/E8 → instancia dedicada o IAM auth, sin debilitar |
+| Compute SA compartida da acceso a `fa4-*` a credenciales de KL | Medio | SA propia del backend (D3) |
+| `kl-migrate` o `kl-worker` reutilizan la SA `migration-runner` | Alto | SA nuevas, nunca la compartida |
+| Deriva de Terraform (recursos `fa4_*` fuera de estado) causa un `apply` destructivo | Medio | `plan` previo, módulo nuevo aislado, sin `apply` global |
+| PITR/restauración de instancia revierte otras plataformas | Medio | Respaldo lógico propio de `beeside_kl` |
+| Imagen del worker (Chromium) sin validar | Medio | Paso 9 / §5.5; no declarar producción |
+| Objeto de almacenamiento GCS no implementado | Bloqueante de G2 | Cambio de código a aprobar |
+
+## 8. Decisiones y aprobaciones que necesita el PO
+
+| ID | Decisión |
+|---|---|
+| D1 | Autorizar **push** de `feat/kl-1.0-code` para ejecutar los builds y smoke tests en CI (§5.5-A), sin credenciales de GCP |
+| D2 | Autorizar la **instancia PG16 desechable** de ensayo (creación y destrucción) y, de preferirse, Cloud Build con etiqueta `kl-g2-*` (§5.5-B) |
+| D3 | Crear una **cuenta de servicio propia** para `beeside-dev-backend-api` (hoy compute por defecto, compartida con FA4). Cambia un servicio existente |
+| D4 | Autorizar lecturas de apoyo: `terraform plan -lock=false` y conexión de solo lectura por proxy (`SHOW max_connections`, `pg_stat_activity`) a `beeside_app` |
+| D5 | Plataforma: revocar `CONNECT` de PUBLIC en `beeside` y `fa4_staging` (E10) |
+| D6 | Cómo probar como `postgres`: restablecer temporalmente su contraseña (modifica la instancia) o aceptar la equivalencia con `beeside_app` documentada |
+| D7 | Si G1 falla: instancia dedicada `beeside-dev-kl-db` **o** usuarios IAM de base de datos (requiere reiniciar la instancia compartida) |
+| D8 | Aprobar el cambio compartido para `@google-cloud/storage` y el `GcsObjectStore` |
+| D9 | Habilitar `cloudscheduler.googleapis.com` en dev |
+| D10 | Aceptar `db-g1-small` si hay margen de conexiones, o cambiar de tier |
+
+Sin ninguna de estas aprobaciones no se ejecuta nada. **No declaro G1 aprobado ni G2 listo.**
+
+---
+
+## 9. Resultado del ensayo D2 (2026-10-16)
+
+Instancia desechable `g1-rehearsal-kl` (PG16, `db-f1-micro`, ENTERPRISE) en `beeside-dev-508220`; reproduce la semántica de usuarios por API/`cloudsqlsuperuser`. Se imitó el estado de la compartida (`beeside_app` por API, `postgres`, `fa4_staging_runtime` por SQL, bases `beeside`/`fa4_staging`) y se aprovisionó KL según §5.2 (roles por SQL con `roles.sql`, `beeside_kl` con dueño `kl_owner`, aprovisionador sin ADMIN residual). Contraseñas aleatorias en memoria, jamás impresas y borradas; la instancia fue **eliminada** y `gcloud sql instances list` solo muestra `beeside-dev-canonical-db`. Evidencia: `evidence/G1-rehearsal-2026-10-16/`. Las E se ejecutaron contra roles `kl_*` aprovisionados y una base `beeside_kl` con esquema `kl` simulado (sin las migraciones KL-0001…0005).
+
+| Principal | E1 | E2 GRANT | E3 SET ROLE | E4 ALTER/DROP | E5 CREATE ROLE | E6 OWNER | E7 | E8 | E11 DROP DB | E12 terminar sesiones | E14 | E15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `beeside_app` (API, `cloudsqlsuperuser`) | falla ✅ | **ÉXITO ❌** | **ÉXITO ❌** | **ÉXITO ❌** (PASSWORD, NOLOGIN) | **ÉXITO ❌** | **ÉXITO ❌** | **todo true ❌** | **5 filas ❌** | **ÉXITO ❌** | n/c | 0 ✅ | falla ✅ |
+| `postgres` (`cloudsqlsuperuser`) | — | **ÉXITO ❌** | no concluyente: `SET ROLE kl_app` falló porque solo se concedió `kl_owner` (el `GRANT kl_owner TO postgres` tuvo éxito, y se revirtió) | **ÉXITO ❌** | — | — | — | — | — | **2 sesiones terminadas ❌** | — | — |
+| `fa4_staging_runtime` (rol simple por SQL) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | sin efecto ✅ | 0 ✅ | falla ✅ |
+| `beeside_app` **degradado** (`REVOKE cloudsqlsuperuser`, `NOCREATEROLE NOCREATEDB`) | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | falla ✅ | todo false ✅ | 0 ✅ | falla ✅ | falla ✅ (necesita `pg_signal_backend`) | 0 ✅ | falla ✅ |
+
+Además: E9 → solo `kl_owner` (más `pg_database_owner`, rol predefinido de PG para el esquema `public`; aceptable, documentar); E10 → los cinco `kl_*` reciben `permission denied` al leer una tabla de `beeside`; la degradación de `beeside_app` conserva su acceso a sus propias tablas y DDL. Controles: un rol creado **por la API** (`kl_provisioner`) también fue tomado por `beeside_app` (`GRANT` a sí mismo, `ALTER ROLE … PASSWORD`, `SET ROLE`), y un usuario **IAM** de base de datos (cuenta de servicio) también fue manipulado por `postgres` (`GRANT`, `SET ROLE`, `ALTER ROLE NOLOGIN`, `DROP ROLE` con éxito).
+
+### Conclusiones
+1. **G1 FALLA en el estado actual de la plataforma.** Cualquier miembro de `cloudsqlsuperuser` administra por completo todo rol no superusuario de la instancia, sea creado por API, por SQL o IAM, sin ADMIN explícito en `pg_auth_members` (E8 sí lo detecta para `beeside_app` por haberse concedido a sí mismo). Esto contradice el supuesto de CR-KL-002 §8.3 y cierra las dos vías que el addendum sugería primero: **crear los roles por SQL no basta, y la autenticación IAM tampoco** (la propia §8.3 mencionaba IAM; queda descartada como remedio *por sí sola*).
+2. Los principales que hoy son `cloudsqlsuperuser`: `beeside_app` (runtime del backend **y** migrador), `postgres` y, por construcción, cualquier usuario creado por API. **El backend en ejecución corre como uno de ellos.**
+3. Un principal ajeno que **no** sea `cloudsqlsuperuser` queda aislado; también `beeside_app` después de degradarlo, con E1–E15 limpios.
+
+### Opciones (decisión del PO/Plataforma)
+| | Opción | Efecto | Costo/impacto |
+|---|---|---|---|
+| **A** | **Instancia dedicada `beeside-dev-kl-db`** (recomendada) | Los únicos `cloudsqlsuperuser` son los de KL; aislamiento duro (también `max_connections`, PITR, mantenimiento). Ningún cambio en `beeside_app` ni en FA4 | Nueva instancia (no dimensionado aquí); contradice la decisión MVP1 "una instancia", pero es lo que CR-KL-002 §12 dejó como alternativa diferida |
+| **B** | Misma instancia + **degradar** `beeside_app` a rol simple (`REVOKE cloudsqlsuperuser`, `NOCREATEROLE NOCREATEDB`) y tratar `postgres` y los usuarios de API como inertes (contraseña no registrada, restablecible solo por IAM) | G1 pasa para los principales de la plataforma; sigue siendo un ajuste a una instancia viva de otras plataformas. `fa4-staging-prepare` usa `beeside_app` para `CREATE ROLE`: se rompería. Cualquier futuro usuario creado por API volvería a romper el aislamiento | Cambio en Discovery/Precision/FA4 (modificación de entorno compartido) |
+| **C** | Misma instancia sin cambios | **No permitido**: G1 no se cumple y CR-KL-002 prohíbe habilitar KL | — |
+
+**Recomendación: A.** B es viable técnicamente (ensayado), pero deja a KL dependiendo de una disciplina operativa sobre usuarios de otras plataformas y de que nadie cree otro usuario por API en la instancia compartida. En A el procedimiento de §5.2 y E1–E15 se mantiene idéntico; solo cambia el destino y se simplifica D5/D6 (no hay otros principales: solo `postgres` de la nueva instancia, a no registrar).
+
+### Pendientes tras el ensayo
+- E12 en el principal simple se verificó con sesión activa solo para `beeside_app` degradado; para `fa4_staging_runtime` quedó sin sesión activa (resultado "sin efecto" no es concluyente, pero PostgreSQL exige `pg_signal_backend`, que ese rol no tiene).
+- La prueba se hizo antes de KL-0001: repetir E1–E15 en el destino real tras la migración, porque KL-0001 concede CONNECT y define las ACL finales.
+- No ensayado: conector `/cloudsql` con los pools de KL, `max_connections` real de `db-g1-small` y X24/X26/X27.
+
+---
+
+## 10. Opción A aprobada: módulo Terraform y costo (preparado, NO aplicado)
+
+Decisión del PO (2026-10-16): **instancia dedicada `beeside-dev-kl-db`**. Preparado sin ejecutar: `infra/terraform/modules/kl-database`, `modules/kl-runtime`, `envs/dev-kl` (raíz propia con estado propio, prefijo `dev-kl`; no modifica `envs/dev|staging|production`) y `envs/dev-kl/RUNBOOK.md` (fases 0–6 con rollback).
+
+**Verificado offline:** `terraform validate` OK; `terraform plan` contra un estado local vacío (en copia temporal, con solo lecturas de datos): **38 recursos a crear, 0 a cambiar, 0 a destruir** (48 con `provisioner_enabled` y `scheduler_enabled`). No se creó ni cambió nada en GCP en esta fase.
+
+**Contenido:** instancia PG16 ENTERPRISE (`db-g1-small`, ZONAL, 10 GB, PITR + 7 respaldos, `deletion_protection=true`, TLS con certificado de cliente), sin `google_sql_user` para los `kl_*` (se crean por SQL), 5 secretos de conexión por rol (`/cloudsql`, base `beeside_kl`), aprovisionador de un solo uso conmutable, 3 cuentas de servicio nuevas (`migrate`, `worker`, `scheduler`), acceso por secreto (migrate→owner; worker→agent+knowledge; backend→app+reader), 2 buckets privados (almacén con retención de 30 días no bloqueada, exportaciones con versiones), jobs `migrate` y `worker` (agentes apagados, `PRECISION_KNOWLEDGE_PROVIDER=off`), y schedules opcionales **pausados**. Reutiliza solo hechos del proyecto (cuenta compute, cuenta de CI).
+
+**Cambios respecto a lo supuesto antes:** D5 y D6 dejan de ser necesarias (no hay otros principales en la instancia dedicada); D3 (SA propia del backend) sigue abierta: el backend actual comparte cuenta con `fa4-*`, que podrían leer `kl_app`/`kl_reader_precision` (sin escalada de BD, pero con acceso de aplicación). D7 queda resuelta con A.
+
+### Estimación de costo (mensual, dev, USD, orden de magnitud)
+Las fuentes de precios oficiales no se pudieron consultar de forma automática (la API de facturación no está habilitada en el proyecto y no se habilitó; la página de precios no se puede extraer). Las cifras salen de un agregador público y de tarifas generales: **confirmar en la calculadora de Google Cloud antes de aprobar**.
+
+| Concepto | Estimación | Nota |
+|---|---|---|
+| Instancia `db-g1-small` | ≈ 28 | Cifra de agregador para `northamerica-south1` (tabla MySQL; no verificada para PostgreSQL). Núcleo compartido |
+| Disco 10 GB SSD + respaldos/PITR | ≈ 2–4 | Datos mínimos (KL no guarda datos de clientes) |
+| Secret Manager (6 secretos) | < 1 | |
+| Almacenamiento (2 buckets, pocos GB) | < 1 | |
+| Cloud Run jobs | ≈ 0–5 | `worker` cada 5 min (288 ejecuciones/día) de pocos segundos; probablemente dentro del nivel gratuito. Chromium en 2 GiB |
+| Cloud Scheduler | 0 | 3 trabajos entran en el nivel gratuito por cuenta de facturación |
+| **Total** | **≈ 31–40** | Mayormente la instancia. Es costo **incremental** sobre la instancia canónica existente |
+
+Palanca: `db-f1-micro` (variable `tier`) cuesta una fracción, pero su `max_connections` y memoria son menores; los topes de conexión de KL (28 entre los cinco roles) deben revisarse antes de usarla. Para staging/producción habrá que dimensionar aparte (`db-custom-*`, REGIONAL).
+
+### Pendiente de aprobación antes de ejecutar (Fase 0 en adelante)
+D3 (SA del backend), D8 (`GcsObjectStore` y su dependencia), D9 (habilitar Cloud Scheduler) y autorización expresa de cada fase del RUNBOOK. Los archivos de `infra/` son componentes compartidos: quedan declarados en `scripts/kl/shared-changes.txt` como **preparados, sin autorización de aplicar**.
+
+### Fase 0 ejecutada (2026-10-16, solo lectura)
+`terraform init` (backend GCS, prefijo `dev-kl`) y `terraform plan -lock=false` contra el estado real: **`provisioner_enabled=false` → 38 a crear; `=true` → 42 a crear; en ambos 0 a cambiar y 0 a destruir.** No se aplicó nada, no se guardó el plan, no se modificó el estado de `envs/dev`. Los 48 de la comprobación anterior corresponden además a `scheduler_enabled=true`.
+
+### Fase 1 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase
+`terraform apply` en `envs/dev-kl` con `provisioner_enabled=true` (autorizado por el PO). Resultado: **42 recursos creados**, estado en `gs://beeside-terraform-state-dev-508220/dev-kl/`, plan final sin cambios (`-detailed-exitcode` = 0). Creados: instancia `beeside-dev-kl-db` (PG16 ENTERPRISE, `db-g1-small`, ZONAL, PITR, `sslMode=TRUSTED_CLIENT_CERTIFICATE_REQUIRED`, `deletion_protection` de Terraform activo), usuarios `postgres` (sin contraseña) y `kl_provisioner`, 6 secretos (`beeside-dev-kl-{owner,app,reader-precision,agent,knowledge}-url` y `-provisioner-password`) con acceso por secreto, 3 cuentas de servicio, 2 buckets, jobs `beeside-dev-kl-migrate` y `beeside-dev-kl-worker` (imagen de marcador, **sin ejecutar**). **Sin schedules, sin Cloud Scheduler, sin agentes.**
+
+Incidencias del apply (corregidas en el módulo y registradas): (1) la instancia falló por `require_ssl=false` implícito del proveedor frente a `ssl_mode`; se agregó `require_ssl = true` y la instancia se creó en el reintento; (2) los jobs fallaron porque `latest` de los secretos aún no existía; se agregó `depends_on = [module.kl_database]` y los dos jobs fallidos (marcados *tainted*) se reemplazaron, que son los 2 únicos destruidos. Ninguno de los dos defectos afectó a recursos existentes.
+
+Verificación de no impacto (solo lectura): `beeside-dev-canonical-db` conserva sus mismos usuarios (`beeside_app`, `fa4_staging_runtime`, `postgres`) y bases (`beeside`, `fa4_staging`, `postgres`); los jobs `beeside-dev-migrate` y `fa4-staging-prepare` y el estado `dev/` no se modificaron.
+
+**Siguiente (requiere autorización):** Fase 2 (roles y `beeside_kl` por SQL), Fase 3 (retirar `kl_provisioner`) y Fase 4 (G1 / E1–E15). Hasta entonces `beeside_kl` **no existe** y G1 sigue **NO APROBADO**.
+
+### Fase 2 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase
+En `beeside-dev-kl-db`, como `kl_provisioner` por Cloud SQL Auth Proxy (contraseñas leídas en memoria desde Secret Manager, nunca impresas): `roles.sql` (cinco roles `LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB`, límites de conexión 4/8/8/4/4 y tiempos por rol), contraseñas fijadas desde cada secreto, `CREATE DATABASE beeside_kl OWNER kl_owner` (con `GRANT/REVOKE kl_owner` temporal del aprovisionador) y `REVOKE ALL … FROM PUBLIC`. Verificación (solo lectura):
+- `pg_auth_members`: ninguna fila con un `kl_*` como rol o como miembro; **ningún `ADMIN OPTION`**; `kl_provisioner` solo aparece en `cloudsqlsuperuser`.
+- Dueño de `beeside_kl`: `kl_owner`; ACL `{kl_owner=CTc/kl_owner}` (nada para PUBLIC).
+- Los cinco roles se autentican con su secreto; `kl_app` aún **no** tiene CONNECT a `beeside_kl` (lo concede KL-0001 al migrar).
+- Miembros de `cloudsqlsuperuser`: `postgres` (sin contraseña), `kl_provisioner` y los roles internos de Cloud SQL. **`kl_provisioner` sigue existiendo** hasta la Fase 3.
+No se ejecutó ninguna migración KL, ni G1/E1–E15, ni se tocó la instancia canónica. G1 sigue **NO APROBADO**. Nota: los `kl_*` pueden conectarse a la base `postgres` de esta instancia (CONNECT de PUBLIC por defecto); sin tablas ni datos allí.
+
+### Fase 3 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase
+`terraform apply` con `provisioner_enabled=false`: **0 añadidos, 0 cambiados, 4 destruidos** (usuario `kl_provisioner`, su secreto, su versión y su contraseña aleatoria; ningún otro recurso). Plan posterior sin cambios. Verificación como `kl_owner` por proxy (solo lectura): miembros de `cloudsqlsuperuser` = `postgres` (sin contraseña) y los roles internos de Cloud SQL (`cloudsqlagent`, `cloudsqlimportexport`, `cloudsqllogical`); **ningún usuario humano ni de otra plataforma**. `pg_auth_members`: ninguna fila con un `kl_*` como rol o miembro. Única fila con `ADMIN OPTION` en la instancia: `cloudsqlsuperuser` sobre `pg_checkpoint` (interna de Cloud SQL, no afecta a KL). Los cinco `kl_*` no son superusuario ni tienen CREATEROLE/CREATEDB ni pertenecen a `cloudsqlsuperuser`. La instancia canónica conserva sus usuarios (`beeside_app`, `fa4_staging_runtime`, `postgres`). El secreto del aprovisionador ya no existe.
+
+**Estado de G1:** sigue **NO APROBADO**. Falta la Fase 4 (E1–E15 sobre la instancia dedicada, con evidencia archivada) y debe ejecutarse **antes de cualquier migración**. `beeside_kl` está vacía (sin esquema `kl`).
+
+### Fase 4 ejecutada (2026-10-16) · estado: HECHA, detenida tras la fase · sin migraciones
+E1–E15 sobre `beeside-dev-kl-db` (evidencia: `evidence/G1-dev-kl-2026-10-16/E1-E15_beeside-dev-kl-db.txt`). Principal ajeno: `g1_probe`, rol **simple creado por SQL** (`NOSUPERUSER NOCREATEROLE NOCREATEDB`, fuera de `cloudsqlsuperuser`). Para crearlo se usó `g1_admin` (usuario de API temporal, miembro de `cloudsqlsuperuser`), **eliminado segundos después**; `g1_probe` también se eliminó al terminar. Estado final verificado: usuarios = los cinco `kl_*` y `postgres`; `terraform plan` sin deriva; la instancia canónica intacta.
+
+| Caso | Resultado |
+|---|---|
+| E1 conexión a `beeside_kl` | falla ✅ (`permission denied for database`) |
+| E2 GRANT de cada `kl_*` · E3 SET ROLE · E4 ALTER (PASSWORD, NOLOGIN) / DROP · E5 CREATE ROLE IN/ADMIN | todos fallan ✅ (5 + 5 + 15 + 2 intentos) |
+| E6 cambiar dueño · E11 DROP DATABASE · E13 GRANT CONNECT / a PUBLIC / SET de base | fallan ✅ |
+| E7 `pg_has_role` recursivo (incl. `cloudsqlsuperuser`) | todo `false` ✅ |
+| E8 filas con `admin_option` sobre `kl_*` o con `cloudsqlsuperuser`/probe como miembro | **0** ✅ |
+| E9 dueños | `beeside_kl` = `kl_owner`; esquemas: `kl_owner` y el rol predefinido `pg_database_owner`; bases de la instancia: solo las propias de Cloud SQL y `postgres` ✅ |
+| E10 inverso (cada `kl_*` lee `pg_authid`) | denegado ×5 ✅. *No aplica el caso "tabla de `beeside`": esta instancia no contiene bases de otras plataformas (aislamiento estructural)* |
+| E12 terminar sesión activa de `kl_app` | falla ✅ (`permission denied to terminate process`) |
+| E14 `kl_*` con super/createrole/createdb/`cloudsqlsuperuser` | **0** ✅ · E15 leer `pg_authid` | falla ✅ |
+
+**Veredicto G1.** *Pre-migración:* **CUMPLE** en el entorno destino real: ningún intento de escalada tiene éxito, y los únicos miembros de `cloudsqlsuperuser` son `postgres` (sin contraseña, no puede iniciar sesión) y roles internos de Cloud SQL. La condición se cumple *por construcción de la instancia dedicada*, no porque `cloudsqlsuperuser` esté contenido (el ensayo D2 demostró que no lo está).
+**Límites declarados (no es aprobación plena todavía):** (1) E9/E10 se ejecutaron con la base vacía y sin las ACL finales; deben **repetirse tras KL-0001** (que concede CONNECT y define privilegios). (2) El plano IAM sigue pudiendo restablecer la contraseña de `postgres` o crear usuarios por API (`cloudsql.users.*`: hoy solo el owner humano `mo@beeside.you`); crear cualquier usuario por API en esta instancia **rompe el aislamiento**. Control recomendado: prohibirlo por proceso y comprobar periódicamente (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` solo debe devolver `postgres` y `cloudsql*`), y vigilar en Cloud Audit Logs `cloudsql.users.create/update`. (3) El principal `postgres` no se probó (no tiene contraseña); es equivalente a un miembro de `cloudsqlsuperuser`.
+
+**Decisión del PO:** declarar **G1 aprobado condicionado** (repetición E1–E15 + comprobación de miembros tras KL-0001) o exigir esa repetición antes de aprobarlo. No se migró nada; `beeside_kl` sigue vacía. Siguiente fase del RUNBOOK (5: exportación previa y migración KL-0001…0005) requiere imagen `runtime` construida (validación de imagen **PENDIENTE G2**: sin Docker local; requiere push de la rama para CI o Cloud Build).
+
+---
+
+## 11. Estado de G1 y validación de imágenes (preparada, NO ejecutada)
+
+### G1 — APROBADO CONDICIONADO (decisión del PO, 2026-10-16)
+Condiciones, a cumplir **después de KL-0001 (y de cada migración KL posterior que cambie privilegios)**:
+1. Repetir E1–E15 con `scripts/kl/g1/run-e.sh` (rol simple de prueba creado y eliminado según RUNBOOK Fase 4), incluyendo E9 y E10 ya con objetos y ACL finales, y archivar la salida en `evidence/G1-<fecha>/`.
+2. Comprobar `pg_auth_members` de `cloudsqlsuperuser`: solo `postgres` y `cloudsql*`.
+3. Prohibir por proceso crear usuarios por API en `beeside-dev-kl-db` y vigilar `cloudsql.users.create/update` en Cloud Audit Logs.
+Si cualquiera falla: **G1 deja de estar aprobado** y no se continúa.
+
+### Validación de imágenes (G2, `runtime` y `runtime-kl-worker`)
+Este Mac no tiene Docker: **PENDIENTE G2; el worker NO se declara listo para producción** hasta que corra con éxito. Preparado sin ejecutar:
+- `scripts/kl/smoke/images.sh`: construye los dos destinos y el predeterminado (debe ser idéntico a `runtime`), y comprueba metadatos (usuario `node`, CMD, puerto), disposición de archivos exactamente donde el código compilado los busca (`dist/kl/db/migrations`, `dist/kl/products/assets` con `fonts` y `fonts-fallback`, `db/migrations` de plataforma, `playwright-core`), ausencia de Chromium en la API y presencia legible en el worker, las migraciones empaquetadas (contiguas, con huellas y lint contra las tablas ajenas), la API arrancando **sin KL** (`/health` 200; `/api/public/editions/*` y `/api/admin/kl/*` → 404; sin credenciales de KL en el log), el render real en el worker con `--network none` y que el worker se niega a arrancar sin configuración.
+- `scripts/kl/smoke/render-smoke.js` y `migrations-smoke.js` (se ejecutan dentro de las imágenes).
+- Job `kl-images` en `.github/workflows/kl-ci.yml` (sin credenciales de GCP, sin publicar imágenes).
+- **Validado localmente** (fuera de contenedor, Chromium 153.0.8010.12 en macOS): `render-smoke.js` pasa (Lato verificada, 3 páginas, dos renders idénticos, petición remota bloqueada y registrada) y `migrations-smoke.js` pasa (10 archivos, 56 tablas ajenas comparadas). El comportamiento **dentro del contenedor Linux** sigue sin comprobar.
+
+Cómo se ejecuta (requiere tu autorización de **push** de la rama para el CI, D1; o Docker en otra máquina con `bash scripts/kl/smoke/images.sh`). Alternativa con Cloud Build (D2): etiqueta `kl-g2-<sha>` en Artifact Registry sin desplegar.
+
+Hallazgos de la preparación:
+- **AC-10 en Linux no tiene línea base.** `ac10-baseline.json` solo tiene `darwin-arm64-chromium-153.0.8010.12-lato`. El smoke verifica determinismo dentro de la plataforma e informa la huella; registrar la clave `linux-x64-…` es un cambio a aprobar tras la primera ejecución.
+- **El worker en producción no puede renderizar aún:** `kl-worker.ts` lanza `KlConfigError` si `KL_RENDER_ENABLED=true` con `NODE_ENV=production` hasta existir el adaptador de almacenamiento GCS (D8). En dev (`NODE_ENV=development`, como define el job de Terraform) usaría `LocalObjectStore` sobre disco efímero de Cloud Run: sirve para el humo, **no** para publicar ediciones.
+
+### Resultado de la validación de imágenes en CI (2026-10-17) · commit `ddfbc9d`
+Primer push (`e1262db`): `kl-preflight` ✅; `kl-images` ✅ (18 comprobaciones); `kl-tests` ❌ — **defecto del arnés de pruebas, no del producto**: el servicio `postgres:16` de CI exige contraseña (SCRAM) y el arnés asumía autenticación `trust` (`SASL: client password must be a string`; 264 de 350 pruebas). Corrección en `990b15a` (el arnés reutiliza la contraseña del clúster para los roles de prueba); 350/350 pasan también contra un clúster SCRAM local. Estado en `ddfbc9d`: `kl-preflight` ✅, `kl-tests` ✅, `kl-images` ✅.
+
+`kl-images` (runs `39003397870`, `39004780807`, `39005024374`, `ddfbc9d`): **`runtime` y `runtime-kl-worker` se construyen** en Linux x64 con Docker real; el destino predeterminado es idéntico a `runtime`; ambos corren como `node`; CMD correctos; API con puerto 8080 y **sin Chromium**; worker con Chromium 153.0.8010.12 legible por `node`; migraciones KL (10 archivos, KL-0001…0005) en `dist/kl/db/migrations` y assets (tema, paginador, `fonts`, `fonts-fallback`) en `dist/kl/products/assets`, exactamente donde las busca el código compilado; migraciones de plataforma en `db/migrations` (56 tablas ajenas para el lint); API arranca **sin KL** (`/health` 200, `/api/public/editions/*` y `/api/admin/kl/*` → 404, sin credenciales de KL en el log); render real en el worker **con `--network none`** (Lato verificada, 3 páginas, dos renders idénticos, petición remota bloqueada y registrada: X19); el worker se niega a arrancar sin `KL_DB_URL_AGENT`/`KL_DB_URL_KNOWLEDGE`.
+
+**Estado G2 respecto de las imágenes:** *validación de build y humo: HECHA (en CI, sin credenciales de GCP, sin publicar imágenes).* **No** implica worker listo para producción. Quedan: (1) imágenes no construidas con la cadena de despliegue ni publicadas en Artifact Registry; (2) humo contra una base real (`kl-migrate` y `kl-worker` en Cloud Run con el conector `/cloudsql`); (3) adaptador GCS (D8) sin el cual el worker rechaza `KL_RENDER_ENABLED` en producción; (4) `node:20-slim` sin fijar por resumen; (5) huella del render dentro del contenedor no comparada con la del host.
+
+**AC-10:** línea base `linux-x64-chromium-153.0.8010.12-lato` registrada (ver `R3_EVIDENCIA_PDF.md`): determinista en dos corridas de CI independientes, `documentSha256` y 7 páginas idénticos a macOS, texto idéntico y Δy = 0 / Δx ≤ 0,11 pt frente a macOS. Sin diferencias de contenido ni de maquetación que presentar.
+
+### Pendientes de imagen: preparados (2026-10-17, sin ejecutar nada en GCP)
+- **Base fijada por digest:** `backend/Dockerfile` usa `node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0` (índice multi-arquitectura leído de Docker Hub el 2026-10-17; manifiesto linux/amd64 `sha256:3d0f0545…c41c`) en las etapas `build` y `runtime-base`. Declarado en `shared-changes.txt` como instrucción expresa del PO. `frontend/Dockerfile` **no** se tocó. Para actualizar la base hay que cambiar el digest a propósito (y volver a pasar kl-images y AC-10).
+- **Comparativo de huella contenedor ↔ host:** el documento de referencia del humo vive ahora en `backend/src/kl/products/render/smoke.ts` (mismo código para el host y el contenedor). La prueba `r3-smoke-reference.test.ts` registra su huella en `ac10-smoke-baseline.json` (hoy solo la clave de macOS, `2564f374…b923`, igual que antes de refactorizar). `render-smoke.js` dentro de la imagen la compara con ese archivo (montado en solo lectura) y `images.sh` informa `coincide` o `DIFIERE`; con `KL_SMOKE_REQUIRE_BASELINE=1` (hoy `0` en `kl-ci.yml`) la ausencia o la diferencia es un fallo. El job `kl-tests` publica el candidato de huella del host de Linux en el artefacto `ac10-linux-candidate` (`ac10-smoke-host.json`).
+- **Para cerrar la comparación** falta ejecutar CI una vez (requiere push): si la huella del contenedor coincide con la del host de Linux se registra esa clave y se pasa `KL_SMOKE_REQUIRE_BASELINE` a `1`; **si difiere**, se presenta la desviación al PO (no se acepta automáticamente).
+- **Incidencia:** Node 20 llegó a fin de vida (30-abr-2026); fijar el digest congela una base que ya no recibe parches de Node. Recomendación: migrar a Node 22 LTS en un cambio aparte (afecta a todo el backend, decisión de Plataforma).
+
+### Comparativo contenedor ↔ host: RESULTADO (CI run `39032673173`, commit `b873e33`)
+Documento de referencia del humo, clave `linux-x64-chromium-153.0.8010.12-lato`: **host (kl-tests) `62b5a1508ebb5db94f1fa61411579f5b3402152738963b9cb0a3aa039962f942`, 3 páginas; contenedor `runtime-kl-worker` (node:20-slim fijada por digest, `--network none`) la misma huella y 3 páginas. Sin desviación.** Se registró la clave Linux en `ac10-smoke-baseline.json` y `kl-ci.yml` pasa a exigir la coincidencia (`KL_SMOKE_REQUIRE_BASELINE=1`). Alcance: documento sintético mínimo (no la edición completa de la instantánea fija, que no corre en el contenedor porque el código de prueba no viaja en la imagen). Cierra el pendiente (5) de la lista de G2; quedan (1), (2), (3) y la migración de Node 20.
+
+---
+
+## 12. Fase 5 EJECUTADA (2026-10-17) · estado: HECHA
+
+Autorizada por el PO (con congelación de KL-0001…0005 en dev-kl confirmada). Cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`. Commit base de las imágenes: `7af37659a4b68285c36d8498b8ed9d7151f83115` (CI en verde sobre ese commit).
+
+| Subfase | Resultado |
+|---|---|
+| Precondiciones | gcloud válido; gate OK; `terraform plan` sin deriva; `beeside-dev-kl-db` RUNNABLE con usuarios = cinco `kl_*` + `postgres` y solo `beeside_kl` |
+| **5.1** publicación | Etiqueta `kl-publish-dev-7af3765` → workflow `KL publish images` (run `39036612441`) ✅: 19 controles de humo y publicación de `kl-backend:7af37659…` (`sha256:ff0d6646e1310648351a428106e321fc887237ec6e6e6dfd1bfae9064d5104ae`) y `kl-worker:7af37659…` (`sha256:37957dc614794099f6c7787e52ca47e71bccc3fdab2542aa04c66e30bc8e6be7`); los jobs `beeside-dev-kl-migrate` y `beeside-dev-kl-worker` apuntan a ellas. `backend-api`/`frontend-app` y los servicios en ejecución no cambiaron. **El worker no se ejecutó.** |
+| **5.2** exportación previa | `gs://beeside-dev-508220-beeside-dev-kl-exports/pre-migration/pre-KL-0001-0005-7af3765.sql.gz` (452 bytes; base vacía): primera prueba real del permiso de escritura de Cloud SQL en el bucket |
+| **5.3** ensayo en seco | Ejecución `beeside-dev-kl-migrate-6qgw9` ✅: conectó como `kl_owner` a `beeside_kl` por `/cloudsql`; `applied: []`, 10 pendientes |
+| **5.4** migración | Ejecución `beeside-dev-kl-migrate-vw5w7` ✅: **`applied` = las 10 migraciones** (KL-0001…0005 y sus `_integrity`), `pending: []` |
+| **5.5** verificación | Diario con 10 filas y huellas idénticas a las esperadas; `kl.agents_enabled = false` y `kl.r10_claims_enabled = false`; 51 tablas, 28 vistas, 116 funciones en `kl`; **ninguna tabla concedida directamente** a `kl_app`, `kl_reader_precision`, `kl_agent`, `kl_knowledge`; CONNECT verdadero para los cinco roles; sin uso de `public` ni objetos en `public`; los cuatro roles de aplicación se conectan a `beeside_kl` |
+| **5.6** E1–E15 (condición G1) | Evidencia: `evidence/G1-post-KL0001-2026-10-17/`. Con un rol simple de prueba: **35 intentos de escalada, los 35 fallan**; E7 todo `false`; E8 = 0; E9 solo `kl_owner` y `pg_database_owner` (ya con 51 tablas, 116 funciones y tipos); E10 los cinco `kl_*` reciben `permission denied` al leer `pg_authid`; E14 = 0; miembros de `cloudsqlsuperuser`: solo `postgres` y roles internos de Cloud SQL. Ventana de `g1_admin` (miembro temporal de `cloudsqlsuperuser`): segundos, eliminado; `g1_probe` eliminado; usuarios finales = cinco `kl_*` + `postgres` |
+
+**Incidencias.** (1) *Defecto del script de evidencia, no del producto:* la primera ejecución de `scripts/kl/g1/run-e.sh` marcó E10 como «PERMITIDO» porque con `set -o pipefail` el cierre anticipado de `grep -q` devolvía SIGPIPE; una comprobación directa mostró `permission denied` en los cinco roles. Se corrigió el script, se repitió **toda** la ejecución y la evidencia archivada es la de la repetición limpia. (2) *Deriva menor de Terraform:* `gcloud run jobs update` fija `client`/`client_version` en los jobs; se añadieron a `ignore_changes` del módulo (no se aplicó nada) y el plan volvió a 0 cambios. (3) La etiqueta de las imágenes usa el SHA completo (`github.sha`).
+
+**G1:** las condiciones de la aprobación condicionada **se cumplen para KL-0001…0005** (E1–E15 repetidos con objetos y ACL finales; miembros de `cloudsqlsuperuser` correctos). La condición sigue vigente para cualquier migración posterior que cambie privilegios, y el control de «no crear usuarios por API en esta instancia» es continuo.
+
+**Pendientes reales (fuera de la Fase 5):** `kl-bootstrap` (primer KL_ADMIN; requiere la credencial de lectura de la plataforma, decisión de Plataforma); cableado del backend (`KL_DB_URL_APP`/`KL_DB_URL_READER` en `beeside-dev-backend-api`; hoy la ruta de KL no está montada en dev); ejecución del `kl-worker` con agentes apagados; Cloud Scheduler (D9); X24 (restauración: necesita una base nueva con dueño `kl_owner`, lo que exige un aprovisionador temporal), X26/X27; adaptador GCS (D8); migración de Node 20; SA propia del backend (D3); AC-13 (revisión manual con lector de pantalla).

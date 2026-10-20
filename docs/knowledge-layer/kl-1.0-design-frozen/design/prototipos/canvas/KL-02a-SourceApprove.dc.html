@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Approve source</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[po]@beeside</span><span class="admin-badge" data-role="ADMIN">KL_ADMIN</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Datos de S05 del Source Registry de trabajo. Marca las tres verificaciones para habilitar la aprobación.</p>
+<p><a href="KL-02-Sources.dc.html">← Source Registry</a></p>
+<h1 class="admin-title">S05 · INEGI · ENOE <span class="admin-badge" data-tone="info">{{statusLabel}}</span></h1>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="sa-id">
+<h2 id="sa-id">Identity and scope</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Institution · class</dt><dd>INEGI · A (oficial primaria)</dd></div>
+<div><dt>Series</dt><dd>Informalidad laboral, PEA, ocupación, tasa de participación, ingreso</dd></div>
+<div><dt>Granularity</dt><dd>Nacional mensual; 32 estados y 39 ciudades solo trimestral</dd></div>
+<div><dt>Retrieval</dt><dd>Tabulados XLSX, microdatos, BIE / API con token</dd></div>
+<div><dt>Expected periodicity</dt><dd><span class="kl-nowrap">3T-2026</span> estatal el <span class="kl-nowrap">25-nov-2026</span></dd></div>
+<div><dt>Default risk level</dt><dd>1 · estadístico estable (nuevo periodo y corrección se publican solos si pasan controles)</dd></div>
+<div><dt>Catalog links</dt><dd><code>people_payroll_employment</code> (recruitment, payroll_processing, compensation_studies, temporary_staffing) · <code>corporate_legal_admin</code> (labor_legal_support)</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="sa-cfg">
+<h2 id="sa-cfg">Collection settings</h2>
+<div class="admin-form-row">
+<label>Check frequency<select class="select"><option>Inherit · semiannual (Doing Business)</option><option>Weekly</option><option>Monthly</option><option>Quarterly</option><option>Semiannual</option><option>Annual</option><option>Do not update</option></select></label>
+<label>Late-publication alert<input class="input" value="5 business days"></label>
+</div>
+<div class="admin-form-row">
+<label>Permitted use<select class="select"><option>Commercial use with attribution "Fuente: INEGI"</option><option>Quote and paraphrase</option><option>Cite only</option></select></label>
+<label>Monthly agent budget<input class="input" value="[por fijar con la línea base]"></label>
+</div>
+<p class="helper" lang="es">Los cambios de configuración se guardan como versión nueva con autor; nada se sobrescribe.</p>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="sa-check">
+<h2 id="sa-check">Before approving</h2>
+<ul class="kl-checks">
+<li><input type="checkbox" id="c1" checked="{{c1}}" onChange="{{t1}}"><label for="c1">License verified on the official terms page</label></li>
+<li><input type="checkbox" id="c2" checked="{{c2}}" onChange="{{t2}}"><label for="c2">Official URL and retrieval method verified</label></li>
+<li><input type="checkbox" id="c3" checked="{{c3}}" onChange="{{t3}}"><label for="c3">Scope (jurisdiction, series, excluded indicators) reviewed</label></li>
+</ul>
+<p class="helper" lang="es">Aprobar autoriza al agente a recolectar esta fuente. Nada se publica sin pasar controles y, según el nivel, revisión humana.</p>
+<div class="admin-actions">
+<button type="button" class="button button-primary" disabled="{{blocked}}" onClick="{{approve}}">Approve source</button>
+<button type="button" class="button button-secondary">Keep as candidate</button>
+</div>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<p class="admin-notice" role="status" lang="es">Fuente aprobada por [po]@beeside. Registrado en kl.audit_event. El agente la verificará en la próxima fecha del calendario.</p>
+</sc-if>
+</section>
+<section class="admin-card" aria-labelledby="sa-hist">
+<h2 id="sa-hist">History</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">When</th><th scope="col">Change</th><th scope="col">By</th></tr></thead>
+<tbody lang="es"><tr><td><span class="kl-nowrap">15-oct-2026</span></td><td>Registrada como candidata (Workspace)</td><td>Workspace</td></tr></tbody>
+</table></div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { c1: false, c2: false, c3: false, done: false }; }
+renderVals() {
+const s = this.state;
+return {
+c1: s.c1, c2: s.c2, c3: s.c3, done: s.done,
+blocked: !(s.c1 && s.c2 && s.c3) || s.done,
+statusLabel: s.done ? 'Approved' : 'Candidate',
+t1: () => this.setState({ c1: !s.c1 }),
+t2: () => this.setState({ c2: !s.c2 }),
+t3: () => this.setState({ c3: !s.c3 }),
+approve: () => this.setState({ done: true })
+};
+}
+}
+</script>
+</body>
+</html>

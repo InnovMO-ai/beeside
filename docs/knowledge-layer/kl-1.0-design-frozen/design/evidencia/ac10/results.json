@@ -1,0 +1,23 @@
+{
+  "chromium": "141.0.7390.37",
+  "pages": 7,
+  "content": {
+    "report_document_equal": true,
+    "print_html_sha": ["77e216a3e38831fd0335188036c1b834e09da3f9ca17127008625250b9bc58b3", "77e216a3e38831fd0335188036c1b834e09da3f9ca17127008625250b9bc58b3"],
+    "extracted_text_equal": true
+  },
+  "visual": { "raster_72dpi_all_pages_equal": true },
+  "binary": {
+    "raw_sha": ["af947d7b5f44fd1cd5376b514ae457bb6a5369561d87d43c66657d6d685b471a", "bb6f77616695e12a9a9043787366d6c75bdbeaf22dda1bef4b32b8015ee031ca"],
+    "raw_equal": false,
+    "normalized_sha": ["a4391a85b70ea35ce7c073747344e36d9797643c66e7722250e7121b4d3bd3ce", "a4391a85b70ea35ce7c073747344e36d9797643c66e7722250e7121b4d3bd3ce"],
+    "normalized_equal": true,
+    "differing_fields_before_normalization": "CreationDate, ModDate"
+  },
+  "negative_control": {
+    "mutation": "posición de informalidad laboral 2 → 3",
+    "normalized_sha_differs": true,
+    "extracted_text_differs": true
+  },
+  "accessibility": { "tagged": "yes", "outline_objects": 2, "lang": "/Lang (es)" }
+}

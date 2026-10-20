@@ -1,0 +1,25 @@
+┌─────────┬─────────────────────────────────────────────┬────────────────┬─────────┬──────────┬─────────────────────────────┬──────┐
+│ (index) │ name                                        │ expectApproved │ current │ proposed │ claimId                     │ ok   │
+├─────────┼─────────────────────────────────────────────┼────────────────┼─────────┼──────────┼─────────────────────────────┼──────┤
+│ 0       │ 'P1 idéntica'                               │ true           │ true    │ true     │ 'test.card.vat_general@1#1' │ true │
+│ 1       │ 'P2 solo mayúsculas, acentos y puntuación'  │ true           │ true    │ true     │ 'test.card.vat_general@1#1' │ true │
+│ 2       │ 'N1 extensión en la misma frase'            │ false          │ true    │ false    │ null                        │ true │
+│ 3       │ 'N2 truncamiento que borra la excepción'    │ false          │ true    │ false    │ null                        │ true │
+│ 4       │ 'N3 fuente corta que aprueba frases largas' │ false          │ true    │ false    │ null                        │ true │
+│ 5       │ 'N4 negación'                               │ false          │ true    │ false    │ null                        │ true │
+│ 6       │ 'N5 idioma distinto'                        │ false          │ false   │ false    │ null                        │ true │
+│ 7       │ 'N6 afirmación vencida'                     │ false          │ true    │ false    │ null                        │ true │
+│ 8       │ 'N7 cifra cambiada'                         │ false          │ false   │ false    │ null                        │ true │
+│ 9       │ 'N8 dos afirmaciones unidas'                │ false          │ true    │ false    │ null                        │ true │
+└─────────┴─────────────────────────────────────────────┴────────────────┴─────────┴──────────┴─────────────────────────────┴──────┘
+{
+ "proposed_all_expected": true,
+ "current_wrongly_approves": [
+  "N1 extensión en la misma frase",
+  "N2 truncamiento que borra la excepción",
+  "N3 fuente corta que aprueba frases largas",
+  "N4 negación",
+  "N6 afirmación vencida",
+  "N8 dos afirmaciones unidas"
+ ]
+}

@@ -1,0 +1,43 @@
+# E1–E15 en beeside-dev-kl-db · principal: g1_probe (rol simple por SQL: NOSUPERUSER NOCREATEROLE NOCREATEDB, fuera de cloudsqlsuperuser) · 2026-10-17T04:20:26Z
+E1  | conectarse a beeside_kl | FALLA ✅ (psql: error: connection to server at "127.0.0.1", port 5458 failed: FATAL:  permission denied f)
+E2  | GRANT kl_owner TO g1_probe | FALLA ✅ (ERROR:  permission denied to grant role "kl_owner")
+E2  | GRANT kl_app TO g1_probe | FALLA ✅ (ERROR:  permission denied to grant role "kl_app")
+E2  | GRANT kl_reader_precision TO g1_probe | FALLA ✅ (ERROR:  permission denied to grant role "kl_reader_precision")
+E2  | GRANT kl_agent TO g1_probe | FALLA ✅ (ERROR:  permission denied to grant role "kl_agent")
+E2  | GRANT kl_knowledge TO g1_probe | FALLA ✅ (ERROR:  permission denied to grant role "kl_knowledge")
+E3  | SET ROLE kl_owner | FALLA ✅ (ERROR:  permission denied to set role "kl_owner")
+E3  | SET ROLE kl_app | FALLA ✅ (ERROR:  permission denied to set role "kl_app")
+E3  | SET ROLE kl_reader_precision | FALLA ✅ (ERROR:  permission denied to set role "kl_reader_precision")
+E3  | SET ROLE kl_agent | FALLA ✅ (ERROR:  permission denied to set role "kl_agent")
+E3  | SET ROLE kl_knowledge | FALLA ✅ (ERROR:  permission denied to set role "kl_knowledge")
+E4a | ALTER ROLE kl_owner PASSWORD | FALLA ✅ (ERROR:  permission denied to alter role)
+E4b | ALTER ROLE kl_owner NOLOGIN | FALLA ✅ (ERROR:  permission denied to alter role)
+E4c | DROP ROLE kl_owner | FALLA ✅ (ERROR:  permission denied to drop role)
+E4a | ALTER ROLE kl_app PASSWORD | FALLA ✅ (ERROR:  permission denied to alter role)
+E4b | ALTER ROLE kl_app NOLOGIN | FALLA ✅ (ERROR:  permission denied to alter role)
+E4c | DROP ROLE kl_app | FALLA ✅ (ERROR:  permission denied to drop role)
+E4a | ALTER ROLE kl_reader_precision PASSWORD | FALLA ✅ (ERROR:  permission denied to alter role)
+E4b | ALTER ROLE kl_reader_precision NOLOGIN | FALLA ✅ (ERROR:  permission denied to alter role)
+E4c | DROP ROLE kl_reader_precision | FALLA ✅ (ERROR:  permission denied to drop role)
+E4a | ALTER ROLE kl_agent PASSWORD | FALLA ✅ (ERROR:  permission denied to alter role)
+E4b | ALTER ROLE kl_agent NOLOGIN | FALLA ✅ (ERROR:  permission denied to alter role)
+E4c | DROP ROLE kl_agent | FALLA ✅ (ERROR:  permission denied to drop role)
+E4a | ALTER ROLE kl_knowledge PASSWORD | FALLA ✅ (ERROR:  permission denied to alter role)
+E4b | ALTER ROLE kl_knowledge NOLOGIN | FALLA ✅ (ERROR:  permission denied to alter role)
+E4c | DROP ROLE kl_knowledge | FALLA ✅ (ERROR:  permission denied to drop role)
+E5a | CREATE ROLE x_probe IN ROLE kl_owner | FALLA ✅ (ERROR:  permission denied to create role)
+E5b | CREATE ROLE x_probe2 ADMIN kl_owner | FALLA ✅ (ERROR:  permission denied to create role)
+E6  | ALTER DATABASE beeside_kl OWNER TO g1_probe | FALLA ✅ (ERROR:  must be owner of database beeside_kl)
+E7  | pg_has_role(...,'MEMBER') | kl_owner=false, kl_app=false, kl_reader_precision=false, kl_agent=false, kl_knowledge=false, cloudsqlsuperuser=false
+E8  | filas pg_auth_members con kl_* y admin_option, o con cloudsqlsuperuser/g1_probe como miembro | 0
+E9a | dueño de beeside_kl y esquemas/objetos de usuario (como kl_owner) | kl_owner, pg_database_owner
+E9b | dueños de TODAS las bases de la instancia | beeside_kl=kl_owner, cloudsqladmin=cloudsqladmin, postgres=cloudsqlsuperuser
+E10 | inverso: cada kl_* lee pg_authid / tablas de otra base | kl_owner:denegado kl_app:denegado kl_reader_precision:denegado kl_agent:denegado kl_knowledge:denegado 
+E11 | DROP DATABASE beeside_kl | FALLA ✅ (ERROR:  must be owner of database beeside_kl)
+E12 | pg_terminate_backend sobre sesión activa de kl_app | FALLA ✅ (ERROR:  permission denied to terminate process)
+E13a| GRANT CONNECT ON DATABASE beeside_kl TO g1_probe | FALLA ✅ (ERROR:  permission denied for database beeside_kl)
+E13b| GRANT CONNECT ... TO PUBLIC | FALLA ✅ (ERROR:  permission denied for database beeside_kl)
+E13c| ALTER DATABASE beeside_kl SET search_path=public | FALLA ✅ (ERROR:  must be owner of database beeside_kl)
+E14 | kl_* con super/createrole/createdb/miembro de cloudsqlsuperuser | 0
+E15 | leer pg_authid (hashes) | FALLA ✅ (ERROR:  permission denied for table pg_authid)
+--  | miembros actuales de cloudsqlsuperuser | cloudsqlagent, cloudsqlimportexport, postgres, cloudsqllogical

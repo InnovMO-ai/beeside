@@ -1,0 +1,68 @@
+name: KL publish images (manual, dev)
+
+# G2 · Fase 5.1. SOLO se dispara al empujar una etiqueta kl-publish-dev-* (acto explícito del PO u operador autorizado) y SOLO publica si el
+# commit etiquetado pertenece a feat/kl-1.0-code. (workflow_dispatch no sirve: GitHub exige que el archivo exista en la rama por defecto.) Construye y prueba las imágenes de KL (mismo script que kl-ci), y las
+# publica en Artifact Registry con nombres PROPIOS (kl-backend, kl-worker; no toca backend-api ni frontend-app) etiquetadas con el SHA del
+# commit. Después apunta los jobs de KL (beeside-dev-kl-migrate y beeside-dev-kl-worker) a esas imágenes. NO ejecuta ningún job, NO migra,
+# NO despliega servicios. Autenticación por Workload Identity Federation (sin llaves), con la identidad de CI de dev.
+# Referencia: docs/knowledge-layer/kl-1.0-code/G2_FASE5_PROCEDIMIENTO.md
+on:
+  push:
+    tags: ["kl-publish-dev-*"]
+
+permissions:
+  id-token: write # Workload Identity Federation
+  contents: read
+
+concurrency:
+  group: kl-publish-images
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      PRECISION_KNOWLEDGE_PROVIDER: "off"
+      REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The tagged commit must belong to feat/kl-1.0-code
+        run: |
+          git fetch origin feat/kl-1.0-code
+          git merge-base --is-ancestor "${{ github.sha }}" origin/feat/kl-1.0-code || { echo "El commit etiquetado no pertenece a feat/kl-1.0-code: no se publica nada"; exit 1; }
+
+      # Lo que se publica es EXACTAMENTE lo que pasó las pruebas de humo: images.sh construye y prueba kl-smoke-api / kl-smoke-worker.
+      - name: Build and smoke-test both targets (same script as kl-ci)
+        env:
+          KL_SMOKE_REQUIRE_BASELINE: "1"
+        run: bash scripts/kl/smoke/images.sh
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Push the tested images (KL-owned names, tag = commit SHA)
+        run: |
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          docker tag kl-smoke-api    "$REGISTRY/kl-backend:${{ github.sha }}"
+          docker tag kl-smoke-worker "$REGISTRY/kl-worker:${{ github.sha }}"
+          docker push "$REGISTRY/kl-backend:${{ github.sha }}"
+          docker push "$REGISTRY/kl-worker:${{ github.sha }}"
+          for n in kl-backend kl-worker; do
+            echo "$n digest: $(gcloud artifacts docker images describe "$REGISTRY/$n:${{ github.sha }}" --format='value(image_summary.digest)')"
+          done
+
+      - name: Point the KL jobs at the new images (does NOT execute them)
+        run: |
+          gcloud run jobs update beeside-dev-kl-migrate --image "$REGISTRY/kl-backend:${{ github.sha }}" \
+            --region "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT_ID }}" --quiet
+          gcloud run jobs update beeside-dev-kl-worker --image "$REGISTRY/kl-worker:${{ github.sha }}" \
+            --region "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT_ID }}" --quiet

@@ -1,0 +1,119 @@
+# G2 · D9 · Cloud Scheduler para KL en dev (worker cada 5 min, creado en pausa) — PREPARADO, NO EJECUTADO
+
+Base: `kl-worker:835d2a2…` publicado, ciclo ejecutado a mano con éxito (agentes apagados, 0 trabajos), Terraform de `envs/dev-kl` sin deriva. Todo por el módulo propio de KL; nada toca otras plataformas. Script: `scripts/kl/g2/d9-scheduler.sh` (probado en `plan`; se niega a cambiar algo sin `D9_CONFIRM=yes`).
+
+## Hallazgo que cambió el diseño
+**Cloud Scheduler no está disponible en `northamerica-south1` (Querétaro)**; la página oficial de ubicaciones solo lista, en Norteamérica, `northamerica-northeast1/2` y `us-central1/east1/east4/south1/west1/west2/west3/west4`. El módulo usaba la región del proyecto y el `apply` habría fallado. Corregido: variable `scheduler_region` con valor por omisión **`us-south1` (Dallas, la soportada más cercana)**. Es solo la ubicación de la definición del schedule; los destinos son APIs HTTPS (Cloud Run Admin y Cloud SQL Admin) y el worker sigue corriendo en `northamerica-south1`. Implicación de residencia: los metadatos del schedule (nombre, cron, URL de la API) viven en EE. UU.; no contienen datos.
+
+## Qué se crea (plan verificado: **6 altas, 0 cambios, 0 destrucciones**; sin D9 el plan queda en 0 cambios)
+| # | Recurso | Detalle |
+|---|---|---|
+| 1 | `google_project_service.scheduler` | habilita `cloudscheduler.googleapis.com` en `beeside-dev-508220` (cambio de proyecto compartido, aditivo; `disable_on_destroy=false`) |
+| 2 | `google_cloud_scheduler_job.worker_tick` | `beeside-dev-kl-worker-tick`, `*/5 * * * *` UTC, **`paused=true`**, `POST https://run.googleapis.com/v2/projects/beeside-dev-508220/locations/northamerica-south1/jobs/beeside-dev-kl-worker:run` con token OAuth de `beeside-dev-kl-scheduler@` |
+| 3 | `google_cloud_scheduler_job.daily_export` | `beeside-dev-kl-daily-export`, `30 8 * * *` UTC, **`paused=true`**, `POST …/sql/v1/projects/…/instances/beeside-dev-kl-db/export` hacia `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz` (el bucket está versionado: la historia se conserva) |
+| 4 | `google_cloud_run_v2_job_iam_member.scheduler_runs_worker` | `roles/run.invoker` para `beeside-dev-kl-scheduler@` **solo sobre el job `beeside-dev-kl-worker`** |
+| 5 | `google_project_iam_custom_role.kl_export` | rol `klExportOnlyDev` con **un solo permiso**, `cloudsql.instances.export` |
+| 6 | `google_project_iam_member.scheduler_export` | ese rol para `beeside-dev-kl-scheduler@`, **con condición IAM** `resource.name == "projects/beeside-dev-508220/instances/beeside-dev-kl-db"` (no sirve para la instancia canónica) |
+Sin schedules para ninguna otra plataforma; la cuenta `beeside-dev-kl-scheduler@` ya existe desde la Fase 1.
+
+## Comandos (en este orden; cada paso se autoriza o se agrupa expresamente)
+```bash
+cd /Users/miguelortega/Developer/beeside-kl
+bash scripts/kl/g2/d9-scheduler.sh plan                                  # solo lectura: 6/0/0
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh apply                  # habilita la API y crea los 2 schedules EN PAUSA; verifica solo
+bash scripts/kl/g2/d9-scheduler.sh verify                                # estado PAUSED, rol e IAM, plan sin deriva
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh run-now export         # prueba única del camino de exportación (condición IAM + permiso)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh run-now worker         # prueba única del tick (si la API rechaza ejecutar un job en pausa: usar resume)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh resume                 # SOLO tras las dos pruebas: activa el tick cada 5 min (y "resume export" para el diario)
+```
+Verificación de cada prueba (solo lectura): `gcloud run jobs executions list --job beeside-dev-kl-worker --region northamerica-south1 --limit 3` (una ejecución nueva **creada por el schedule**, `exit 0`, un solo intento); `gcloud storage ls -l gs://beeside-dev-508220-beeside-dev-kl-exports/daily/` (objeto nuevo con su versión); en Cloud Logging, `protoPayload.authenticationInfo.principalEmail = beeside-dev-kl-scheduler@…`. **Tras activar:** comprobar durante 2–3 ticks `retriedCount` y la ausencia de `exit(1)` (aquí se confirma con muestras el fallo intermitente de conexión ya corregido con 10 s).
+
+## Rollback
+```bash
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh pause                  # detención inmediata, conserva todo
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh rollback               # destruye los 5 recursos de KL de D9 (schedules, IAM, rol)
+gcloud services disable cloudscheduler.googleapis.com --project beeside-dev-508220   # opcional: la API queda habilitada tras el rollback
+```
+Un tick que ya se disparó termina solo (el worker es idempotente y reclama con `SKIP LOCKED`); pausar no interrumpe una ejecución en curso.
+
+## Riesgos
+| Riesgo | Detalle / mitigación |
+|---|---|
+| **Cambio en el proyecto compartido** | Se habilita una API y se crean un rol personalizado y una asignación condicionada (aditivos, KL-owned, sin afectar a otras plataformas). Todo reversible salvo que la API queda habilitada |
+| **Condición IAM del export** | `resource.name` de Cloud SQL tiene el formato `projects/<proyecto>/instances/<instancia>`; si el formato no coincidiera, la exportación respondería 403 en la prueba `run-now export` **antes** de reanudarla (por eso existe esa prueba). No se asume: se verifica |
+| Ejecuciones solapadas | Un tick cada 5 min con ciclos de ~10–20 s; si una ejecución se atrasara, Cloud Run permite ejecuciones paralelas y la cola usa `FOR UPDATE SKIP LOCKED` con `lease_token`; el daño posible es nulo con agentes apagados |
+| Falla silenciosa | Sin alertas de Monitoring (fuera de alcance): una racha de `exit(1)` solo se vería en los registros. Recomendado: alerta sobre ejecuciones fallidas del job (decisión posterior) |
+| Ruido y costo | 288 ejecuciones/día × ~8–20 s de 1 vCPU/2 GiB ≈ entre 2.300 y 5.800 vCPU-s/día (70–170 mil/mes) y 140–350 mil GiB-s/mes: **dentro o en el límite del nivel gratuito** de Cloud Run (180 mil vCPU-s y 360 mil GiB-s/mes) si nadie más lo consume; 2 schedules entran en los 3 gratuitos de Cloud Scheduler por cuenta de facturación (compartida con otros proyectos: no verificable aquí). Orden de magnitud: 0–5 USD/mes. Sin verificar contra la calculadora oficial |
+| Exportación diaria sobre una instancia `db-g1-small` | La exportación SQL de una base pequeña es breve; sobrecarga mínima en la ventana 08:30 UTC (02:30 CDMX) |
+| Deriva de Terraform | Un `terraform apply` posterior **sin** `-var scheduler_enabled=true` destruiría los schedules. El script siempre pasa las variables; tras la aprobación se debe fijar `scheduler_enabled`/`scheduler_paused` por omisión en `envs/dev-kl/main.tf` (cambio KL) |
+| Rol del worker en producción | Hoy el tick solo hace mantenimiento (planificación, triage, caducidades) con agentes apagados; activar los agentes es otra decisión y exigiría control de salida a red (G3) |
+| Dependencias abiertas | Adaptador GCS (D8): el worker en `NODE_ENV=development` usa disco efímero y **no publica ediciones**; el tick activo no lo necesita. Procesos de fondo del backend que escalan a cero: independientes de este cambio |
+
+## Qué necesito
+Autorización expresa de: (1) `apply` (habilita la API y crea los 2 schedules **en pausa**), (2) las pruebas `run-now export` y `run-now worker`, y (3) por separado, `resume` (activación periódica).
+
+---
+
+## RESULTADO (2026-10-17, 17:1x UTC) · apply y verify HECHOS; pruebas `run-now` NO realizables en pausa
+
+**`apply` ejecutado (autorizado):** `Plan: 6 to add, 0 to change, 0 to destroy` → `Apply complete! Resources: 6 added, 0 changed, 0 destroyed`. Creados: API `cloudscheduler.googleapis.com` habilitada; `beeside-dev-kl-worker-tick` (`*/5 * * * *` UTC) y `beeside-dev-kl-daily-export` (`30 8 * * *` UTC) en **`us-south1`**, ambos **`PAUSED`**; `roles/run.invoker` de `beeside-dev-kl-scheduler@` solo sobre el job del worker; rol `klExportOnlyDev` (un permiso: `cloudsql.instances.export`) y su asignación condicionada a `beeside-dev-kl-db`.
+**`verify`:** ambos schedules `PAUSED` sin intento previo (`lastAttemptTime` vacío); rol correcto; `terraform plan` con D9 activo **sin deriva** (exit 0). Ningún otro recurso cambió.
+
+**Pruebas `run-now export` y `run-now worker`: NO se pudieron ejecutar.** La API respondió `FAILED_PRECONDITION: Job.state must be ENABLED for RunJob`: **Cloud Scheduler solo permite ejecutar de forma forzada un schedule habilitado**. Probar el camino real (cuenta del scheduler → API de Cloud Run/Cloud SQL con la condición IAM) exige, por tanto, reanudar el schedule, y el PO prohibió `resume`. Se respetó: no se reanudó nada; los schedules nunca se han disparado (el objeto `daily/` no existe y la última ejecución del worker sigue siendo la manual de las 16:59). El script `run-now` ahora lo informa con claridad (`exit 3`).
+
+**Consecuencia:** la condición IAM del export (`resource.name == "projects/…/instances/beeside-dev-kl-db"`) y el permiso `run.jobs.run` del scheduler **siguen sin probarse empíricamente**; están correctos por documentación y por el plan, pero sin evidencia real.
+
+**Opciones (decisión del PO):**
+- **A.** `resume export` y, en cuanto se confirme el objeto y la identidad en los registros, `pause export` (ventana de unos minutos; el siguiente disparo programado sería a las 08:30 UTC, no inmediato). Igual con `worker`, cuyo tick de 5 min dispararía a lo sumo 1–2 ciclos antes de pausarlo.
+- **B.** Fixtures de prueba **fuera de Terraform**: dos schedules temporales habilitados con un cron que casi nunca dispara (p. ej. `0 0 29 2 *`), `run-now`, verificación y borrado. Es lo que más se acerca a «probar sin reanudar», pero crea y destruye recursos que no están en el plan aprobado.
+- **C.** No probar ahora: activar con `resume` cuando el PO decida y verificar con las primeras ejecuciones reales (`retriedCount`, objeto en `daily/`, identidad en los registros); si fallara, `pause`.
+
+---
+
+## Prueba A ejecutada (2026-10-17, 17:27–17:31 UTC) · autorizada por el PO · ambos schedules vuelven a `PAUSED`
+
+**Exportación (`beeside-dev-kl-daily-export`)** — `resume` → ejecución forzada → `pause` inmediato:
+- Intento del scheduler `AttemptFinished` **HTTP 200** (17:27:42). Objeto creado: `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz`, **59.465 bytes**, versión `#1792258059416087` (el bucket está versionado).
+- Operación de Cloud SQL `EXPORT` **DONE** (17:27:38–17:27:49), **emitida por `beeside-dev-kl-scheduler@beeside-dev-508220.iam.gserviceaccount.com`** (campo `user` del registro de la operación). Quedan probados empíricamente el permiso `cloudsql.instances.export` del rol `klExportOnlyDev` y su **condición IAM** (`resource.name == projects/…/instances/beeside-dev-kl-db`).
+- El filtro de Cloud Logging de la auditoría de administración no devolvió entradas (retraso o nombre de método distinto); la identidad queda demostrada por el registro de la operación.
+
+**Worker (`beeside-dev-kl-worker-tick`)** — `resume` → ejecución forzada + un tick natural → `pause`:
+- Dos ejecuciones nuevas del job, **ambas con éxito en el primer intento**: `beeside-dev-kl-worker-lbc5z` (17:28:53, forzada) y `beeside-dev-kl-worker-zdxg9` (17:30:05, **tick natural del cron `*/5`**). `succeededCount = 1`, **sin `failedCount` ni `retriedCount`**, un único intento (`attempt 0`, `exit(0)`), sin `exit(1)`; ambos ciclos `{"claimed":0,"failed":0,"message":"kl-worker cycle"}` (agentes apagados). Los intentos del scheduler terminaron con **HTTP 200**.
+- Frente a la ejecución del 16:47 (primer intento fallido y reintento), **tres ejecuciones consecutivas** (16:59, 17:28 y 17:30) sin fallos con el timeout de 10 s: refuerza, sin demostrar estadísticamente, que la corrección funciona.
+- **El worker estuvo activo ~2 min** (resume 17:28:45 → pausa tras la verificación). El siguiente tick (17:35) no se ejecutó.
+
+**Estado final:** ambos schedules `PAUSED`; `terraform plan` con D9 activo sin deriva. Falta (decisión del PO) `resume` para la operación periódica real. Pendiente menor: la identidad del scheduler en las ejecuciones del worker se infiere (único invocador configurado y HTTP 200); la de la exportación está demostrada.
+
+---
+
+## ACTIVADO (2026-10-17, 17:32 UTC) · autorizado por el PO · ambos schedules `ENABLED`
+
+**Estado:** `beeside-dev-kl-worker-tick` (`*/5 * * * *` UTC) y `beeside-dev-kl-daily-export` (`30 8 * * *` UTC, próximo disparo **18-oct 08:30 UTC = 02:30 CDMX**) reanudados. **Quedan activos.**
+
+**Verificación de las primeras ejecuciones del worker (tres ticks naturales consecutivos):** `…-gxhl2` (17:35:07), `…-8k54s` (17:40:05) y `…-z6qn4` (17:45:05): cada una `succeededCount = 1`, **sin `failedCount` ni `retriedCount`**, intento 0, 6–8 s, ciclo `{"claimed":0,"failed":0}` (agentes apagados); **0 ejecuciones fallidas o reintentadas** desde la reanudación, sin `stderr` ni `exit(1)` en los registros; intentos del scheduler con HTTP 200. Con las dos de la prueba anterior son **cinco ejecuciones seguidas sin fallos** desde la imagen con el timeout de 10 s.
+**Pendiente de comprobar (no se puede antes de mañana):** la **primera exportación programada** (18-oct 08:30 UTC). Lista de verificación: objeto nuevo/versión en `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz` (`gcloud storage ls -a …`), operación `EXPORT` `DONE` con `user = beeside-dev-kl-scheduler@…` (`gcloud sql operations list --instance beeside-dev-kl-db --filter="operationType=EXPORT" --limit 3`), tamaño comparable (~59 KB hoy). Si falla: `pause export` y reportar.
+
+**Terraform alineado con el estado activo:** `scheduler_enabled=true` y `scheduler_paused=false` por omisión en `envs/dev-kl/main.tf`; `terraform plan` sin variables → **No changes** (sin deriva). Cuidado: poner `scheduler_enabled=false` **destruiría** los schedules.
+
+### Procedimiento de pausa (listo)
+```bash
+cd /Users/miguelortega/Developer/beeside-kl
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh pause            # ambos, inmediato (fuera de Terraform)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh pause worker     # solo el worker  (o: pause export)
+D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh resume [worker|export]
+# equivalente directo, sin repositorio:
+gcloud scheduler jobs pause beeside-dev-kl-worker-tick   --location us-south1 --project beeside-dev-508220
+gcloud scheduler jobs pause beeside-dev-kl-daily-export  --location us-south1 --project beeside-dev-508220
+# tras una pausa de emergencia, alinear Terraform (la pausa manual aparece como deriva):
+D9_PAUSED=true bash scripts/kl/g2/d9-scheduler.sh verify           # o fijar scheduler_paused=true y aplicar
+```
+Una pausa detiene los disparos futuros sin interrumpir una ejecución en curso. **Rollback completo** (destruye los recursos de D9): `D9_CONFIRM=yes bash scripts/kl/g2/d9-scheduler.sh rollback`.
+
+### Qué vigilar (sin alertas automáticas todavía)
+`gcloud run jobs executions list --job beeside-dev-kl-worker --region northamerica-south1 --limit 10` (columnas `FAILED_COUNT`/`RETRIED_COUNT` vacías) y los registros `stderr`; una racha de `exit(1)` pide pausar. Recomendado como decisión posterior: una alerta de Cloud Monitoring sobre ejecuciones fallidas del job.
+
+
+---
+
+## Verificación de la PRIMERA exportación programada (preparada 2026-10-17, 23:20 UTC)
+Aún no ha disparado: el siguiente disparo del schedule es **2026-10-18 08:30:00 UTC (02:30 CDMX)**. Comando único, solo lectura: `bash scripts/kl/g2/verify-scheduled-export.sh` (a partir de las **08:35 UTC**). Comprueba que, **tras el disparo programado**: (1) el intento del scheduler terminó con HTTP 200; (2) hay una **versión nueva** de `gs://beeside-dev-508220-beeside-dev-kl-exports/daily/beeside_kl.sql.gz`; (3) existe una operación `EXPORT` **DONE** emitida por `beeside-dev-kl-scheduler@…`. Sale con 0 solo si las tres se cumplen (**G2 puede cerrarse**), con 3 si aún no ha disparado y con 1 si falla (entonces: `d9-scheduler.sh pause export` y diagnóstico). Probado hoy: devuelve «aún no ha disparado» y, con `LAST_OVERRIDE` apuntando a la ejecución manual de las 17:27 UTC, las tres comprobaciones salen OK (valida el análisis; **no** cuenta como la verificación programada). Nota: el campo `lastAttemptTime` de Cloud Scheduler solo refleja disparos programados, no las ejecuciones forzadas.

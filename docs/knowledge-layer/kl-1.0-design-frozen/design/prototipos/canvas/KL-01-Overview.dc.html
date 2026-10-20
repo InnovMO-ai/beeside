@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Datos reales: Source Registry de trabajo e ICE 2025 extraído (candidato, no publicado). Entre [corchetes]: marcador sin dato real.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html" aria-current="page">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<section class="admin-card" aria-labelledby="ov-status">
+<h2 id="ov-status">Status · Mexico</h2>
+<div class="kl-stats">
+<div class="kl-stat"><b>0</b><span>published units (Precision reads only published)</span></div>
+<div class="kl-stat"><b>10</b><span>candidate publications in the initial set (S01–S10)</span></div>
+<div class="kl-stat"><b>0</b><span>approved sources</span></div>
+<div class="kl-stat"><b>1</b><span>upload awaiting review</span></div>
+<div class="kl-stat"><b>Off</b><span>Precision knowledge port</span></div>
+</div>
+</section>
+<div class="admin-grid">
+<section class="admin-card" aria-labelledby="ov-attn">
+<h2 id="ov-attn">Needs attention</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Item</th><th scope="col">Why</th><th scope="col">Who</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+<tbody>
+<tr><th scope="row" lang="es">ICE 2025 · boletas y anexo</th><td lang="es">1,696 registros extraídos, informe de QA sin fallos bloqueantes</td><td>KL_REVIEWER ≠ uploader</td><td><a href="KL-04b-UploadReview.dc.html">Review</a></td></tr>
+<tr><th scope="row" lang="es">S10 · ATDT</th><td lang="es">Bloqueada hasta verificar URL oficial y cobertura (sustituye a CONAMER)</td><td>KL_ADMIN</td><td><a href="KL-02-Sources.dc.html">Open</a></td></tr>
+<tr><th scope="row" lang="es">S02 · IMCO ICE 2026</th><td lang="es">Cambio de método: no se actualiza solo (caso A05)</td><td>KL_REVIEWER</td><td><a href="KL-03a-ChangeReview.dc.html">Open</a></td></tr>
+<tr><th scope="row" lang="es">Doing Business México</th><td lang="es">Dominios de nivel 3 sin validador designado: secciones limitadas a orientación general (D21)</td><td>KL_ADMIN</td><td><a href="KL-07-Products.dc.html">Open</a></td></tr>
+</tbody></table></div>
+</section>
+<section class="admin-card" aria-labelledby="ov-next">
+<h2 id="ov-next">Expected publications</h2>
+<p class="helper" lang="es">Calendarios oficiales del Source Registry. Una publicación atrasada 5 días hábiles genera alerta y el dato se sirve como "último disponible".</p>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Publication</th><th scope="col">Next</th><th scope="col">Source</th></tr></thead>
+<tbody>
+<tr><th scope="row" lang="es">ITAEE <span class="kl-nowrap">2T-2026</span></th><td><span class="kl-nowrap">29-oct-2026</span></td><td>S06 · INEGI</td></tr>
+<tr><th scope="row" lang="es">IMSS puestos afiliados, octubre</th><td lang="es">8–12 días tras el cierre</td><td>S09 · IMSS</td></tr>
+<tr><th scope="row" lang="es">ENOE <span class="kl-nowrap">3T-2026</span> (estatal)</th><td><span class="kl-nowrap">25-nov-2026</span></td><td>S05 · INEGI</td></tr>
+<tr><th scope="row" lang="es">DENUE 11/2026</th><td><span class="kl-nowrap">25-nov-2026</span></td><td>S04 · INEGI</td></tr>
+<tr><th scope="row" lang="es">PIBE 2025 preliminar</th><td><span class="kl-nowrap">7-dic-2026</span></td><td>S06 · INEGI</td></tr>
+</tbody></table></div>
+</section>
+<section class="admin-card" aria-labelledby="ov-val">
+<h2 id="ov-val">Specialist validations</h2>
+<dl class="admin-kv">
+<div><dt>Expiring in 60 days</dt><dd>0</dd></div>
+<div><dt>Expired</dt><dd>0</dd></div>
+<div><dt>Domains without validator</dt><dd lang="es">societario · fiscal · laboral y seguridad social · aduanas · migración · datos personales y propiedad industrial</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="ov-use">
+<h2 id="ov-use">Consumption</h2>
+<dl class="admin-kv">
+<div><dt>Queries (30 days)</dt><dd>[sin datos · puerto apagado]</dd></div>
+<div><dt>Coverage not_available</dt><dd>[sin datos]</dd></div>
+<div><dt>Agent cost (month)</dt><dd>[sin ejecuciones]</dd></div>
+</dl>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

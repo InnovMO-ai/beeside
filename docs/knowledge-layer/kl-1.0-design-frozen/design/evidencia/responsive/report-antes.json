@@ -1,0 +1,1080 @@
+{
+ "KL-01-Overview.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    },
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    }
+   ],
+   "splitCount": 2,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "29-oct-2026",
+     "in": "td"
+    },
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    },
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    },
+    {
+     "word": "7-dic-2026",
+     "in": "td"
+    },
+    {
+     "word": "societario",
+     "in": "dd"
+    },
+    {
+     "word": "seguridad",
+     "in": "dd"
+    },
+    {
+     "word": "migración",
+     "in": "dd"
+    },
+    {
+     "word": "personales",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 10,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [
+    {
+     "word": "29-oct-2026",
+     "in": "td"
+    },
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    },
+    {
+     "word": "25-nov-2026",
+     "in": "td"
+    },
+    {
+     "word": "7-dic-2026",
+     "in": "td"
+    }
+   ],
+   "splitCount": 4,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-02-Sources.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "15-oct-2026",
+     "in": "p.admin-notice kl-proto"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [
+    {
+     "word": "15-oct-2026",
+     "in": "p.admin-notice kl-proto"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 1
+  }
+ },
+ "KL-02a-SourceApprove.dc.html": {
+  "desktop": {
+   "split": [
+    {
+     "word": "15-oct-2026",
+     "in": "td"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "laptop": {
+   "split": [
+    {
+     "word": "15-oct-2026",
+     "in": "td"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [
+    {
+     "word": "15-oct-2026",
+     "in": "td"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ },
+ "KL-03-Agents.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "contenido",
+     "in": "dd"
+    },
+    {
+     "word": "publicado",
+     "in": "dd"
+    },
+    {
+     "word": "ejecución",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 3,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 2
+  }
+ },
+ "KL-03a-ChangeReview.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-04-Repository.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [
+    {
+     "el": "th.",
+     "w": 48,
+     "h": 261
+    }
+   ],
+   "narrowCount": 1,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 2
+  }
+ },
+ "KL-04a-Upload.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ },
+ "KL-04b-UploadReview.dc.html": {
+  "desktop": {
+   "split": [
+    {
+     "word": "editor",
+     "in": "dd"
+    },
+    {
+     "word": "beeside",
+     "in": "dd"
+    },
+    {
+     "word": "Inmutable",
+     "in": "dd"
+    },
+    {
+     "word": "SHA-256",
+     "in": "dd"
+    },
+    {
+     "word": "registrado",
+     "in": "dd"
+    },
+    {
+     "word": "antes",
+     "in": "dd"
+    },
+    {
+     "word": "cerrar",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 7,
+   "narrow": [
+    {
+     "el": "dd.",
+     "w": 16,
+     "h": 290
+    },
+    {
+     "el": "dd.",
+     "w": 15,
+     "h": 606
+    },
+    {
+     "el": "dd.",
+     "w": 11,
+     "h": 685
+    }
+   ],
+   "narrowCount": 3,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [
+    {
+     "word": "editor",
+     "in": "dd"
+    },
+    {
+     "word": "beeside",
+     "in": "dd"
+    },
+    {
+     "word": "Inmutable",
+     "in": "dd"
+    },
+    {
+     "word": "SHA-256",
+     "in": "dd"
+    },
+    {
+     "word": "registrado",
+     "in": "dd"
+    },
+    {
+     "word": "antes",
+     "in": "dd"
+    },
+    {
+     "word": "cerrar",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 7,
+   "narrow": [
+    {
+     "el": "dd.",
+     "w": 16,
+     "h": 290
+    },
+    {
+     "el": "dd.",
+     "w": 15,
+     "h": 606
+    },
+    {
+     "el": "dd.",
+     "w": 11,
+     "h": 685
+    }
+   ],
+   "narrowCount": 3,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 2
+  }
+ },
+ "KL-04c-Unit.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "Porcentaje",
+     "in": "dd"
+    },
+    {
+     "word": "población",
+     "in": "dd"
+    },
+    {
+     "word": "encuentra",
+     "in": "dd"
+    },
+    {
+     "word": "condición",
+     "in": "dd"
+    },
+    {
+     "word": "informalidad",
+     "in": "dd"
+    },
+    {
+     "word": "9-jun-2025",
+     "in": "dd"
+    },
+    {
+     "word": "paráfrasis",
+     "in": "dd"
+    },
+    {
+     "word": "reproducir",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 10,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-05-Demand.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [
+    {
+     "word": "MX-GUA",
+     "in": "td"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [
+    {
+     "el": "th.",
+     "w": 58,
+     "h": 149
+    }
+   ],
+   "narrowCount": 1,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [
+    {
+     "el": "th.",
+     "w": 58,
+     "h": 149
+    }
+   ],
+   "narrowCount": 1,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 1
+  }
+ },
+ "KL-05a-DemandDecide.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ },
+ "KL-06-Seed.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "KL_ADMIN",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-07-Products.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-07a-EditionApprove.dc.html": {
+  "desktop": {
+   "split": [
+    {
+     "word": "editor",
+     "in": "dd"
+    },
+    {
+     "word": "beeside",
+     "in": "dd"
+    },
+    {
+     "word": "Debe",
+     "in": "dd"
+    },
+    {
+     "word": "otra",
+     "in": "dd"
+    },
+    {
+     "word": "persona",
+     "in": "dd"
+    },
+    {
+     "word": "KL_REVIEWER",
+     "in": "dd"
+    },
+    {
+     "word": "editorial",
+     "in": "dd"
+    },
+    {
+     "word": "calcula",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 10,
+   "narrow": [
+    {
+     "el": "dd.",
+     "w": 16,
+     "h": 290
+    },
+    {
+     "el": "dd.",
+     "w": 17,
+     "h": 843
+    },
+    {
+     "el": "dd.",
+     "w": 15,
+     "h": 764
+    }
+   ],
+   "narrowCount": 3,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [
+    {
+     "word": "editor",
+     "in": "dd"
+    },
+    {
+     "word": "beeside",
+     "in": "dd"
+    },
+    {
+     "word": "Debe",
+     "in": "dd"
+    },
+    {
+     "word": "otra",
+     "in": "dd"
+    },
+    {
+     "word": "persona",
+     "in": "dd"
+    },
+    {
+     "word": "KL_REVIEWER",
+     "in": "dd"
+    },
+    {
+     "word": "editorial",
+     "in": "dd"
+    },
+    {
+     "word": "calcula",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 10,
+   "narrow": [
+    {
+     "el": "dd.",
+     "w": 16,
+     "h": 290
+    },
+    {
+     "el": "dd.",
+     "w": 17,
+     "h": 843
+    },
+    {
+     "el": "dd.",
+     "w": 15,
+     "h": 764
+    }
+   ],
+   "narrowCount": 3,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "AC-02",
+     "in": "td"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 1
+  }
+ },
+ "KL-07b-Validation.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ },
+ "KL-08-Settings.dc.html": {
+  "desktop": {
+   "split": [
+    {
+     "word": "PO-6",
+     "in": "th"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [
+    {
+     "word": "PRECISION_KNOWLEDGE_PROVIDER",
+     "in": "dd"
+    },
+    {
+     "word": "Plataforma",
+     "in": "dd"
+    },
+    {
+     "word": "kl.r10_claims_enabled",
+     "in": "dd"
+    },
+    {
+     "word": "aceptación",
+     "in": "dd"
+    },
+    {
+     "word": "registrada",
+     "in": "dd"
+    },
+    {
+     "word": "responsable",
+     "in": "dd"
+    },
+    {
+     "word": "kl.links.discovery_start",
+     "in": "dd"
+    },
+    {
+     "word": "beeside.you",
+     "in": "dd"
+    }
+   ],
+   "splitCount": 11,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [
+    {
+     "word": "kl-agent",
+     "in": "p.helper"
+    }
+   ],
+   "splitCount": 1,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": true,
+   "localScroll": 1
+  }
+ },
+ "PUB-Verify.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ },
+ "PZ-RevocationNotice.dc.html": {
+  "desktop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "laptop": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "tablet": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  },
+  "mobile": {
+   "split": [],
+   "splitCount": 0,
+   "narrow": [],
+   "narrowCount": 0,
+   "clipped": [],
+   "pageScroll": false,
+   "localScroll": 0
+  }
+ }
+}

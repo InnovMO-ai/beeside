@@ -1,0 +1,124 @@
+# X24 · 20261017T180407Z · exportación gs://beeside-dev-508220-beeside-dev-kl-exports/x24/post-KL0001-0005-20261017T180407Z.sql.gz
+# origen = beeside_kl · restauración = beeside_kl_restore (huellas por tabla/objeto; sin datos)
+ACL de esquema | {kl_owner=UC/kl_owner,kl_app=U/kl_owner,kl_reader_precision=U/kl_owner,kl_agent=U/kl_owner,kl_knowledge=U/kl_owner} dueño kl_owner
+ACL de funciones | 04af65db1f59d05cd970dd03ca0e564c
+ACL de relaciones | 1a4eccb89ef487b6a97a6c94e31cdba6
+SET
+columnas | 35bf130e54eb8ce1029291606be6c201
+diario 1 | KL-0001_base 047d00993e7b0f38ac70769f4a73710e8759c0ef72e4d61453d1cb931089b0c8
+diario 10 | KL-0005_products_integrity 5342158a783d8d9603f20b33e92664e3e44c7512f52ea7b6a2c43f0ceb95b6f2
+diario 2 | KL-0001_base_integrity a6d234b492a35ac12f02c156e36c59ea015a1193eaf7a781cf802407d5435c0b
+diario 3 | KL-0002_schema dd3436c75779bcce212c0b73dfdd9a4dd0b158d465ad1f6bcd2bdfccaf097c5d
+diario 4 | KL-0002_schema_integrity 98548b8d1e9174f94828d2e0f6bac25408c6e47c210b57e7b14540c1fcc8238f
+diario 5 | KL-0003_domain 7ba3f367e9840c7f2bacfb639fb8a9490fb65832f351331563bdda9e5b276fde
+diario 6 | KL-0003_domain_integrity 4c989689c872ae1932734cd6d82073fbcd282171a39d4f699d0181a788f00a39
+diario 7 | KL-0004_governance bfd3c6e9c5435e5481e91f956c43e2dca07e8011992cce1ac05906cf0316bd19
+diario 8 | KL-0004_governance_integrity 98ec7f2ab60e38f300d7298e770444fd5f194c6f9511b5900a23f48937b8057f
+diario 9 | KL-0005_products fb47e8623b9a7a66cb473e034f5fd150926c5ffae32bd6b503b07016ce4b267c
+funciones | 116 · ea280fd166c838cef89d8e17cdec6e12
+restricciones kl.__kl_migrations | 3 · ee016333ceb62d4e7c04dc08b52bbbbe
+restricciones kl.agent_run | 12 · 449458730f9310e856c3b5c58321c220
+restricciones kl.audit_correlation_report | 8 · adf92a0df38dec098a0585ea29d6b921
+restricciones kl.audit_event | 4 · 29a8ed3f061e5cde5a466c70d2967168
+restricciones kl.card_content | 5 · 06a37075171f13018546fd95f4f8c386
+restricciones kl.card_locale_variant | 7 · 9d1a513dc055e08f53e518e25327b563
+restricciones kl.catalog_entry | 5 · c99da80892d40c68c04d7745264261f0
+restricciones kl.change_notice | 9 · c750bbdb06e40ee5048338789ab9b9eb
+restricciones kl.composition_item | 6 · 1c24e9971e71a30fe37337b446c3293f
+restricciones kl.context_package | 14 · ed51eb6b516d4748c02beb274915a73c
+restricciones kl.demand_decision | 6 · bd6a4747147605ca4df316f497b438cc
+restricciones kl.demand_group | 6 · 8931b53371150df9b47840e46f945f46
+restricciones kl.demand_group_project | 3 · ade27f4dcf4a86e620ca4ed75c4a9e72
+restricciones kl.demand_signal | 11 · f44e8b7abf656c95703d3792b00aa7a6
+restricciones kl.distribution_daily | 4 · a92eb39a7d6485dc362c2a42b0e50c63
+restricciones kl.edition | 13 · 132b0d60df48bdb8086714faaafa0831
+restricciones kl.edition_preview | 6 · 9b576f41fe37f15bbc67280dd0d59065
+restricciones kl.edition_rendering | 9 · d0195a046e935ac76fb23931d4b7e1dc
+restricciones kl.extracted_row | 4 · ed9189d837bfde8cf3bd289c438a38fa
+restricciones kl.file_object | 8 · 71ca3fa36a502849e16f9fdac384e070
+restricciones kl.fixed_block | 11 · 2dca7f29290db95c0672f3d19d9d2197
+restricciones kl.indicator | 7 · 5d8e98200e3c52e1d8506f6ec202edcb
+restricciones kl.ingest_batch | 14 · 2dff1e94c70f84637ded341aaddfaf81
+restricciones kl.institution | 6 · 5263697006f96a97db652cbb74431ce6
+restricciones kl.job | 11 · 87b7e2733519fbc4b32e683e25637824
+restricciones kl.job_kind | 4 · dea93633c4f4eadb5f80ce6dd14cfcf1
+restricciones kl.package_member | 3 · 455b29d77cb91bfdd585cb64d9229a54
+restricciones kl.permission_role | 3 · b0ff6fb71e585c7339e75ad2de5d6fed
+restricciones kl.principal | 5 · eb775e1f358a1e81eb576f0c61e7ce6d
+restricciones kl.private_term | 5 · 044e6b28f05bdf37181f5e3255dea6cd
+restricciones kl.product | 6 · bbb3ae3f76702651363ff5ec9d32e418
+restricciones kl.product_section | 5 · e349cd6c0639593262e9f1f33779e15e
+restricciones kl.promotion_event | 6 · 829acc2a46319a84dd681a43153889aa
+restricciones kl.promotion_policy | 5 · 28ade9b8612fa02c598acacc18baade5
+restricciones kl.publication | 11 · ece178899031c98f456c4b04be7296f7
+restricciones kl.publication_config_version | 5 · b5b474f50fd7ec0a499885333bf4469a
+restricciones kl.qa_report | 3 · cb3b1dafdcbe2e1c14edff8a36aff8f8
+restricciones kl.request_attestation | 6 · b63969063d914a89af8a6ab266b78824
+restricciones kl.role_grant | 10 · 03b5c925686f3d7ffa3302d3134da8a1
+restricciones kl.setting_version | 6 · 9112ead0019d811e848af00a5df6a242
+restricciones kl.signal_discard_daily | 3 · 35bb42af61580c27d51eb76aa2a3bd72
+restricciones kl.source_exception | 4 · 4471d23770f373072de081ca5077e58b
+restricciones kl.specialist_validation | 10 · 5f36a795493dd224c9f935e0ad36b4f9
+restricciones kl.stat_value | 13 · 96e5703b81fd554c7a231e17afce124e
+restricciones kl.state_transition | 1 · c275ae73f0e441b9009f5752938d0992
+restricciones kl.topic | 3 · f29c37e5407f28931c87918457840862
+restricciones kl.unit | 6 · 2cfc0069f44d5f80be87b6c3301b9437
+restricciones kl.unit_link | 5 · 7e050fb5dee14dab9437762f48e7832d
+restricciones kl.unit_version | 16 · 2209af151df82e626f8886e49f126550
+restricciones kl.usage_daily | 6 · e893fd51589dc34532ccb0bd0543b65d
+restricciones kl.validator | 7 · 882a259bd6a394c6e382e41b9e27ce04
+tabla __kl_migrations | 10 rows · a6fabced57d8d663317790879bca17d4
+tabla agent_run | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla audit_correlation_report | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla audit_event | 1 rows · ace55818afb1b9ced985b1a3056dd48b
+tabla card_content | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla card_locale_variant | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla catalog_entry | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla change_notice | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla composition_item | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla context_package | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla demand_decision | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla demand_group | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla demand_group_project | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla demand_signal | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla distribution_daily | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla edition | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla edition_preview | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla edition_rendering | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla extracted_row | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla file_object | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla fixed_block | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla indicator | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla ingest_batch | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla institution | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla job | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla job_kind | 8 rows · 66fc7d5e2320db9fbd4013d00b11f940
+tabla package_member | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla permission_role | 38 rows · 82be4eb605d1c6cd2d4a36872ebadb4a
+tabla principal | 4 rows · 7ede40b4e2184b911ebd4d1914947a60
+tabla private_term | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla product | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla product_section | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla promotion_event | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla promotion_policy | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla publication | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla publication_config_version | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla qa_report | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla request_attestation | 19 rows · ffda2bce8d37904a299a328d12099227
+tabla role_grant | 3 rows · 9c8d8ccfc6134fc7f96f5e0b21cc77d4
+tabla setting_version | 4 rows · 7af280bd37025cb603c61be47b7851be
+tabla signal_discard_daily | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla source_exception | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla specialist_validation | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla stat_value | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla state_transition | 50 rows · 443e2c757cdf09afaa847af60b6b9556
+tabla topic | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla unit | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla unit_link | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla unit_version | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla usage_daily | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+tabla validator | 0 rows · d41d8cd98f00b204e9800998ecf8427e
+triggers | 216 · 813c254bf8f96305b33f3e4112a3edac
+vistas | 28 · 8a2841393057d990e1a199ba3eef0b6b
+índices | 95 · b54afbb5c987c1a3272c6b13ae8728f1
+# diferencias con la restauración: 1 restricción equivalente por normalización de paréntesis (kl.private_term_term_check: ((A AND B) AND C) → (A AND B AND C)); ninguna otra

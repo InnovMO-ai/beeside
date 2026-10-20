@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Precision · aviso de edición revocada</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#F8F8FC}
+a{color:#2E0879}a:hover{color:#161D35}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F8F8FC; color: #161D35; font-family: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; display: flex; flex-wrap: wrap">
+<nav aria-label="Precision Center" style="flex: 1 1 240px; max-width: 280px; min-width: 0; box-sizing: border-box; padding: 20px 16px; background: #FFFFFF; border-right: 1px solid #E4E4EE; display: grid; align-content: start; gap: 6px">
+<img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 22px; width: auto; margin: 0 8px 16px">
+<a href="#" style="padding: 10px 12px; border-radius: 8px; color: #161D35; text-decoration: none">Precision Center</a>
+<a href="#" style="padding: 10px 12px; border-radius: 8px; color: #161D35; text-decoration: none">Precision Understanding</a>
+<a href="#" style="padding: 10px 12px; border-radius: 8px; color: #161D35; text-decoration: none">My Service Map</a>
+<a href="#" aria-current="page" style="padding: 10px 12px; border-radius: 8px; background: #EEEAFB; color: #2E0879; font-weight: 600; text-decoration: none">Recursos</a>
+<a href="#" style="padding: 10px 12px; border-radius: 8px; color: #161D35; text-decoration: none">Help Center</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px clamp(16px, 3.4vw, 40px)">
+<div style="max-width: 960px; margin: 0 auto; display: grid; gap: 16px">
+<div style="padding: 10px 14px; border: 1px dashed #8A8FA5; border-radius: 10px; font-size: 13px; color: #3B4262">Prototipo de Design · componente Banner (tono "note") de Precision. Caso:
+<select value="{{mode}}" onChange="{{pick}}" aria-label="Caso de prototipo" style="font: inherit; margin-left: 6px; padding: 4px 6px; border: 1px solid #8A8FA5; border-radius: 6px; background: #fff"><option value="replaced">Revocada, hay edición vigente</option><option value="none">Revocada, sin edición vigente</option></select></div>
+<div role="status" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: 10px; border: 1px solid #EBCB8B; background: #FDF3E1">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A4D00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px; flex: none"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+<div style="flex: 1 1 320px; min-width: 0"><strong style="display: block; font-size: 14px; color: #161D35">La guía que descargaste fue retirada</strong><p style="margin: 4px 0 0; color: #7A4D00; line-height: 1.5">{{body}}</p></div>
+<sc-if value="{{hasCurrent}}" hint-placeholder-val="{{true}}"><a href="#" style="flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 10px 20px; border-radius: 8px; background: #161D35; color: #FFFFFF; font-weight: 600; text-decoration: none">Descargar la edición vigente</a></sc-if>
+</div>
+<section aria-labelledby="pz-res" style="padding: 20px; border: 1px solid #E4E4EE; border-radius: 12px; background: #FFFFFF; display: grid; gap: 12px">
+<span style="font: 600 11px/1.3 'Public Sans', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #5F6480">Guía</span>
+<h1 id="pz-res" style="margin: 0; font: 600 22px/1.25 'Public Sans', sans-serif">Doing Business beeside México</h1>
+<p style="margin: 0; color: #3B4262; line-height: 1.5">Guía práctica para establecer y operar una empresa en México. No sustituye la asesoría especializada.</p>
+<dl style="margin: 0; display: grid; gap: 6px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><dt style="color: #5F6480">Edición</dt><dd style="margin: 0; font-weight: 600">{{edition}}</dd></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><dt style="color: #5F6480">Información vigente al</dt><dd style="margin: 0">[fecha de corte]</dd></div>
+</dl>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" disabled="{{noCurrent}}" style="min-height: 44px; padding: 10px 20px; border-radius: 8px; border: 1px solid transparent; background: #161D35; color: #FFFFFF; font: 600 14px/1.25 'Public Sans', sans-serif; cursor: pointer">Descargar en español</button>
+<button type="button" disabled="{{noCurrent}}" style="min-height: 44px; padding: 10px 20px; border-radius: 8px; border: 1px solid #8A8FA5; background: #FFFFFF; color: #161D35; font: 600 14px/1.25 'Public Sans', sans-serif; cursor: pointer">Download in English</button>
+</div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { mode: 'replaced' }; }
+renderVals() {
+const r = this.state.mode === 'replaced';
+return {
+mode: this.state.mode, hasCurrent: r, noCurrent: !r,
+edition: r ? '[2026.2] · vigente' : 'Sin edición disponible por ahora',
+body: r ? 'La edición [2026.1] ya no debe usarse como referencia. Te recomendamos descargar la edición vigente y desechar la copia anterior.' : 'La edición [2026.1] ya no debe usarse como referencia. Aquí aparecerá la nueva edición en cuanto esté publicada.',
+pick: (e) => this.setState({ mode: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

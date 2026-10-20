@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Seed Management</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[po]@beeside</span><span class="admin-badge" data-role="ADMIN">KL_ADMIN</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Ningún paquete compilado: no hay unidades publicadas. Presupuestos pendientes de la línea base con el tokenizador real (R5).</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html" aria-current="page">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<p class="kl-sub" lang="es">Paquetes de contexto que KL compila para la RAM de Precision. Cada uno lleva manifiesto id@versión; si una pieza cambia de estado, el paquete se invalida y Precision lo detecta en el siguiente turno.</p>
+<section class="admin-card" aria-labelledby="sd-pk">
+<h2 id="sd-pk">Packages</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Package</th><th scope="col">Level</th><th scope="col">Units</th><th scope="col">Tokens · budget</th><th scope="col">Status</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>pkg.mx.core.es</code> · <code>.en</code></th><td>Core</td><td>0</td><td>— · [por fijar]</td><td><span class="admin-badge" data-tone="muted">Not compiled</span></td></tr>
+<tr><th scope="row"><code>pkg.mx.understanding.es</code> · <code>.en</code></th><td>Stage</td><td>0</td><td>— · [por fijar]</td><td><span class="admin-badge" data-tone="muted">Not compiled</span></td></tr>
+<tr><th scope="row"><code>pkg.mx.precision_by_category.&lt;category&gt;.es</code> · <code>.en</code></th><td>Stage</td><td>0</td><td>— · [por fijar]</td><td><span class="admin-badge" data-tone="muted">Not compiled</span></td></tr>
+</tbody></table></div>
+</section>
+<div class="admin-grid">
+<section class="admin-card" aria-labelledby="sd-pol">
+<h2 id="sd-pol">Selection policy</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Automatic promotion by use</dt><dd><span class="admin-badge" data-tone="muted">Off</span> el agente propone; KL_ADMIN aprueba</dd></div>
+<div><dt>Promotion threshold</dt><dd>[usos por ámbito y ventana · por fijar]</dd></div>
+<div><dt>Never in packages</dt><dd>Valores diarios (FIX, tasa objetivo): solo consulta con fecha (T15)</dd></div>
+<div><dt>Language</dt><dd>Variante exacta para HIGH; respaldo en español marcado solo para LOW y MEDIUM (<span class="kl-nowrap">PO-3</span>)</dd></div>
+</dl>
+<div class="admin-actions"><button type="button" class="button button-secondary">Edit policy</button></div>
+</section>
+<section class="admin-card" aria-labelledby="sd-ev">
+<h2 id="sd-ev">Promotions and invalidations</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">When</th><th scope="col">Unit</th><th scope="col">Action</th><th scope="col">Reason</th></tr></thead>
+<tbody><tr><td colspan="4" class="kl-muted">No events.</td></tr></tbody>
+</table></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1050}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

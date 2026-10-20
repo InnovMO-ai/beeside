@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Edition approval</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER · editorial</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Controles con su estado real de hoy: sin piezas aprobadas, la edición no puede publicarse. Ver el PDF de prototipo en la carpeta design/prototipos.</p>
+<p><a href="KL-07-Products.dc.html">← Knowledge Products</a></p>
+<h1 class="admin-title">Edition [2026.1] · approval</h1>
+<ol class="kl-steps" aria-label="Edition steps"><li>Composing</li><li aria-current="step">Automatic checks and editorial approval</li><li>Rendering ES and EN</li><li>Published</li></ol>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="ea-chk">
+<h2 id="ea-chk">Blocking checks</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Check</th><th scope="col">Criterion</th><th scope="col">Result</th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">Toda cifra referencia un registro publicado id@versión</th><td><span class="kl-nowrap">AC-01</span>, <span class="kl-nowrap">AC-02</span></td><td><span class="admin-badge" data-tone="error">Fail · 0 registros publicados</span></td></tr>
+<tr><th scope="row">Validación especializada vigente en toda ficha normativa</th><td><span class="kl-nowrap">AC-03</span></td><td><span class="admin-badge" data-tone="error">Fail · sin validadores</span></td></tr>
+<tr><th scope="row">ES y EN con las mismas piezas, citas y cifras</th><td><span class="kl-nowrap">AC-04</span></td><td><span class="admin-badge" data-tone="error">Fail · EN sin iniciar</span></td></tr>
+<tr><th scope="row">Sin percepción, partners, datos de cliente ni valores diarios</th><td><span class="kl-nowrap">AC-05</span></td><td><span class="admin-badge" data-tone="ok">Pass</span></td></tr>
+<tr><th scope="row">Uso permitido de cada fuente respetado</th><td><span class="kl-nowrap">AC-06</span></td><td><span class="admin-badge" data-tone="attention">Pending · licencias IMCO, DOF, Banxico, IMSS</span></td></tr>
+<tr><th scope="row">Límites declarados y claves de catálogo válidas</th><td><span class="kl-nowrap">AC-12</span></td><td><span class="admin-badge" data-tone="ok">Pass · 17 categorías del catálogo provisional</span></td></tr>
+<tr><th scope="row">Cambios aprobados frente a la edición anterior</th><td><span class="kl-nowrap">AC-08</span></td><td><span class="admin-badge" data-tone="info">Primera edición</span></td></tr>
+</tbody></table></div>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="ea-ap">
+<h2 id="ea-ap">Editorial approval</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Composed by</dt><dd>[editor]@beeside</dd></div>
+<div><dt>Approver</dt><dd>Debe ser otra persona con KL_REVIEWER editorial</dd></div>
+<div><dt>Manifest hash</dt><dd>Se calcula al aprobar; se imprime en el PDF</dd></div>
+</dl>
+<p class="kl-guard" lang="es">3 controles bloqueantes. La aprobación y el render se habilitan cuando todos pasan.</p>
+<div class="admin-actions"><button type="button" class="button button-primary" disabled>Approve and render</button><button type="button" class="button button-secondary">Return to composing</button></div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

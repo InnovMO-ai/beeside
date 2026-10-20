@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { Pool } from "pg";
 import { corePoolConfig, precisionPoolConfig } from "./db/pool-config";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
+import { KlAdminDeps, createKlAdminRouter } from "./admin/kl/router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
@@ -13,6 +14,7 @@ import { LegalConfig } from "./fa4/repository";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
+import { klRuntimeFromEnv } from "./kl/wiring";
 import { BillingDeps, createBillingRouter } from "./premium/billing-router";
 import { devSimulatedCheckout } from "./premium/premium-service";
 import { premiumPolicyFromEnv } from "./premium/premium-policy";
@@ -54,6 +56,10 @@ export interface AppOptions {
   admin?: AdminDeps;
   /** Precision Center API (`/api/precision/*`, absolute paths); mounted only when provided (PRECISION_API_ENABLED=true). */
   precision?: { router: Router };
+  /** Knowledge Layer admin API (/api/admin/kl/*); mounted only when KL_DB_URL_APP / KL_DB_URL_READER are configured. */
+  kl?: KlAdminDeps;
+  /** Knowledge Layer public edition-status route (PO-2); mounted only when KL is configured. */
+  klPublic?: Router;
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
   readiness?: { db: Db; expectedMigrations: number };
   security?: SecurityOptions;
@@ -81,6 +87,9 @@ export function createApp(options: AppOptions = {}) {
   // Raw-body Stripe webhook (signature verified in the handler). Mounted before the generic billing router.
   if (options.stripe) app.use("/api/billing/stripe", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createStripeWebhookRouter(options.stripe));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
+  // KL goes first: /api/admin/kl/* resolves its own session and certification before the generic admin router sees the path.
+  if (options.kl) app.use("/api/admin/kl", createKlAdminRouter(options.kl, { limiter: security.limiter }));
+  if (options.klPublic) app.use("/api/public/editions", options.klPublic);
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
   if (options.precision) app.use(options.precision.router);
   app.use(notFoundJson());
@@ -385,6 +394,7 @@ async function main(): Promise<void> {
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
+  const klRuntime = klRuntimeFromEnv(process.env, admin);
   const stripe = stripeDepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
   const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db);
   // When only Precision is enabled there is no other database handle: its own pool then backs the shared rate-limit counters and
@@ -400,11 +410,13 @@ async function main(): Promise<void> {
     billing,
     stripe,
     admin,
+    ...(klRuntime ? { kl: klRuntime.admin, klPublic: klRuntime.publicEditions(security.limiter) } : {}),
     security,
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
   const port = Number(process.env.PORT ?? 8080);
   const server = app.listen(port, () => jsonLogger("info", "beeside backend listening", { port }));
+  klRuntime?.startBackground((message, fields) => jsonLogger("info", message, fields));
   // Slow-request protections (a request may not hold a connection open indefinitely).
   server.requestTimeout = 30_000;
   server.headersTimeout = 35_000;

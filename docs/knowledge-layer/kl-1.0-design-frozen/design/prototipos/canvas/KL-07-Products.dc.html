@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Knowledge Products</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[editor]@beeside</span><span class="admin-badge">KL_EDITOR</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Estructura aprobada (D20–D26). Ninguna pieza está redactada ni aprobada; los estados son el punto de partida real.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html" aria-current="page">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<section class="admin-card" aria-labelledby="pr-ed">
+<h2 id="pr-ed">Doing Business beeside México · edition [2026.1]</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Status</dt><dd><span class="admin-badge" data-tone="info">Composing</span></dd></div>
+<div><dt>Languages</dt><dd>Español (maestro) e inglés · se publican juntos, sin respaldo de idioma</dd></div>
+<div><dt><label for="pr-cad">Review periodicity</label></dt><dd><select id="pr-cad" class="select" style="width:auto;min-width:12rem;padding:.4rem .6rem" aria-describedby="pr-cad-h"><option>Weekly</option><option>Monthly</option><option>Quarterly</option><option selected>Semiannual</option><option>Annual</option><option>Do not update</option></select> <span id="pr-cad-h" class="kl-muted">Próximo ciclo: [abr-2027] · sin cambios aprobados no hay edición nueva · solo KL_ADMIN</span></dd></div>
+<div><dt>Format</dt><dd>A4 vertical · tema db.v3b (referencia v3, opción B) · Public Sans provisional; Lato tras verificación en el worker</dd></div>
+<div><dt>Start link</dt><dd>kl.links.discovery_start = https://beeside.you <span class="kl-muted">(estabilización; cambia en Settings al pasar a producción)</span></dd></div>
+<div><dt>Distribution</dt><dd>Controlada: descarga autenticada desde Precision · verificación pública solo de estado</dd></div>
+<div><dt>Anonymous downloads</dt><dd>—</dd></div>
+</dl>
+<div class="admin-actions"><a class="button button-primary" href="KL-07a-EditionApprove.dc.html">Request edition approval</a><a class="button button-secondary" href="#">Change notices (0)</a><button type="button" class="button button-text">Check now</button></div>
+</section>
+<section class="admin-card" aria-labelledby="pr-ch">
+<h2 id="pr-ch">Chapters</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">#</th><th scope="col">Chapter</th><th scope="col">Dominant content</th><th scope="col">Level</th><th scope="col">ES</th><th scope="col">EN</th><th scope="col">Validation</th></tr></thead>
+<tbody lang="es">
+<tr><td>00</td><th scope="row">Resumen y ruta típica</th><td>Orientación</td><td>2</td><td>Borrador</td><td>—</td><td>—</td></tr>
+<tr><td>01</td><th scope="row">México en breve</th><td>Estadístico</td><td>1</td><td>Borrador</td><td>—</td><td>Automática</td></tr>
+<tr><td>02</td><th scope="row">Entorno de negocios y regiones</th><td>Estadístico y contexto</td><td>1–2</td><td>Borrador</td><td>—</td><td>—</td></tr>
+<tr><td>03</td><th scope="row">Opciones de entrada</th><td>Orientación y normativo</td><td>3</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="attention">Sin validador · orientación general</span></td></tr>
+<tr><td>04</td><th scope="row">Constitución y registros</th><td>Normativo</td><td>3</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="attention">Sin validador · orientación general</span></td></tr>
+<tr><td>05</td><th scope="row">Inmuebles, sitios e infraestructura</th><td>Orientación y contexto</td><td>2</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="info">Cobertura parcial declarada</span></td></tr>
+<tr><td>06</td><th scope="row">Personas, nómina, seguridad social y movilidad</th><td>Normativo y estadístico</td><td>3</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="attention">Sin validador · orientación general</span></td></tr>
+<tr><td>07</td><th scope="row">Impuestos y contabilidad</th><td>Normativo</td><td>3</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="attention">Sin validador · orientación general</span></td></tr>
+<tr><td>08</td><th scope="row">Comercio exterior, aduanas y logística</th><td>Normativo y contexto</td><td>3</td><td>Borrador</td><td>—</td><td><a href="KL-07b-Validation.dc.html">Record validation</a></td></tr>
+<tr><td>09</td><th scope="row">Cumplimiento transversal</th><td>Normativo</td><td>3</td><td>Borrador</td><td>—</td><td><span class="admin-badge" data-tone="attention">Sin validador · orientación general</span></td></tr>
+<tr><td>10</td><th scope="row">Perfiles estatales (32)</th><td>Estadístico</td><td>1</td><td>Generado</td><td>Generado</td><td>Automática</td></tr>
+<tr><td>11</td><th scope="row">Cómo apoya beeside tu expansión</th><td>Proceso beeside</td><td>2</td><td>Borrador</td><td>—</td><td>Texto aprobado por el PO</td></tr>
+<tr><td>12</td><th scope="row">Fuentes, método y avisos</th><td>Generado del manifiesto</td><td>—</td><td>Generado</td><td>Generado</td><td>—</td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">Las notas editoriales (privacidad, reforma aduanera) no pasan a pieza aprobada sin contrastarse con el DOF (D26).</p>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
