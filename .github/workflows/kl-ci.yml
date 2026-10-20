@@ -1,10 +1,12 @@
 name: KL CI (aislado)
 
 # CI aislado de Knowledge Layer 1.0: PostgreSQL 16 efímero, Chromium fijado para el generador de PDF, datos sintéticos, sin secretos, sin despliegue y sin tocar
-# ninguna base compartida (CR-KL-002 Handoff §4 y §7). Solo corre para la rama feat/kl-1.0-code.
+# ninguna base compartida (CR-KL-002 Handoff §4 y §7).
+# Consolidación en main (ADR-001, L1): corre en push a main (y a feat/kl-1.0-code mientras exista) y en TODO pull request, para que un cambio de
+# otra plataforma sobre archivos compartidos no pueda romper KL sin que su CI lo detecte.
 on:
   push:
-    branches: ["feat/kl-1.0-code"]
+    branches: ["main", "feat/kl-1.0-code"]
   pull_request:
 
 permissions:
@@ -12,7 +14,6 @@ permissions:
 
 jobs:
   kl-tests:
-    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -71,7 +72,6 @@ jobs:
   # Validación REAL de las imágenes (G2): construye runtime y runtime-kl-worker y ejecuta las pruebas de humo (ver scripts/kl/smoke/images.sh).
   # Sin credenciales de GCP, sin subir imágenes, render con --network none. Su resultado es lo que cierra «validación de imagen PENDIENTE G2».
   kl-images:
-    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
     runs-on: ubuntu-latest
     env:
       PRECISION_KNOWLEDGE_PROVIDER: "off"

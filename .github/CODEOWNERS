@@ -1,0 +1,23 @@
+# Ownership by path (ADR-003). Today every path resolves to the single GitHub account; the file still declares which domain answers for
+# what, and becomes enforcing once a second reviewer/team exists (ruleset: require code-owner review). Later lines win.
+*                                   @InnovMO-ai
+# Shared, cross-platform (Architecture): changes need transversal review and contract tests
+/.github/                           @InnovMO-ai
+/backend/db/migrations/             @InnovMO-ai
+/backend/src/index.ts               @InnovMO-ai
+/backend/src/admin/admin-router.ts  @InnovMO-ai
+/backend/Dockerfile                 @InnovMO-ai
+/package.json                       @InnovMO-ai
+/package-lock.json                  @InnovMO-ai
+/backend/package.json               @InnovMO-ai
+/deploy/                            @InnovMO-ai
+/infra/                             @InnovMO-ai
+/scripts/ci/                        @InnovMO-ai
+/docs/adr/                          @InnovMO-ai
+# Domains
+/backend/src/precision/             @InnovMO-ai
+/backend/src/knowledge-layer/       @InnovMO-ai
+/backend/src/kl/                    @InnovMO-ai
+/scripts/kl/                        @InnovMO-ai
+/backend/src/fa4/                   @InnovMO-ai
+/frontend/                          @InnovMO-ai

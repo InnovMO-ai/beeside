@@ -31,12 +31,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: The tagged commit must belong to feat/kl-1.0-code
+      - name: The tagged commit must belong to main (or feat/kl-1.0-code while it exists)
         run: |
-          git fetch origin feat/kl-1.0-code
-          git merge-base --is-ancestor "${{ github.sha }}" origin/feat/kl-1.0-code || { echo "El commit etiquetado no pertenece a feat/kl-1.0-code: no se publica nada"; exit 1; }
-
-      # Lo que se publica es EXACTAMENTE lo que pasó las pruebas de humo: images.sh construye y prueba kl-smoke-api / kl-smoke-worker.
+          git fetch origin main
+          git fetch origin feat/kl-1.0-code || true
+          if git merge-base --is-ancestor "${{ github.sha }}" origin/main; then echo "commit on main"
+          elif git rev-parse -q --verify origin/feat/kl-1.0-code >/dev/null && git merge-base --is-ancestor "${{ github.sha }}" origin/feat/kl-1.0-code; then echo "commit on feat/kl-1.0-code (transition)"
+          else echo "El commit etiquetado no pertenece a main ni a feat/kl-1.0-code: no se publica nada"; exit 1; fi
       - name: Build and smoke-test both targets (same script as kl-ci)
         env:
           KL_SMOKE_REQUIRE_BASELINE: "1"
