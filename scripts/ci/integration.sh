@@ -50,3 +50,17 @@ for f in $(grep -lE 'TEST_RUNTIME_ADMIN_DATABASE_URL' src/__integration__/*.int.
   TEST_DATABASE_URL="$ADM/$db" TEST_RUNTIME_ADMIN_DATABASE_URL="$ADM/$db" TEST_SHARED_DOMAIN_SCHEMA=1 \
     npx jest --runInBand -c jest.integration.config.js "$f"
 done
+# 4. Migration target guard against a REAL legacy-shaped database (ADR-002): a database named `discovery` holding exactly the authorized
+#    24 migrations must refuse this build's newer ones (and stay at 24); the canonical `beeside` must take the full chain.
+LEG=$(mktemp -d); cp -R db/migrations "$LEG/m"
+node -e 'const f=process.argv[1]+"/m/meta/_journal.json",j=require(f);j.entries=j.entries.slice(0,24);require("fs").writeFileSync(f,JSON.stringify(j))' "$LEG"
+psql -qc "DROP DATABASE IF EXISTS discovery WITH (FORCE)"; psql -v ON_ERROR_STOP=1 -qc "CREATE DATABASE discovery"
+node -e 'const {drizzle}=require("drizzle-orm/node-postgres");const {migrate}=require("drizzle-orm/node-postgres/migrator");const {Pool}=require("pg");const p=new Pool({connectionString:process.argv[1]});migrate(drizzle(p),{migrationsFolder:process.argv[2],migrationsTable:"__drizzle_migrations",migrationsSchema:"drizzle"}).then(()=>p.end())' "$ADM/discovery" "$LEG/m"
+count(){ psql -d "$1" -Atc "SELECT count(*) FROM drizzle.__drizzle_migrations"; }
+[ "$(count discovery)" = 24 ] || { echo "legacy fixture is not at 24"; exit 4; }
+if NODE_ENV=production MIGRATION_DATABASE_URL="$ADM/discovery" node dist/scripts/migrate.js >/dev/null 2>&1; then echo "GUARD FAILED: the build migrated the legacy discovery database"; exit 4; fi
+[ "$(count discovery)" = 24 ] || { echo "GUARD FAILED: legacy discovery database changed"; exit 4; }
+psql -qc "DROP DATABASE IF EXISTS beeside WITH (FORCE)"; psql -v ON_ERROR_STOP=1 -qc "CREATE DATABASE beeside"
+NODE_ENV=production MIGRATION_DATABASE_URL="$ADM/beeside" node dist/scripts/migrate.js >/dev/null
+[ "$(count beeside)" = "$(node -e 'console.log(require("./db/migrations/meta/_journal.json").entries.length)')" ] || { echo "canonical beeside did not receive the full chain"; exit 4; }
+echo "== migration target guard: discovery refused and still 24; beeside received the full chain"
