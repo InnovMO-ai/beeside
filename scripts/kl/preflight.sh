@@ -7,6 +7,7 @@
 #   KL_PLATFORM=knowledge-layer-code bash scripts/kl/preflight.sh --remote   # además contrasta la etiqueta con origin
 #   bash scripts/kl/preflight.sh --ci                                        # GitHub Actions (implica --gate)
 #
+# Ramas: feat/kl-1.0-code (modo heredado, sin cambios) o kl/* creadas desde main (modo main: solo cuenta lo que la rama cambia respecto de main).
 # Salida: 0 = OK (puede listar elementos a REVISAR) · 1 = STOP: no escribir · 3 = uso incorrecto
 # Compatible con bash 3.2 (macOS) y GNU/Linux. Solo lee: no modifica el repositorio.
 set -u
@@ -14,7 +15,8 @@ set -u
 # ── Constantes de identidad (no dependen de archivos editables) ─────────────────
 PLATFORM="knowledge-layer-code"
 REPO_SLUG="InnovMO-ai/beeside"
-BRANCH="feat/kl-1.0-code"
+BRANCH="feat/kl-1.0-code"                     # modo heredado (rama larga de KL): base de comparación = commit de Design
+TRUNK="main"; TRUNK_PREFIX="kl/"               # modo main (ADR-001): ramas cortas kl/* desde main; base = merge-base con origin/main
 WORKTREE_REL="Developer/beeside-kl"            # relativo a $HOME en el Mac
 TAG="kl-design-1.0-frozen"
 TAG_OBJ="02198ebd426a1935cad9c8176edc65586bfb7e20"
@@ -81,7 +83,17 @@ fi
 # P4 · Rama
 if [ "$CI" = 1 ]; then BR="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
 else BR="$(git symbolic-ref -q --short HEAD || echo '<detached>')"; fi
-[ "$BR" = "$BRANCH" ] && ok "rama: $BRANCH" || stop "rama '$BR' ≠ $BRANCH"
+BASE="$DESIGN_COMMIT"; BMODE="heredado"
+case "$BR" in
+  "$BRANCH") ok "rama: $BRANCH (modo heredado)" ;;
+  "$TRUNK_PREFIX"*)
+    BMODE="main"
+    if git rev-parse -q --verify "refs/remotes/origin/$TRUNK" >/dev/null; then
+      BASE="$(git merge-base HEAD "refs/remotes/origin/$TRUNK" 2>/dev/null || true)"
+      [ -n "$BASE" ] && ok "rama: $BR (modo main; base $(printf '%s' "$BASE" | cut -c1-12) = merge-base con origin/$TRUNK)" || stop "rama $BR sin ancestro común con origin/$TRUNK"
+    else stop "modo main: falta origin/$TRUNK (git fetch origin $TRUNK)"; fi ;;
+  *) stop "rama '$BR' no es $BRANCH ni ${TRUNK_PREFIX}*" ;;
+esac
 
 # P5 · Referencia de Design y ancestría
 OBJ="$(git rev-parse -q --verify "refs/tags/$TAG" 2>/dev/null || true)"
@@ -111,8 +123,8 @@ GDIR="$(git rev-parse --git-dir)"
 for f in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply BISECT_LOG; do
   [ -e "$GDIR/$f" ] && stop "operación git en curso: $f"
 done
-M="$(git rev-list --merges "$DESIGN_COMMIT..HEAD" 2>/dev/null | head -1)"
-[ -z "$M" ] && ok "sin merges desde Design" || stop "commit de merge no autorizado en la rama: ${M:0:12}"
+M="$(git rev-list --merges "$BASE..HEAD" 2>/dev/null | head -1)"
+[ -z "$M" ] && ok "sin merges en la rama (desde $( [ "$BMODE" = main ] && echo "la base en main" || echo Design))" || stop "commit de merge no autorizado en la rama: ${M:0:12}"
 
 # P7 · Design congelado intacto
 FD_CHANGED="$( { git diff --name-only "$DESIGN_COMMIT" -- $FROZEN_DIRS; git diff --cached --name-only "$DESIGN_COMMIT" -- $FROZEN_DIRS; git ls-files --others --exclude-standard -- $FROZEN_DIRS; } 2>/dev/null | sort -u)"
@@ -171,7 +183,7 @@ declared() {  # $1 = ruta → imprime la referencia de aprobación si está decl
 }
 BOOT="$(git log --diff-filter=A --format=%H "$DESIGN_COMMIT..HEAD" -- scripts/kl/preflight.sh 2>/dev/null | tail -1)"
 TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
-{ git diff --name-only --no-renames "$DESIGN_COMMIT" HEAD
+{ git diff --name-only --no-renames "$BASE" HEAD
   git diff --name-only --no-renames HEAD
   git diff --cached --name-only --no-renames HEAD
   git ls-files --others --exclude-standard; } 2>/dev/null | sort -u > "$TMP"
@@ -205,7 +217,7 @@ while IFS= read -r f; do
       else review "$lbl sin declarar (declararlo antes de commit): $f"; fi ;;
   esac
 done < "$TMP"
-ok "cambios desde Design: $n_kl KL · $n_sh compartidos/guarda · $n_blk bloqueados"
+ok "cambios desde la base ($BMODE): $n_kl KL · $n_sh compartidos/guarda · $n_blk bloqueados"
 if [ "$CI" = 0 ]; then
   W="$(git status --porcelain=v1 2>/dev/null | wc -l | tr -d ' ')"
   [ "$W" = 0 ] && ok "árbol limpio" || ok "árbol con $W cambios locales (permitido en desarrollo; clasificados arriba)"

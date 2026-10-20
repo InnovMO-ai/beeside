@@ -1,10 +1,10 @@
 name: KL preflight
 
-# CI aislado de Knowledge Layer: solo corre para la rama feat/kl-1.0-code.
+# CI aislado de Knowledge Layer: corre para feat/kl-1.0-code (modo heredado) y para ramas kl/* creadas desde main (ADR-001).
 # No despliega, no migra y no usa secretos.
 on:
   push:
-    branches: ["feat/kl-1.0-code"]
+    branches: ["feat/kl-1.0-code", "kl/**"]
   pull_request:
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   kl-preflight:
-    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code'
+    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code' || startsWith(github.head_ref, 'kl/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
