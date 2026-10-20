@@ -91,7 +91,7 @@ jobs:
 
   # FA Public v1.0 against REAL PostgreSQL with the ACTUAL least-privilege runtime role (no owner/superuser in the application path):
   # persistence + security integration tests, then the end-to-end suite at 375 and 1440 with the API connected as the runtime login role.
-  fa4-postgres:
+  integration-postgres:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -112,26 +112,18 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
-      - name: Databases and the runtime login role
-        run: |
-          psql -c "CREATE ROLE beeside_runtime LOGIN PASSWORD 'rt'"
-          for d in fa4_it fa4_rt fa4_e2e; do psql -c "CREATE DATABASE $d"; done
       - name: Build engine and backend
         run: |
           npm run build --workspace=shared/canonical-fields
           npm run build --workspace=shared/fa-public-engine
           npm run build --workspace=backend
-      - name: Migrate the three databases (real Drizzle migrations)
-        working-directory: backend
-        run: |
-          for d in fa4_it fa4_rt; do DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/$d npx drizzle-kit migrate; done
-      - name: FA4 integration tests (rolled-back suite + runtime-role / abuse / concurrency suite)
-        env:
-          TEST_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/fa4_it
-          TEST_RUNTIME_ADMIN_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/fa4_rt
-          TEST_RUNTIME_DATABASE_URL: postgres://beeside_runtime:rt@127.0.0.1:5432/fa4_rt
-        run: npx jest --runInBand -c jest.integration.config.js src/__integration__/fa4
-        working-directory: backend
+      # All database-backed suites (Discovery, Precision, platform). Rolled-back suites share one database; every runtime-role suite gets its
+      # OWN database and the canonical login topology (Discovery login only in beeside_discovery_rw, Precision login only in beeside_runtime_role),
+      # bound by the same domain-roles-prepare step production uses. Root cause of the 2026-10-16 failures: one shared database for suites that commit data.
+      - name: Integration suites (shared rolled-back + dedicated runtime-role databases)
+        run: bash scripts/ci/integration.sh
+      - name: End-to-end database
+        run: psql -c "CREATE DATABASE fa4_e2e"
       - name: Install browser
         run: npx playwright install --with-deps chromium
         working-directory: frontend
