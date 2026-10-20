@@ -25,6 +25,12 @@ if [ "$DRY_RUN" = "0" ]; then
   [ "${PROD_CONFIRM:-}" = "DEPLOY-TO-PRODUCTION:${PROJECT_ID}" ] || { echo "PROD_CONFIRM must be DEPLOY-TO-PRODUCTION:${PROJECT_ID}"; exit 3; }
   [ -z "$(git status --porcelain)" ] || { echo "working tree is not clean"; exit 3; }
   [ "$(git rev-parse --short HEAD)" = "$IMAGE_TAG" ] || { echo "IMAGE_TAG ($IMAGE_TAG) must be the commit being deployed ($(git rev-parse --short HEAD))"; exit 3; }
+  # Until the cutover to `beeside` (ADR-001/002), Discovery production is deployed ONLY from the release line. main carries Precision and
+  # migrations 0024+ that the legacy `discovery` database must never receive. Fail closed if the release line cannot be read.
+  RELEASE_LINE=release/discovery-v1
+  git fetch --quiet origin "refs/heads/${RELEASE_LINE}:refs/remotes/origin/${RELEASE_LINE}" || { echo "cannot read origin/${RELEASE_LINE}: refusing to deploy"; exit 3; }
+  git merge-base --is-ancestor HEAD "origin/${RELEASE_LINE}" || { echo "HEAD $(git rev-parse --short HEAD) is not on ${RELEASE_LINE}: Discovery production deploys only from the release line until the cutover"; exit 3; }
+  [ "$(find backend/db/migrations -maxdepth 1 -name '[0-9][0-9][0-9][0-9]_*.sql' | wc -l | tr -d ' ')" = "24" ] || { echo "this tree ships a migration count other than the 24 authorized for the legacy discovery database: refusing"; exit 3; }
 else
   echo "(DRY RUN: commands are printed, nothing is executed)"
 fi

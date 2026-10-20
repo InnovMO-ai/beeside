@@ -27,6 +27,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      # Fail-safe (L0 2026-10-20): every GCP_* variable is repository-level and points at the DEV project, and the "production" GitHub environment
+      # does not exist (GitHub would create it unprotected on first run). This workflow refuses unless the "production" environment itself declares
+      # DEPLOY_TARGET_ENVIRONMENT=production. It also stays disabled until the promotion-by-digest pipeline replaces it (ADR-004).
+      - name: Refuse unless the production environment is explicitly configured
+        run: |
+          if [ "${{ vars.DEPLOY_TARGET_ENVIRONMENT }}" != "production" ]; then
+            echo "Refusing: vars.DEPLOY_TARGET_ENVIRONMENT must be 'production', defined on the 'production' GitHub environment (not at repository level)."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
