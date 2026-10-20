@@ -39,3 +39,14 @@ for f in $(grep -lE 'TEST_RUNTIME_DATABASE_URL' src/__integration__/*.int.test.t
   TEST_DATABASE_URL="$ADM/$db" TEST_RUNTIME_ADMIN_DATABASE_URL="$ADM/$db" TEST_RUNTIME_DATABASE_URL="postgres://${login}:rt@${PGHOST}:${PGPORT}/$db" \
     npx jest --runInBand -c jest.integration.config.js "$f"
 done
+# 3. Owner-only suites (production preparation / stabilization reset): owner credential on a dedicated database with the shared canonical schema.
+#    Their legacy-database variant (24 migrations) belongs to the release/discovery-v1 line, not to main.
+for f in $(grep -lE 'TEST_RUNTIME_ADMIN_DATABASE_URL' src/__integration__/*.int.test.ts src/*/__integration__/*.int.test.ts 2>/dev/null | xargs grep -LE 'TEST_RUNTIME_DATABASE_URL' | sort); do
+  name=$(basename "$f" .int.test.ts)
+  case "$name" in discovery-prod-prepare|discovery-stabilization-reset) ;; *) echo "owner-only suite $name has no declared domain in scripts/ci/integration.sh"; exit 3;; esac
+  db="own_$(printf '%s' "$name" | tr -c 'a-z0-9' '_')"
+  fresh_db "$db"
+  echo "== owner-only suite $name (discovery, shared canonical schema) on dedicated database $db"
+  TEST_DATABASE_URL="$ADM/$db" TEST_RUNTIME_ADMIN_DATABASE_URL="$ADM/$db" TEST_SHARED_DOMAIN_SCHEMA=1 \
+    npx jest --runInBand -c jest.integration.config.js "$f"
+done
