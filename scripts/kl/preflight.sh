@@ -26,8 +26,17 @@ FROZEN_DIRS="docs/knowledge-layer/kl-1.0-design-frozen docs/knowledge-layer/kl-1
 GUARD_FILES="scripts/kl/preflight.sh scripts/kl/kl.fingerprint .github/workflows/kl-preflight.yml"
 # Modo main (L1 v2): además del gate, son controles protegidos el CI de KL, el registro de aprobaciones, la lista de aprobadores y los scripts que verifican aprobación y CI.
 # Cualquier cambio exige aprobación VERIFICADA del PO en GitHub (no basta lo que diga un archivo de la propia rama).
-GUARD_FILES_MAIN="$GUARD_FILES .github/workflows/kl-ci.yml scripts/kl/shared-changes.txt scripts/kl/po-approvers.txt scripts/kl/verify-approval.sh scripts/kl/require-kl-ci.sh"
+GUARD_FILES_MAIN="$GUARD_FILES .github/workflows/kl-ci.yml scripts/kl/shared-changes.txt scripts/kl/po-approvers.txt scripts/kl/verify-approval.sh scripts/kl/require-kl-ci.sh scripts/kl/verify-check-origin.sh scripts/kl/gate-run.sh"
 KL_PATHS_GLOB() { case "$1" in backend/src/kl/*|frontend/src/kl/*|backend/src/admin/kl/*|frontend/src/admin/kl/*|scripts/kl/*|.github/workflows/kl-*|docs/knowledge-layer/*) return 0 ;; esac; return 1; }
+# Decisión única sobre aprobación de controles protegidos (L1 v3). Falla cerrado: solo dos combinaciones evento/valor se aceptan, cualquier otra (vacía, desconocida,
+# "deferred" fuera de push, "verified" fuera de pull_request_target) es STOP. El valor lo calcula el workflow confiable (gate-run.sh), nunca la rama.
+approval_gate() {  # $1 = rutas protegidas modificadas
+  case "${KL_GUARD_APPROVAL:-}:${GITHUB_EVENT_NAME:-}" in
+    verified:pull_request_target) review "controles protegidos modificados con aprobación VERIFICADA del PO en GitHub:$1" ;;
+    deferred:push) review "controles protegidos modificados:$1 (en push la aprobación del PO no se puede verificar; se exige en el pull request)" ;;
+    *) stop "controles protegidos modificados sin aprobación verificada del PO (revisión APPROVED de un aprobador de scripts/kl/po-approvers.txt sobre este commit; evento '${GITHUB_EVENT_NAME:-?}', valor '${KL_GUARD_APPROVAL:-<vacío>}'):$1" ;;
+  esac
+}
 FP="scripts/kl/kl.fingerprint"
 DECL="scripts/kl/shared-changes.txt"
 DATABASE="beeside_kl"                                   # CR-KL-002
@@ -46,6 +55,8 @@ for a in "$@"; do
   esac
 done
 [ "$CI" = 1 ] && KL_PLATFORM="${KL_PLATFORM:-}"
+# En eventos de pull request el gate de PR es OBLIGATORIO aunque falte la bandera: ese camino nunca usa el modo heredado.
+[ "${GITHUB_EVENT_NAME:-}" = pull_request_target ] && { PRGATE=1; CI=1; MODE="gate"; }
 
 N_STOP=0; N_REVIEW=0; N_WARN=0
 ok()     { printf 'OK       %s\n' "$*"; }
@@ -92,7 +103,12 @@ if [ "$CI" = 1 ]; then BR="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}"
 else BR="$(git symbolic-ref -q --short HEAD || echo '<detached>')"; fi
 BASE="$DESIGN_COMMIT"; BMODE="heredado"
 case "$BR" in
-  "$BRANCH") ok "rama: $BRANCH (modo heredado)" ;;
+  "$BRANCH")
+    if [ "$PRGATE" = 1 ]; then
+      stop "el gate de pull request NO admite el modo heredado: '$BRANCH' no se fusiona por PR; los cambios de KL entran desde ramas ${TRUNK_PREFIX}* creadas desde $TRUNK"
+      echo "──"; echo "RESULTADO: STOP — $N_STOP incumplimiento(s). No escribir; informar al PO."; exit 1
+    fi
+    ok "rama: $BRANCH (modo heredado)" ;;
   "$TRUNK_PREFIX"*)
     BMODE="main"
     if git rev-parse -q --verify "refs/remotes/origin/$TRUNK" >/dev/null; then
@@ -108,12 +124,16 @@ case "$BR" in
         else
           KLTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | while IFS= read -r f; do KL_PATHS_GLOB "$f" && echo "$f"; done)"
           if [ -n "$KLTOUCH" ]; then stop "rama '$BR' (no es ${TRUNK_PREFIX}* ni $BRANCH) modifica rutas de KL; los cambios de KL solo entran desde ramas ${TRUNK_PREFIX}*:"; printf '           %s\n' $KLTOUCH | head -10
-          else ok "PR ajeno a KL ('$BR'): no toca rutas de KL"; fi
+          else
+            ok "PR ajeno a KL ('$BR'): no toca rutas de KL"
+            GHTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | grep -E '^\.github/' | tr '\n' ' ' || true)"
+            [ -n "$GHTOUCH" ] && approval_gate " $GHTOUCH"
+          fi
         fi
       else stop "falta origin/$TRUNK"; fi
       echo "──"
       if [ "$N_STOP" -gt 0 ]; then echo "RESULTADO: STOP — $N_STOP incumplimiento(s). No escribir; informar al PO."; exit 1; fi
-      echo "RESULTADO: OK (PR ajeno a KL)"; exit 0
+      echo "RESULTADO: OK (PR ajeno a KL)$( [ "$N_REVIEW" -gt 0 ] && echo " · $N_REVIEW elemento(s) a REVISAR por el PO")"; exit 0
     fi
     stop "rama '$BR' no es $BRANCH ni ${TRUNK_PREFIX}*" ;;
 esac
@@ -230,6 +250,8 @@ while IFS= read -r f; do
   [ -z "$f" ] && continue
   c="$(classify "$f")"
   if [ "$c" = KL ] && printf '%s\n' "$GUARD_CHANGED" | grep -qxF "$f"; then c=GUARD; fi
+  # Modo main: TODO lo que cuelga de .github/ (workflows de CI, publicación y despliegue, CODEOWNERS) es control protegido; no basta declararlo.
+  if [ "$BMODE" = main ] && [ "$c" != GUARD ]; then case "$f" in .github/*) c=PROTECTED ;; esac; fi
   case "$c" in
     KL) n_kl=$((n_kl+1)) ;;
     FROZEN) n_blk=$((n_blk+1)) ;;   # ya reportado en P7
@@ -237,6 +259,7 @@ while IFS= read -r f; do
     MIGRATION) n_blk=$((n_blk+1)); cap && stop "migración compartida (prohibido; KL migra solo a beeside_kl desde backend/src/kl/db/migrations, CR-KL-002 B10): $f" ;;
     PRECISION) n_blk=$((n_blk+1)); cap && stop "ruta de Precision (no autorizada desde KL): $f" ;;
     DISCOVERY) n_blk=$((n_blk+1)); cap && stop "ruta de Discovery (no autorizada desde KL): $f" ;;
+    PROTECTED) n_sh=$((n_sh+1)); GUARD_LIST="$GUARD_LIST $f" ;;
     SHARED|GUARD)
       n_sh=$((n_sh+1)); lbl="componente compartido"; [ "$c" = GUARD ] && lbl="archivo de guarda del preflight"
       if [ "$c" = GUARD ] && [ "$BMODE" = main ]; then GUARD_LIST="$GUARD_LIST $f"; fi
@@ -252,13 +275,7 @@ while IFS= read -r f; do
       else review "$lbl sin declarar (declararlo antes de commit): $f"; fi ;;
   esac
 done < "$TMP"
-if [ "$CI" = 1 ] && [ "$BMODE" = main ] && [ -n "$GUARD_LIST" ]; then
-  case "${KL_GUARD_APPROVAL:-}" in
-    verified) review "controles protegidos modificados con aprobación VERIFICADA del PO en GitHub:$GUARD_LIST" ;;
-    deferred) review "controles protegidos modificados:$GUARD_LIST (la aprobación del PO se verifica en el pull request, no en push)" ;;
-    *) stop "controles protegidos modificados sin aprobación verificada del PO (revisión APPROVED de un aprobador de scripts/kl/po-approvers.txt sobre este commit):$GUARD_LIST" ;;
-  esac
-fi
+if [ "$CI" = 1 ] && [ "$BMODE" = main ] && [ -n "$GUARD_LIST" ]; then approval_gate "$GUARD_LIST"; fi
 ok "cambios desde la base ($BMODE): $n_kl KL · $n_sh compartidos/guarda · $n_blk bloqueados"
 if [ "$CI" = 0 ]; then
   W="$(git status --porcelain=v1 2>/dev/null | wc -l | tr -d ' ')"

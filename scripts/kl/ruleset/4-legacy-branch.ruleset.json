@@ -1,0 +1,8 @@
+{
+  "name": "feat/kl-1.0-code · conservar la historia mientras exista (PROPUESTO, no aplicado)",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/heads/feat/kl-1.0-code"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ]
+}

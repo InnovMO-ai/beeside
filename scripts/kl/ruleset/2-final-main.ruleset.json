@@ -1,5 +1,5 @@
 {
-  "name": "main · KL gate + revisión obligatoria (PROPUESTO, no aplicado)",
+  "name": "main · KL gate + revisión obligatoria (PROPUESTO, no aplicado; reemplaza al bootstrap tras fusionar L1)",
   "target": "branch",
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
@@ -21,7 +21,11 @@
       "type": "required_status_checks",
       "parameters": {
         "strict_required_status_checks_policy": true,
-        "required_status_checks": [ { "context": "kl-gate" }, { "context": "kl-tests" }, { "context": "kl-images" } ]
+        "required_status_checks": [
+          { "context": "kl-gate", "integration_id": 15368 },
+          { "context": "kl-tests", "integration_id": 15368 },
+          { "context": "kl-images", "integration_id": 15368 }
+        ]
       }
     }
   ]
