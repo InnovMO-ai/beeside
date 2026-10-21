@@ -52,7 +52,7 @@ test.describe("browser journey on the real URL (fictitious data)", () => {
     const cat = await request.get("/api/fa4/catalog"); test.skip(cat.status() !== 200, "backend not reachable yet");
     const a = JSON.parse(JSON.stringify(journeyNortica("es"))); a.identity.email = `contact+smoke-ui-${Date.now()}@beeside.you`;
     const s = await request.post("/api/fa4/sessions", { data: { answers: a, step: "extra" } }); const token = (await s.json()).sessionToken as string;
-    await page.addInitScript((t) => { if (sessionStorage.getItem("beeside.fa4.session")) return; sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); }, token);
+    await page.addInitScript((t) => { sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); }, token);
     await page.goto("/");
     await expect(page.getByTestId("stabilization-notice")).toBeVisible();   // Stabilization notice: must be confirmed before anything else
     await page.getByRole("button", { name: "Entendido, continuar" }).click();

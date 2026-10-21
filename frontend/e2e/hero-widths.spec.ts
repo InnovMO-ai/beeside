@@ -28,7 +28,8 @@ for (const [w, h] of [[375, 812], [768, 1024], [1024, 768], [1200, 800], [1440, 
     if (w >= 900) expect(m.cover, "photo fully covers the Hero box").toBeTruthy();
     expect(m.natural![0], "decoded source is the real asset").toBeGreaterThanOrEqual(w <= 767 ? 1000 : 2000);
     expect(m.scale, "never enlarged beyond its pixels at 1× (no pixelation)").toBeLessThanOrEqual(w <= 767 ? 1.0 : 1.0);
-    expect(m.bg).toBe("rgb(246, 242, 239)"); expect(m.card).toBe("rgb(255, 255, 255)");      // #F6F2EF canvas · white comparison card
+    expect(m.bg).toBe("rgb(246, 242, 239)");                                                    // #F6F2EF canvas
+    expect(await page.locator(".vc-card, .vc-compare").count(), "DSC-10: the comparison is retired from the YEV").toBe(0);
     expect(await axeViolations(page)).toEqual([]);
     if (OUT) { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: `${OUT}/yev-hero-${w}.png` });
       await page.locator(".continue-zone").first().scrollIntoViewIfNeeded(); await page.screenshot({ path: `${OUT}/value-of-continuing-${w}.png`, fullPage: false }); }
