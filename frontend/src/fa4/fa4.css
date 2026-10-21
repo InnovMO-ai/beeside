@@ -305,12 +305,11 @@ fieldset > legend.label + * { clear: both; }
 .eyebrow { letter-spacing: .02em; }
 .h1 { text-wrap: balance; }
 
-/* Thematic screens (VT-03 presentation): A = numbered questions under a theme title; B = the single question is the title */
+/* Thematic screens (VT-03 presentation): A = questions under a theme title (no visible numbering, DSC-05); B = the single question is the title */
 .qlist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .qblock { padding: 2px 0 10px; }
 .qlist .qblock + .qblock { border-top: 1px solid var(--line); padding-top: 6px; }
 .qtitle { display: flex; gap: 12px; align-items: baseline; margin: 18px 0 12px; }
-.qnum { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--lav); color: var(--purple); font-size: 13px; font-weight: 700; display: inline-grid; place-items: center; transform: translateY(-1px); }
 .theme.single .qblock { margin-top: 18px; }
 
 /* Identity: required legal block, then a separate OPTIONAL block (D-144) */

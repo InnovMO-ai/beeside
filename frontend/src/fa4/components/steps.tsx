@@ -185,7 +185,6 @@ export function ReasonStep({ a, set, locale }: StepCtx) {
       <Head eyebrow={UI.reasonEyebrow[locale]} title={UI.reasonTitle[locale]} />
       <CheckGroup req={{ k: "reason", label: UI.reasonTitle[locale] }} values={a.reasons} onChange={(v) => set((x) => ({ ...x, reasons: v }))} options={(Object.keys(UI.reasons) as Array<keyof typeof UI.reasons>).map((v) => ({ value: v, label: T(UI.reasons[v], locale) }))} two />
       <TextField multiline label={UI.reasonWords[locale]} help={UI.reasonWordsHelp[locale]} value={a.reasonText} onChange={(v) => set((x) => ({ ...x, reasonText: v }))} />
-      {a.reasonText.trim() && <div className="card soft" style={{ marginTop: 12 }}><p className="hint">{UI.reasonMirror[locale]}</p><p className="quote">“{a.reasonText.trim()}”</p></div>}
     </div>
   );
 }
@@ -289,7 +288,7 @@ export function ActivatorsStep(s: StepCtx & { mode: 'all' | 'sell' | 'site' }) {
   return (
     <div className="narrow theme">
       <Head eyebrow={UI.stages[3]![locale]} title={themeTitle} lead={mode === 'all' ? undefined : UI.actTitle1[locale]} />
-      <ol className="qlist">{blocks.map((b, i) => <li key={b.key} className="qblock"><h2 className="qtitle"><span className="qnum" aria-hidden>{i + 1}</span>{b.q}</h2><Req k={b.key} label={b.q}>{b.node}</Req></li>)}</ol>
+      <ul className="qlist">{blocks.map((b) => <li key={b.key} className="qblock"><h2 className="qtitle">{b.q}</h2><Req k={b.key} label={b.q}>{b.node}</Req></li>)}</ul>
     </div>
   );
 }
@@ -339,11 +338,9 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
 export function FrontsStatusStep(s: StepCtx) {
   const { a, locale: loc } = s; const plans = plansFor(a);
   const setFront = (dest: string, f: FrontKey, p: Partial<Answers['fronts'][string]>) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], ...p } } }));
-  const markAllPending = () => s.set((x) => { const fr = { ...x.fronts }; for (const p of plans) for (const t of p.applies) fr[frontKey(p.destination, t.front)] = { ...fr[frontKey(p.destination, t.front)], status: 'pending' }; return { ...x, fronts: fr }; });
   return (
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
-      <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
       {plans.map((p) => (
         <section key={p.destination} aria-label={countryName(p.destination, loc)}>
           <div className="dest-head"><h2>{countryName(p.destination, loc)}{a.destinations.list.find((d) => d.iso === p.destination)?.region ? ` · ${a.destinations.list.find((d) => d.iso === p.destination)!.region}` : ''}</h2><span className="hint">{p.applies.length} {UI.topics[loc]}</span></div>
@@ -371,7 +368,6 @@ export function FrontsStatusStep(s: StepCtx) {
 export function FrontsTableStep(s: StepCtx) {
   const { a, locale: loc } = s; const plans = plansFor(a);
   const setFront = (dest: string, f: FrontKey, p: Partial<Answers['fronts'][string]>) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], ...p } } }));
-  const markAllPending = () => s.set((x) => { const fr = { ...x.fronts }; for (const p of plans) for (const t of p.applies) fr[frontKey(p.destination, t.front)] = { ...fr[frontKey(p.destination, t.front)], status: 'pending' }; return { ...x, fronts: fr }; });
   const raw = a.externalDate.date; const when = raw ? formatKeyDate(raw, loc) : '';
   const critLabel = `${UI.readyBefore[loc]} ${when}?`;
   const yn = (v: boolean | undefined) => (v === undefined ? undefined : v ? 'yes' : 'no');
@@ -379,7 +375,6 @@ export function FrontsTableStep(s: StepCtx) {
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
       <CargoBlock {...s} />
-      <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
       {plans.map((p) => (
         <section key={p.destination} aria-label={countryName(p.destination, loc)}>
           <div className="dest-head"><h2>{countryName(p.destination, loc)}{a.destinations.list.find((d) => d.iso === p.destination)?.region ? ` · ${a.destinations.list.find((d) => d.iso === p.destination)!.region}` : ''}</h2><span className="hint">{p.applies.length} {UI.topics[loc]}</span></div>

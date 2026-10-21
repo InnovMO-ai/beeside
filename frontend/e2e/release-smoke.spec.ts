@@ -24,7 +24,7 @@ for (const loc of ["es", "en"] as const) {
     await expect(page.getByRole("heading", { level: 2, name: loc === "es" ? "Concretar tu expansión en México" : "Define your expansion in Mexico" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Start Your Expansion" })).toBeVisible();
     await expect(page.getByTestId("beeside-value-section")).toContainText(loc === "es" ? "Piensa en grande." : "Think bigger.");
-    await expect(page.getByTestId("value-comparison")).toBeVisible();
+    await expect(page.getByTestId("value-comparison")).toHaveCount(0);        // DSC-10: the comparison is retired from the visible YEV (component kept, not rendered)
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(246, 242, 239)");
     expect(await page.locator("body").innerText()).not.toMatch(BAD_NAME);
     expect(await page.locator("body").innerText()).not.toMatch(/Expande tu negocio\. No tu carga|Not your workload|radar|ola de activaci|activation wave/i);
