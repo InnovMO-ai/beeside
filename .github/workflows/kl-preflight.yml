@@ -1,26 +1,85 @@
 name: KL preflight
 
-# CI aislado de Knowledge Layer: corre para feat/kl-1.0-code (modo heredado) y para ramas kl/* creadas desde main (ADR-001).
-# No despliega, no migra y no usa secretos.
+# Gate de Knowledge Layer (L1 v2). El trabajo se evalúa SIEMPRE con scripts tomados de main (referencia protegida), nunca con los de la rama que pide fusionarse:
+#  - En pull requests el evento es pull_request_target: GitHub ejecuta ESTE archivo tal como está en main, así que una rama no puede reescribir el workflow que la juzga.
+#  - El árbol de la rama se descarga solo para leerlo (git); no se ejecuta nada de él.
+#  - El job NO tiene `if` a nivel de job: siempre produce un resultado (un check omitido cuenta como aprobado en GitHub, por eso se evita).
+# No despliega, no migra y no usa secretos. Ver docs/knowledge-layer/kl-1.0-code/L1_GUARDAS_CI.md.
 on:
   push:
     branches: ["feat/kl-1.0-code", "kl/**"]
-  pull_request:
+  pull_request_target:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
 
+concurrency:
+  group: kl-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  kl-preflight:
-    if: github.event_name == 'push' || github.head_ref == 'feat/kl-1.0-code' || startsWith(github.head_ref, 'kl/')
+  kl-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
     steps:
-      - uses: actions/checkout@v4
+      - name: "Referencia protegida (main) - scripts del gate"
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: trusted
+          persist-credentials: false
+
+      - name: "Árbol evaluado (solo lectura, no se ejecuta nada de él)"
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: pr
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
+
+      - name: Elegir preflight confiable
+        id: pf
+        run: |
+          if [ -f trusted/scripts/kl/preflight.sh ]; then
+            echo "dir=$GITHUB_WORKSPACE/trusted" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            echo "AVISO: main aún no contiene el preflight (instalación inicial de L1); en push se usa el de la rama (solo modo heredado)"
+            echo "dir=$GITHUB_WORKSPACE/pr" >> "$GITHUB_OUTPUT"
+          else
+            echo "STOP: main no contiene scripts/kl/preflight.sh; un PR no puede validarse con los scripts de su propia rama"; exit 1
+          fi
+
+      - name: Aprobación del PO verificada con la API de GitHub
+        id: appr
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          APPROVERS_FILE: ${{ github.workspace }}/trusted/scripts/kl/po-approvers.txt
+        run: echo "value=$(bash trusted/scripts/kl/verify-approval.sh)" >> "$GITHUB_OUTPUT"
+
       - name: KL preflight (gate)
+        working-directory: pr
         env:
           KL_PLATFORM: knowledge-layer-code
-        run: bash scripts/kl/preflight.sh --ci
+          KL_GUARD_APPROVAL: ${{ steps.appr.outputs.value || 'deferred' }}
+          PF_DIR: ${{ steps.pf.outputs.dir }}
+        run: bash "$PF_DIR/scripts/kl/preflight.sh" --ci --pr-gate
+
+      - name: "KL CI obligatorio (kl-tests y kl-images deben terminar en success)"
+        if: github.event_name == 'pull_request_target' && (startsWith(github.event.pull_request.head.ref, 'kl/') || github.event.pull_request.head.ref == 'feat/kl-1.0-code')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash trusted/scripts/kl/require-kl-ci.sh

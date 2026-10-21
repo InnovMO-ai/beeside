@@ -6,6 +6,7 @@
 #   KL_PLATFORM=knowledge-layer-code bash scripts/kl/preflight.sh --gate     # antes de cada commit
 #   KL_PLATFORM=knowledge-layer-code bash scripts/kl/preflight.sh --remote   # además contrasta la etiqueta con origin
 #   bash scripts/kl/preflight.sh --ci                                        # GitHub Actions (implica --gate)
+#   bash <ref-protegida>/scripts/kl/preflight.sh --ci --pr-gate              # gate de pull request: el script viene de main, el árbol evaluado es el de la rama
 #
 # Ramas: feat/kl-1.0-code (modo heredado, sin cambios) o kl/* creadas desde main (modo main: solo cuenta lo que la rama cambia respecto de main).
 # Salida: 0 = OK (puede listar elementos a REVISAR) · 1 = STOP: no escribir · 3 = uso incorrecto
@@ -23,20 +24,25 @@ TAG_OBJ="02198ebd426a1935cad9c8176edc65586bfb7e20"
 DESIGN_COMMIT="69f211a11f9c95ea5f5288c61b4d263d354910fa"
 FROZEN_DIRS="docs/knowledge-layer/kl-1.0-design-frozen docs/knowledge-layer/kl-1.0-freeze-meta"
 GUARD_FILES="scripts/kl/preflight.sh scripts/kl/kl.fingerprint .github/workflows/kl-preflight.yml"
+# Modo main (L1 v2): además del gate, son controles protegidos el CI de KL, el registro de aprobaciones, la lista de aprobadores y los scripts que verifican aprobación y CI.
+# Cualquier cambio exige aprobación VERIFICADA del PO en GitHub (no basta lo que diga un archivo de la propia rama).
+GUARD_FILES_MAIN="$GUARD_FILES .github/workflows/kl-ci.yml scripts/kl/shared-changes.txt scripts/kl/po-approvers.txt scripts/kl/verify-approval.sh scripts/kl/require-kl-ci.sh"
+KL_PATHS_GLOB() { case "$1" in backend/src/kl/*|frontend/src/kl/*|backend/src/admin/kl/*|frontend/src/admin/kl/*|scripts/kl/*|.github/workflows/kl-*|docs/knowledge-layer/*) return 0 ;; esac; return 1; }
 FP="scripts/kl/kl.fingerprint"
 DECL="scripts/kl/shared-changes.txt"
 DATABASE="beeside_kl"                                   # CR-KL-002
 ADDENDUM_DIR="docs/knowledge-layer/kl-1.0-addenda/CR-KL-002"
 ADDENDUM_MANIFEST_SHA="08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b"
 
-MODE="dev"; REMOTE=0; CI=0
+MODE="dev"; REMOTE=0; CI=0; PRGATE=0
 for a in "$@"; do
   case "$a" in
     --gate) MODE="gate" ;;
     --remote) REMOTE=1 ;;
     --ci) CI=1; MODE="gate" ;;
+    --pr-gate) PRGATE=1 ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
-    *) echo "uso: preflight.sh [--gate] [--remote] [--ci]" >&2; exit 3 ;;
+    *) echo "uso: preflight.sh [--gate] [--remote] [--ci] [--pr-gate]" >&2; exit 3 ;;
   esac
 done
 [ "$CI" = 1 ] && KL_PLATFORM="${KL_PLATFORM:-}"
@@ -50,6 +56,7 @@ sha()    { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else sh
 
 echo "KL preflight · modo=$MODE$( [ "$CI" = 1 ] && echo ' (CI)')$( [ "$REMOTE" = 1 ] && echo ' +remote')"
 
+SELF_DIR="$(cd "$(dirname "$0")" && pwd -P)"   # dónde vive ESTE script (en CI debe estar fuera del árbol evaluado)
 TOP="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "STOP     no es un repositorio git"; echo "RESULTADO: STOP — no escribir"; exit 1; }
 cd "$TOP" || exit 1
 
@@ -92,8 +99,28 @@ case "$BR" in
       BASE="$(git merge-base HEAD "refs/remotes/origin/$TRUNK" 2>/dev/null || true)"
       [ -n "$BASE" ] && ok "rama: $BR (modo main; base $(printf '%s' "$BASE" | cut -c1-12) = merge-base con origin/$TRUNK)" || stop "rama $BR sin ancestro común con origin/$TRUNK"
     else stop "modo main: falta origin/$TRUNK (git fetch origin $TRUNK)"; fi ;;
-  *) stop "rama '$BR' no es $BRANCH ni ${TRUNK_PREFIX}*" ;;
+  *)
+    if [ "$PRGATE" = 1 ]; then
+      # PR de otra plataforma: no se evalúa el resto del gate de KL, pero NO puede tocar rutas de KL (el nombre de la rama no debe servir para esquivar el control).
+      if git rev-parse -q --verify "refs/remotes/origin/$TRUNK" >/dev/null; then
+        NB="$(git merge-base HEAD "refs/remotes/origin/$TRUNK" 2>/dev/null || true)"
+        if [ -z "$NB" ]; then stop "PR ajeno a KL sin ancestro común con origin/$TRUNK"
+        else
+          KLTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | while IFS= read -r f; do KL_PATHS_GLOB "$f" && echo "$f"; done)"
+          if [ -n "$KLTOUCH" ]; then stop "rama '$BR' (no es ${TRUNK_PREFIX}* ni $BRANCH) modifica rutas de KL; los cambios de KL solo entran desde ramas ${TRUNK_PREFIX}*:"; printf '           %s\n' $KLTOUCH | head -10
+          else ok "PR ajeno a KL ('$BR'): no toca rutas de KL"; fi
+        fi
+      else stop "falta origin/$TRUNK"; fi
+      echo "──"
+      if [ "$N_STOP" -gt 0 ]; then echo "RESULTADO: STOP — $N_STOP incumplimiento(s). No escribir; informar al PO."; exit 1; fi
+      echo "RESULTADO: OK (PR ajeno a KL)"; exit 0
+    fi
+    stop "rama '$BR' no es $BRANCH ni ${TRUNK_PREFIX}*" ;;
 esac
+# El preflight de una rama kl/* debe ejecutarse desde una referencia protegida, no desde el árbol que se evalúa (si no, la rama puede reescribir su propio control).
+if [ "$CI" = 1 ] && [ "$BMODE" = main ]; then
+  case "$SELF_DIR/" in "$(pwd -P)"/*) stop "preflight ejecutado desde el árbol evaluado ($SELF_DIR): en modo main debe venir de una referencia protegida (checkout separado de main)" ;; *) ok "preflight ejecutado desde referencia protegida ($(printf '%s' "$SELF_DIR" | sed 's#.*/##')): sha256 $(sha "$0" | cut -c1-12)" ;; esac
+fi
 
 # P5 · Referencia de Design y ancestría
 OBJ="$(git rev-parse -q --verify "refs/tags/$TAG" 2>/dev/null || true)"
@@ -131,7 +158,8 @@ FD_CHANGED="$( { git diff --name-only "$DESIGN_COMMIT" -- $FROZEN_DIRS; git diff
 if [ -z "$FD_CHANGED" ]; then ok "documentación congelada sin cambios respecto de ${DESIGN_COMMIT:0:12}"
 else stop "documentación congelada alterada:"; printf '           %s\n' $FD_CHANGED; fi
 VS="docs/knowledge-layer/kl-1.0-freeze-meta/verify.sh"
-if [ -f "$VS" ] && bash "$VS" >/dev/null 2>&1; then ok "verify.sh: manifiesto 8901ecfa… y 88 archivos versionados idénticos"
+if [ -n "$FD_CHANGED" ]; then :   # verify.sh pertenece a la documentación congelada: si cambió, NO se ejecuta (es código de la rama)
+elif [ -f "$VS" ] && bash "$VS" >/dev/null 2>&1; then ok "verify.sh: manifiesto 8901ecfa… y 88 archivos versionados idénticos"
 else stop "verify.sh falló (ejecuta: bash $VS)"; fi
 
 # P7b · Addendum aprobado CR-KL-002 (inmutable; cambios = nuevo CR aprobado por el PO)
@@ -187,11 +215,12 @@ TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
   git diff --name-only --no-renames HEAD
   git diff --cached --name-only --no-renames HEAD
   git ls-files --others --exclude-standard; } 2>/dev/null | sort -u > "$TMP"
-GUARD_CHANGED=""
+GUARD_CHANGED=""; GUARD_LIST=""
+GF="$GUARD_FILES"; [ "$BMODE" = main ] && GF="$GUARD_FILES_MAIN"
 # Modo main: una guarda que difiere de la base en main es guarda, aunque coincida con la versión del bootstrap (no puede revertirse sin declararla).
 GREF="$BOOT"; [ "$BMODE" = main ] && GREF="$BASE"
 if [ -n "$GREF" ]; then
-  GUARD_CHANGED="$( { git diff --name-only "$GREF" HEAD -- $GUARD_FILES; git diff --name-only HEAD -- $GUARD_FILES; git diff --cached --name-only HEAD -- $GUARD_FILES; } 2>/dev/null | sort -u)"
+  GUARD_CHANGED="$( { git diff --name-only "$GREF" HEAD -- $GF; git diff --name-only HEAD -- $GF; git diff --cached --name-only HEAD -- $GF; } 2>/dev/null | sort -u)"
 else
   warn "bootstrap del preflight aún sin commit (estado inicial esperado solo durante la instalación)"
 fi
@@ -210,15 +239,26 @@ while IFS= read -r f; do
     DISCOVERY) n_blk=$((n_blk+1)); cap && stop "ruta de Discovery (no autorizada desde KL): $f" ;;
     SHARED|GUARD)
       n_sh=$((n_sh+1)); lbl="componente compartido"; [ "$c" = GUARD ] && lbl="archivo de guarda del preflight"
+      if [ "$c" = GUARD ] && [ "$BMODE" = main ]; then GUARD_LIST="$GUARD_LIST $f"; fi
+      # El registro de declaraciones no puede declararse a sí mismo: en modo main su cambio exige aprobación verificada (más abajo); en modo heredado es un archivo de KL.
+      if [ "$f" = "$DECL" ]; then review "registro de declaraciones modificado: $f"; continue; fi
       dec=""; if d="$(declared "$f")"; then dec="$d"; fi
       ap="${dec%%	*}"; dh="${dec#*	}"
       # Una guarda solo cuenta como declarada si la declaración fija la huella exacta de su contenido actual
       if [ -n "$dec" ] && [ "$c" = GUARD ] && { [ ! -f "$f" ] || [ "$dh" != "$(sha "$f" | cut -d' ' -f1)" ]; }; then dec=""; fi
-      if [ -n "$dec" ]; then review "$lbl declarado en $DECL (aprobación: $ap): $f"
+      if [ -n "$dec" ] && [ "$CI" = 1 ] && printf '%s' "$ap" | grep -qi 'pendiente'; then stop "$lbl con aprobación PENDIENTE (bloquea en CI hasta que el PO registre la aprobación): $f"
+      elif [ -n "$dec" ]; then review "$lbl declarado en $DECL (aprobación: $ap): $f"
       elif [ "$MODE" = gate ]; then stop "$lbl sin declarar en $DECL: $f"
       else review "$lbl sin declarar (declararlo antes de commit): $f"; fi ;;
   esac
 done < "$TMP"
+if [ "$CI" = 1 ] && [ "$BMODE" = main ] && [ -n "$GUARD_LIST" ]; then
+  case "${KL_GUARD_APPROVAL:-}" in
+    verified) review "controles protegidos modificados con aprobación VERIFICADA del PO en GitHub:$GUARD_LIST" ;;
+    deferred) review "controles protegidos modificados:$GUARD_LIST (la aprobación del PO se verifica en el pull request, no en push)" ;;
+    *) stop "controles protegidos modificados sin aprobación verificada del PO (revisión APPROVED de un aprobador de scripts/kl/po-approvers.txt sobre este commit):$GUARD_LIST" ;;
+  esac
+fi
 ok "cambios desde la base ($BMODE): $n_kl KL · $n_sh compartidos/guarda · $n_blk bloqueados"
 if [ "$CI" = 0 ]; then
   W="$(git status --porcelain=v1 2>/dev/null | wc -l | tr -d ' ')"
