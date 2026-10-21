@@ -219,6 +219,8 @@ export const UI = {
   quarterNames: [L('1.er trimestre','Q1'),L('2.º trimestre','Q2'),L('3.er trimestre','Q3'),L('4.º trimestre','Q4')] as L10n[],
   emailSending: L('Enviando…', 'Sending…'),
   emailSent: L('Te enviamos tu Your Expansion View a {email}. Si no lo ves en unos minutos, revisa la carpeta de correo no deseado.', "We've sent your Your Expansion View to {email}. If you don't see it in a few minutes, check your spam folder."),
+  // DSC-33 (Stabilization only): shown ONLY for the recipient-policy refusal code; every other failure keeps `emailFailed`.
+  emailNotAuthorized: L('Durante la etapa de Estabilización sólo podemos enviar el resultado a direcciones autorizadas. Tu resultado sigue disponible aquí.', 'During Stabilization we can only send results to authorized addresses. Your result is still available here.'),
   emailFailed: L('No pudimos enviarlo ahora. Tu resultado sigue aquí; inténtalo de nuevo en un momento.', "We couldn't send it right now. Your result is still here; please try again in a moment."),
   // Stabilization notice (closed test only; PO copy, 2026-10-16)
   stabTitle: L('Discovery está en etapa de Estabilización', 'Discovery is in the Stabilization phase'),

@@ -11,7 +11,7 @@ import { UI } from '../copy/ui';
 /** Canonical order (D-120): YourExpansionView → BeesideValueSection → PremiumContinuation. Three independent components. */
 export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRestart, email, footer, delivered }: {
   model: YourExpansionViewModel; locale: Locale; onEdit?: () => void; email?: string; footer?: ReactNode; delivered?: boolean;
-  onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean>; onRestart?: () => void;
+  onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean | 'unauthorized'>; onRestart?: () => void;
 }) {
   // The result is ready: announce it politely and move focus to its title (screen-reader and keyboard users do not lose their place).
   useEffect(() => { const h = document.getElementById('yev-title'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } }, [model]);

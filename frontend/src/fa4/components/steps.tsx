@@ -76,7 +76,7 @@ export function CompanyStep({ a, set, locale }: StepCtx) {
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[0]![locale]} title={UI.hasBiz[locale]} />
-      <RadioGroup req={{ k: "company.hasBiz", label: UI.hasBiz[locale] }} value={c.hasExistingBusiness === null ? null : c.hasExistingBusiness ? 'yes' : 'no'} onChange={(v) => setC({ hasExistingBusiness: v === 'yes' })} options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} />
+      <RadioGroup req={{ k: "company.hasBiz", label: UI.hasBiz[locale] }} value={c.hasExistingBusiness === null ? null : c.hasExistingBusiness ? 'yes' : 'no'} onChange={(v) => setC(v === 'yes' ? { hasExistingBusiness: true } : { hasExistingBusiness: false, sector: '', size: null, operatesIn: [] })} options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} />
       {c.hasExistingBusiness && (<>
         <Req k="company.sector" label={UI.sector[locale]}><TextField label={UI.sector[locale]} value={c.sector} onChange={(v) => setC({ sector: v })} placeholder={UI.sectorPh[locale]} /></Req>
         <RadioGroup req={{ k: "company.size", label: UI.size[locale] }} legend={UI.size[locale]} value={c.size} onChange={(v) => setC({ size: v })} options={(Object.keys(UI.sizes) as Array<keyof typeof UI.sizes>).map((v) => ({ value: v, label: T(UI.sizes[v], locale) }))} three />

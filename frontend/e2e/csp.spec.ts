@@ -11,7 +11,7 @@ test("FA4 runs under the production CSP: no policy violations on the cover or th
   await page.goto("/fa4");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const token = await seed(request, journeyB("es", "unknown"), "extra");
-  await page.addInitScript((t) => sessionStorage.setItem("beeside.fa4.session", t), token);
+  await page.addInitScript((t) => { if (sessionStorage.getItem("beeside.fa4.session")) return; sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); }, token);
   await page.goto("/fa4");
   await page.getByRole("button", { name: "Ver mi resultado" }).click();
   await expect(page.getByTestId("result-screen")).toBeVisible({ timeout: 20_000 });

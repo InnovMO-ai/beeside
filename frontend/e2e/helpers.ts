@@ -11,7 +11,7 @@ export async function seed(request: APIRequestContext, answers: Answers, step: s
 }
 /** Opens /fa4 with this tab's working session (what a returning visitor has after the emailed link is exchanged). */
 export async function open(page: Page, token: string) {
-  await page.addInitScript((t) => sessionStorage.setItem("beeside.fa4.session", t), token);
+  await page.addInitScript((t) => { if (sessionStorage.getItem("beeside.fa4.session")) return; sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); }, token);
   await page.goto("/fa4");
 }
 

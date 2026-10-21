@@ -19,10 +19,10 @@ function nextStepTitle(destinations: YourExpansionViewModel['destinations'] | un
 export function PremiumContinuation({ premium, destinations, locale, onContinue, onEmail, email, delivered, purchaseUrl = PREMIUM_PURCHASE_URL, fallbackAllowed = PURCHASE_FALLBACK_ALLOWED }: {
   purchaseUrl?: string | null; fallbackAllowed?: boolean;
   premium: YourExpansionViewModel['premium']; destinations?: YourExpansionViewModel['destinations']; locale: Locale; email?: string; delivered?: boolean;
-  onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean>;
+  onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean | 'unauthorized'>;
 }) {
   const [cont, setCont] = useState<'idle' | 'confirm' | 'busy' | 'done' | 'err'>('idle');
-  const [mail, setMail] = useState<'idle' | 'busy' | 'done' | 'err'>('idle');
+  const [mail, setMail] = useState<'idle' | 'busy' | 'done' | 'err' | 'unauth'>('idle');
   return (
     <section className="sec" aria-labelledby="pc-title" data-testid="premium-continuation">
       {premium.shown ? (
@@ -51,9 +51,10 @@ export function PremiumContinuation({ premium, destinations, locale, onContinue,
       )}
       <div className="pc-secondary">
         {mail === 'err' && <p className="state err" role="alert">{UI.emailFailed[locale]}</p>}
+        {mail === 'unauth' && <p className="state" role="status" data-testid="email-not-authorized">{UI.emailNotAuthorized[locale]}</p>}
         {mail === 'done'
           ? <p className="state ok" role="status">{fill(UI.emailSent, locale, { email: email ?? '' })}</p>
-          : <button className="btn ghost" disabled={mail === 'busy'} aria-busy={mail === 'busy'} onClick={async () => { setMail('busy'); setMail((await onEmail?.()) ? 'done' : 'err'); }}>{mail === 'busy' ? UI.emailSending[locale] : mail === 'err' ? UI.tryAgain[locale] : UI.emailResult[locale]}</button>}
+          : mail === 'unauth' ? null : <button className="btn ghost" disabled={mail === 'busy'} aria-busy={mail === 'busy'} onClick={async () => { setMail('busy'); const r = await onEmail?.(); setMail(r === 'unauthorized' ? 'unauth' : r ? 'done' : 'err'); }}>{mail === 'busy' ? UI.emailSending[locale] : mail === 'err' ? UI.tryAgain[locale] : UI.emailResult[locale]}</button>}
         {!delivered && mail !== 'done' && <p className="hint">{UI.emailFinalNote[locale]}</p>}
         {delivered && <p className="hint" role="status">{UI.deliveredNote[locale]}</p>}
         <p className="hint pc-privacy">{UI.privacyNotice[locale]}</p>
