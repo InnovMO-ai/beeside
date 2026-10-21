@@ -130,7 +130,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
 
   it("Queued ≠ sent: 'save and continue later' says sent only on confirmation; a failure offers retry and never claims delivery", async () => {
     const a = journeyA("es");
-    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43));
+    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43)); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now()));
     let fail = true;
     mockApi((c) => {
       if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "extra", status: "IN_PROGRESS" });
@@ -148,7 +148,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
 
   it("generates the result through the API and renders the three components; 'save for later' uses the stored email", async () => {
     const a = journeyA("es");
-    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43));
+    sessionStorage.setItem("beeside.fa4.session", "S".repeat(43)); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now()));
     const model = modelFor(a);
     mockApi((c) => {
       if (c.url === "/api/fa4/session" && c.method === "GET") return json({ answers: a, step: "extra", status: "IN_PROGRESS" });

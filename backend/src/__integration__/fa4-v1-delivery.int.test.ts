@@ -278,6 +278,41 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
     expect((await getFa4PrecisionContext(rtDb, pid, e.body.resultId)).declared.company.operatingBusiness).toBe(true);
   });
 
+  describe("DSC-01 — the result shows only THIS session's declared data", () => {
+    const NORTICA = ["Nórtica", "envases sostenibles", "51–250", "España", "Portugal", "dos clientes en México", "La relación comercial con nuestros clientes"];
+    it("two sessions at the same time never see each other: each token returns its own answers and its own YEV only", async () => {
+      const x = await start(journeyNortica());                                   // «previous / concurrent visitor»
+      const ya: Answers = JSON.parse(JSON.stringify(journeyNewBusiness())); ya.identity.company = "Taller Nuevo MX"; ya.keepWords = "";
+      const y = await start(ya);
+      const [rx, ry, gx, gy] = await Promise.all([
+        app().post("/api/fa4/session/result").set(auth(x.token)), app().post("/api/fa4/session/result").set(auth(y.token)),
+        app().get("/api/fa4/session").set(auth(x.token)), app().get("/api/fa4/session").set(auth(y.token)),
+      ]);
+      expect([rx.status, ry.status, gx.status, gy.status]).toEqual([200, 200, 200, 200]);
+      expect(gx.body.answers.identity.company).toBe("Nórtica Envases"); expect(gy.body.answers.identity.company).toBe("Taller Nuevo MX");
+      const sy = JSON.stringify(ry.body.model), sx = JSON.stringify(rx.body.model);
+      for (const m of NORTICA) expect(sy).not.toContain(m);                       // nothing of X in Y
+      expect(sx).toContain("Tu empresa: 51–250 personas");
+      expect(gx.headers["cache-control"]).toBe("no-store"); expect(gy.headers["cache-control"]).toBe("no-store");   // no shared cache can replay a session to someone else
+    });
+    it("a token of another project never opens this one; a missing or malformed token opens nothing", async () => {
+      const a = await start(); const b = await start();
+      expect((await app().get("/api/fa4/session").set(auth(a.token))).body.answers.identity.email).toBe(a.email);
+      expect((await app().get("/api/fa4/session").set(auth(b.token))).body.answers.identity.email).toBe(b.email);
+      for (const bad of ["", "x".repeat(43), a.token.slice(0, -1) + (a.token.endsWith("A") ? "B" : "A")]) expect((await app().get("/api/fa4/session").set(auth(bad))).status).toBe(401);
+    });
+    it("«company is not operating» drops sector / size / operating countries typed before: not stored, not in the result, not in the coverage input", async () => {
+      const stale: Answers = JSON.parse(JSON.stringify(journeyNortica())); stale.company.hasExistingBusiness = false;
+      const { token, pid } = await start(stale);
+      const saved = (await q("SELECT answers FROM fa4_project WHERE project_id = $1", [pid]))[0].answers as Answers;
+      expect(saved.company).toEqual({ hasExistingBusiness: false, sector: "", size: null, operatesIn: [] });
+      const put = await app().put("/api/fa4/session").set(auth(token)).send({ answers: stale, step: "decision" }); expect(put.status).toBe(200);   // a later save keeps it clean
+      expect(((await q("SELECT answers FROM fa4_project WHERE project_id = $1", [pid]))[0].answers as Answers).company.operatesIn).toEqual([]);
+      const r = await app().post("/api/fa4/session/result").set(auth(token)); const s = JSON.stringify(r.body.model);
+      for (const m of ["envases sostenibles", "51–250", "España", "Portugal"]) expect(s).not.toContain(m);
+    });
+  });
+
   describe("CLOSED TEST mode (no final Privacy version): identifiable, e-mail restricted to test domains", () => {
     beforeAll(() => { closedTest = { emailDomains: ["beeside.you"], emailAddresses: [] }; });
     afterAll(() => { closedTest = undefined; });
@@ -289,7 +324,8 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
     it("never mails an address outside the allowed test domains: the delivery is CANCELLED and the person is told it was not sent; the result is still delivered", async () => {
       const outside = await start(); mail.messages.length = 0;
       const r = await app().post("/api/fa4/session/result/email").set(auth(outside.token));
-      expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+      expect(r.status).toBe(403); expect(r.body.error).toBe("RECIPIENT_NOT_AUTHORIZED"); expect(JSON.stringify(r.body)).not.toContain("@");   // DSC-02/33: its own code (not a 5xx), the address never echoed
+      expect(mail.messages).toHaveLength(0);
       expect((await q("SELECT status FROM fa4_email_delivery WHERE project_id = $1 AND template = 'fa4_result_link'", [outside.pid]))[0].status).toBe("CANCELLED");
       expect(await status(outside.pid)).toBe("DELIVERED");
       const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = `ok.${uniq()}@beeside.you`;
@@ -300,6 +336,18 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
   });
   describe("CLOSED TEST mode: individually authorized e-mail address (no domain opened)", () => {
     const reviewer = () => `reviewer.${uniq()}@hive-reviewers.example`;
+    it("DSC-33 — the two paths stay distinguishable: an AUTHORIZED address whose SMTP fails is a real 502 (state kept), an UNAUTHORIZED one is a 403 with its own code", async () => {
+      const addr = reviewer(); closedTest = { emailDomains: [], emailAddresses: [addr] };
+      try {
+        const mk = async (email: string) => { const a: Answers = JSON.parse(JSON.stringify(journeyNortica())); a.identity.email = email; const r = await app().post("/api/fa4/sessions").send({ answers: a, step: "presence:c1" }); return r.body.sessionToken as string; };
+        const authorized = await mk(addr); mail.failNext.push(new Error("smtp down"));
+        const real = await app().post("/api/fa4/session/result/email").set(auth(authorized));
+        expect(real.status).toBe(502); expect(real.body.error).toBe("EMAIL_NOT_SENT");                               // the real failure is NOT disguised as a policy message
+        const outsider = await mk(`outsider.${uniq()}@hive-reviewers.example`);
+        const denied = await app().post("/api/fa4/session/result/email").set(auth(outsider));
+        expect(denied.status).toBe(403); expect(denied.body.error).toBe("RECIPIENT_NOT_AUTHORIZED");
+      } finally { closedTest = undefined; }
+    });
     it("mails ONLY the authorized address; the same domain and an alias of it are CANCELLED; the domain list can be empty", async () => {
       const addr = reviewer(); closedTest = { emailDomains: [], emailAddresses: [addr] };
       try {
@@ -309,7 +357,7 @@ describeRt("FA4 Public v1.0 — delivery, sealed envelope, Precision context, er
         expect(sent.status).toBe(200); expect(mail.messages.filter((m) => m.template === "fa4_result_link")).toHaveLength(1);
         for (const other of [`someone.else.${uniq()}@hive-reviewers.example`, addr.replace("@", "+tag@"), `x.${uniq()}@beeside.you`]) {
           mail.messages.length = 0; const o = await mk(other); const r = await app().post("/api/fa4/session/result/email").set(auth(o.token));
-          expect(r.status).not.toBe(200); expect(mail.messages).toHaveLength(0);
+          expect(r.status).toBe(403); expect(r.body.error).toBe("RECIPIENT_NOT_AUTHORIZED"); expect(mail.messages).toHaveLength(0);
         }
         expect(JSON.stringify((await app().get("/api/fa4/legal-mode")).body)).not.toContain("hive-reviewers");   // the list is never exposed
       } finally { closedTest = undefined; }

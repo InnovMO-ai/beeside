@@ -111,7 +111,7 @@ export function Fa4App() {
           sessionStore.set(exchanged.sessionToken);
           window.history.replaceState({}, '', window.location.pathname);
         }
-        if (sessionStore.get()) {
+        if (sessionStore.resumable()) {          // DSC-01: only a recent visit of THIS tab is resumed; an old token is dropped and the visit starts clean
           const s = await api.session();
           if (!alive) return;
           setA(s.answers); setHasSession(true);
@@ -208,7 +208,15 @@ export function Fa4App() {
     }
   }
   const safely = (fn: () => Promise<unknown>) => async () => { try { await fn(); return true; } catch (e) { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); return false; } };
-  const sendResultEmail = safely(async () => { const r = await confirmSend(api.emailResult(previewToken ?? undefined), 'result'); setDelivered(true); return r; });
+  // DSC-33: only the closed-test recipient refusal gets its own message (the result IS delivered server-side); any other failure stays the generic, real error.
+  const sendResultEmail = async (): Promise<boolean | 'unauthorized'> => {
+    try { await confirmSend(api.emailResult(previewToken ?? undefined), 'result'); setDelivered(true); return true; }
+    catch (e) {
+      if (e instanceof ApiError && e.status === 401) { setRecovery('stale'); return false; }
+      if (e instanceof ApiError && e.code === 'RECIPIENT_NOT_AUTHORIZED') { setDelivered(true); return 'unauthorized'; }
+      return false;
+    }
+  };
   const startExpansion = safely(async () => { await api.continueWithBeeside(previewToken ?? undefined); setDelivered(true); });
   // contact: pending after the server's wait is reported as "not confirmed" (the same form can be sent again: it is idempotent)
   const sendContact = async (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string }) => {

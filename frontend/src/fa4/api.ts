@@ -9,10 +9,26 @@ export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, readonly details?: Record<string, unknown>) { super(code); }
 }
 
+const ACTIVITY_KEY = 'beeside.fa4.session.at';
+/**
+ * DSC-01 — a working session belongs to ONE visit. The token lives in this tab only, and it is resumed on a reload only while the visit is recent: a tab that comes back
+ * after a long pause (browser restored on another day, a duplicated or old tab) starts clean instead of silently re-opening an earlier project with its answers.
+ * The earlier project is never lost: «Guardar y seguir después» e-mails a private link that resumes it explicitly.
+ */
+export const RESUME_IDLE_MS = 30 * 60 * 1000;
 export const sessionStore = {
   get(): string | null { try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; } },
-  set(token: string) { try { sessionStorage.setItem(SESSION_KEY, token); } catch { /* storage unavailable: the session works until the tab closes */ } },
-  clear() { try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } },
+  set(token: string) { try { sessionStorage.setItem(SESSION_KEY, token); sessionStorage.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* storage unavailable: the session works until the tab closes */ } },
+  /** Marks the visit as active (every request that carries the token). */
+  touch() { try { if (sessionStorage.getItem(SESSION_KEY)) sessionStorage.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* ignore */ } },
+  /** The token to resume on load, or null (and the stale token is dropped) when the visit has been idle too long or has no activity record. */
+  resumable(now = Date.now()): string | null {
+    const token = this.get(); if (!token) return null;
+    let at = NaN; try { at = Number(sessionStorage.getItem(ACTIVITY_KEY)); } catch { /* ignore */ }
+    if (Number.isFinite(at) && at > 0 && now - at >= 0 && now - at <= RESUME_IDLE_MS) return token;
+    this.clear(); return null;
+  },
+  clear() { try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(ACTIVITY_KEY); } catch { /* ignore */ } },
 };
 
 async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
@@ -25,6 +41,7 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
   // Where the FA4 API is not enabled, a static host answers with HTML: treat it as unavailable.
   if (!(response.headers.get('Content-Type') ?? '').includes('application/json')) throw new ApiError(response.ok ? 503 : response.status, 'NOT_READY');
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (token && response.ok) sessionStore.touch();
   if (!response.ok) throw new ApiError(response.status, typeof data.error === 'string' ? data.error : 'HTTP_ERROR', data.details as Record<string, unknown> | undefined);
   return data as T;
 }

@@ -38,7 +38,7 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
         <Req k="identity.email" label={UI.email[locale]}><div onBlur={() => setTouched(true)}>
           <TextField label={UI.email[locale]} type="email" value={id.email} onChange={(v) => setId({ email: v })} autoComplete="email" help={UI.emailHelp[locale]} invalid={touched && id.email && !isValidEmail(id.email) ? UI.emailInvalid[locale] : undefined} />
         </div></Req>
-        <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
+        <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} placeholder={UI.rolePh[locale]} help={UI.roleHelp[locale]} value={id.role} onChange={(v) => setId({ role: v })} />
       </div>
       <RadioGroup req={{ k: "identity.decider", label: UI.decider[locale] }} three legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
       {/* Closing section of Identity: separated from "who decides" by space + a divider; required acceptances only; these two alone enable «Aceptar y continuar». */}
@@ -76,7 +76,7 @@ export function CompanyStep({ a, set, locale }: StepCtx) {
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[0]![locale]} title={UI.hasBiz[locale]} />
-      <RadioGroup req={{ k: "company.hasBiz", label: UI.hasBiz[locale] }} value={c.hasExistingBusiness === null ? null : c.hasExistingBusiness ? 'yes' : 'no'} onChange={(v) => setC({ hasExistingBusiness: v === 'yes' })} options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} />
+      <RadioGroup req={{ k: "company.hasBiz", label: UI.hasBiz[locale] }} value={c.hasExistingBusiness === null ? null : c.hasExistingBusiness ? 'yes' : 'no'} onChange={(v) => setC(v === 'yes' ? { hasExistingBusiness: true } : { hasExistingBusiness: false, sector: '', size: null, operatesIn: [] })} options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} />
       {c.hasExistingBusiness && (<>
         <Req k="company.sector" label={UI.sector[locale]}><TextField label={UI.sector[locale]} value={c.sector} onChange={(v) => setC({ sector: v })} placeholder={UI.sectorPh[locale]} /></Req>
         <RadioGroup req={{ k: "company.size", label: UI.size[locale] }} legend={UI.size[locale]} value={c.size} onChange={(v) => setC({ size: v })} options={(Object.keys(UI.sizes) as Array<keyof typeof UI.sizes>).map((v) => ({ value: v, label: T(UI.sizes[v], locale) }))} three />
@@ -137,7 +137,7 @@ export function ActivityStep(s: StepCtx & { compId: string }) {
       <Head eyebrow={eyebrowFor(a, c, locale)} title={CT(UI.actTitle, locale, c)} lead={UI.actHelp[locale]} />
       <CheckGroup req={{ k: "act.acts", label: CT(UI.actTitle, locale, c) }} values={c.activities} onChange={(v) => upd(s, compId, (x) => ({ ...x, activities: nextActivities(v, x.activities) }))}
         options={acts.map((v) => ({ value: v, label: T(UI.acts[v], locale) }))} />
-      {needsWith && <CheckGroup req={{ k: "act.with", label: CT(UI.withTitle, locale, c) }} legend={CT(UI.withTitle, locale, c)} values={c.withWhat} onChange={(v) => upd(s, compId, (x) => ({ ...x, withWhat: v }))} options={(['goods', 'services', 'digital'] as const).map((v) => ({ value: v, label: T(UI.withs[v], locale) }))} />}
+      {needsWith && <CheckGroup req={{ k: "act.with", label: CT(UI.withTitle, locale, c) }} legend={CT(UI.withTitle, locale, c)} help={UI.withsHelp[locale]} values={c.withWhat} onChange={(v) => upd(s, compId, (x) => ({ ...x, withWhat: v }))} options={(['goods', 'services', 'digital'] as const).map((v) => ({ value: v, label: T(UI.withs[v], locale) }))} />}
       <TextField label={UI.descPh[locale]} value={c.description ?? ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, description: v || undefined }))} />
       {isLastProjectScreen(a, 'activity', compId) && <ClarityQuestion a={a} set={s.set} locale={locale} />}
     </div>
@@ -185,7 +185,6 @@ export function ReasonStep({ a, set, locale }: StepCtx) {
       <Head eyebrow={UI.reasonEyebrow[locale]} title={UI.reasonTitle[locale]} />
       <CheckGroup req={{ k: "reason", label: UI.reasonTitle[locale] }} values={a.reasons} onChange={(v) => set((x) => ({ ...x, reasons: v }))} options={(Object.keys(UI.reasons) as Array<keyof typeof UI.reasons>).map((v) => ({ value: v, label: T(UI.reasons[v], locale) }))} two />
       <TextField multiline label={UI.reasonWords[locale]} help={UI.reasonWordsHelp[locale]} value={a.reasonText} onChange={(v) => set((x) => ({ ...x, reasonText: v }))} />
-      {a.reasonText.trim() && <div className="card soft" style={{ marginTop: 12 }}><p className="hint">{UI.reasonMirror[locale]}</p><p className="quote">“{a.reasonText.trim()}”</p></div>}
     </div>
   );
 }
@@ -289,7 +288,7 @@ export function ActivatorsStep(s: StepCtx & { mode: 'all' | 'sell' | 'site' }) {
   return (
     <div className="narrow theme">
       <Head eyebrow={UI.stages[3]![locale]} title={themeTitle} lead={mode === 'all' ? undefined : UI.actTitle1[locale]} />
-      <ol className="qlist">{blocks.map((b, i) => <li key={b.key} className="qblock"><h2 className="qtitle"><span className="qnum" aria-hidden>{i + 1}</span>{b.q}</h2><Req k={b.key} label={b.q}>{b.node}</Req></li>)}</ol>
+      <ul className="qlist">{blocks.map((b) => <li key={b.key} className="qblock"><h2 className="qtitle">{b.q}</h2><Req k={b.key} label={b.q}>{b.node}</Req></li>)}</ul>
     </div>
   );
 }
@@ -339,11 +338,9 @@ function AddNeed({ s, dest }: { s: StepCtx; dest: string }) {
 export function FrontsStatusStep(s: StepCtx) {
   const { a, locale: loc } = s; const plans = plansFor(a);
   const setFront = (dest: string, f: FrontKey, p: Partial<Answers['fronts'][string]>) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], ...p } } }));
-  const markAllPending = () => s.set((x) => { const fr = { ...x.fronts }; for (const p of plans) for (const t of p.applies) fr[frontKey(p.destination, t.front)] = { ...fr[frontKey(p.destination, t.front)], status: 'pending' }; return { ...x, fronts: fr }; });
   return (
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
-      <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
       {plans.map((p) => (
         <section key={p.destination} aria-label={countryName(p.destination, loc)}>
           <div className="dest-head"><h2>{countryName(p.destination, loc)}{a.destinations.list.find((d) => d.iso === p.destination)?.region ? ` · ${a.destinations.list.find((d) => d.iso === p.destination)!.region}` : ''}</h2><span className="hint">{p.applies.length} {UI.topics[loc]}</span></div>
@@ -371,7 +368,6 @@ export function FrontsStatusStep(s: StepCtx) {
 export function FrontsTableStep(s: StepCtx) {
   const { a, locale: loc } = s; const plans = plansFor(a);
   const setFront = (dest: string, f: FrontKey, p: Partial<Answers['fronts'][string]>) => s.set((x) => ({ ...x, fronts: { ...x.fronts, [frontKey(dest, f)]: { ...x.fronts[frontKey(dest, f)], ...p } } }));
-  const markAllPending = () => s.set((x) => { const fr = { ...x.fronts }; for (const p of plans) for (const t of p.applies) fr[frontKey(p.destination, t.front)] = { ...fr[frontKey(p.destination, t.front)], status: 'pending' }; return { ...x, fronts: fr }; });
   const raw = a.externalDate.date; const when = raw ? formatKeyDate(raw, loc) : '';
   const critLabel = `${UI.readyBefore[loc]} ${when}?`;
   const yn = (v: boolean | undefined) => (v === undefined ? undefined : v ? 'yes' : 'no');
@@ -379,7 +375,6 @@ export function FrontsTableStep(s: StepCtx) {
     <div>
       <Head eyebrow={UI.stages[3]![loc]} title={UI.topicsTitle[loc]} lead={`${UI.topicsLead[loc]}${a.externalDate.has ? UI.topicsLeadDate[loc] : ''}.`} />
       <CargoBlock {...s} />
-      <button type="button" className="btn outline" style={{ width: '100%', borderStyle: 'dashed', maxWidth: 420 }} onClick={markAllPending}>{UI.notStarted[loc]}</button>
       {plans.map((p) => (
         <section key={p.destination} aria-label={countryName(p.destination, loc)}>
           <div className="dest-head"><h2>{countryName(p.destination, loc)}{a.destinations.list.find((d) => d.iso === p.destination)?.region ? ` · ${a.destinations.list.find((d) => d.iso === p.destination)!.region}` : ''}</h2><span className="hint">{p.applies.length} {UI.topics[loc]}</span></div>
@@ -531,7 +526,9 @@ export function SupportValuesStep({ a, set, locale }: StepCtx) {
   );
 }
 export function ExtraStep({ a, set, locale }: StepCtx) {
-  const ctx = a.context; const setC = (p: Partial<Answers['context']>) => set((x) => ({ ...x, context: { ...x.context, ...p } }));
+  const ctx = a.context;
+  const [pn, setPn] = useState<'yes' | 'no' | null>(null);   // the radio's own choice (the stored boolean cannot tell «No» from empty)
+  const setC = (p: Partial<Answers['context']>) => set((x) => ({ ...x, context: { ...x.context, ...p } }));
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[4]![locale]} title={UI.extraTitle[locale]} lead={UI.extraLead[locale]} />
@@ -539,7 +536,9 @@ export function ExtraStep({ a, set, locale }: StepCtx) {
       <TextField multiline label={UI.constraints[locale]} help={UI.constraintsHelp[locale]} value={ctx.constraints} onChange={(v) => setC({ constraints: v })} />
       <TextField multiline label={UI.descr[locale]} value={ctx.description} onChange={(v) => setC({ description: v })} />
       <TextField multiline label={UI.experience[locale]} help={UI.experienceHelp[locale]} value={ctx.experience} onChange={(v) => setC({ experience: v })} />
-      <fieldset className="qblock" style={{ border: 0, padding: 0, margin: '8px 0 0' }}><legend className="label">{UI.personal[locale]}</legend><p className="help">{UI.personalHelp[locale]}</p><div className="choices"><label className={`choice ${ctx.personalNeed ? 'on' : ''}`}><input type="checkbox" checked={ctx.personalNeed} onChange={(e) => setC({ personalNeed: e.target.checked })} /><span>{UI.yes[locale]}</span></label></div></fieldset>
+      {/* DSC-28 (PO): optional Yes / No, same question and help, same boolean (No = false; left empty = false). Existence only (D-061): no free text. */}
+      <div style={{ margin: '8px 0 0' }}><RadioGroup legend={UI.personal[locale]} help={UI.personalHelp[locale]} value={pn ?? (ctx.personalNeed ? 'yes' : null)} onChange={(v) => { setPn(v); setC({ personalNeed: v === 'yes' }); }}
+        options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} /></div>
     </div>
   );
 }

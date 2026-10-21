@@ -43,7 +43,7 @@ for (const loc of ["es", "en"] as const) {
     test.skip(!USER || info.project.name !== "desktop-1440", "needs gate credentials; desktop only (project creation)");
     const a = JSON.parse(JSON.stringify(journeyNortica(loc))); a.identity.email = `prueba.ficticia.${Date.now()}@empresa-ficticia.example`;
     const s = await request.post("/api/fa4/sessions", { data: { answers: a, step: "support_values" } }); expect(s.ok()).toBeTruthy();
-    await page.addInitScript((t) => { sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.stabilization-ack", "1"); }, (await s.json()).sessionToken as string);
+    await page.addInitScript((t) => { sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); sessionStorage.setItem("beeside.fa4.stabilization-ack", "1"); }, (await s.json()).sessionToken as string);
     await page.goto("/");
     await expect(page.getByRole("heading", { name: UI.valuesTitle[loc] })).toBeVisible();
     await expect(page.getByText(loc === "es" ? "En tus palabras (opcional)" : "In your own words (optional)")).toHaveCount(0);   // E

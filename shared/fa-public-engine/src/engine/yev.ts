@@ -186,8 +186,9 @@ export function reflectionParagraphs(a: Answers): Seg[][] {
   const company: Seg[] = [];
   const name = a.identity.company.trim();
   if (name) company.push({ text: L(name, name), edit: 'identity' });
-  const what = c.sector.trim();
-  const size = c.size ? sizeLabel(c.size) : null;
+  const operating = c.hasExistingBusiness === true;            // DSC-01: nothing typed before answering «No» is reflected
+  const what = operating ? c.sector.trim() : '';
+  const size = operating && c.size ? sizeLabel(c.size) : null;
   if (what) company.push({ text: L(what, what), edit: 'company', ...(name ? { br: true } : {}) });
   if (size) {
     if (what) company.push(seg(' · ', ' · '));
@@ -374,9 +375,11 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
     contract: L('Ejecutar un contrato ganado', 'Executing a contract you won'), partner: L('Una plataforma para crecer con otros clientes', 'A platform to grow with other customers'), other: L('Otro motivo', 'Another reason'),
   };
 
-  const sectorL: L10n | null = a.company.sector ? L(a.company.sector, a.company.sector) : null;
-  const sizeL = a.company.size ? sizeLabel(a.company.size) : null;
-  const sub = [sectorL, a.company.operatesIn.length ? joinL(a.company.operatesIn.map(countryL10n)) : null, sizeL,
+  // DSC-01: company facts are shown ONLY when the person declared an operating company; anything typed before answering «No» is never reflected. The size is labelled as the company's.
+  const operating = a.company.hasExistingBusiness === true;
+  const sectorL: L10n | null = operating && a.company.sector ? L(a.company.sector, a.company.sector) : null;
+  const sizeL: L10n | null = operating && a.company.size ? ((z) => L(`Tu empresa: ${z.es}`, `Your company: ${z.en}`))(sizeLabel(a.company.size)) : null;
+  const sub = [sectorL, operating && a.company.operatesIn.length ? joinL(a.company.operatesIn.map(countryL10n)) : null, sizeL,
     a.externalDate.has && a.externalDate.date ? L(`Fecha clave: ${formatKeyDate(a.externalDate.date, 'es')}`, `Key date: ${formatKeyDate(a.externalDate.date, 'en')}`) : null].filter((x): x is L10n => !!x);
 
   return {

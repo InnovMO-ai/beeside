@@ -305,12 +305,11 @@ fieldset > legend.label + * { clear: both; }
 .eyebrow { letter-spacing: .02em; }
 .h1 { text-wrap: balance; }
 
-/* Thematic screens (VT-03 presentation): A = numbered questions under a theme title; B = the single question is the title */
+/* Thematic screens (VT-03 presentation): A = questions under a theme title (no visible numbering, DSC-05); B = the single question is the title */
 .qlist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .qblock { padding: 2px 0 10px; }
 .qlist .qblock + .qblock { border-top: 1px solid var(--line); padding-top: 6px; }
 .qtitle { display: flex; gap: 12px; align-items: baseline; margin: 18px 0 12px; }
-.qnum { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--lav); color: var(--purple); font-size: 13px; font-weight: 700; display: inline-grid; place-items: center; transform: translateY(-1px); }
 .theme.single .qblock { margin-top: 18px; }
 
 /* Identity: required legal block, then a separate OPTIONAL block (D-144) */
@@ -720,3 +719,12 @@ dialog.stab-notice .sheet-actions .btn.primary { flex: 0 0 auto; min-width: 200p
 .req-bad { position: relative; }
 .req-bad::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: #a1261b; }   /* no border/padding: nothing shifts when it appears */
 .req-msg { margin: 6px 0 0; color: #a1261b; font-size: 14px; font-weight: 600; }
+
+/* DSC-14 — compact Stabilization notice: 15 px text, tight spacing; the focus ring only for keyboard use (data-kbd, see StabilizationNotice) */
+dialog.stab-notice .sheet-head { padding: 14px 20px 2px; }
+dialog.stab-notice .sheet-head h2 { font-size: 20px; line-height: 1.2; }
+dialog.stab-notice .sheet-body { padding: 2px 20px 16px; gap: 0; }
+dialog.stab-notice .sheet-body p { font-size: 15px; line-height: 1.45; margin: 0 0 8px; }
+dialog.stab-notice .sheet-actions { margin-top: 10px; }
+dialog.stab-notice:not([data-kbd]) :focus-visible { outline: none; }
+dialog.stab-notice[data-kbd] .btn:focus { outline: 3px solid var(--focus); outline-offset: 2px; }   /* keyboard use: the ring is always there (WCAG 2.4.7) */

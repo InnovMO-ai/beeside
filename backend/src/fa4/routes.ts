@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import express, { NextFunction, Request, Response, Router } from "express";
 import {
   answersSchema,
+  type Answers,
   clientResolution,
   isValidEmail,
   toPublicCatalog,
@@ -12,7 +13,7 @@ import { FaError } from "../fa/services/errors";
 import { looksLikeAccessToken } from "../fa/services/tokens";
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../security/rate-limit";
 import {
-  DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, latestDelivery, retryFa4Delivery, stateOfStatus,
+  DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, closedTestRecipientAllowed, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, latestDelivery, retryFa4Delivery, stateOfStatus,
 } from "./email";
 import { parseClientEvent, recordEvent } from "./events";
 import { cleanInput } from "./email-render";
@@ -81,6 +82,13 @@ type Handler = (req: Request, res: Response) => Promise<void>;
  * Authorization header for their own credentials) or, equivalently, `Authorization: Bearer`.
  */
 const bearer = (req: Request) => req.header("x-fa4-session")?.trim() || /^Bearer\s+(\S+)$/i.exec(req.header("authorization") ?? "")?.[1] || null;
+/**
+ * DSC-01 — only what the person declared is stored and used: facts about an OPERATING company (sector, size, operating countries) are kept only when the answer to
+ * «is your company already operating?» is Yes. Typed and then «No»: they are dropped here (they would otherwise be persisted, feed the document-coverage rule
+ * that reads the operating countries, and reach the result as if declared).
+ */
+export const onlyDeclared = (a: Answers): Answers => (a.company.hasExistingBusiness === true || a.company.hasExistingBusiness === null
+  ? a : { ...a, company: { hasExistingBusiness: false, sector: "", size: null, operatesIn: [] } });
 const bodyOf = (req: Request): Record<string, unknown> => (typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {});
 const maskEmail = (e: string) => { const [u = "", d = ""] = e.split("@"); return `${u.slice(0, 1)}***@${d}`; };
 
@@ -106,13 +114,16 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
    * (HTTP 202 — the UI polls /session/email-status); `failed` otherwise (HTTP 502). A queued row is never reported as sent.
    * A repeated request while the delivery is FAILED/DEAD makes exactly one more attempt of the same delivery.
    */
-  const settle = async (res: Response, deliveryId: string, extra: Record<string, unknown> = {}) => {
+  const settle = async (res: Response, deliveryId: string, extra: Record<string, unknown> = {}, recipient?: string) => {
     let status = await deliveryStatus(deps.db, deliveryId);
     if (status === "FAILED" || status === "DEAD") { await retryFa4Delivery(deps.db, deliveryId, deps.config.now()); status = "FAILED"; }
     await dispatch();
     const state: DeliveryState = await awaitDelivery(deps.db, deliveryId, waitMs);
     if (state === "sent") res.status(200).json({ state, ...extra });
     else if (state === "pending") res.status(202).json({ state, ...extra });
+    // DSC-02 / DSC-33: a delivery refused by the closed-test recipient policy is NOT a delivery failure (no SMTP attempt was made): it gets its own code and a 4xx, so the person
+    // is told the true reason and the 5xx alert keeps meaning «something is broken». Any other failure keeps the generic 502 with the real state. The address is never echoed.
+    else if (recipient && deps.config.closedTest && !closedTestRecipientAllowed(recipient, deps.config.closedTest)) res.status(403).json({ error: "RECIPIENT_NOT_AUTHORIZED", message: "e-mail is limited to authorized addresses during the closed test" });
     else res.status(502).json({ error: "EMAIL_NOT_SENT", message: "the email could not be sent", details: { state } });
   };
 
@@ -149,7 +160,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
   router.post("/sessions", rateLimit(limiter, lim('create')), handle(async (req, res) => {
     const parsed = answersSchema.safeParse(bodyOf(req).answers);
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
-    const a = parsed.data;
+    const a = onlyDeclared(parsed.data);
     const missing = [
       !a.identity.name.trim() && "name", !a.identity.company.trim() && "company", !isValidEmail(a.identity.email) && "email",
       !a.identity.termsAccepted && "termsAccepted", !a.identity.privacyAcknowledged && "privacyAcknowledged",
@@ -168,13 +179,13 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     await session(req);
     const parsed = answersSchema.safeParse(bodyOf(req).answers);
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
-    res.set("Cache-Control", "no-store").json(clientResolution(parsed.data, await loadPublishedCatalog(deps.db)));
+    res.set("Cache-Control", "no-store").json(clientResolution(onlyDeclared(parsed.data), await loadPublishedCatalog(deps.db)));
   }));
 
   router.get("/session", handle(async (req, res) => {
     const p = await session(req);
     // the append-only consent history is the source of truth for the optional marketing checkbox
-    res.json({ answers: { ...p.answers, identity: { ...p.answers.identity, marketingConsent: await latestMarketingConsent(deps.db, p.projectId) } }, step: p.stepKey, status: p.status });
+    res.set("Cache-Control", "no-store").json({ answers: { ...p.answers, identity: { ...p.answers.identity, marketingConsent: await latestMarketingConsent(deps.db, p.projectId) } }, step: p.stepKey, status: p.status });
   }));
 
   router.put("/session", handle(async (req, res) => {
@@ -185,7 +196,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (!parsed.success) throw new FaError("INVALID_INPUT", "the answers are not valid");
     // Email and the two legal acknowledgements are pinned to what was captured at identity: the email can't be swapped silently
     // and acceptance evidence (fa4_legal_acceptance) can't diverge from the stored flags. Name / company / role stay editable.
-    const a = { ...parsed.data, identity: { ...parsed.data.identity, email: p.email, termsAccepted: p.answers.identity.termsAccepted, privacyAcknowledged: p.answers.identity.privacyAcknowledged } };
+    const a = { ...onlyDeclared(parsed.data), identity: { ...parsed.data.identity, email: p.email, termsAccepted: p.answers.identity.termsAccepted, privacyAcknowledged: p.answers.identity.privacyAcknowledged } };
     const step = typeof bodyOf(req).step === "string" ? String(bodyOf(req).step).slice(0, 40) : p.stepKey;
     await saveProject(deps.db, p.projectId, a, step);
     const before = await latestMarketingConsent(deps.db, p.projectId);
@@ -202,7 +213,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (r.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
     if (!r.deliveryId) throw new FaError("NOT_FOUND", "no such project");
     if (r.queued) await recordEvent(deps.db, { name: "resume_email_requested", source: "server", projectId: p.projectId, locale: p.answers.locale });
-    await settle(res, r.deliveryId, { email: maskEmail(p.email) });
+    await settle(res, r.deliveryId, { email: maskEmail(p.email) }, p.email);
   }));
 
   // State of the latest email of a kind, for the UI to poll while a send is `pending`.
@@ -218,7 +229,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const p = await session(req);
     const r = await latestResult(deps.db, p.projectId);
     if (!r) throw new FaError("NOT_FOUND", "no result yet");
-    res.json({ resultId: r.resultId, model: r.model, delivered: true, deliveredAt: r.deliveredAt });
+    res.set("Cache-Control", "no-store").json({ resultId: r.resultId, model: r.model, delivered: true, deliveredAt: r.deliveredAt });
   }));
 
   // PREVIEW (D-156): computes the YEV from the current answers. Nothing historical is stored and the project is NOT delivered. «Corregir algo» + regenerate stay available.
@@ -226,7 +237,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     const p = await session(req);
     const done = await latestResult(deps.db, p.projectId);
     if (done) throw new FaError("ALREADY_DELIVERED", "this First Assessment was delivered", { resultId: done.resultId });
-    const { model, previewToken } = await previewResult(deps.db, p.projectId, p.answers, deps.config.now());
+    const { model, previewToken } = await previewResult(deps.db, p.projectId, onlyDeclared(p.answers), deps.config.now());   // rows saved before DSC-01 are normalised too
     const m = model;
     await recordEvent(deps.db, {
       name: "yev_previewed", source: "server", projectId: p.projectId, locale: p.answers.locale, step: "result", catalogVersion: m.catalogVersion,
@@ -256,7 +267,7 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (q.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
     if (!q.deliveryId) throw new FaError("NOT_FOUND", "no such project");
     if (q.queued) await recordEvent(deps.db, { name: "yev_email_requested", source: "server", projectId: p.projectId, locale: p.answers.locale });
-    await settle(res, q.deliveryId, { email: maskEmail(p.email), resultId: d.resultId });
+    await settle(res, q.deliveryId, { email: maskEmail(p.email), resultId: d.resultId }, p.email);
   }));
 
   // "Hablar con beeside": an operational message to contact@beeside.you. Not marketing (never touches marketingConsent), not a provider
