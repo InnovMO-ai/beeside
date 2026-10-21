@@ -144,8 +144,9 @@ function InvolvesBlock({ d, locale, shortcut }: { d: YevDestination; locale: Loc
         </div>
       )}
       {d.notApplicable.length > 0 && (
-        <div style={{ marginTop: 12 }}><b style={{ fontSize: 14 }}>{UI.notApply[locale]}</b>
-          {d.notApplicable.map((n, i) => <p key={i} style={{ color: 'var(--ink-2)', fontSize: 14 }}>{n.fronts.map((f) => t(f.name)).join(' · ')} — {t(n.reason)}</p>)}</div>
+        <div style={{ marginTop: 12 }}><b style={{ fontSize: 14 }}>{UI.yevNotApply[locale]}</b>
+          {/* DSC-07: topics only. A reason is shown only when Product approves one per rule (docs/fa4/DSC07_NOT_APPLICABLE_RULES_INVENTORY.md): never inferred text. */}
+          {d.notApplicable.map((n, i) => <p key={i} style={{ color: 'var(--ink-2)', fontSize: 14 }}>{n.fronts.map((f) => t(f.name)).join(' · ')}</p>)}</div>
       )}
       {shortcut && d.notIndicated.length > 0 && (
         <div style={{ marginTop: 12 }}><b style={{ fontSize: 14 }}>{UI.notIndicated[locale]} · {d.notIndicated.length}</b>

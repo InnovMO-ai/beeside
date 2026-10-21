@@ -9,6 +9,7 @@ import { API } from "./paths";
  * Release smoke (runs against the local production-built stack; point baseURL / E2E_BASIC_AUTH at staging to run it there):
  * destination-aware next step (one / many / open), no-premium scenario, delivered lock for both delivery paths, naming, legal links, canvas, brand lines.
  */
+const PREMIUM_TITLE = { es: "Con beeside Premium pasas del diagnóstico a la ejecución.", en: "With beeside Premium, you move from diagnosis to execution." };
 const BAD_NAME = /First Assessment|FIRST ASSESSMENT|(^|[^A-Za-z0-9_/-])FA4?([^A-Za-z0-9_/-]|$)/;
 const result = async (page: Page, request: Parameters<typeof seed>[0], a: Answers) => {
   await open(page, await seed(request, a, "extra"));
@@ -18,10 +19,10 @@ const result = async (page: Page, request: Parameters<typeof seed>[0], a: Answer
 const openDest = (): Answers => { const a = journeyNortica("es"); a.destinations = { list: [], open: true, sameInAll: true }; a.components = a.components.map((c) => ({ ...c, destinations: [] })); return a; };
 
 for (const loc of ["es", "en"] as const) {
-  test(`one defined destination → «${loc === "es" ? "Concretar tu expansión en México" : "Define your expansion in Mexico"}»; canvas, brand line, CTA, naming (${loc})`, async ({ page, request }, info) => {
+  test(`one defined destination → the approved Premium title (DSC-08); canvas, brand line, CTA, naming (${loc})`, async ({ page, request }, info) => {
     test.skip(info.project.name !== "desktop-1440", "run once");
     await result(page, request, journeyNortica(loc));
-    await expect(page.getByRole("heading", { level: 2, name: loc === "es" ? "Concretar tu expansión en México" : "Define your expansion in Mexico" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: PREMIUM_TITLE[loc] })).toBeVisible();
     await expect(page.getByRole("button", { name: "Start Your Expansion" })).toBeVisible();
     await expect(page.getByTestId("beeside-value-section")).toContainText(loc === "es" ? "Piensa en grande." : "Think bigger.");
     await expect(page.getByTestId("value-comparison")).toHaveCount(0);        // DSC-10: the comparison is retired from the visible YEV (component kept, not rendered)
@@ -32,16 +33,16 @@ for (const loc of ["es", "en"] as const) {
     await noHorizontalOverflow(page);
   });
 }
-test("several destinations → target-markets title", async ({ page, request }, info) => {
+test("several destinations → the same approved Premium title (DSC-08)", async ({ page, request }, info) => {
   test.skip(info.project.name !== "desktop-1440", "run once");
   await result(page, request, journeyB("es", "unknown"));
-  await expect(page.getByRole("heading", { level: 2, name: "Concretar tu expansión en tus mercados objetivo" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: PREMIUM_TITLE.es })).toBeVisible();
 });
-test("open / undefined destination → generic title", async ({ page, request }, info) => {
+test("open / undefined destination → the same approved Premium title when Premium applies", async ({ page, request }, info) => {
   test.skip(info.project.name !== "desktop-1440", "run once");
   await result(page, request, openDest());
-  const h = page.getByRole("heading", { level: 2, name: /Concretar tu expansión|Define your expansion/ });
-  if (await h.count()) await expect(h).toHaveText("Concretar tu expansión");
+  const h = page.getByRole("heading", { level: 2, name: PREMIUM_TITLE.es });
+  if (await h.count()) await expect(h).toHaveText(PREMIUM_TITLE.es);
   else await expect(page.getByTestId("premium-continuation")).toBeVisible();     // no Premium value for an undefined market: no CTA, no title (D-050)
 });
 test("no-premium scenario: no CTA, understanding is the deliverable, email option remains", async ({ page, request }, info) => {

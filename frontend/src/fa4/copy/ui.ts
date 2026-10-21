@@ -5,7 +5,7 @@ import { L, type L10n } from '@beeside/fa-public-engine';
 export const UI = {
   back: L('Atrás', 'Back'), next: L('Continuar', 'Continue'), saveLater: L('Guardar y seguir después', 'Save and continue later'),
   stepOf: L('de', 'of'), optional: L('opcional', 'optional'), logoAlt: L('beeside', 'beeside'),
-  stages: [L('Tu empresa', 'Your company'), L('Tu proyecto', 'Your project'), L('Por qué y cuándo', 'Why and when'), L('Lo que necesita tu proyecto', 'What your project needs'), L('Algo más', 'Anything else'), L('Tu resultado', 'Your result')] as L10n[],
+  stages: [L('Tu empresa', 'Your company'), L('Tu proyecto', 'Your project'), L('Por qué y cuándo', 'Why and when'), L('Lo que necesita tu proyecto', 'What your project needs'), L('Detalles adicionales', 'Additional details'), L('Tu resultado', 'Your result')] as L10n[],
   saved: L('Te enviamos el enlace de regreso a {email}.', 'We sent your return link to {email}.'),
   saveError: L('No pudimos guardar ahora. Tu avance sigue en este dispositivo.', "We couldn't save right now. Your progress is still on this device."),
 
@@ -29,6 +29,7 @@ export const UI = {
   emailHelp: L('Lo usaremos para guardar tu avance y enviarte tu resultado.', "We'll use it to save your progress and send you your result."),
   emailInvalid: L('Revisa el email', 'Check the email address'),
   role: L('Tu rol en el proyecto', 'Your role in the project'),
+  rolePh: L('Por ejemplo: director general, asesor externo', 'For example: CEO, external advisor'), roleHelp: L('Puedes indicar más de uno.', 'You can list more than one.'),   // DSC-23
   decider: L('¿Quién toma las decisiones sobre este proyecto?', 'Who makes the decisions on this project?'),
   deciderOpts: { me: L('Yo', 'I do'), other: L('Otra persona', 'Someone else'), shared: L('Decidimos entre varios', 'We decide together') },
   terms: L('Acepto los Términos y Condiciones', 'I accept the Terms and Conditions'), privacy: L('Reconozco la Política de Privacidad', 'I acknowledge the Privacy Policy'),
@@ -47,7 +48,8 @@ export const UI = {
   sameYes: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameYesMany: L('Sí, lo mismo en todos', 'Yes, the same in all'), sameNo: L('No, es distinto en cada país', 'No, it differs by country'),
   actTitle: L('¿Qué planeas hacer en {country}?', 'What do you plan to do in {country}?'), actHelp: L('Puedes elegir varias', 'You can choose several'),
   acts: { sell: L('Vender', 'Sell'), produce: L('Producir', 'Produce'), source: L('Comprar a proveedores locales', 'Buy from local suppliers'), operate: L('Operar (dar servicios o ejecutar trabajos allí)', 'Operate (provide services or carry out work there)'), hire: L('Contratar personas', 'Hire people'), invest_only: L('Solo invertir, sin operar', 'Only invest, without operating') },
-  withTitle: L('¿Qué vas a vender, producir o comprar en {country}?', 'What will you sell, produce or buy in {country}?'), withs: { goods: L('Bienes físicos', 'Physical goods'), services: L('Servicios', 'Services'), digital: L('Productos o servicios digitales', 'Digital products or services') },
+  withTitle: L('¿Qué vas a vender, producir o comprar en {country}?', 'What will you sell, produce or buy in {country}?'), withsHelp: L('Bienes físicos incluye productos terminados, materias primas y equipos.', 'Physical goods include finished products, raw materials and equipment.'),   // DSC-22
+  withs: { goods: L('Bienes físicos', 'Physical goods'), services: L('Servicios', 'Services'), digital: L('Productos o servicios digitales', 'Digital products or services') },
   descPh: L('Cuéntalo con tus palabras (opcional)', 'Say it in your own words (optional)'),
   presTitle: L('¿Cómo piensas estar presente en {country}?', 'How do you plan to be present in {country}?'),
   pres: { remote: L('Desde mi país, sin estar allí', 'From my country, without being there'), third_parties: L('Con un socio o distribuidor', 'Through a partner or distributor'), own_physical: L('Con oficina, planta o local propio', 'With my own office, plant or premises'), own_onsite: L('Con mi equipo trabajando allí, sin oficina propia', 'With my team working there, without our own office'), acquisition: L('Comprando una empresa', 'By buying a company'), open: L('Aún por definir', 'Still to be decided') },
@@ -113,6 +115,7 @@ export const UI = {
   topicsLeadDate: L(' y qué debe estar listo antes de tu fecha clave', ' and what must be ready before your key date'),
   statuses: { resolved: L('Ya resuelto', 'Resolved'), in_progress: L('En marcha', 'Under way'), pending: L('Pendiente', 'Pending'), unknown: L('No lo sé', 'Not sure') },
   missing: L('¿Necesitas algo que no aparece aquí? Escríbelo.', "Need something that isn't listed? Write it here."), missingPh: L('Escríbelo con tus palabras', 'Write it in your own words'), add: L('Añadir', 'Add'),
+  yevNotApply: L('Temas que no aplican a tu proyecto', "Topics that don't apply to your project"),   // DSC-07 (PO, 2026-10-21): the YEV lists them WITHOUT a reason until Product approves one per rule
   notApply: L('No aplican, por lo que nos contaste', 'Not relevant, based on what you told us'),
   dependsTitle: L('Todavía no está definido', "It's not yet defined"), dependsLead: L('De esa decisión depende:', 'That decision affects:'), dependsTag: L('Depende', 'Depends'),
   causes: { presence: L('cómo estarás presente en', 'how you will be present in'), hire: L('cómo contrates', 'how you hire'), legal_operation: L('cómo operarás legalmente en', 'how you will operate legally in') },
@@ -129,9 +132,9 @@ export const UI = {
   valuesTitle: L('¿Qué es lo más importante para ti al recibir apoyo?', 'What matters most to you when getting support?'), valuesLead: L('Elige lo que más valoras. Puedes saltar este paso.', 'Choose what you value most. You can skip this step.'),
   values: { speed: L('Velocidad', 'Speed'), no_network: L('No construir red desde cero', "Not building a network from scratch"), single_contact: L('Un solo interlocutor', 'A single point of contact'), local_validation: L('Validación local', 'Local validation'), comparable_options: L('Alternativas comparables', 'Comparable options'), coordination: L('Coordinación', 'Coordination'), cost: L('Costo', 'Cost'), keep_control: L('Mantener el control de mi equipo', 'Keeping control of my team') },
   keepQ: L('¿Qué prefieres seguir haciendo con tu propio equipo?', 'What would you rather keep doing with your own team?'),
-  extraTitle: L('Algo más', 'Anything else'), extraLead: L('Nada depende de este paso.', 'Nothing depends on this step.'),
+  extraTitle: L('¿Hay algo más de tu proyecto que nos quieras contar?', "Is there anything else about your project you'd like to tell us?"), extraLead: L('Nada depende de este paso.', 'Nothing depends on this step.'),
   success: L('¿Cómo sabrás que la expansión salió bien?', 'How will you know the expansion went well?'), successHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'), constraints: L('¿Hay algo que hoy frene o limite el proyecto?', 'Is anything holding back or limiting the project today?'), constraintsHelp: L('Una o dos frases son suficientes.', 'One or two sentences is enough.'),
-  descr: L('¿Quieres contarnos algo más con tus propias palabras?', "Anything else you'd like to tell us in your own words?"), experience: L('¿Has intentado antes expandirte a otro país?', 'Have you tried expanding to another country before?'), experienceHelp: L('Cuéntanos brevemente qué pasó y qué fue difícil.', 'Tell us briefly what happened and what was hard.'),
+  descr: L('Otros detalles (opcional)', 'Other details (optional)'), experience: L('¿Has intentado antes expandirte a otro país?', 'Have you tried expanding to another country before?'), experienceHelp: L('Cuéntanos brevemente qué pasó y qué fue difícil.', 'Tell us briefly what happened and what was hard.'),
   personal: L('¿Hay alguna necesidad personal, tuya o de alguien de tu equipo, relacionada con este proyecto?', 'Is there a personal need, for you or someone on your team, related to this project?'), personalHelp: L('Solo queremos saber si existe; no necesitamos detalles.', 'We only need to know it exists; no details needed.'),
   reqField: L('Falta responder esto para continuar.', 'This is needed to continue.'), reqSummary: L('Para continuar, completa:', 'To continue, please complete:'),
   seeResult: L('Ver mi resultado', 'See my result'),
@@ -148,7 +151,7 @@ export const UI = {
   whereValue: L('Where beeside adds value.', 'Where beeside adds value.'), whereValueTitle: L('Dónde puede aportar beeside en tu proyecto', 'Where beeside can add value to your project'),
   valuedSupport: L('Lo que valoras en un apoyo', 'What you value in support'), keptTeam: L('Lo que mantienes en tu equipo', 'What you keep in-house'),
   criticalTag: L('Fecha crítica', 'Critical date'), nextStep: L('Siguiente paso', 'Next step'),
-  premiumBody: L('Con acceso Premium, trabajamos contigo el detalle de cada tema y te presentamos propuestas con alcance, plazo y costo para que decidas.', 'With Premium access, we work through each topic with you and bring you proposals with scope, timing and cost so you can decide.'),
+  premiumBody: L('Mantén integrada tu estrategia, coordina cada tema con tu Sherpa y activa las capacidades que tu proyecto necesita para ejecutarse.', 'Keep your strategy integrated, coordinate every topic with your Sherpa and activate the capabilities your project needs to execute.'),
   continueWith: L('Start Your Expansion', 'Start Your Expansion'),   // branded CTA, identical in ES and EN (PO, 2026-10-14)
   continued: L('Listo. Tu beeside Sherpa revisará tu Your Expansion View y te escribirá desde contact@beeside.you dentro de 2 días hábiles para agendar la llamada. Todavía no hay ningún pago.', 'Done. Your beeside Sherpa will review your Your Expansion View and write to you from contact@beeside.you within 2 business days to schedule the call. There is no payment yet.'),
   confirmTitle: L('¿Confirmas que quieres comenzar?', 'Do you confirm you want to start?'),
@@ -185,9 +188,7 @@ export const UI = {
     L('Ecosistema seleccionado', 'Curated ecosystem'), L('Continuidad', 'Continuity'), L('Plataforma digital 24/7', '24/7 digital platform access'), L('Documentación centralizada', 'Centralized documentation')],
   cmpNote: L('Solo dimensiones de capacidad coordinada: no es un juicio sobre las personas ni las oficinas, ni una cifra de costo. No se muestran importes hasta contar con datos comerciales validados. La comparación es ilustrativa y no representa precios garantizados.', 'Coordinated-capability dimensions only — not a judgment on the people or offices themselves, and not a cost figure. No monetary values are shown until validated commercial data is available. The comparison is illustrative and does not represent guaranteed pricing.'),
   // Next step — destination-aware (PO, 2026-10-14)
-  nextOne: L('Concretar tu expansión en {country}', 'Define your expansion in {country}'),
-  nextMany: L('Concretar tu expansión en tus mercados objetivo', 'Define your expansion across your target markets'),
-  nextOpen: L('Concretar tu expansión', 'Define your expansion'),
+  premiumTitle: L('Con beeside Premium pasas del diagnóstico a la ejecución.', 'With beeside Premium, you move from diagnosis to execution.'),   // DSC-08 (PO, 2026-10-21)
   // BeesideValueSection (PO-approved copy, D-134). Headline: see vsHeadline (Discovery v1.0 brand lines).
   vsSherpa: L('Tu Sherpa', 'Your Sherpa'), vsSherpaD: L('Una persona que coordina tu expansión y mantiene continuidad de principio a fin.', 'One person coordinating your expansion and keeping continuity from start to finish.'),
   vsHive: L('The Hive', 'The Hive'), vsHiveD: L('Especialistas y proveedores seleccionados para las necesidades de tu proyecto.', 'Curated specialists and providers for the needs of your project.'),

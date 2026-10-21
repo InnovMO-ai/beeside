@@ -38,7 +38,7 @@ export function IdentityStep({ a, set, locale }: StepCtx) {
         <Req k="identity.email" label={UI.email[locale]}><div onBlur={() => setTouched(true)}>
           <TextField label={UI.email[locale]} type="email" value={id.email} onChange={(v) => setId({ email: v })} autoComplete="email" help={UI.emailHelp[locale]} invalid={touched && id.email && !isValidEmail(id.email) ? UI.emailInvalid[locale] : undefined} />
         </div></Req>
-        <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} value={id.role} onChange={(v) => setId({ role: v })} />
+        <TextField label={<>{UI.role[locale]} <span className="hint">({UI.optional[locale]})</span></>} placeholder={UI.rolePh[locale]} help={UI.roleHelp[locale]} value={id.role} onChange={(v) => setId({ role: v })} />
       </div>
       <RadioGroup req={{ k: "identity.decider", label: UI.decider[locale] }} three legend={UI.decider[locale]} value={id.decider} onChange={(v) => setId({ decider: v })} options={(['me', 'other', 'shared'] as const).map((v) => ({ value: v, label: T(UI.deciderOpts[v], locale) }))} />
       {/* Closing section of Identity: separated from "who decides" by space + a divider; required acceptances only; these two alone enable «Aceptar y continuar». */}
@@ -137,7 +137,7 @@ export function ActivityStep(s: StepCtx & { compId: string }) {
       <Head eyebrow={eyebrowFor(a, c, locale)} title={CT(UI.actTitle, locale, c)} lead={UI.actHelp[locale]} />
       <CheckGroup req={{ k: "act.acts", label: CT(UI.actTitle, locale, c) }} values={c.activities} onChange={(v) => upd(s, compId, (x) => ({ ...x, activities: nextActivities(v, x.activities) }))}
         options={acts.map((v) => ({ value: v, label: T(UI.acts[v], locale) }))} />
-      {needsWith && <CheckGroup req={{ k: "act.with", label: CT(UI.withTitle, locale, c) }} legend={CT(UI.withTitle, locale, c)} values={c.withWhat} onChange={(v) => upd(s, compId, (x) => ({ ...x, withWhat: v }))} options={(['goods', 'services', 'digital'] as const).map((v) => ({ value: v, label: T(UI.withs[v], locale) }))} />}
+      {needsWith && <CheckGroup req={{ k: "act.with", label: CT(UI.withTitle, locale, c) }} legend={CT(UI.withTitle, locale, c)} help={UI.withsHelp[locale]} values={c.withWhat} onChange={(v) => upd(s, compId, (x) => ({ ...x, withWhat: v }))} options={(['goods', 'services', 'digital'] as const).map((v) => ({ value: v, label: T(UI.withs[v], locale) }))} />}
       <TextField label={UI.descPh[locale]} value={c.description ?? ''} onChange={(v) => upd(s, compId, (x) => ({ ...x, description: v || undefined }))} />
       {isLastProjectScreen(a, 'activity', compId) && <ClarityQuestion a={a} set={s.set} locale={locale} />}
     </div>
@@ -526,7 +526,9 @@ export function SupportValuesStep({ a, set, locale }: StepCtx) {
   );
 }
 export function ExtraStep({ a, set, locale }: StepCtx) {
-  const ctx = a.context; const setC = (p: Partial<Answers['context']>) => set((x) => ({ ...x, context: { ...x.context, ...p } }));
+  const ctx = a.context;
+  const [pn, setPn] = useState<'yes' | 'no' | null>(null);   // the radio's own choice (the stored boolean cannot tell «No» from empty)
+  const setC = (p: Partial<Answers['context']>) => set((x) => ({ ...x, context: { ...x.context, ...p } }));
   return (
     <div className="narrow">
       <Head eyebrow={UI.stages[4]![locale]} title={UI.extraTitle[locale]} lead={UI.extraLead[locale]} />
@@ -534,7 +536,9 @@ export function ExtraStep({ a, set, locale }: StepCtx) {
       <TextField multiline label={UI.constraints[locale]} help={UI.constraintsHelp[locale]} value={ctx.constraints} onChange={(v) => setC({ constraints: v })} />
       <TextField multiline label={UI.descr[locale]} value={ctx.description} onChange={(v) => setC({ description: v })} />
       <TextField multiline label={UI.experience[locale]} help={UI.experienceHelp[locale]} value={ctx.experience} onChange={(v) => setC({ experience: v })} />
-      <fieldset className="qblock" style={{ border: 0, padding: 0, margin: '8px 0 0' }}><legend className="label">{UI.personal[locale]}</legend><p className="help">{UI.personalHelp[locale]}</p><div className="choices"><label className={`choice ${ctx.personalNeed ? 'on' : ''}`}><input type="checkbox" checked={ctx.personalNeed} onChange={(e) => setC({ personalNeed: e.target.checked })} /><span>{UI.yes[locale]}</span></label></div></fieldset>
+      {/* DSC-28 (PO): optional Yes / No, same question and help, same boolean (No = false; left empty = false). Existence only (D-061): no free text. */}
+      <div style={{ margin: '8px 0 0' }}><RadioGroup legend={UI.personal[locale]} help={UI.personalHelp[locale]} value={pn ?? (ctx.personalNeed ? 'yes' : null)} onChange={(v) => { setPn(v); setC({ personalNeed: v === 'yes' }); }}
+        options={[{ value: 'yes', label: UI.yes[locale] }, { value: 'no', label: UI.no[locale] }]} /></div>
     </div>
   );
 }

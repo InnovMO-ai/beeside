@@ -44,13 +44,14 @@ export function RadioGroup<T extends string>({ legend, value, options, onChange,
 }
 
 /** Multiple choice (checkbox group) */
-export function CheckGroup<T extends string>({ legend, values, options, onChange, two, req }: {
-  req?: ReqMark; legend?: ReactNode; values: T[]; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T[]) => void; two?: boolean;
+export function CheckGroup<T extends string>({ legend, values, options, onChange, two, req, help }: {
+  req?: ReqMark; help?: ReactNode; legend?: ReactNode; values: T[]; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T[]) => void; two?: boolean;
 }) {
   const r = useReqBlock<HTMLFieldSetElement>(req);
   return (
     <fieldset ref={r.ref} {...r.attrs} style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
+      {help && <p className="help">{help}</p>}
       <div className={`choices ${two ? 'two' : ''}`}>
         {options.map((o) => {
           const on = values.includes(o.value);

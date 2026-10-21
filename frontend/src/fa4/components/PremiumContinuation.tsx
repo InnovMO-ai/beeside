@@ -2,23 +2,12 @@ import { useState } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { UI, fill } from '../copy/ui';
 import { PREMIUM_PURCHASE_URL, PURCHASE_FALLBACK_ALLOWED } from '../brand';
-import { OPEN_DEST } from '@beeside/fa-public-engine';
 import type { YourExpansionViewModel } from '@beeside/fa-public-engine';
 
 /** PremiumContinuation — next-step conversion. Shown with a CTA only when the result has real value (D-050); otherwise understanding is the deliverable. */
-/** Discovery v1.0 (PO, 2026-10-14): destination-aware next-step title. One defined destination → country; several (or one + «a country you choose») → target markets; none defined → generic. */
-function nextStepTitle(destinations: YourExpansionViewModel['destinations'] | undefined, locale: Locale): string {
-  const list = destinations ?? [];
-  const defined = list.filter((d) => d.destination !== OPEN_DEST);
-  const open = list.some((d) => d.destination === OPEN_DEST);
-  if (defined.length === 1 && !open) return fill(UI.nextOne, locale, { country: defined[0]!.name[locale] });
-  if (defined.length >= 1) return UI.nextMany[locale];
-  return UI.nextOpen[locale];
-}
-
-export function PremiumContinuation({ premium, destinations, locale, onContinue, onEmail, email, delivered, purchaseUrl = PREMIUM_PURCHASE_URL, fallbackAllowed = PURCHASE_FALLBACK_ALLOWED }: {
+export function PremiumContinuation({ premium, locale, onContinue, onEmail, email, delivered, purchaseUrl = PREMIUM_PURCHASE_URL, fallbackAllowed = PURCHASE_FALLBACK_ALLOWED }: {
   purchaseUrl?: string | null; fallbackAllowed?: boolean;
-  premium: YourExpansionViewModel['premium']; destinations?: YourExpansionViewModel['destinations']; locale: Locale; email?: string; delivered?: boolean;
+  premium: YourExpansionViewModel['premium']; locale: Locale; email?: string; delivered?: boolean;
   onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean | 'unauthorized'>;
 }) {
   const [cont, setCont] = useState<'idle' | 'confirm' | 'busy' | 'done' | 'err'>('idle');
@@ -29,7 +18,7 @@ export function PremiumContinuation({ premium, destinations, locale, onContinue,
         <div className="premium">
           <div>
             <p className="pc-eyebrow">{UI.nextStep[locale]}</p>
-            <h2 id="pc-title" className="pc-title">{nextStepTitle(destinations, locale)}</h2>
+            <h2 id="pc-title" className="pc-title">{UI.premiumTitle[locale]}</h2>
             <p className="pc-body">{UI.premiumBody[locale]}</p>
           </div>
           {!purchaseUrl && !fallbackAllowed ? null : cont === 'done'

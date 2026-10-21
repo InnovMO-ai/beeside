@@ -7,6 +7,7 @@ import { ResultScreen } from "./components/ResultScreen";
 import { modelFor } from "./fa4.test-helpers";
 
 afterEach(cleanup);
+const ES_TITLE = "Con beeside Premium pasas del diagnóstico a la ejecución."; const EN_TITLE = "With beeside Premium, you move from diagnosis to execution.";
 const FORBIDDEN = ["Por confirmar", "Sin servicio hoy", "Snapshot", "radar", "readiness", "SOURCEABLE", "NOT_OFFERED", "UNMAPPED_NEED", "NO_ACTIVE_COVERAGE", "DEVELOPING", "Grant Thornton", "Baker Tilly", "Traxión", "Santander", "MAPFRE", "Garza Ponce", "AMPIP"];
 
 async function a11y(container: HTMLElement) {
@@ -158,7 +159,7 @@ describe("Start Your Expansion — configurable Premium purchase destination", (
     const onContinue = vi.fn().mockResolvedValue(true);
     const { PremiumContinuation } = await import("./components/PremiumContinuation");
     const m = modelFor(journeyA("es"));
-    const { container } = render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" onContinue={onContinue} purchaseUrl="https://pay.example/checkout" />);
+    const { container } = render(<PremiumContinuation premium={m.premium} locale="es" onContinue={onContinue} purchaseUrl="https://pay.example/checkout" />);
     fireEvent.click(screen.getByRole("button", { name: "Start Your Expansion" }));
     expect(container.textContent).not.toMatch(/Todavía no hay ningún pago|Sherpa lo revisará/);
     fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
@@ -170,7 +171,7 @@ describe("Start Your Expansion — configurable Premium purchase destination", (
     const assign = vi.fn(); const orig = window.location; Object.defineProperty(window, "location", { configurable: true, value: { ...orig, assign } });
     const { PremiumContinuation } = await import("./components/PremiumContinuation");
     const m = modelFor(journeyA("es"));
-    render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" onContinue={vi.fn().mockResolvedValue(false)} purchaseUrl="https://pay.example/checkout" />);
+    render(<PremiumContinuation premium={m.premium} locale="es" onContinue={vi.fn().mockResolvedValue(false)} purchaseUrl="https://pay.example/checkout" />);
     fireEvent.click(screen.getByRole("button", { name: "Start Your Expansion" })); fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument()); expect(assign).not.toHaveBeenCalled();
     Object.defineProperty(window, "location", { configurable: true, value: orig });
@@ -178,17 +179,20 @@ describe("Start Your Expansion — configurable Premium purchase destination", (
   it("open / undefined destination: when Premium is offered the title is the generic one (ES and EN)", () => {
     const a = journeyNortica("es"); a.destinations = { list: [], open: true, sameInAll: true }; a.components = a.components.map((c) => ({ ...c, destinations: [] }));
     const m = modelFor(a);
-    for (const [loc, title] of [["es", "Concretar tu expansión"], ["en", "Define your expansion"]] as const) {
+    for (const [loc, title] of [["es", ES_TITLE], ["en", EN_TITLE]] as const) {
       const r = render(<ResultScreen model={m} locale={loc} onContinue={vi.fn()} />);
       if (m.premium.shown) expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument(); else expect(screen.queryByRole("button", { name: "Start Your Expansion" })).toBeNull();
       r.unmount();
     }
   });
-  it("destination-aware next step: one country / several / open", () => {
-    const t = (a: Parameters<typeof modelFor>[0], loc: "es" | "en" = "es") => { const r = render(<ResultScreen model={modelFor(a)} locale={loc} onContinue={vi.fn()} />); const h = screen.getByRole("heading", { level: 2, name: /Concretar|Define/ }).textContent; r.unmount(); return h; };
-    expect(t(journeyA("es"))).toMatch(/^Concretar tu expansión en .+/);
-    expect(t(journeyB("es", "unknown"))).toBe("Concretar tu expansión en tus mercados objetivo");
-    expect(t(journeyB("en", "unknown"), "en")).toBe("Define your expansion across your target markets");
+  it("DSC-08 — the Premium block carries the approved title and text (ES/EN), identical for every destination", () => {
+    const body = { es: "Mantén integrada tu estrategia, coordina cada tema con tu Sherpa y activa las capacidades que tu proyecto necesita para ejecutarse.", en: "Keep your strategy integrated, coordinate every topic with your Sherpa and activate the capabilities your project needs to execute." };
+    for (const loc of ["es", "en"] as const) for (const a of [journeyA(loc), journeyB(loc, "unknown"), journeyNortica(loc)]) {
+      const m = modelFor(a); if (!m.premium.shown) continue;
+      const r = render(<ResultScreen model={m} locale={loc} onContinue={vi.fn()} />);
+      expect(screen.getByRole("heading", { level: 2, name: loc === "es" ? ES_TITLE : EN_TITLE })).toBeInTheDocument();
+      expect(screen.getByTestId("premium-continuation")).toHaveTextContent(body[loc]); r.unmount();
+    }
   });
 });
 
@@ -196,15 +200,15 @@ describe("release audit — purchase destination is fail-closed in a public buil
   it("no destination and no staging opt-in → the CTA is not rendered (no silent no-payment fallback)", async () => {
     const { PremiumContinuation } = await import("./components/PremiumContinuation");
     const m = modelFor(journeyA("es"));
-    const { container } = render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" purchaseUrl={null} fallbackAllowed={false} onContinue={vi.fn()} />);
+    const { container } = render(<PremiumContinuation premium={m.premium} locale="es" purchaseUrl={null} fallbackAllowed={false} onContinue={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "Start Your Expansion" })).toBeNull();
-    expect(container.textContent).not.toMatch(/Todavía no hay ningún pago|Sherpa/);
-    expect(screen.getByRole("heading", { level: 2 }).textContent).toMatch(/Concretar tu expansión/);
+    expect(container.textContent).not.toMatch(/Todavía no hay ningún pago|Tu beeside Sherpa revisará/);   // DSC-08: the approved Premium text names the Sherpa; what must not appear is the continuation / «no payment» claim
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(ES_TITLE);
   });
   it("a configured destination renders the CTA even when the fallback is not allowed", async () => {
     const { PremiumContinuation } = await import("./components/PremiumContinuation");
     const m = modelFor(journeyA("es"));
-    render(<PremiumContinuation premium={m.premium} destinations={m.destinations} locale="es" purchaseUrl="https://pay.example/x" fallbackAllowed={false} onContinue={vi.fn()} />);
+    render(<PremiumContinuation premium={m.premium} locale="es" purchaseUrl="https://pay.example/x" fallbackAllowed={false} onContinue={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Start Your Expansion" })).toBeInTheDocument();
   });
   it.each([["https://pay.example/checkout", "https://pay.example/checkout"], ["http://pay.example/x", null], ["javascript:alert(1)", null], ["", null], ["//pay.example", null]])("VITE_FA4_PREMIUM_PURCHASE_URL=%j → %j (https only)", async (v, expected) => {
