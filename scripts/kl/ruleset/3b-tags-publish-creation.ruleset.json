@@ -1,0 +1,19 @@
+{
+  "name": "creación de etiquetas de publicación de KL (PROPUESTO, no aplicado)",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/tags/kl-publish-*"
+      ],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "creation"
+    }
+  ]
+}

@@ -12,6 +12,9 @@
 # Salida: 0 = OK (puede listar elementos a REVISAR) · 1 = STOP: no escribir · 3 = uso incorrecto
 # Compatible con bash 3.2 (macOS) y GNU/Linux. Solo lee: no modifica el repositorio.
 set -u
+# L1 0005: rutas no ASCII literales (sin comillas ni escapes octales) para que los filtros por ruta las reconozcan; git sigue citando las que
+# llevan caracteres de control, y esas son STOP (ver más abajo). Requiere git >= 2.31.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.quotePath GIT_CONFIG_VALUE_0=false
 
 # ── Constantes de identidad (no dependen de archivos editables) ─────────────────
 PLATFORM="knowledge-layer-code"
@@ -27,6 +30,9 @@ GUARD_FILES="scripts/kl/preflight.sh scripts/kl/kl.fingerprint .github/workflows
 # Modo main (L1 v2): además del gate, son controles protegidos el CI de KL, el registro de aprobaciones, la lista de aprobadores y los scripts que verifican aprobación y CI.
 # Cualquier cambio exige aprobación VERIFICADA del PO en GitHub (no basta lo que diga un archivo de la propia rama).
 GUARD_FILES_MAIN="$GUARD_FILES .github/workflows/kl-ci.yml scripts/kl/shared-changes.txt scripts/kl/po-approvers.txt scripts/kl/verify-approval.sh scripts/kl/require-kl-ci.sh scripts/kl/verify-check-origin.sh scripts/kl/gate-run.sh"
+# L1 0005 · Controles de CI y despliegue fuera de .github/: los scripts que ejecutan los checks obligatorios o la guarda de migraciones. Cambiarlos
+# equivale a cambiar el workflow que los llama, así que exigen la misma aprobación verificada que .github/ (en ramas kl/* y en PR de otras plataformas).
+CI_CONTROL_GLOB() { case "$1" in .github/*|scripts/ci/*|scripts/secrets-scan.sh|scripts/fa4-copy-inventory.js|scripts/migrate.js|scripts/kl/smoke/*|backend/src/scripts/migration-target.ts|backend/src/scripts/domain-roles-prepare.ts|backend/db/migrations/migration-targets.json) return 0 ;; esac; return 1; }
 KL_PATHS_GLOB() { case "$1" in backend/src/kl/*|frontend/src/kl/*|backend/src/admin/kl/*|frontend/src/admin/kl/*|scripts/kl/*|.github/workflows/kl-*|docs/knowledge-layer/*) return 0 ;; esac; return 1; }
 # Decisión única sobre aprobación de controles protegidos (L1 v3). Falla cerrado: solo dos combinaciones evento/valor se aceptan, cualquier otra (vacía, desconocida,
 # "deferred" fuera de push, "verified" fuera de pull_request_target) es STOP. El valor lo calcula el workflow confiable (gate-run.sh), nunca la rama.
@@ -122,11 +128,13 @@ case "$BR" in
         NB="$(git merge-base HEAD "refs/remotes/origin/$TRUNK" 2>/dev/null || true)"
         if [ -z "$NB" ]; then stop "PR ajeno a KL sin ancestro común con origin/$TRUNK"
         else
+          QUOTED="$(git diff --name-only --no-renames "$NB" HEAD | grep '^"' || true)"
+          [ -n "$QUOTED" ] && { stop "rutas con caracteres de control o citadas por git (no se pueden clasificar con seguridad):"; printf '           %s\n' "$QUOTED" | head -10; }
           KLTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | while IFS= read -r f; do KL_PATHS_GLOB "$f" && echo "$f"; done)"
           if [ -n "$KLTOUCH" ]; then stop "rama '$BR' (no es ${TRUNK_PREFIX}* ni $BRANCH) modifica rutas de KL; los cambios de KL solo entran desde ramas ${TRUNK_PREFIX}*:"; printf '           %s\n' $KLTOUCH | head -10
           else
             ok "PR ajeno a KL ('$BR'): no toca rutas de KL"
-            GHTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | grep -E '^\.github/' | tr '\n' ' ' || true)"
+            GHTOUCH="$(git diff --name-only --no-renames "$NB" HEAD | while IFS= read -r f; do CI_CONTROL_GLOB "$f" && printf '%s ' "$f"; done)"
             [ -n "$GHTOUCH" ] && approval_gate " $GHTOUCH"
           fi
         fi
@@ -248,10 +256,12 @@ n_kl=0; n_sh=0; n_blk=0; n_shown=0
 cap() { n_shown=$((n_shown+1)); [ "$n_shown" -le 25 ] || { N_STOP=$((N_STOP+1)); [ "$n_shown" -eq 26 ] && echo "STOP     … (más rutas bloqueadas omitidas)"; return 1; }; }
 while IFS= read -r f; do
   [ -z "$f" ] && continue
+  case "$f" in \"*) cap && stop "ruta con caracteres de control o citada por git (no se puede clasificar con seguridad): $f"; continue ;; esac
   c="$(classify "$f")"
   if [ "$c" = KL ] && printf '%s\n' "$GUARD_CHANGED" | grep -qxF "$f"; then c=GUARD; fi
   # Modo main: TODO lo que cuelga de .github/ (workflows de CI, publicación y despliegue, CODEOWNERS) es control protegido; no basta declararlo.
-  if [ "$BMODE" = main ] && [ "$c" != GUARD ]; then case "$f" in .github/*) c=PROTECTED ;; esac; fi
+  # 0005: también los scripts de CI_CONTROL_GLOB. Solo eleva KL/SHARED (una migración compartida sigue siendo STOP sin excepción).
+  if [ "$BMODE" = main ] && { [ "$c" = KL ] || [ "$c" = SHARED ]; } && CI_CONTROL_GLOB "$f"; then c=PROTECTED; fi
   case "$c" in
     KL) n_kl=$((n_kl+1)) ;;
     FROZEN) n_blk=$((n_blk+1)) ;;   # ya reportado en P7

@@ -81,12 +81,14 @@ jobs:
       needs.gate.outputs.enabled == 'true' &&
       (
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.path == '.github/workflows/ci.yml' &&
          github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
          github.event.workflow_run.head_repository.full_name == github.repository) ||
         (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
       )
     runs-on: ubuntu-latest
     environment: dev
+    # L1 0005: the triggering run must be ci.yml itself (workflow_run matches by display name, and any workflow can call itself "CI").
     # H3: the commit that PASSED CI (workflow_run.head_sha), never the moving head of main. Fork pull requests whose branch
     # is also called "main" are excluded above (event must be a push to this repository). Dev deploys only main (ADR-004).
     env:
@@ -94,11 +96,13 @@ jobs:
     steps:
       - name: Log manual dispatch context
         if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_REASON: ${{ github.event.inputs.reason }}
         run: |
           echo "Manual dev deploy requested by ${{ github.actor }}"
           echo "Branch/ref: ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Reason: ${{ github.event.inputs.reason }}"
+          printf 'Reason: %s\n' "$DISPATCH_REASON"
 
       - uses: actions/checkout@v4
         with:

@@ -2,11 +2,22 @@
   "name": "main · KL gate + revisión obligatoria (PROPUESTO, no aplicado; reemplaza al bootstrap tras fusionar L1)",
   "target": "branch",
   "enforcement": "active",
-  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
+      "exclude": []
+    }
+  },
   "bypass_actors": [],
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -22,9 +33,54 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "kl-gate", "integration_id": 15368 },
-          { "context": "kl-tests", "integration_id": 15368 },
-          { "context": "kl-images", "integration_id": 15368 }
+          {
+            "context": "kl-gate",
+            "integration_id": 15368
+          },
+          {
+            "context": "kl-tests",
+            "integration_id": 15368
+          },
+          {
+            "context": "kl-images",
+            "integration_id": 15368
+          },
+          {
+            "context": "build-lint-test (shared/canonical-fields)",
+            "integration_id": 15368
+          },
+          {
+            "context": "build-lint-test (shared/fa-public-engine)",
+            "integration_id": 15368
+          },
+          {
+            "context": "build-lint-test (backend)",
+            "integration_id": 15368
+          },
+          {
+            "context": "build-lint-test (frontend)",
+            "integration_id": 15368
+          },
+          {
+            "context": "container-images",
+            "integration_id": 15368
+          },
+          {
+            "context": "dependency-audit",
+            "integration_id": 15368
+          },
+          {
+            "context": "secrets-scan",
+            "integration_id": 15368
+          },
+          {
+            "context": "fa4-copy-inventory",
+            "integration_id": 15368
+          },
+          {
+            "context": "integration-postgres",
+            "integration_id": 15368
+          }
         ]
       }
     }

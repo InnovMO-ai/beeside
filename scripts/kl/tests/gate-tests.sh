@@ -137,8 +137,8 @@ sc kl/b3h; echo "# x" >> scripts/kl/gate-run.sh; c x; expect "B3h gate-run.sh es
 echo "── Origen de los checks (API simulada)"
 HS=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 CRK="$A/$(key "repos/o/r/commits/$HS/check-runs?per_page=100").json"; STK="$A/$(key "repos/o/r/commits/$HS/statuses?per_page=100").json"
-runfile() { printf '{"id":%s,"path":"%s","head_sha":"%s","repository":{"full_name":"%s"}}' "$1" "$2" "${3:-$HS}" "${4:-o/r}" > "$A/$(key "repos/o/r/actions/runs/$1").json"; }
-cr() { printf '{"name":"%s","app":{"id":%s,"slug":"%s"},"details_url":"https://github.com/o/r/actions/runs/%s/job/9"}' "$1" "$2" "$3" "$4"; }
+runfile() { printf '{"id":%s,"path":"%s","head_sha":"%s","repository":{"full_name":"%s"},"check_suite_id":%s}' "$1" "$2" "${3:-$HS}" "${4:-o/r}" "$((9000+$1))" > "$A/$(key "repos/o/r/actions/runs/$1").json"; }
+cr() { printf '{"name":"%s","app":{"id":%s,"slug":"%s"},"details_url":"https://github.com/o/r/actions/runs/%s/job/9","check_suite":{"id":%s}}' "$1" "$2" "$3" "$4" "$((9000+$4))"; }
 co() { KL_API_DIR="$A" REPO=o/r HEAD_SHA=$HS bash "$T/verify-check-origin.sh" 2>&1; echo "exit=$?"; }
 runfile 100 .github/workflows/kl-preflight.yml; runfile 200 .github/workflows/kl-ci.yml; echo '[]' > "$STK"
 printf '{"check_runs":[%s,%s,%s]}' "$(cr kl-gate 15368 github-actions 100)" "$(cr kl-tests 15368 github-actions 200)" "$(cr kl-images 15368 github-actions 200)" > "$CRK"; expect "O1 checks de GitHub Actions y workflows esperados" 0 "origen de los checks protegidos verificado" "$(co)"
