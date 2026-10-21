@@ -188,8 +188,10 @@ TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
   git diff --cached --name-only --no-renames HEAD
   git ls-files --others --exclude-standard; } 2>/dev/null | sort -u > "$TMP"
 GUARD_CHANGED=""
-if [ -n "$BOOT" ]; then
-  GUARD_CHANGED="$( { git diff --name-only "$BOOT" HEAD -- $GUARD_FILES; git diff --name-only HEAD -- $GUARD_FILES; git diff --cached --name-only HEAD -- $GUARD_FILES; } 2>/dev/null | sort -u)"
+# Modo main: una guarda que difiere de la base en main es guarda, aunque coincida con la versión del bootstrap (no puede revertirse sin declararla).
+GREF="$BOOT"; [ "$BMODE" = main ] && GREF="$BASE"
+if [ -n "$GREF" ]; then
+  GUARD_CHANGED="$( { git diff --name-only "$GREF" HEAD -- $GUARD_FILES; git diff --name-only HEAD -- $GUARD_FILES; git diff --cached --name-only HEAD -- $GUARD_FILES; } 2>/dev/null | sort -u)"
 else
   warn "bootstrap del preflight aún sin commit (estado inicial esperado solo durante la instalación)"
 fi
