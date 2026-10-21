@@ -52,9 +52,11 @@ else ENV_COMMON="${ENV_COMMON},FA4_PRIVACY_VERSION=${FA4_PRIVACY_VERSION}"; fi
 SECRETS_COMMON="DATABASE_URL=${SECRET_DATABASE_URL}:latest,SECURITY_HASH_SECRET=${SECRET_HASH}:latest,SMTP_PASSWORD=${SECRET_SMTP_PASSWORD}:latest"
 
 want images && {
-echo "== 2. images"
-run gcloud --project "$PROJECT_ID" builds submit --config deploy/production/cloudbuild.production.yaml --service-account "projects/${PROJECT_ID}/serviceAccounts/$(SA build)" \
-  --substitutions "_REPO=${REPO},_TAG=${IMAGE_TAG},_PRIVACY_URL=${FA4_PRIVACY_URL:-https://www.beeside.you/privacy},_PREMIUM_URL=${VITE_FA4_PREMIUM_PURCHASE_URL:-},_BASE_PATH=${VITE_BASE_PATH}" .
+echo "== 2. images (build context = the COMMITTED tree of ${IMAGE_TAG}, exported with git archive: untracked, ignored or foreign material — e.g. KnowledgeLayer/ — never travels in the Cloud Build tarball)"
+CTX=$(mktemp -d)
+run bash -c "git archive --format=tar HEAD | tar -x -C '${CTX}'"
+run bash -c "cd '${CTX}' && gcloud --project '${PROJECT_ID}' builds submit --config deploy/production/cloudbuild.production.yaml --service-account 'projects/${PROJECT_ID}/serviceAccounts/$(SA build)' --substitutions '_REPO=${REPO},_TAG=${IMAGE_TAG},_PRIVACY_URL=${FA4_PRIVACY_URL:-https://www.beeside.you/privacy},_PREMIUM_URL=${VITE_FA4_PREMIUM_PURCHASE_URL:-},_BASE_PATH=${VITE_BASE_PATH}' ."
+rm -rf "$CTX"
 }
 want database && {
 echo "== 3. migrations + least-privilege verification + catalog seed (own jobs, own database role; the runtime services never see this credential)"
