@@ -15,6 +15,7 @@ test("a tab coming back after a long pause never shows the earlier answers: cont
   await page.reload();
   await expect(page.getByTestId("idle-continuation")).toBeVisible();                                                           // the continuity screen, not the old project
   await expect(page.getByText(UI.decTitle.es)).toHaveCount(0); await expect(page.getByText("Nórtica")).toHaveCount(0);
+  await expect(page.getByTestId("idle-continuation")).toHaveAttribute("data-phase", "sent");                                 // the answer arrived (the token is dropped when it does; a transient failure would keep it to retry)
   expect(await page.evaluate(() => sessionStorage.getItem("beeside.fa4.session"))).toBeNull();
   await page.getByRole("button", { name: UI.idleNewProject.es }).click();
   await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
