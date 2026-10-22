@@ -7,6 +7,7 @@ import { KlLocale } from "../contract/kl-v1";
 import { EditionIntegrityError, OpenEditionStore, KlReadService } from "../read/read-service";
 export { EditionIntegrityError };
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../../security/rate-limit";
+import { KlError } from "../db/errors";
 
 /**
  * Distribución controlada de ediciones PUBLICADAS (Design Spec §10). No existe URL pública ni firmada: el archivo solo sale por una ruta
@@ -86,9 +87,18 @@ export function createPublicEditionRouter(read: KlReadService, security: { limit
   const router = Router();
   router.get("/:id/status", rateLimit(security.limiter, EDITION_VERIFY_POLICY), (req, res, next) => {
     void (async () => {
-      const status = await read.editionPublicStatus(String(req.params.id ?? ""));
       res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "X-Content-Type-Options": "nosniff" });
-      res.json(status);
+      try {
+        res.json(await read.editionPublicStatus(String(req.params.id ?? "")));
+      } catch (error) {
+        // Una falla de infraestructura NO se presenta como «unknown»: 503 genérico (sin detalle interno) y reintento sugerido.
+        if (error instanceof KlError && error.code === "UNAVAILABLE") {
+          res.set("Retry-After", "30");
+          res.status(503).json({ error: "UNAVAILABLE" });
+          return;
+        }
+        throw error;
+      }
     })().catch(next);
   });
   return router;

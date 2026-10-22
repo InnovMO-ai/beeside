@@ -104,4 +104,36 @@ describe("objectStoreFromEnv (elección del almacén por entorno)", () => {
     expect(local.store).toBeInstanceOf(LocalObjectStore);
     expect(() => objectStoreFromEnv({ NODE_ENV: "production" } as NodeJS.ProcessEnv)).toThrow(/KL_STORE_BUCKET/);
   });
+
+  it("usa la caducidad real del token de metadatos (expires_in) y vuelve a pedirlo antes de que venza", async () => {
+    const g = fakeGcs(); let metaCalls = 0;
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).includes("metadata.google.internal")) { metaCalls += 1; return new Response(JSON.stringify({ access_token: `tok-${metaCalls}`, expires_in: 130 }), { status: 200 }); }
+      return g.fetchImpl(input, init);
+    }) as typeof fetch;
+    const store = new GcsObjectStore("bkt", { endpoint: "https://gcs.test", fetchImpl, backoffMs: 1 });
+    await store.put(sha(Buffer.from("a")), Buffer.from("a"));
+    await store.put(sha(Buffer.from("b")), Buffer.from("b"));
+    expect(metaCalls).toBe(2); // 130 s − 120 s de margen = 10 s < 60 s: no se reutiliza (antes se reutilizaba hasta 50 min)
+  });
+
+  it("ante un 401 descarta el token y reintenta con uno nuevo", async () => {
+    const g = fakeGcs(); const tokens = { n: 0 };
+    const store = new GcsObjectStore("bkt", { endpoint: "https://gcs.test", fetchImpl: ((input: string | URL | Request, init?: RequestInit) => g.fetchImpl(input, init)) as typeof fetch, tokenProvider: async () => { tokens.n += 1; return `tok-${tokens.n}`; }, backoffMs: 1 });
+    const auths: string[] = [];
+    const wrapped = new GcsObjectStore("bkt", {
+      endpoint: "https://gcs.test", backoffMs: 1,
+      tokenProvider: async () => { tokens.n += 1; return `t${tokens.n}`; },
+      fetchImpl: (async (input: string | URL | Request, init?: RequestInit) => {
+        const a = (init?.headers as Record<string, string>).Authorization ?? ""; auths.push(a);
+        if (a === "Bearer t1") return new Response("expired", { status: 401 });
+        return g.fetchImpl(input, init);
+      }) as typeof fetch,
+    });
+    void store;
+    const key = await wrapped.put(sha(Buffer.from("x")), Buffer.from("x"));
+    expect(key).toContain("kl/objects/");
+    expect(auths[0]).toBe("Bearer t1");
+    expect(auths[1]).toBe("Bearer t2");
+  });
 });

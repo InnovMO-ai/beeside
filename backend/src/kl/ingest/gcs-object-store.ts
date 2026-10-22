@@ -103,7 +103,12 @@ export class GcsObjectStore implements ObjectStore {
           ...(body ? { body: Buffer.from(body) } : {}),
           signal: AbortSignal.timeout(this.timeoutMs),
         });
-        if (res.status === 429 || res.status >= 500) {
+        if (res.status === 401) {
+          // Token caducado o revocado: se descarta la caché y se reintenta con uno nuevo (nunca se reutiliza un token rechazado).
+          this.cached = null;
+          last = new GcsObjectStoreError("unavailable", "almacenamiento no disponible (HTTP 401)");
+          try { await res.arrayBuffer(); } catch { /* se descarta el cuerpo */ }
+        } else if (res.status === 429 || res.status >= 500) {
           last = new GcsObjectStoreError("unavailable", `almacenamiento no disponible (HTTP ${res.status})`);
           try { await res.arrayBuffer(); } catch { /* se descarta el cuerpo */ }
         } else return res;
@@ -117,8 +122,10 @@ export class GcsObjectStore implements ObjectStore {
 
   private async token(): Promise<string> {
     if (this.cached && this.cached.expiresAt > Date.now() + 60_000) return this.cached.token;
+    this.cached = null;
     const token = await this.tokenProvider();
-    this.cached = { token, expiresAt: Date.now() + 50 * 60_000 };
+    // El proveedor por defecto (servidor de metadatos) fija la caducidad REAL (`expires_in`); un proveedor inyectado no la declara y se asume vigencia de 50 min.
+    this.cached ??= { token, expiresAt: Date.now() + 50 * 60_000 };
     return token;
   }
 

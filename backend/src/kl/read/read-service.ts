@@ -22,6 +22,7 @@ import {
   RelatedResourcesRequest,
   UsageBatch,
 } from "../contract/kl-v1";
+import { KlError } from "../db/errors";
 import { claimDigest, clip, isSingleSentence } from "./text";
 
 /**
@@ -455,12 +456,15 @@ export class KlReadService {
   }
 
   async editionPublicStatus(verificationId: string): Promise<{ status: "current" | "superseded" | "revoked" | "unknown"; [k: string]: unknown }> {
+    // «unknown» significa SOLO «este identificador no corresponde a ninguna edición». Un fallo de la base de datos NO es «unknown»: se señala como
+    // UNAVAILABLE (HTTP 503) para no hacer pasar por desconocida —p. ej.— una edición revocada durante una caída (decisión del PO, 22-oct-2026).
+    let r: Array<{ s?: { status: "current" | "superseded" | "revoked" | "unknown"; [k: string]: unknown } }>;
     try {
-      const r = await this.rows("SELECT kl.edition_public_status($1) AS s", [String(verificationId ?? "").slice(0, 64)]);
-      return r[0]?.s ?? { status: "unknown" };
+      r = (await this.rows("SELECT kl.edition_public_status($1) AS s", [String(verificationId ?? "").slice(0, 64)])) as typeof r;
     } catch {
-      return { status: "unknown" };
+      throw new KlError("UNAVAILABLE", "knowledge layer database unavailable");
     }
+    return r[0]?.s ?? { status: "unknown" };
   }
 }
 
