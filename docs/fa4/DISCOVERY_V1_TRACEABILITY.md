@@ -138,8 +138,12 @@ States: APPROVED → IMPLEMENTED → TESTED → INTEGRATED → DEPLOYED → FUNC
 | DSC-23 | ✓ | ✓ | ✓ | ✓ | – | – | – | `3db4766` | |
 | DSC-28 | ✓ | ✓ | ✓ | ✓ | – | – | – | `3db4766` | boolean cannot tell «No» from empty: nothing is pre-selected after a reload |
 | DSC-33 | ✓ (condition met by DSC-02) | ✓ | ✓ | ✓ | – | – | – | `35a7d08` | message only for `RECIPIENT_NOT_AUTHORIZED` |
-| DSC-09 | ✓ | n/a (verification) | **FAIL (1 point)** | n/a | – | – | – | tests | fix out of P1 |
-| DSC-27 | ✓ | n/a (verification) | PASS | n/a | – | – | – | tests | |
+| DSC-09 | ✓ | ✓ (`9b93672`) | ✓ | ✓ | – | – | – | `9b93672` | message once per country (value block); browser: MX / CL+KR / MX+CL+KR |
+| DSC-27 | ✓ | n/a (verification) | PASS | n/a | – | – | – | tests | J-check PASS (`acb22aa`) |
+| DSC-36 | ✓ | ✓ | ✓ | ✓ | – | – | – | `8996919` | 13 backend + 11 frontend + browser; L1: PENDING (DB role grants on convergence) |
+| DSC-37 | ✓ | ✓ | ✓ | ✓ | – | – | – | `472820a` | help-v1; flags E/F OFF until DSC-36/38 validated; `contact=open` deep link still opens ContactDialog |
+| DSC-38 / PD-39 | ✓ | ✓ | ✓ | ✓ | – | – | – | `acb22aa`, `472820a` | label «Correo electrónico»/«Email address»; cover dialog; timing measured, NOT fixed (see DISCOVERY_CODE_STAGE2_REPORT.md) |
+| DSC-40 | ✓ | ✓ | ✓ | ✓ | – | – | – | `e2015f3` | hero SHA-1 verified; card fits at 375/768/1024/1440 |
 | DSC-13, 15, 25a | ✓ | – | – | – | – | – | – | – | **Design first** |
 | DSC-18, 16 | ✓ | – | – | – | – | – | – | – | **not authorised** |
 | DSC-12, 19, 20, 21, 25, 26 | ✓ | – | – | – | – | – | – | – | **ARCHITECTURE DEPENDENCY** |
