@@ -122,7 +122,7 @@ describe("18 · retry and «start a new project»", () => {
     const calls = mockApi((_c, n) => (n === 1 ? json({ error: "EMAIL_NOT_SENT" }, 502) : json({ state: "sent" })));
     sessionStore.set("T".repeat(43)); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now() - 2 * RESUME_IDLE_MS));
     render(<Fa4App />); await screen.findByTestId("idle-continuation");
-    expect(screen.getByTestId("idle-continuation")).toHaveAttribute("data-phase", "failed"); expect(sessionStorage.getItem("beeside.fa4.session")).toBeNull();
+    expect(screen.getByTestId("idle-continuation")).toHaveAttribute("data-phase", "failed"); expect(sessionStorage.getItem("beeside.fa4.session")).not.toBeNull();   // a transient failure keeps the idle token so a reload can still retry (it is never re-opened as a session)
     fireEvent.click(screen.getByRole("button", { name: "Intentar de nuevo" }));
     await vi.waitFor(() => expect(screen.getByTestId("idle-continuation")).toHaveAttribute("data-phase", "sent"));
     expect(idleCalls(calls)).toHaveLength(2); expect(idleCalls(calls)[1]!.body).toEqual({ retry: true }); expect(idleCalls(calls)[1]!.auth).toBe("T".repeat(43));

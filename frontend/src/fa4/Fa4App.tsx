@@ -111,7 +111,7 @@ export function Fa4App() {
       setIdle('failed');
     } catch (e) {
       if (e instanceof ApiError) {
-        sessionStore.clear();
+        if (e.status === 401 || e.code === 'NOT_APPLICABLE' || e.code === 'RECIPIENT_NOT_AUTHORIZED' || e.status === 429) sessionStore.clear();   // a transient failure (5xx / network) keeps the token so a reload can still retry
         if (e.status === 401) { idleToken.current = null; setIdle(null); setRecovery('stale'); return; }          // expired (> 24 h) or unknown: the «stale» screen with the link request
         if (e.code === 'NOT_APPLICABLE') { toCover(); return; }                                                    // delivered / closed project: nothing to continue
         if (e.code === 'RECIPIENT_NOT_AUTHORIZED') { setIdle('unauthorized'); return; }

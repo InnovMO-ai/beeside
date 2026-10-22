@@ -8,7 +8,7 @@ type EmailRef = RefObject<HTMLInputElement>;
 type MsgRef = RefObject<HTMLParagraphElement>;
 
 /** E-mail + «send me a new link». The answer is the SAME neutral message for known and unknown addresses (no account enumeration). Shared by the recovery screen and the cover dialog (DSC-38). */
-export function LinkRequestForm({ locale, secondary, emailRef, resultRef }: { locale: Locale; secondary: ReactNode; emailRef?: EmailRef; resultRef?: MsgRef }) {
+export function LinkRequestForm({ locale, secondary, secondaryDone, emailRef, resultRef }: { locale: Locale; secondary: ReactNode; secondaryDone?: ReactNode; emailRef?: EmailRef; resultRef?: MsgRef }) {
   const [email, setEmail] = useState(''); const [st, setSt] = useState<'idle' | 'busy' | 'done'>('idle');
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
   const own = useRef<HTMLParagraphElement>(null); const msg = resultRef ?? own;
@@ -19,7 +19,7 @@ export function LinkRequestForm({ locale, secondary, emailRef, resultRef }: { lo
     try { await api.requestLink(email.trim()); } catch { /* the answer is identical either way (no account enumeration) */ }
     setSt('done');
   }
-  return st === 'done' ? <p className="state ok" role="status" tabIndex={-1} ref={msg}>{UI.linkRequested[locale]}</p> : (
+  return st === 'done' ? <><p className="state ok" role="status" tabIndex={-1} ref={msg}>{UI.linkRequested[locale]}</p>{secondaryDone}</> : (
     <div className="recovery-form">
       <label><span className="label">{UI.email[locale]}</span>
         <input ref={emailRef} className="field" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void ask(); }} /></label>
@@ -48,7 +48,7 @@ export function ContinueLinkDialog({ locale, open, onClose }: { locale: Locale; 
         <>
           <div className="sheet-head"><h2 id={titleId}>{UI.continueLinkCta[locale]}</h2><button type="button" className="ha-x" aria-label={UI.close[locale]} onClick={onClose}>×</button></div>
           <div className="sheet-body">
-            <LinkRequestForm locale={locale} emailRef={email} resultRef={result} secondary={<button type="button" className="btn" onClick={onClose}>{UI.close[locale]}</button>} />
+            <LinkRequestForm locale={locale} emailRef={email} resultRef={result} secondaryDone={<button type="button" className="btn" onClick={onClose}>{UI.close[locale]}</button>} secondary={<button type="button" className="btn" onClick={onClose}>{UI.close[locale]}</button>} />
           </div>
         </>
       )}
@@ -82,7 +82,7 @@ export function IdleContinuation({ phase, locale, onRetry, onNew }: { phase: Idl
     <main className="main narrow" id="main" data-testid="idle-continuation" data-phase={phase}>
       <h1 className="h1" tabIndex={-1} ref={h1}>{(phase === 'sending' ? UI.idleSending : UI.idleTitle)[locale]}</h1>
       {msg && <p className="lead" role="status" aria-live="polite">{msg[locale]}</p>}
-      {phase === 'sending' && <p className="sr-only" role="status" aria-busy="true">{UI.idleSending[locale]}</p>}
+      {phase === 'sending' && <p className="sr-only" role="status" aria-busy="true" />}
       <div className="sheet-actions">
         {phase === 'failed' && <button type="button" className="btn primary" onClick={onRetry}>{UI.idleRetry[locale]}</button>}
         <button type="button" className="btn" onClick={onNew}>{UI.idleNewProject[locale]}</button>
