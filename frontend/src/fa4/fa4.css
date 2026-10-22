@@ -529,7 +529,7 @@ body, .fa4, .shell, .shell.tinted { background: var(--paper); }
 .band { background: transparent; }
 
 /* 2 · YEV Hero: full-bleed editorial photograph, headline on open sky, glance card as the project signal */
-.res-hero.photo { position: relative; overflow: hidden; isolation: isolate; background: #1d4a9e; color: #fff; --hero-ink: #fff; }   /* DSC-40: glass-towers photograph (dark towers, blue sky) with the approved dark-blue veil → WHITE text, as in the approved prototype */
+.res-hero.photo { position: relative; isolation: isolate; background: #1d4a9e; color: #fff; --hero-ink: #fff; }   /* DSC-40: glass-towers photograph (dark towers, blue sky) with the approved dark-blue veil → WHITE text, as in the approved prototype */
 .res-hero.photo .hero-photo::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(9, 20, 58, .52), rgba(9, 20, 58, .48) 70%); }
 .res-hero.photo .hero-photo { position: absolute; inset: 0; z-index: -2; display: block; }
 .res-hero.photo .hero-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }   /* DSC-40: approved crops, centred */
@@ -772,3 +772,5 @@ dialog.sheet[data-testid="continue-link-dialog"] .sheet-actions .btn.primary { f
 @media (min-width: 1024px) { .top-actions .ta-save { display: none; } }   /* ≥1024 the save action lives in the Back/Continue bar */
 
 .res-hero.photo .in > div:first-child { position: relative; z-index: 4; }   /* the open help panel must sit above the glance cards */
+
+.res-hero.photo .hero-photo { overflow: hidden; }   /* the photograph is clipped, not the hero: the open help panel may extend below it */

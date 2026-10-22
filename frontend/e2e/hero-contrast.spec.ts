@@ -27,6 +27,7 @@ test('DSC-40: white hero text and controls meet the contrast minimum', async ({ 
   await page.addStyleTag({ content: '.res-hero.photo .in { visibility: hidden !important; }' });
   const hb = (await hero.boundingBox())!;
   const shot = (await page.screenshot({ clip: { x: hb.x, y: hb.y, width: hb.width, height: hb.height } })).toString('base64');
+  expect(Object.keys(boxes).sort(), 'every target rendered').toEqual(targets.map((t) => t.name).sort());
   const rows: string[] = [];
   const p90s = await page.evaluate(async ({ shot, hb, boxes }) => {
     const img = new Image(); img.src = `data:image/png;base64,${shot}`; await img.decode();
@@ -43,8 +44,8 @@ test('DSC-40: white hero text and controls meet the contrast minimum', async ({ 
     return out;
   }, { shot, hb, boxes });
   for (const t of targets) {
-    const p90 = p90s[t.name]; if (p90 === undefined) continue;
-    const ratio = 1.05 / (p90 + 0.05);
+    const p90 = p90s[t.name]; expect(p90, `${t.name} measured`).toBeDefined();
+    const ratio = 1.05 / (p90! + 0.05);
     rows.push(`${info.project.name}\t${t.name}\t${ratio.toFixed(2)}\tmin ${t.min}`);
     expect.soft(ratio, `${info.project.name} · ${t.name}`).toBeGreaterThanOrEqual(t.min);
   }

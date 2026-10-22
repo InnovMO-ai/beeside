@@ -47,3 +47,20 @@ test('DSC-38: cover link opens the dialog on the e-mail field; Escape returns to
   await page.getByRole('dialog').getByRole('button', { name: 'Enviarme un enlace nuevo' }).click();
   await expect(page.getByRole('dialog').getByRole('status')).toContainText('Si ese correo tiene un proyecto');
 });
+
+test('DSC-37: the YEV help panel is never clipped by the hero, with every answer open', async ({ page, request }) => {
+  const token = await seed(request, journeyA(), 'extra');
+  await open(page, token);
+  await page.getByRole('button', { name: 'Ver mi resultado' }).click();
+  await page.getByTestId('result-screen').waitFor({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Ayuda y contacto' }).click();
+  const panel = page.getByTestId('help-panel'); await expect(panel).toBeVisible();
+  for (const q of await panel.locator('.ha-q').all()) await q.click();
+  const talk = panel.getByRole('link', { name: /Hablar con beeside/ });
+  await talk.scrollIntoViewIfNeeded();
+  const hit = await talk.evaluate((el) => { const r = el.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!e && (e === el || el.contains(e)); });
+  expect(hit, 'the last link is reachable (not clipped / covered)').toBe(true);
+  const vp = page.viewportSize()!; const pb = (await panel.boundingBox())!;
+  expect(pb.x).toBeGreaterThanOrEqual(0); expect(pb.x + pb.width).toBeLessThanOrEqual(vp.width + 0.5);
+  await noHorizontalOverflow(page);
+});
