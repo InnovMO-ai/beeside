@@ -80,7 +80,9 @@ resource "google_monitoring_alert_policy" "worker_attempts_failing" {
   conditions {
     display_name = "more than 2 failed task attempts in 30 min"
     condition_threshold {
-      filter          = "${local.job} AND metric.type=\"run.googleapis.com/job/completed_task_attempt_count\" AND metric.labels.result=\"failed\""
+      # Cloud Run labels a failed attempt that will be retried as result="retried"; only the LAST attempt of an execution is "failed" (verified 21-oct-2026
+      # with real data: 2 failing executions with max_retries=1 gave retried=2, failed=2). Counting only "failed" never exceeded the threshold.
+      filter          = "${local.job} AND metric.type=\"run.googleapis.com/job/completed_task_attempt_count\" AND (metric.labels.result=\"failed\" OR metric.labels.result=\"retried\")"
       comparison      = "COMPARISON_GT"
       threshold_value = 2
       duration        = "0s"
@@ -110,9 +112,12 @@ resource "google_monitoring_alert_policy" "worker_not_running" {
     condition_absent {
       filter   = "${local.job} AND metric.type=\"run.googleapis.com/job/completed_execution_count\""
       duration = "1200s"
+      # Absence must be judged on the SUM of all results. Without the reducer each series (result=failed/retried/succeeded) is judged alone, so every isolated
+      # failure opened a false "no executions" incident ~20 min later (seen 22-oct-2026 00:09 UTC while the tick was running every 5 minutes).
       aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_SUM"
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
       }
       trigger { count = 1 }
     }
