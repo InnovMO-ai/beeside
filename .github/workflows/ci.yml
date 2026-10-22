@@ -35,6 +35,15 @@ jobs:
       - name: Build
         run: npm run build --workspace=${{ matrix.workspace }}
 
+      # Precision's document extraction (backend/src/knowledge-layer/extract.ts) calls the system tools pdftotext (poppler-utils) and
+      # unzip; the hosted runner image does not guarantee them, and without them the backend suites fail with «spawnSync pdftotext ENOENT».
+      - name: System tools for document extraction (backend only)
+        if: matrix.workspace == 'backend'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils unzip
+          pdftotext -v 2>&1 | head -1; unzip -v | head -1
+
       - name: Test
         run: npm run test --workspace=${{ matrix.workspace }}
 
@@ -120,6 +129,12 @@ jobs:
       # All database-backed suites (Discovery, Precision, platform). Rolled-back suites share one database; every runtime-role suite gets its
       # OWN database and the canonical login topology (Discovery login only in beeside_discovery_rw, Precision login only in beeside_runtime_role),
       # bound by the same domain-roles-prepare step production uses. Root cause of the 2026-10-16 failures: one shared database for suites that commit data.
+      - name: System tools for document extraction (pdftotext, unzip)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils unzip
+          pdftotext -v 2>&1 | head -1; unzip -v | head -1
+
       - name: Integration suites (shared rolled-back + dedicated runtime-role databases)
         run: bash scripts/ci/integration.sh
       - name: End-to-end database
