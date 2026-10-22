@@ -398,7 +398,8 @@ describeKl("lado KL de kl.v1 (I2, I3, I5, I6, I7) con datos sintéticos", () => 
       expect((await down.packageStatus({ packageRefs: ["pkg.a@1"] })).statuses).toEqual({ "pkg.a@1": "invalidated" });
       expect(await down.emitDemand({ contract: "kl.v1" } as never, q.availability)).toBe("skipped");
       expect(await down.reportUsage({ contract: "kl.v1", items: [] })).toBe(0);
-      expect(await down.editionPublicStatus("x")).toEqual({ status: "unknown" });
+      // M1 (decisión del PO, 22-oct-2026): una caída de la base NO es «unknown»; el estado público señala UNAVAILABLE (la ruta responde 503).
+      await expect(down.editionPublicStatus("x")).rejects.toMatchObject({ code: "UNAVAILABLE" });
       await dead.end().catch(() => undefined);
     });
 
