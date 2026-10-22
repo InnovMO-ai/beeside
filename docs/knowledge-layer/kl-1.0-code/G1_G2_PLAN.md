@@ -1,6 +1,6 @@
 # KL 1.0 · Plan ejecutable G1–G2 (diagnóstico y preparación)
 
-Estado: **PREPARADO; ensayo D2 EJECUTADO en instancia desechable (ya destruida); la instancia compartida NO se tocó** (ver §9). Fecha del diagnóstico: 2026-10-16. Alcance observado: proyecto `beeside-dev-508220`, región `northamerica-south1`, con la cuenta `mo@beeside.you` (roles/owner), **solo con lecturas**. No se creó ni cambió ningún recurso. No se leyó ni se mostró ningún valor de secreto; de tres secretos de cadena de conexión se extrajo únicamente el nombre del usuario de base de datos (la contraseña nunca se imprimió).
+Estado: **PREPARADO; ensayo D2 EJECUTADO en instancia desechable (ya destruida); la instancia compartida NO se tocó** (ver §9). Fecha del diagnóstico: 2026-10-16. Alcance observado: proyecto `beeside-dev-508220`, región `northamerica-south1`, con la cuenta `<correo-del-PO>` (roles/owner), **solo con lecturas**. No se creó ni cambió ningún recurso. No se leyó ni se mostró ningún valor de secreto; de tres secretos de cadena de conexión se extrajo únicamente el nombre del usuario de base de datos (la contraseña nunca se imprimió).
 Staging y producción no existen como proyectos desplegados (los `envs/staging|production` de Terraform son andamios sin aplicar y con bucket de estado sin definir): este plan es para **dev**.
 
 ---
@@ -29,7 +29,7 @@ Staging y producción no existen como proyectos desplegados (los `envs/staging|p
 | Cloud Run Services | `beeside-dev-backend-api`, `beeside-dev-frontend-app`, `fa4-staging-backend`, `fa4-staging-web`: todos con la **cuenta compute por defecto** |
 | Cloud Run Jobs | `beeside-dev-migrate` y `fa4-staging-prepare`, ambos con `beeside-dev-migration-runner` (la SA del migrador **se comparte con FA4**) |
 | Secret Manager | `beeside-dev-db-password`, `-database-url`, `-migration-database-url`, placeholders, `fa4-*`. Acceso por secreto (sin `secretAccessor` a nivel de proyecto): compute SA → `database-url`, `fa4-*`; migration-runner → `migration-database-url` y `fa4-staging-db-runtime-password`. `beeside-dev-db-password` sin enlaces |
-| IAM de proyecto | `owner: mo@beeside.you`; `cloudsql.client`: compute SA y migration-runner (a nivel de proyecto, único alcance posible). Sin `editor` |
+| IAM de proyecto | `owner: <correo-del-PO>`; `cloudsql.client`: compute SA y migration-runner (a nivel de proyecto, único alcance posible). Sin `editor` |
 | Red | `beeside-dev-vpc` + `default`. Sin routers/Cloud NAT, sin políticas de firewall de red. El backend no usa VPC (Cloud SQL por conector `/cloudsql`) |
 | Almacenamiento | Buckets: `beeside-dev-508220_cloudbuild` y el de estado de Terraform. **No hay bucket de KL** |
 | APIs | Habilitadas: sqladmin, secretmanager, storage, cloudbuild. **Cloud Scheduler no está habilitado** (error `PERMISSION_DENIED` al listar) |
@@ -46,7 +46,7 @@ Staging y producción no existen como proyectos desplegados (los `envs/staging|p
 | `fa4_staging_runtime` | Runtime de FA4, rol creado por SQL | Probablemente no (rol de aplicación), debe probarse |
 | Compute SA | Runtime de 4 servicios; `cloudsql.client` + secretos de `database-url`/`fa4-*` | No puede cambiar usuarios de BD (no tiene `cloudsql.admin`); sí abrirá conexiones |
 | `beeside-dev-migration-runner` | Jobs `migrate` y `fa4-staging-prepare` | Recibe la credencial de `beeside_app` (migración) |
-| `mo@beeside.you` (owner) | Humano | Puede restablecer cualquier contraseña por API y leer todo secreto (alcance IAM aceptado) |
+| `<correo-del-PO>` (owner) | Humano | Puede restablecer cualquier contraseña por API y leer todo secreto (alcance IAM aceptado) |
 
 ## 3. Local vs. real
 
@@ -281,7 +281,7 @@ E1–E15 sobre `beeside-dev-kl-db` (evidencia: `evidence/G1-dev-kl-2026-10-16/E1
 | E14 `kl_*` con super/createrole/createdb/`cloudsqlsuperuser` | **0** ✅ · E15 leer `pg_authid` | falla ✅ |
 
 **Veredicto G1.** *Pre-migración:* **CUMPLE** en el entorno destino real: ningún intento de escalada tiene éxito, y los únicos miembros de `cloudsqlsuperuser` son `postgres` (sin contraseña, no puede iniciar sesión) y roles internos de Cloud SQL. La condición se cumple *por construcción de la instancia dedicada*, no porque `cloudsqlsuperuser` esté contenido (el ensayo D2 demostró que no lo está).
-**Límites declarados (no es aprobación plena todavía):** (1) E9/E10 se ejecutaron con la base vacía y sin las ACL finales; deben **repetirse tras KL-0001** (que concede CONNECT y define privilegios). (2) El plano IAM sigue pudiendo restablecer la contraseña de `postgres` o crear usuarios por API (`cloudsql.users.*`: hoy solo el owner humano `mo@beeside.you`); crear cualquier usuario por API en esta instancia **rompe el aislamiento**. Control recomendado: prohibirlo por proceso y comprobar periódicamente (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` solo debe devolver `postgres` y `cloudsql*`), y vigilar en Cloud Audit Logs `cloudsql.users.create/update`. (3) El principal `postgres` no se probó (no tiene contraseña); es equivalente a un miembro de `cloudsqlsuperuser`.
+**Límites declarados (no es aprobación plena todavía):** (1) E9/E10 se ejecutaron con la base vacía y sin las ACL finales; deben **repetirse tras KL-0001** (que concede CONNECT y define privilegios). (2) El plano IAM sigue pudiendo restablecer la contraseña de `postgres` o crear usuarios por API (`cloudsql.users.*`: hoy solo el owner humano `<correo-del-PO>`); crear cualquier usuario por API en esta instancia **rompe el aislamiento**. Control recomendado: prohibirlo por proceso y comprobar periódicamente (`SELECT member::regrole FROM pg_auth_members WHERE roleid='cloudsqlsuperuser'::regrole` solo debe devolver `postgres` y `cloudsql*`), y vigilar en Cloud Audit Logs `cloudsql.users.create/update`. (3) El principal `postgres` no se probó (no tiene contraseña); es equivalente a un miembro de `cloudsqlsuperuser`.
 
 **Decisión del PO:** declarar **G1 aprobado condicionado** (repetición E1–E15 + comprobación de miembros tras KL-0001) o exigir esa repetición antes de aprobarlo. No se migró nada; `beeside_kl` sigue vacía. Siguiente fase del RUNBOOK (5: exportación previa y migración KL-0001…0005) requiere imagen `runtime` construida (validación de imagen **PENDIENTE G2**: sin Docker local; requiere push de la rama para CI o Cloud Build).
 
@@ -331,7 +331,7 @@ Documento de referencia del humo, clave `linux-x64-chromium-153.0.8010.12-lato`:
 
 ## 12. Fase 5 EJECUTADA (2026-10-17) · estado: HECHA
 
-Autorizada por el PO (con congelación de KL-0001…0005 en dev-kl confirmada). Cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`. Commit base de las imágenes: `7af37659a4b68285c36d8498b8ed9d7151f83115` (CI en verde sobre ese commit).
+Autorizada por el PO (con congelación de KL-0001…0005 en dev-kl confirmada). Cuenta `<correo-del-PO>`, proyecto `beeside-dev-508220`. Commit base de las imágenes: `7af37659a4b68285c36d8498b8ed9d7151f83115` (CI en verde sobre ese commit).
 
 | Subfase | Resultado |
 |---|---|

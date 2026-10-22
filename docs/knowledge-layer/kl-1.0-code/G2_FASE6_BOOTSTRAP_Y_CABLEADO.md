@@ -20,7 +20,7 @@ Otros riesgos de B: ver tabla de riesgos.
 
 ## A · `kl-bootstrap` (decisión: ejecución por operador, no por job)
 
-CR-KL-002 §5 describe un job dedicado `kl-bootstrap` con dos credenciales (la de `beeside` y `kl_owner`) cuyo acceso se retira al terminar. Hoy la única credencial utilizable de `beeside` es la del runtime del backend, `beeside-dev-database-url`, que es **`beeside_app`**: miembro de `cloudsqlsuperuser` y dueño de la base (hallazgo del ensayo G1). Un job necesitaría un permiso temporal sobre ese secreto **de la plataforma** (modificar su IAM) y, además, el bootstrap **escribe** `admin_audit_event`, por lo que no basta una credencial «de lectura». Por eso se prepara la **variante A1 (recomendada)**: el operador de Plataforma lo ejecuta una vez desde su equipo (`mo@beeside.you` ya puede leer ambos secretos; no se concede ni se retira ningún permiso). La variante A2 (job + permiso temporal) queda descrita como alternativa.
+CR-KL-002 §5 describe un job dedicado `kl-bootstrap` con dos credenciales (la de `beeside` y `kl_owner`) cuyo acceso se retira al terminar. Hoy la única credencial utilizable de `beeside` es la del runtime del backend, `beeside-dev-database-url`, que es **`beeside_app`**: miembro de `cloudsqlsuperuser` y dueño de la base (hallazgo del ensayo G1). Un job necesitaría un permiso temporal sobre ese secreto **de la plataforma** (modificar su IAM) y, además, el bootstrap **escribe** `admin_audit_event`, por lo que no basta una credencial «de lectura». Por eso se prepara la **variante A1 (recomendada)**: el operador de Plataforma lo ejecuta una vez desde su equipo (`<correo-del-PO>` ya puede leer ambos secretos; no se concede ni se retira ningún permiso). La variante A2 (job + permiso temporal) queda descrita como alternativa.
 
 ### Precondiciones
 - `gcloud auth print-access-token` OK; `cloud-sql-proxy` y `psql` en el equipo; `npm ci` hecho.
@@ -105,7 +105,7 @@ Si la revisión nueva no arranca, Cloud Run **no** le envía tráfico y la revis
 ---
 
 ## Resultado del `--check` (2026-10-17) · BLOQUEADO, no se ejecutó `--apply`
-`bash scripts/kl/g2/bootstrap-admin.sh --check contact@beeside.you` (solo lectura; cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`):
+`bash scripts/kl/g2/bootstrap-admin.sh --check contact@beeside.you` (solo lectura; cuenta `<correo-del-PO>`, proyecto `beeside-dev-508220`):
 - `admin_user existe=0 activo=false login_habilitado=false` → **`contact@beeside.you` no existe como `admin_user`** en la base principal de dev.
 - `KL_ADMIN no revocados=0` (nadie tiene KL_ADMIN todavía).
 Diagnóstico adicional (solo conteos, sin correos): `admin_user total=1, activos=1, con_login=0, elegibles=0, técnicas(@beeside.internal)=1, del dominio beeside.you=0`. **El único `admin_user` de dev es una identidad técnica `@beeside.internal` sin login; no hay ningún administrador humano aprovisionado.** El bootstrap se rechazaría (`not_found`) por diseño, y no se creó ninguna identidad ni se sustituyó el correo.
@@ -114,9 +114,9 @@ Diagnóstico adicional (solo conteos, sin correos): `admin_user total=1, activos
 
 ---
 
-## Parte A EJECUTADA (2026-10-17) · primer KL_ADMIN = mo@beeside.you
+## Parte A EJECUTADA (2026-10-17) · primer KL_ADMIN = <correo-del-PO>
 
-Corrección del PO: el administrador principal es **mo@beeside.you**; `contact@beeside.you` es institucional y **no** se aprovisionó. `padmin@beeside.you` queda como posible segundo administrador, **sin aprovisionar** y sin usarse para ningún control de doble intervención (pendiente de confirmar su titular individual y su autenticación).
+Corrección del PO: el administrador principal es **<correo-del-PO>**; `contact@beeside.you` es institucional y **no** se aprovisionó. `<cuenta-admin-plataforma>` queda como posible segundo administrador, **sin aprovisionar** y sin usarse para ningún control de doble intervención (pendiente de confirmar su titular individual y su autenticación).
 
 1. **Aprovisionamiento** en la base principal de dev con el mecanismo de desarrollo del repositorio (`admin:provision --development-only`, con `CONFIG_BOOTSTRAP_ENV=development`; en producción lo haría un ADMIN desde el Control Center): `admin_user` `67e7bb19-ea05-4ac0-bf0c-091cdb1607ff`, **rol ADMIN, `active = true`, `login_enabled = true`**; 1 evento `admin_user.provisioned` (SYSTEM, ALLOWED) en `admin_audit_event`. `admin_user` total = 2 (la identidad técnica `@beeside.internal` y esta).
 2. **`--check`:** `admin_user existe=1 activo=true login_habilitado=true`; `KL_ADMIN no revocados=0`.
@@ -125,7 +125,7 @@ Corrección del PO: el administrador principal es **mo@beeside.you**; `contact@b
 
 **Límites que no se ocultan:**
 - **La autenticación no se pudo verificar**: no existe IdP/Admin API en dev (bloqueo B1). `admin_user.auth_subject` queda sin enlazar; la identidad se enlaza en el primer inicio de sesión real. No se crearon sesiones ficticias ni se omitió ningún control.
-- **Separación de funciones:** con un solo humano en KL (KL_ADMIN) no pueden ejercerse los controles que exigen una segunda persona (p. ej. «quien compone envía; otra persona con rol editorial aprueba»). Eso queda pendiente de más identidades, no de `padmin@beeside.you` hasta confirmarla.
+- **Separación de funciones:** con un solo humano en KL (KL_ADMIN) no pueden ejercerse los controles que exigen una segunda persona (p. ej. «quien compone envía; otra persona con rol editorial aprueba»). Eso queda pendiente de más identidades, no de `<cuenta-admin-plataforma>` hasta confirmarla.
 - Un KL_ADMIN no puede revocarse a sí mismo; si hubiera que deshacer el bootstrap antes de que existan datos reales, el camino es el reinicio descrito arriba (`DROP SCHEMA kl CASCADE` y re-migrar).
 - La parte B (cableado del backend) sigue **bloqueada** por B1–B3.
 
@@ -133,9 +133,9 @@ Corrección del PO: el administrador principal es **mo@beeside.you**; `contact@b
 
 ## S3 VERIFICADO (2026-10-17, 15:37 UTC) y S4 (cableado de KL) PREPARADO, NO EJECUTADO
 
-### S3 — inicio de sesión real de mo@beeside.you (verificación solo lectura)
-- `admin_user mo@beeside.you`: `ADMIN`, `active=true`, `login_enabled=true`, **`auth_subject` enlazado** (identificador de Google de 21 caracteres), `last_login_at = 2026-10-17 15:37:50 UTC`.
-- `admin_session`: 1 fila, creada 15:37:50, **vigente hasta 23:37:50 UTC (8 h)**, usuario `mo@beeside.you`, rol `ADMIN`.
+### S3 — inicio de sesión real de <correo-del-PO> (verificación solo lectura)
+- `admin_user <correo-del-PO>`: `ADMIN`, `active=true`, `login_enabled=true`, **`auth_subject` enlazado** (identificador de Google de 21 caracteres), `last_login_at = 2026-10-17 15:37:50 UTC`.
+- `admin_session`: 1 fila, creada 15:37:50, **vigente hasta 23:37:50 UTC (8 h)**, usuario `<correo-del-PO>`, rol `ADMIN`.
 - Auditoría: `admin.login · ALLOWED · ADMIN_USER → admin_session · {"role":"ADMIN"}` a las 15:37:50.865 (antes, las 3 filas `DENIED` del fallo original y de mis pruebas de reproducción). La identidad técnica `@beeside.internal` no cambió (sin login). **S3 cumplido; sin sesiones ficticias.**
 
 ### Pantalla en blanco al navegar (reportada por el titular)
@@ -145,7 +145,7 @@ Los registros del frontend y del backend muestran, tras el login, solo respuesta
 Los bloqueos B1 (Admin API/IdP) y B2 (imagen con KL) **ya están resueltos**: el servicio corre `kl-backend:8f82c58…` (revisión `00009-cm2`) con el Admin API activo. Queda B3 (adjuntar `beeside-dev-kl-db`) y las variables de KL.
 - **Plan (probado, solo lectura):** imagen `kl-backend` ✔; `ADMIN_API_ENABLED` definido ✔; sin `KL_DB_URL_*` ni variables prohibidas ✔; la cuenta del backend puede leer `beeside-dev-kl-app-url` y `beeside-dev-kl-reader-precision-url` y ambos tienen versión habilitada ✔; `beeside-dev-kl-db` RUNNABLE ✔; revisión de rollback `beeside-dev-backend-api-00009-cm2`.
 - **Comando:** `S4_CONFIRM=yes bash scripts/kl/g2/s4-wire-backend.sh apply` → una revisión nueva con `--add-cloudsql-instances …:beeside-dev-kl-db`, `KL_DB_URL_APP` y `KL_DB_URL_READER` por referencia a Secret Manager y `PRECISION_KNOWLEDGE_PROVIDER=off`. Verifica (por el origen del navegador): `/health` y `/health/ready` 200; `/api/admin/me` y `/api/admin/kl/me` sin sesión **401**; `/api/public/editions/<id>/status` → `{"status":"unknown"}` con `Cache-Control: no-store`; el login sigue redirigiendo a Google. **Si algo falla: rollback automático** a `00009-cm2`.
-- **Comprobación autenticada (la hace el titular):** abrir `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. Después KL verifica en solo lectura las conexiones de `kl_app` / `kl_reader_precision` y la correlación de auditoría.
+- **Comprobación autenticada (la hace el titular):** abrir `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"<correo-del-PO>","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. Después KL verifica en solo lectura las conexiones de `kl_app` / `kl_reader_precision` y la correlación de auditoría.
 
 #### Capacidad (medida en solo lectura en `beeside-dev-kl-db`)
 `max_connections = 50` (3 reservadas), 3 sesiones activas ahora; topes por rol: `kl_owner=4, kl_app=8, kl_reader_precision=8, kl_agent=4, kl_knowledge=4` (suma 28). Los pools del backend son 3 + 3 por instancia y el servicio escala hasta 3 instancias → **9 conexiones por rol frente a un tope de 8** en el peor caso. Opción recomendada **W0** (antes de S4): subir `kl_app` y `kl_reader_precision` a **12** (suma 36 ≤ 47 disponibles) con una ventana corta de un usuario de API temporal, igual que en la Fase 4, y reflejar los topes en `roles.sql`. Si se decide no hacerlo, el riesgo solo aparece a escala máxima (errores «too many connections for role» en KL, no en la plataforma).
@@ -166,7 +166,7 @@ Una revisión nueva del servicio compartido (rollback inmediato a `00009-cm2`); 
 
 **S4 (cableado):** `S4_CONFIRM=yes bash scripts/kl/g2/s4-wire-backend.sh apply` → revisión **`beeside-dev-backend-api-00010-5q2`** al 100 %, misma imagen `kl-backend:8f82c58…`. Configuración: Cloud SQL = canónica **+ `beeside-dev-kl-db`**; `KL_DB_URL_APP` y `KL_DB_URL_READER` como **referencias a Secret Manager**; `PRECISION_KNOWLEDGE_PROVIDER=off`; variables de S2 intactas. Verificación automática (con rollback a `00009-cm2` si fallaba, no fue necesario): `/health` y `/health/ready` 200; `/api/admin/me` y `/api/admin/kl/me` sin sesión **401**; `/api/public/editions/<id>/status` → `{"status":"unknown"}` con `Cache-Control: no-store`; el login sigue redirigiendo a Google. Verificación independiente: la base `beeside_kl` ya muestra una sesión de `kl_reader_precision` (la del estado público); sin errores nuevos en los logs de la revisión (solo los 401 esperados de las pruebas sin sesión y el aviso conocido de privilegios del usuario de runtime de la plataforma); los demás servicios no cambiaron.
 
-**Pendiente (titular):** comprobación autenticada abriendo `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. La sesión vigente es del 15:37 UTC (hasta 23:37 UTC).
+**Pendiente (titular):** comprobación autenticada abriendo `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app/api/admin/kl/me` con la sesión abierta; esperado `{"email":"<correo-del-PO>","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN",…}]}`. La sesión vigente es del 15:37 UTC (hasta 23:37 UTC).
 **Limitación vigente:** reconciliador de identidades (5 min) y correlación de auditoría diaria dependen de un proceso que escala a cero (ver arriba): sin resolver, X30 y la desactivación por reconciliación no se dan por cumplidos en dev.
 **Rollback:** `gcloud run services update-traffic beeside-dev-backend-api --region northamerica-south1 --project beeside-dev-508220 --to-revisions beeside-dev-backend-api-00009-cm2=100` (y el comando de retiro descrito arriba).
 
@@ -174,15 +174,15 @@ Una revisión nueva del servicio compartido (rollback inmediato a `00009-cm2`); 
 
 ## S3 VERIFIED y S4 VERIFIED (2026-10-17, 16:37 UTC) · lectura independiente
 
-El titular abrió `/api/admin/kl/me` desde Safari con su sesión y obtuvo `HTTP 200` con `{"email":"mo@beeside.you","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN","editorial":false,"domains":[]}]}`. Contraste en solo lectura (sin cookies ni tokens):
+El titular abrió `/api/admin/kl/me` desde Safari con su sesión y obtuvo `HTTP 200` con `{"email":"<correo-del-PO>","platformRole":"ADMIN","klRoles":[{"role":"KL_ADMIN","editorial":false,"domains":[]}]}`. Contraste en solo lectura (sin cookies ni tokens):
 | Comprobación | Resultado |
 |---|---|
 | Petición en el backend | `GET /api/admin/kl/me` **200**, 684 bytes, 16:37:55, revisión `beeside-dev-backend-api-00010-5q2` (la cableada), navegador Safari. Antes solo constaba mi sonda sin sesión (401) |
-| `auth_subject` | **Enlazado** (`mo@beeside.you`: `ADMIN`, `active`, `login_enabled`) |
+| `auth_subject` | **Enlazado** (`<correo-del-PO>`: `ADMIN`, `active`, `login_enabled`) |
 | Sesión | 2 filas: la de 15:37:50 se revocó a las 16:34:19 por **`idle_timeout`** (política de 30 min de inactividad, comportamiento esperado); la de **16:34:25 vigente**, sin revocar, última actividad 16:37:55, expira 00:34 UTC, rol `ADMIN` |
 | Auditoría de la plataforma | `kl.me.read · ALLOWED · ADMIN_USER` a las **16:37:56**, un segundo después de la petición; además `admin.login ALLOWED` a las 15:37:50 y 16:34:25 y `kl.bootstrap_admin ALLOWED SYSTEM` (13:51:44). **0** eventos `kl.*` DENIED/FAILED |
 | Camino a la base de KL | `kl.principal` de mo: `active`, **`last_attested_at = 16:37:56`** (la atestación transaccional de esa petición, hecha con `kl_app`); `KL_ADMIN` vigentes = 1; `kl.audit_event` solo contiene `kl.bootstrap_admin` (las lecturas se auditan solo en `admin_audit_event`, CR-KL-002 §6) |
 | Errores | Ninguno ≥ ERROR en el backend desde las 15:40; los únicos avisos son los 401 de sondas sin sesión y el aviso de privilegios del usuario de runtime de la plataforma, preexistente |
 | Privilegios | `cloudsqlsuperuser` de `beeside-dev-kl-db` = `postgres` y roles internos de Cloud SQL; `kl_*` privilegiados = 0; topes `kl_app=12`, `kl_reader_precision=12`, `kl_agent=4`, `kl_knowledge=4`, `kl_owner=4` |
 
-**S3 = VERIFIED** (acceso real del KL_ADMIN extremo a extremo: Google → Control Center → KL). **S4 = VERIFIED** (cableado y consulta autenticada a `beeside_kl` desde el backend). Notas: el Admin API sigue con la limitación de procesos de fondo (escala a cero) descrita arriba; `padmin@beeside.you` sigue sin aprovisionar.
+**S3 = VERIFIED** (acceso real del KL_ADMIN extremo a extremo: Google → Control Center → KL). **S4 = VERIFIED** (cableado y consulta autenticada a `beeside_kl` desde el backend). Notas: el Admin API sigue con la limitación de procesos de fondo (escala a cero) descrita arriba; `<cuenta-admin-plataforma>` sigue sin aprovisionar.

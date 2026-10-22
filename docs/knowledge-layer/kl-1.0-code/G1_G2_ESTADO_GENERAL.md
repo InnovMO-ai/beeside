@@ -13,7 +13,7 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 ## 2. Qué existe hoy (verificado en esta fecha)
 - **Datos:** `beeside-dev-kl-db` (PG16, `db-g1-small`, ZONAL, PITR, TLS con certificado de cliente; `max_connections` 50), base `beeside_kl` con KL-0001…0005 (51 tablas, 28 vistas, 116 funciones), `kl.agents_enabled=false`, 0 datos de clientes. Roles `kl_*` sin privilegios especiales; topes `kl_app`/`kl_reader_precision` = 12. Instancia canónica **sin cambios** (`beeside_app`, `fa4_staging_runtime`, `postgres`).
 - **Cómputo:** jobs `beeside-dev-kl-migrate` y `beeside-dev-kl-worker` (imágenes `835d2a2…`, publicadas por etiqueta tras 19 controles de humo, render idéntico contenedor↔host); **worker programado cada 5 min** y **exportación diaria 08:30 UTC** (ambos `ENABLED`, en `us-south1` porque Scheduler no existe en Querétaro). Servicio `beeside-dev-backend-api` revisión `00010`: imagen `kl-backend`, **Admin API (Control Center) habilitado con Google** y **KL cableado** (`KL_DB_URL_APP/READER`, proveedor de Precision `off`).
-- **Identidad:** `mo@beeside.you` = `admin_user` ADMIN con `auth_subject` enlazado, **primer KL_ADMIN**, acceso real verificado (`/api/admin/kl/me` 200 + auditoría `kl.me.read`).
+- **Identidad:** `<correo-del-PO>` = `admin_user` ADMIN con `auth_subject` enlazado, **primer KL_ADMIN**, acceso real verificado (`/api/admin/kl/me` 200 + auditoría `kl.me.read`).
 - **Seguridad de credenciales:** X27 **probada** (la identidad del worker recibe 403 en los secretos de plataforma y de otros roles); X26 **por política** (sin prueba empírica).
 - **Calidad:** KL 351/351, backend 402, línea base AC-10 en macOS y Linux (contenido idéntico, Δ ≤ 0,11 pt), `terraform validate/plan` limpios.
 
@@ -38,7 +38,7 @@ Rama `feat/kl-1.0-code` @ `26d7844` (= `origin`, `kl-ci` y `kl-preflight` verdes
 5. **Adaptador GCS (D8):** el worker en producción se niega a renderizar; en dev el almacén local es efímero → **no se pueden publicar ediciones** todavía.
 6. **Cuenta compute compartida con `fa4-*` (D3):** podrían leer `kl_app`/`kl_reader_precision` y los secretos del Control Center. Cuenta de servicio propia del backend, no hecha.
 7. **X26 sin prueba empírica** (sin TokenCreator; decisión del PO si se hace con una sonda como cuenta compute).
-8. **Separación de funciones no ejercitable:** hay un solo humano (KL_ADMIN); `padmin@beeside.you` sigue sin aprovisionar hasta confirmar titular y autenticación.
+8. **Separación de funciones no ejercitable:** hay un solo humano (KL_ADMIN); `<cuenta-admin-plataforma>` sigue sin aprovisionar hasta confirmar titular y autenticación.
 9. **Node 20 fuera de soporte** (base fijada por digest): migrar a Node 22 LTS en un cambio aparte.
 10. **AC-13** (accesibilidad del PDF): revisión manual con lector de pantalla pendiente; no hay validador PDF/UA.
 

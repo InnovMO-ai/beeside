@@ -1,6 +1,6 @@
 # G2 · Fase 6B · Habilitar el Admin API y el proveedor de identidad (IdP) en dev — opciones, requisitos, riesgos y decisores
 
-Estado: **PREPARADO. NADA SE HA EJECUTADO** (solo lecturas de código y de metadatos de GCP). Es el bloqueo **B1** del cableado de KL: sin `ADMIN_API_ENABLED=true` el backend no monta el módulo de KL, y sin un IdP nadie puede iniciar sesión (mo@beeside.you ya es `admin_user` ADMIN y KL_ADMIN, pero su identidad no está enlazada: `auth_subject` vacío).
+Estado: **PREPARADO. NADA SE HA EJECUTADO** (solo lecturas de código y de metadatos de GCP). Es el bloqueo **B1** del cableado de KL: sin `ADMIN_API_ENABLED=true` el backend no monta el módulo de KL, y sin un IdP nadie puede iniciar sesión (<correo-del-PO> ya es `admin_user` ADMIN y KL_ADMIN, pero su identidad no está enlazada: `auth_subject` vacío).
 
 ## 1. Qué es lo que realmente se habilita (alcance real)
 
@@ -8,10 +8,10 @@ El Admin API **no es de KL**: es el **Control Center de la plataforma** (`backen
 
 Datos útiles verificados:
 - La imagen que corre hoy (`backend-api:bc3f527…` = `main`) **ya contiene** el Admin API: habilitarlo **no requiere** una imagen de la rama KL. Se puede hacer primero y por separado (paso S2) y luego, en otro paso, cablear KL.
-- Autorización de dos capas: OIDC válido **y** fila en `admin_user` con `active` y `login_enabled`. Hoy hay 2 filas: la identidad técnica `@beeside.internal` (sin login) y `mo@beeside.you` (ADMIN). Nadie más puede entrar aunque el IdP los autentique.
+- Autorización de dos capas: OIDC válido **y** fila en `admin_user` con `active` y `login_enabled`. Hoy hay 2 filas: la identidad técnica `@beeside.internal` (sin login) y `<correo-del-PO>` (ADMIN). Nadie más puede entrar aunque el IdP los autentique.
 - El flujo: Authorization Code + PKCE (S256), `state`, `nonce`, token verificado localmente contra el JWKS (RS256/ES256), `iss`, `aud`, `exp`, `nonce` y **`email_verified = true`**; restricción opcional por dominio (`ADMIN_ALLOWED_EMAIL_DOMAINS`). Alcance pedido: `openid email`. Autenticación del cliente en el endpoint de token: `client_secret` en el cuerpo (`client_secret_post`).
 - Sesión: token opaco en cookie `HttpOnly`, `SameSite=Strict`, `Secure`; requiere **un único origen** para navegador y API. El frontend de dev (`beeside-dev-frontend-app`) ya tiene `API_UPSTREAM_URL` (proxy de `/api` al backend), así que el origen del Control Center es la URL del frontend: `https://beeside-dev-frontend-app-amwsj4v5uq-pv.a.run.app`. Las escrituras exigen la cabecera `x-beeside-admin: 1` y `Origin` igual a `ADMIN_APP_ORIGIN`.
-- Organización de GCP: `beeside.you` (Google Workspace/Cloud Identity); `mo@beeside.you` es la cuenta Owner. `iap.googleapis.com` está habilitada (no se verificó si se usa). Único secreto relacionado hoy: `beeside-dev-sso-client-secret` (placeholder **sin versión**).
+- Organización de GCP: `beeside.you` (Google Workspace/Cloud Identity); `<correo-del-PO>` es la cuenta Owner. `iap.googleapis.com` está habilitada (no se verificó si se usa). Único secreto relacionado hoy: `beeside-dev-sso-client-secret` (placeholder **sin versión**).
 
 ## 2. Variables que exige el backend (`adminDepsFromEnv`)
 
@@ -44,9 +44,9 @@ Recomendación: **A para dev**, con un cliente OAuth exclusivo de dev; B queda c
 | S0 | Decisiones: IdP (A/B), aceptar la exposición del Control Center completo en la URL pública de dev, dominio permitido | **PO/Plataforma** | — |
 | S1 | Crear el cliente OAuth (consola) y registrar la URI de redireccionamiento; crear versiones de `beeside-dev-sso-client-secret` (secreto del cliente) y de `beeside-dev-admin-session-secret` (aleatorio); conceder `secretAccessor` por secreto a la cuenta del backend | Titular de la consola (Owner) + operador | Credenciales OAuth del proyecto; 2 secretos (el segundo nuevo); IAM por secreto |
 | S2 | **Habilitar el Admin API sobre la imagen actual de `main`** (sin KL): `gcloud run services update beeside-dev-backend-api --update-secrets ADMIN_OIDC_CLIENT_SECRET=beeside-dev-sso-client-secret:latest,ADMIN_SESSION_SECRET=beeside-dev-admin-session-secret:latest --update-env-vars ADMIN_API_ENABLED=true,ADMIN_APP_ORIGIN=…,ADMIN_OIDC_ISSUER=…,ADMIN_OIDC_CLIENT_ID=…,ADMIN_OIDC_REDIRECT_URI=…,ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`. Guardar antes el nombre de la revisión actual (`beeside-dev-backend-api-00007-gtk`) | Operador | Una revisión nueva del servicio compartido (misma imagen) |
-| S3 | **Verificación**: `/health` y `/health/ready` 200; `GET /api/admin/me` sin sesión → 401; abrir `…/admin` y entrar con `mo@beeside.you` (la persona misma, en su navegador); comprobar `auth_subject` enlazado, `admin_session` creada y `admin_audit_event` de inicio de sesión; un correo de otro dominio o sin `admin_user` es rechazado | PO (titular) + operador | Filas de sesión/auditoría en la base principal |
+| S3 | **Verificación**: `/health` y `/health/ready` 200; `GET /api/admin/me` sin sesión → 401; abrir `…/admin` y entrar con `<correo-del-PO>` (la persona misma, en su navegador); comprobar `auth_subject` enlazado, `admin_session` creada y `admin_audit_event` de inicio de sesión; un correo de otro dominio o sin `admin_user` es rechazado | PO (titular) + operador | Filas de sesión/auditoría en la base principal |
 | S4 | **Cableado de KL (Fase 6B original)**: cambiar a `kl-backend:<sha>` y añadir `beeside-dev-kl-db`, `KL_DB_URL_APP/READER` y `PRECISION_KNOWLEDGE_PROVIDER=off`, según `G2_FASE6_BOOTSTRAP_Y_CABLEADO.md` §B; resolver antes los topes de conexión (9 vs 8) y la deriva del módulo | Operador | Otra revisión del servicio compartido |
-| S5 | Verificar KL Admin con `mo@beeside.you` (KL_ADMIN) y que la ruta pública de ediciones responde `unknown` | PO + operador | — |
+| S5 | Verificar KL Admin con `<correo-del-PO>` (KL_ADMIN) y que la ruta pública de ediciones responde `unknown` | PO + operador | — |
 
 **Rollback (S2/S4):** `gcloud run services update-traffic beeside-dev-backend-api --to-revisions beeside-dev-backend-api-00007-gtk=100` devuelve el tráfico a la revisión previa de inmediato; después, `--remove-env-vars`/`--remove-secrets` de lo añadido. Si la revisión nueva no arranca (variable faltante), Cloud Run no le envía tráfico. Retirar el acceso: borrar el cliente OAuth y las versiones de secreto; `admin_user.login_enabled=false` bloquea al usuario sin tocar el IdP.
 
@@ -57,15 +57,15 @@ Recomendación: **A para dev**, con un cliente OAuth exclusivo de dev; B queda c
 | **Superficie pública mayor** | El Control Center completo queda alcanzable en una URL pública (`--no-invoker-iam-check`). Capas: OIDC + dominio + `admin_user` (solo 1 humano) + cookie `Strict/Secure` + cabecera/origen en escrituras + límites de tasa. Datos de dev. Mitigar con `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you` y revisar `admin_user` antes de S2 |
 | El emisor no coincide | El código exige `issuer` configurado == `issuer` del descubrimiento. Con Google: `https://accounts.google.com` exacto; un error deja el inicio de sesión en «unavailable», sin efecto de seguridad |
 | Redirect URI mal registrada | Falla el callback (Google lo rechaza); sin daño |
-| Cuenta equivocada enlazada | La identidad se **enlaza en el primer inicio de sesión** (`auth_subject`). Debe hacerla el titular real de `mo@beeside.you`; una vez enlazada, un `sub` distinto no entra. No simular sesiones |
+| Cuenta equivocada enlazada | La identidad se **enlaza en el primer inicio de sesión** (`auth_subject`). Debe hacerla el titular real de `<correo-del-PO>`; una vez enlazada, un `sub` distinto no entra. No simular sesiones |
 | Secreto de cliente/sesión | Solo en Secret Manager con acceso por secreto; el valor no debe pasar por chat, commits ni logs |
 | Servicio compartido | Cada cambio crea una revisión de `beeside-dev-backend-api` (Discovery/Precision/FA4 usan ese backend o comparten identidad). Rollback inmediato; ventanas cortas |
 | Deriva de Terraform | `modules/cloud-run` ignora deriva de `env`/`image` pero no de secretos montados ni de volúmenes; hoy dev se despliega con `gcloud`, no `apply`. Registrar el cambio y, si Plataforma quiere gestionarlo en Terraform, incorporar las variables al módulo (cambio compartido a aprobar) |
-| Segundo administrador | `padmin@beeside.you` sigue **sin aprovisionar** y sin usarse para doble intervención hasta confirmar su titular individual y su autenticación |
+| Segundo administrador | `<cuenta-admin-plataforma>` sigue **sin aprovisionar** y sin usarse para doble intervención hasta confirmar su titular individual y su autenticación |
 | Producción | Nada de esto define producción: allí no hay script de aprovisionamiento; los usuarios los crea un ADMIN desde el Control Center con el IdP corporativo elegido |
 
 ## 6. Quién decide
-- **PO / Plataforma (Mike, según los documentos de despliegue):** IdP (A/B), aceptar la exposición del Control Center en dev, dominio permitido, y la creación del cliente OAuth (requiere un Owner de la consola).
+- **PO / Plataforma (el PO, según los documentos de despliegue):** IdP (A/B), aceptar la exposición del Control Center en dev, dominio permitido, y la creación del cliente OAuth (requiere un Owner de la consola).
 - **KL (yo):** solo S4–S5 (cableado y verificación de KL) cuando S1–S3 estén cumplidos; preparo comandos y verificaciones, no decido el IdP.
 
 ## 7. Qué necesito para avanzar
@@ -77,7 +77,7 @@ Recomendación: **A para dev**, con un cliente OAuth exclusivo de dev; B queda c
 
 ## 8. S1 con la opción A elegida: pasos exactos para el Owner (PREPARADO, NO EJECUTADO)
 
-Decisión del PO: **opción A — Google Workspace como IdP de dev**. Estado leído hoy (solo lectura): `beeside-dev-sso-client-secret` existe como placeholder **sin versiones ni IAM**; `beeside-dev-admin-session-secret` **no existe**; el backend corre como `640247497574-compute@developer.gserviceaccount.com`; cuenta activa de `gcloud`: `mo@beeside.you` (Owner).
+Decisión del PO: **opción A — Google Workspace como IdP de dev**. Estado leído hoy (solo lectura): `beeside-dev-sso-client-secret` existe como placeholder **sin versiones ni IAM**; `beeside-dev-admin-session-secret` **no existe**; el backend corre como `640247497574-compute@developer.gserviceaccount.com`; cuenta activa de `gcloud`: `<correo-del-PO>` (Owner).
 
 ### 8.1 En la consola de Google Cloud (manual; solo el Owner)
 1. *APIs y servicios → Pantalla de consentimiento de OAuth* (o *Google Auth Platform → Branding/Audiencia*): tipo de usuario **Interno** (limita el acceso a la organización `beeside.you`); nombre de la app «beeside Control Center (dev)»; correo de soporte; alcances solo **`openid`** y **`email`** (no sensibles).
@@ -121,10 +121,10 @@ gcloud secrets remove-iam-policy-binding <secreto> --project $P --member service
 y borrar el cliente OAuth `beeside-dev-control-center` en la consola. Mientras S2 no se ejecute, S1 no tiene efecto sobre ningún servicio.
 
 ### 8.5 Siguiente
-Con el ID de cliente y los secretos listos, S2 (habilitar el Admin API sobre la imagen actual de `main`) y S3 (inicio de sesión real de `mo@beeside.you`) requieren su propia autorización expresa.
+Con el ID de cliente y los secretos listos, S2 (habilitar el Admin API sobre la imagen actual de `main`) y S3 (inicio de sesión real de `<correo-del-PO>`) requieren su propia autorización expresa.
 
 ### 8.6 S1 ejecutado parcialmente (2026-10-17) · lo que hizo KL por autorización del PO
-`S1_CONFIRM=yes … session` e `iam` (cuenta `mo@beeside.you`, proyecto `beeside-dev-508220`):
+`S1_CONFIRM=yes … session` e `iam` (cuenta `<correo-del-PO>`, proyecto `beeside-dev-508220`):
 - Creado `beeside-dev-admin-session-secret` (replicación automática; etiquetas `environment=dev`, `purpose=admin-session-signing`) con **versión 1 habilitada**, 48 bytes aleatorios generados y subidos por tubería (no se leyeron ni se imprimieron).
 - `roles/secretmanager.secretAccessor` concedido a `640247497574-compute@developer.gserviceaccount.com` **solo** sobre `beeside-dev-sso-client-secret` y `beeside-dev-admin-session-secret` (verificado con `verify`: un único miembro en cada uno).
 - El servicio `beeside-dev-backend-api` **no cambió** (revisión `beeside-dev-backend-api-00007-gtk`); no se tocó ninguna base, ni KL, ni el Admin API sigue deshabilitado.
@@ -148,7 +148,7 @@ Nota: el navegador debe usar **una sola** de las dos URLs del frontend; `ADMIN_A
 OIDC_CLIENT_ID=<id>.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh plan      # solo lectura
 S2_CONFIRM=yes OIDC_CLIENT_ID=<id>.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh apply
 ```
-Precondiciones que comprueba y que **hoy fallan en la segunda** (probado): formato del ID de cliente; secreto SSO con una versión habilitada; secreto de sesión habilitado; `secretAccessor` de la cuenta del backend en ambos; `ADMIN_API_ENABLED` aún no definido. `apply` crea **una** revisión de `beeside-dev-backend-api` con la **misma imagen** (`main`, sin KL) añadiendo los dos secretos montados y `ADMIN_API_ENABLED=true`, `ADMIN_APP_ORIGIN`, `ADMIN_OIDC_ISSUER=https://accounts.google.com`, `ADMIN_OIDC_CLIENT_ID`, `ADMIN_OIDC_REDIRECT_URI=<origen>/api/admin/auth/callback`, `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`. Verifica `/health`, `/health/ready`, `/api/admin/me` sin sesión (401/403), y que `/api/admin/auth/login` redirige a Google con el `client_id`, `code_challenge_method=S256` y la `redirect_uri` esperados; **si algo falla, devuelve el 100 % del tráfico a la revisión previa** (`beeside-dev-backend-api-00007-gtk`). Después queda **S3**: el inicio de sesión real lo hace el titular de `mo@beeside.you` en su navegador.
+Precondiciones que comprueba y que **hoy fallan en la segunda** (probado): formato del ID de cliente; secreto SSO con una versión habilitada; secreto de sesión habilitado; `secretAccessor` de la cuenta del backend en ambos; `ADMIN_API_ENABLED` aún no definido. `apply` crea **una** revisión de `beeside-dev-backend-api` con la **misma imagen** (`main`, sin KL) añadiendo los dos secretos montados y `ADMIN_API_ENABLED=true`, `ADMIN_APP_ORIGIN`, `ADMIN_OIDC_ISSUER=https://accounts.google.com`, `ADMIN_OIDC_CLIENT_ID`, `ADMIN_OIDC_REDIRECT_URI=<origen>/api/admin/auth/callback`, `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`. Verifica `/health`, `/health/ready`, `/api/admin/me` sin sesión (401/403), y que `/api/admin/auth/login` redirige a Google con el `client_id`, `code_challenge_method=S256` y la `redirect_uri` esperados; **si algo falla, devuelve el 100 % del tráfico a la revisión previa** (`beeside-dev-backend-api-00007-gtk`). Después queda **S3**: el inicio de sesión real lo hace el titular de `<correo-del-PO>` en su navegador.
 
 ### 9.1 S1 COMPLETO y S2 LISTO PARA APPLY (2026-10-17) · no ejecutado
 Verificación independiente de KL (solo metadatos; el contenido de los secretos no se lee): `beeside-dev-sso-client-secret` versión 1 **habilitada** (creada 14:57:46) y `beeside-dev-admin-session-secret` versión 1 **habilitada** (14:13:10); ambos con `secretAccessor` únicamente para `640247497574-compute@developer.gserviceaccount.com`. Cliente OAuth: ID `640247497574-05msqa6kpbh6iense14hb11r78mjjvdh.apps.googleusercontent.com` (no secreto; el prefijo es el número del proyecto DEV).
@@ -158,7 +158,7 @@ Verificación independiente de KL (solo metadatos; el contenido de los secretos 
 ### 9.2 S2 EJECUTADO (2026-10-17) · estado: HECHO, detenido antes de S3
 `S2_CONFIRM=yes OIDC_CLIENT_ID=640247497574-05msqa6kpbh6iense14hb11r78mjjvdh.apps.googleusercontent.com bash scripts/kl/g2/s2-enable-admin-api.sh apply` (autorizado por el PO). Resultado: **revisión `beeside-dev-backend-api-00008-l7p` sirviendo el 100 % del tráfico**; la revisión previa `00007-gtk` queda disponible para rollback. **Misma imagen** (`backend-api:bc3f52760a5c427c0b057a1e2bb0d71d8d0034d3`, `main`, sin KL). Variables añadidas: `ADMIN_API_ENABLED=true`, `ADMIN_APP_ORIGIN`, `ADMIN_OIDC_ISSUER=https://accounts.google.com`, `ADMIN_OIDC_CLIENT_ID`, `ADMIN_OIDC_REDIRECT_URI=…/api/admin/auth/callback`, `ADMIN_ALLOWED_EMAIL_DOMAINS=beeside.you`; `ADMIN_OIDC_CLIENT_SECRET` y `ADMIN_SESSION_SECRET` montados **por referencia a Secret Manager** (no literales). Verificación del script (sin rollback necesario) y verificación independiente desde el origen del navegador (frontend): `/health` 200; `/admin` 200; `/api/admin/me` sin sesión **401**; `/api/admin/auth/login` → **302** a `accounts.google.com/o/oauth2/v2/auth` con `client_id` correcto, `redirect_uri` exacta, `response_type=code`, `scope=openid email`, `code_challenge_method=S256` y `state`/`nonce`/`code_challenge` presentes; cookie de login `HttpOnly; SameSite=Strict; Secure; Path=/api/admin/auth; Max-Age=600`. Los demás servicios (`frontend-app`, `fa4-*`) no cambiaron de revisión. Los avisos «database privilege check» del arranque son **los mismos que ya tenía la revisión 00007** (el usuario de runtime `beeside_app` es el migrador, puede crear bases y objetos en `public`); no los introduce este cambio.
 **Rollback:** `gcloud run services update-traffic beeside-dev-backend-api --region northamerica-south1 --project beeside-dev-508220 --to-revisions beeside-dev-backend-api-00007-gtk=100` (y, si se quiere retirar la configuración, `gcloud run services update … --remove-env-vars ADMIN_API_ENABLED,… --remove-secrets ADMIN_OIDC_CLIENT_SECRET,ADMIN_SESSION_SECRET`).
-**Siguiente: S3** — el inicio de sesión real lo hace el titular de `mo@beeside.you` en su navegador; KL solo verifica después (solo lectura) que `auth_subject` quedó enlazado y que existen la sesión y su evento de auditoría.
+**Siguiente: S3** — el inicio de sesión real lo hace el titular de `<correo-del-PO>` en su navegador; KL solo verifica después (solo lectura) que `auth_subject` quedó enlazado y que existen la sesión y su evento de auditoría.
 
 ---
 
@@ -175,7 +175,7 @@ Verificación independiente de KL (solo metadatos; el contenido de los secretos 
 | `redirect_uri` | Correcta: Google devolvió el navegador a `/api/admin/auth/callback` en el origen esperado (con una discordancia habría mostrado `redirect_uri_mismatch` en Google) |
 | Secretos | Montados y legibles (el servicio arrancó; las variables `ADMIN_OIDC_CLIENT_SECRET` y `ADMIN_SESSION_SECRET` son referencias a Secret Manager) |
 | Estado/nonce/PKCE | El `state` llegó en el callback; el intento de login duró 10 s (la cookie vive 600 s: no es caducidad). El sellado es sin estado en servidor: no depende de qué instancia atienda |
-| Vinculación | `mo@beeside.you`: `ADMIN`, `active=true`, `login_enabled=true`, `auth_subject` **sin enlazar**, `admin_session` = 0 filas → el flujo nunca pasó de la validación de estado, por eso no hubo intento de vincular |
+| Vinculación | `<correo-del-PO>`: `ADMIN`, `active=true`, `login_enabled=true`, `auth_subject` **sin enlazar**, `admin_session` = 0 filas → el flujo nunca pasó de la validación de estado, por eso no hubo intento de vincular |
 | Audience/dominio | Sin evidencia que apunte a ellos: la pantalla de consentimiento de Google se completó y el correo no llegó a evaluarse |
 | **Reproducción controlada** | Login por el frontend → callback **con** la cookie y el `state` correctos pero un código falso: llega al intercambio de tokens y falla ahí (`code_rejected`). Mismo callback **sin** la cookie: `invalid_login_state`, idéntico a tu intento |
 
