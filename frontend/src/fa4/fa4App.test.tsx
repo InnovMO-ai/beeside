@@ -46,7 +46,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Name"), "Ana");
     await user.type(screen.getByLabelText("Company"), "Acme");
-    await user.type(screen.getByLabelText("Work email"), "ana@acme.example");
+    await user.type(screen.getByLabelText("Email address"), "ana@acme.example");
     await user.click(screen.getByLabelText("I do"));
     await user.click(screen.getByRole("button", { name: "Accept and continue" }));            // terms and privacy are mandatory and separate: pressing it explains what is missing and does NOT move on
     expect(screen.getByRole("alert")).toHaveTextContent(/I accept the Terms/); expect(screen.getByRole("alert")).toHaveTextContent(/I acknowledge the Privacy/);
@@ -121,7 +121,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     expect(window.location.hash).toBe("");
     expect(document.body.textContent).not.toMatch(/NOT_FOUND|404|undefined/);
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Correo de trabajo"), "ana@acme.example");
+    await user.type(screen.getByLabelText("Correo electrónico"), "ana@acme.example");
     await user.click(screen.getByRole("button", { name: "Enviarme un enlace nuevo" }));
     await screen.findByText(/te enviaremos un enlace nuevo/);
     expect(calls.find((c) => c.url === "/api/fa4/links/request")!.body).toEqual({ email: "ana@acme.example" });

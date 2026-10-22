@@ -69,3 +69,28 @@ test("DSC-09 — screenshots + counts: Mexico / Chile + South Korea / Mexico + C
   expect(t["chile-corea"]!.noCoverageMessages).toBe(2); expect(t["chile-corea"]!.premiumCta).toBe(0);                       // DSC-09: ONE message per country (2 countries → 2)
   expect(t["mexico-chile-corea"]!.noCoverageMessages).toBe(2);                                                              // states only for Mexico; one message for each of the other two
 });
+
+/** J-check (condition of help entry J): from the YEV PREVIEW you can go back, edit and regenerate until you send it by e-mail; afterwards the result is closed. Evidence only — no product change. */
+test("J-check — preview → «Corregir algo» → edit → regenerate (reflects the edit) → send by e-mail → closed (no edit, server refuses saves)", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop-1440" && info.project.name !== "mobile-375", "two viewports are enough");
+  await open(page, await seed(request, journeyNortica("es"), "extra"));
+  await page.getByRole("button", { name: UI.seeResult.es }).click(); await expect(page.getByTestId("result-screen")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Querétaro")).toHaveCount(0);
+  await page.getByRole("button", { name: UI.fixSomething.es }).click();                                                            // back from the PREVIEW
+  await expect(page.getByRole("heading", { level: 1, name: UI.destTitle.es })).toBeVisible();
+  await page.getByLabel(`${UI.region.es} — México`).fill("Querétaro");                                                           // edit an answer
+  for (let i = 0; i < 14 && !(await page.getByTestId("result-screen").count()); i++) { await page.locator(".navbar .btn.primary").click(); await page.waitForTimeout(500); }
+  await expect(page.getByTestId("result-screen")).toBeVisible({ timeout: 20_000 });                                                // regenerate
+  await expect(page.getByText("Querétaro").first()).toBeVisible();                                                                  // the preview reflects the correction
+  await expect(page.getByRole("button", { name: UI.fixSomething.es })).toBeVisible();                                              // still editable before sending
+  await page.getByRole("button", { name: UI.emailResult.es }).click();                                                              // the e-mail IS the delivery (D-156)
+  await expect(page.getByText(UI.deliveredNote.es)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: UI.fixSomething.es })).toHaveCount(0);                                             // closed: no edit offered
+  const refused = await page.evaluate(async () => {
+    const t = sessionStorage.getItem("beeside.fa4.session")!; const h = { "X-Fa4-Session": t, "Content-Type": "application/json" };
+    const s = await (await fetch("/api/fa4/session", { headers: h })).json();
+    const r = await fetch("/api/fa4/session", { method: "PUT", headers: h, body: JSON.stringify({ answers: s.answers, step: "decision" }) });
+    return { status: r.status, body: await r.json() };
+  });
+  expect(refused.status).toBe(409); expect(refused.body.error).toBe("ALREADY_DELIVERED");                                         // the server refuses any later save
+});

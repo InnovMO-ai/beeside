@@ -12,7 +12,7 @@ test('English: language is chosen on the cover only; the whole first steps rende
   await expect(page.getByRole('button', { name: 'Español' })).toHaveCount(0);
   await page.getByLabel('Name', { exact: true }).fill('Ana');
   await page.getByLabel('Company').fill('Acme');
-  await page.getByLabel('Work email').fill('ana@acme.example');
+  await page.getByLabel('Email address').fill('ana@acme.example');
   await page.getByLabel('I do', { exact: true }).check();
   await page.getByLabel(/I accept the Terms/).check();
   await page.getByLabel(/I acknowledge the Privacy/).check();

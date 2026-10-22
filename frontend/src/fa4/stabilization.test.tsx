@@ -47,7 +47,7 @@ async function fillIdentity(locale: "es" | "en", email: string) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(locale === "es" ? "Nombre" : "Name"), "Ana");
   await user.type(screen.getByLabelText(locale === "es" ? "Empresa" : "Company", { exact: true }), "Acme");
-  const mail = screen.getByLabelText(locale === "es" ? /Correo/ : "Work email"); await user.clear(mail); await user.type(mail, email);
+  const mail = screen.getByLabelText(locale === "es" ? "Correo electrónico" : "Email address"); await user.clear(mail); await user.type(mail, email);
   await user.click(screen.getByLabelText(locale === "es" ? "Yo" : "I do"));
   await user.click(screen.getByLabelText(locale === "es" ? /Acepto los Términos/ : /I accept the Terms/));
   await user.click(screen.getByLabelText(locale === "es" ? /Reconozco la Política de Privacidad/ : /I acknowledge the Privacy/));

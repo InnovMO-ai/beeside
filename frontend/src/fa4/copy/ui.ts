@@ -25,7 +25,7 @@ export const UI = {
   benefits: { clarity: L('Clarity from day one', 'Clarity from day one'), expert: L('Expert guidance', 'Expert guidance'), global: L('Global expansion', 'Global expansion'), real: L('Real opportunities', 'Real opportunities') },
 
   idTitle: L('Cuéntanos un poco sobre ti.', 'Tell us a little about yourself.'), idLead: L('Sin cuenta ni contraseña.', 'No account or password.'),
-  name: L('Nombre', 'Name'), company: L('Empresa', 'Company'), email: L('Correo de trabajo', 'Work email'),
+  name: L('Nombre', 'Name'), company: L('Empresa', 'Company'), email: L('Correo electrónico', 'Email address'),   // PD-39: one label in Identity, recovery and the continue-link dialog (the work-email RECOMMENDATION text is unchanged)
   emailHelp: L('Lo usaremos para guardar tu avance y enviarte tu resultado.', "We'll use it to save your progress and send you your result."),
   emailInvalid: L('Revisa el email', 'Check the email address'),
   role: L('Tu rol en el proyecto', 'Your role in the project'),

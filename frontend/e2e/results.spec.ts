@@ -110,7 +110,7 @@ test('Hablar con beeside: real submission (success) and honest failure with retr
   await page.getByRole('button', { name: 'Hablar con beeside' }).or(page.getByRole('button', { name: 'Ayuda y contacto' })).first().click();
   if (await page.getByRole('menuitem', { name: 'Hablar con beeside' }).count()) await page.getByRole('menuitem', { name: 'Hablar con beeside' }).click();
   const dlg = page.getByRole('dialog');
-  await expect(dlg.getByLabel('Correo de trabajo')).toHaveValue('laura@nubia.example');                       // prefilled
+  await expect(dlg.getByLabel('Correo electrónico')).toHaveValue('laura@nubia.example');                       // prefilled
   await dlg.getByLabel('Mensaje').fill('Quisiera hablar con alguien sobre la contratación.');
   let fail = true;
   await page.route('**/api/fa4/session/contact', (route) => { if (fail) { fail = false; return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'EMAIL_NOT_SENT' }) }); } return route.continue(); });
