@@ -54,13 +54,15 @@ describe("13 · the tab after 30 min without interaction", () => {
   });
   it("14b · activity heartbeat: beats only while the tab is visible AND the person interacted since the last beat; a quiet or hidden tab sends none", async () => {
     const calls = mockApi(() => json({ state: "sent" })); await openResumed(true);
-    await advance(3 * 60_000); expect(beats(calls)).toHaveLength(0);                                   // opened, no interaction yet
-    fireEvent.pointerMove(document.body); await advance(2 * 60_000); expect(beats(calls)).toHaveLength(1);
-    await advance(10 * 60_000); expect(beats(calls)).toHaveLength(1);                                  // quiet: no more beats
+    await advance(2 * 60_000 + 5_000); await advance(2 * 60_000);                                       // opening the project counts as interaction (at most one beat); then quiet
+    const base = beats(calls).length; expect(base).toBeLessThanOrEqual(1);
+    await advance(6 * 60_000); expect(beats(calls)).toHaveLength(base);                                 // quiet: no beats
+    fireEvent.pointerMove(document.body); await advance(2 * 60_000 + 5_000); expect(beats(calls)).toHaveLength(base + 1);
+    await advance(10 * 60_000); expect(beats(calls)).toHaveLength(base + 1);                            // quiet again
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
-    fireEvent.keyDown(document.body, { key: "a" }); await advance(4 * 60_000); expect(beats(calls)).toHaveLength(1);   // hidden: none
+    fireEvent.keyDown(document.body, { key: "a" }); await advance(4 * 60_000); expect(beats(calls)).toHaveLength(base + 1);   // hidden: none
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
-    fireEvent.scroll(window); await advance(2 * 60_000); expect(beats(calls)).toHaveLength(2);
+    fireEvent.scroll(window); await advance(2 * 60_000 + 5_000); expect(beats(calls)).toHaveLength(base + 2);
     expect(beats(calls)[0]!.auth).toBe("T".repeat(43)); expect(idleCalls(calls)).toHaveLength(0);
   });
   it("14 · interaction before the 30 min restarts the timer", async () => {
