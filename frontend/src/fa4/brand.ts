@@ -12,8 +12,11 @@ import beeMarkPurple from './assets/brand/bee-mark-purple.svg';
 import lifestyleRelaxed from './assets/brand/lifestyle-relaxed.jpg';
 // Discovery v1.0 visual delta (PO-approved photographs, 2026-10-14): editorial Hero of the Your Expansion View (desktop + art-directed mobile crop)
 // and one editorial breathing image inside the result. Unmodified photographs: resized / cropped only, never recoloured, mirrored or overlaid with text.
-import heroArchitecture from './assets/brand/hero-architecture-wide.jpg';   // tablet + desktop: approved photo, cropped (x 0–95 %, y 20–70 %), not altered
-import heroArchitectureMobile from './assets/brand/hero-architecture-mobile.jpg';
+// DSC-40 (PO, 2026-10-21): the four glass towers replace the staircase ONLY in the YEV header. Approved crops, used exactly (never re-cropped / re-compressed / swapped for an older version):
+//   wide   ≥ 768 px : 2600×1144  SHA-1 e5a77fd5bc63f80f74cd6f2a922449ee72846fca
+//   mobile < 768 px : 1100×1000  SHA-1 726560fdd8230cca3338980a7735f04262042b0f   (the 1000×1250 version is obsolete)
+import heroArchitecture from './assets/brand/yev-hero-torres-wide.jpg';
+import heroArchitectureMobile from './assets/brand/yev-hero-torres-mobile.jpg';
 import editorialFacade from './assets/brand/editorial-facade.jpg';
 
 const env = (k: string, d: string): string => ((import.meta.env as Record<string, string | undefined>)[k]) || d;
@@ -51,7 +54,7 @@ export const BRAND = {
   fontStack: '"Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif',
   /** BRAND-3: the lifestyle image of the frozen institutional section (Option A) — the approved "relaxed person" photo already used by First Assessment. */
   lifestyleImage: { src: lifestyleRelaxed },
-  /** Discovery v1.0: YEV Hero photograph (desktop crop by object-position; mobile = pre-cropped right/top 4:5 so the headline sits on open sky). */
+  /** Discovery v1.0 · DSC-40: YEV Hero photograph (approved crops; object-fit cover, centred). */
   heroImage: { src: heroArchitecture, mobile: heroArchitectureMobile },
   /** Discovery v1.0: single editorial image between "where you are" and "where beeside adds value". Decorative: never data, never text over it. */
   editorialImage: { src: editorialFacade },

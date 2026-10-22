@@ -28,7 +28,7 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
         </picture>
         <div className="in">
           <div>
-            <Logo />
+            <Logo onDark />
             <p className="eyebrow" style={{ marginTop: 18 }}>{t(UI.yev)} · {m.company}</p>
             <h1 id="yev-title">{t(m.title)}</h1>
             <p className="sub">{t(m.subtitle)}</p>
