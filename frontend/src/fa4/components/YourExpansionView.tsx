@@ -111,9 +111,8 @@ function GlanceCard({ d, locale, shortcut, model }: { d: YevDestination; locale:
   return (
     <div className="glance">
       <h3><span>{destTitle(d, locale)}</span><span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>{shortcut ? `${UI.marked[locale]} ${d.marked.length} · ${UI.notIndicated[locale]} ${d.notIndicated.length}` : `${d.topicCount} ${UI.topics[locale]}`}</span></h3>
-      {d.countryMessage ? (
-        <div className="row"><span style={{ display: 'flex', alignItems: 'center' }}><span className="dot none" aria-hidden />{COUNTRY_MESSAGES[d.countryMessage][locale]}</span></div>
-      ) : d.glanceMode === 'topics' ? (
+      {/* DSC-09: the «no active coverage» message lives ONCE per country, in its value block (where it replaces the per-need states, D-095); the glance card does not repeat it. */}
+      {d.countryMessage ? null : d.glanceMode === 'topics' ? (
         <>
           {d.glanceItems.map((g) => (
             <div className="row topic-row" key={g.front}><span className="gname">{g.name[locale]}</span><span className={`gchip ${g.key}`}>{STATE_MESSAGES[g.key][locale]}</span></div>

@@ -5,7 +5,7 @@ import { journeyC, journeyNortica } from "@beeside/fa-public-engine/testing";
 import { UI } from "../src/fa4/copy/ui";
 import { open, seed } from "./helpers";
 
-/** DSC-27 and DSC-09 — VERIFICATIONS (no product change): evidence lists / screenshots are written to docs/fa4/visual (local, git-ignored) and summarised in the traceability doc. */
+/** DSC-27 and DSC-09 — verifications (DSC-09 fixed: one message per country): evidence lists / screenshots are written to docs/fa4/visual (local, git-ignored) and summarised in the traceability doc. */
 const OUT = "../docs/fa4/visual/verifications"; fs.mkdirSync(OUT, { recursive: true });
 const norm = (t: string | null) => (t ?? "").replace(/\s+/g, " ").trim();
 const questions = (page: Page) => page.evaluate(() => {
@@ -64,4 +64,8 @@ test("DSC-09 — screenshots + counts: Mexico / Chile + South Korea / Mexico + C
     await p.screenshot({ path: `${OUT}/dsc09-${name}.png`, fullPage: true }); await p.close();
   }
   fs.writeFileSync(`${OUT}/dsc09-table.json`, JSON.stringify(table, null, 2)); console.log("DSC09", JSON.stringify(table));
+  const t = table as Record<string, { noCoverageMessages: number; premiumCta: number; premiumBlock: number }>;
+  expect(t["mexico"]!.noCoverageMessages).toBe(0); expect(t["mexico"]!.premiumCta).toBe(1);                                 // Mexico: states, no coverage message, Premium with value
+  expect(t["chile-corea"]!.noCoverageMessages).toBe(2); expect(t["chile-corea"]!.premiumCta).toBe(0);                       // DSC-09: ONE message per country (2 countries → 2)
+  expect(t["mexico-chile-corea"]!.noCoverageMessages).toBe(2);                                                              // states only for Mexico; one message for each of the other two
 });
