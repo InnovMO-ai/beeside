@@ -1,5 +1,7 @@
 # Aprobadores del PO para controles protegidos de KL (scripts/kl/preflight.sh, kl.fingerprint, shared-changes.txt, kl-preflight.yml, kl-ci.yml y estos mismos scripts).
 # Un login de GitHub por línea. Solo cuenta una revisión APPROVED, sobre el commit exacto del PR, de un login de esta lista que NO sea el autor del PR.
 # Este archivo es un control protegido: cambiarlo exige la misma aprobación verificada. El gate lo lee de main (referencia protegida), nunca de la rama.
-# ESTADO INICIAL: VACÍO A PROPÓSITO. Mientras no haya una segunda identidad humana de confianza, ningún cambio a controles protegidos puede aprobarse por PR
-# (falla cerrado). Lo registra el PO antes de activar el ruleset; Arquitectura y KL no inventan logins.
+# Registrado por decisión D1 del PO (21-oct-2026): castaneda-a es la segunda identidad humana de revisión; InnovMO-ai es la cuenta del PO.
+# Nadie aprueba su propio cambio: no cuenta el autor del PR ni quien haya escrito o empujado commits del PR (verify-approval.sh).
+castaneda-a
+InnovMO-ai

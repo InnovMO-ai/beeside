@@ -1,6 +1,0 @@
-# PROPUESTA, no instalada. El PO decide quién es code owner; este archivo NO inventa identidades.
-# Sustituya <IDENTIDAD-2> por un login de GitHub real (distinto del autor habitual de los PR) y copie el resultado a .github/CODEOWNERS en un PR que pase por el gate.
-# Con una sola cuenta, la revisión de code owners no se puede satisfacer: el autor no puede aprobar su propio PR.
-/.github/             @InnovMO-ai <IDENTIDAD-2>
-/scripts/kl/          @InnovMO-ai <IDENTIDAD-2>
-/backend/src/kl/      @InnovMO-ai <IDENTIDAD-2>

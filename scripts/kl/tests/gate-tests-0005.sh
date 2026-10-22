@@ -121,11 +121,15 @@ import yaml,sys,os
 d=yaml.safe_load(open(os.path.join(sys.argv[1],'.github/workflows/deploy-dev.yml')))
 sys.exit(0 if "github.event.workflow_run.path == '.github/workflows/ci.yml'" in d['jobs']['deploy']['if'] else 1)
 PY
-python3 -I - "$ROOT" <<'PY'; check "R3 rulesets de release/* y de creación de etiquetas kl-publish-* sin bypass" $?
+python3 -I - "$ROOT" <<'PY'; check "R3 release/* solo por PR revisado sin bypass; creación de release/* y kl-publish-* con única excepción: rol administrador" $?
 import json,sys,os
 r=os.path.join(sys.argv[1],'scripts/kl/ruleset')
 a=json.load(open(os.path.join(r,'5-release.ruleset.json'))); b=json.load(open(os.path.join(r,'3b-tags-publish-creation.ruleset.json')))
-ok={x['type'] for x in a['rules']}>={'deletion','non_fast_forward','creation','update'} and not a['bypass_actors'] and {x['type'] for x in b['rules']}=={'creation'} and not b['bypass_actors']
+c=json.load(open(os.path.join(r,'5b-release-creation.ruleset.json')))
+adm=[{"actor_type":"RepositoryRole","actor_id":5,"bypass_mode":"always"}]
+pr=[x for x in a['rules'] if x['type']=='pull_request']
+ok=({x['type'] for x in a['rules']}>={'deletion','non_fast_forward','pull_request','required_status_checks'} and not a['bypass_actors'] and pr and pr[0]['parameters']['required_approving_review_count']>=1
+    and {x['type'] for x in b['rules']}=={'creation'} and b['bypass_actors']==adm and {x['type'] for x in c['rules']}=={'creation'} and c['bypass_actors']==adm)
 sys.exit(0 if ok else 1)
 PY
 python3 -I - "$ROOT" <<'PY2'; check "I2 IMAGE_REF se valida con [[ =~ ]] (sin grep por líneas) y se cita en todos sus usos" $?

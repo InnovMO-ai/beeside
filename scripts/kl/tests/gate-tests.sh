@@ -106,6 +106,7 @@ key() { printf '%s' "$1" | tr '/?&=' '____'; }
 rv() { printf '[{"user":{"login":"%s"},"state":"%s","commit_id":"%s","submitted_at":"%s"}]' "$1" "$2" "$3" "$4"; }
 va() { KL_API_DIR="$A" REPO=o/r PR=7 HEAD_SHA=$SHA AUTHOR="${2:-dev}" APPROVERS_FILE="${3:-$AP}" bash "$T/verify-approval.sh" 2>/dev/null; echo "exit=$?"; }
 K="$A/$(key 'repos/o/r/pulls/7/reviews?per_page=100').json"
+CK="$A/$(key 'repos/o/r/pulls/7/commits?per_page=100').json"; printf '[{"author":{"login":"dev"},"committer":{"login":"dev"}}]' > "$CK"   # D1: commits del PR (autor dev)
 rv po-reviewer APPROVED $SHA 2026-10-20T10:00:00Z > "$K";  expect "A1 aprobación vigente de un aprobador" 0 "^verified" "$(va)"
 rv po-reviewer APPROVED bbbbbbbb 2026-10-20T10:00:00Z > "$K"; expect "A2 aprobación sobre un commit anterior no cuenta" 0 "^missing" "$(va)"
 rv po-reviewer APPROVED $SHA 2026-10-20T10:00:00Z > "$K"; expect "A3 el autor no puede aprobar su propio cambio" 0 "^missing" "$(va x po-reviewer)"
