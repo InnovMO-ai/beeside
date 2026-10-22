@@ -1,0 +1,1 @@
+01:44:20 bases=[postgres beeside_kl ] usuarios=[kl_agent kl_app kl_knowledge kl_owner kl_reader_precision postgres ] servicio_temporal_presente=0

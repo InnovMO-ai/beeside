@@ -1,0 +1,8 @@
+## Log de peticiones (Cloud Run 2026-10-22)
+TIMESTAMP                    REQUEST_METHOD  STATUS  RESPONSE_SIZE
+2026-10-22T01:40:28.709990Z  GET             200     364864
+2026-10-22T00:40:39.002168Z  GET             401     598
+2026-10-22T00:40:38.922431Z  GET             401     598
+2026-10-22T00:39:50.338905Z  GET             401     598
+2026-10-22T00:39:50.249157Z  GET             401     598
+archivo descargado sha256=2e0e8a45355b42b0057abc9a90a9e843c60f828bd2a992e9185d7618093baa95 == fila kl.file_object == objeto del bucket (comparación byte a byte idéntica); 8 páginas; 364240 bytes

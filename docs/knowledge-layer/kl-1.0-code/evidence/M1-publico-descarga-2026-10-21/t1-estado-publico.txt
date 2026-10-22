@@ -1,0 +1,21 @@
+HTTP 200
+HTTP/2 200 
+x-request-id: 873d58b3-53d0-4d6c-99f4-c7f5a9cc2fe5
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: no-referrer
+cross-origin-opener-policy: same-origin
+cross-origin-resource-policy: same-origin
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+permissions-policy: camera=(), microphone=(), geolocation=(), payment=()
+cache-control: no-store
+x-robots-tag: noindex
+content-type: application/json; charset=utf-8
+etag: W/"47-P4a+0g+t7pbVuQHJoWRyOuJN3Fo"
+x-cloud-trace-context: be5340e3984366b77abf6a103061b8e2;o=1
+date: Thu, 22 Oct 2026 00:40:38 GMT
+server: Google Frontend
+content-length: 71
+alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+
+{"status":"current","editionCode":"2026.10","publishedOn":"2026-10-22"}

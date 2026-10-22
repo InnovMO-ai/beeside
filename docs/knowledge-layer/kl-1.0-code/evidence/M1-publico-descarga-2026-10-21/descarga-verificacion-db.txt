@@ -1,0 +1,27 @@
+## KL (beeside_kl_e2e): vista previa registrada y objeto
+en | 7c6bd6f83929aa5b9f80cfdb634b6c7e4e29854a40b93f25ff0cddace41ceaa8 | 364279 | kl/previews/p0fc58e62b5494073a0bd38e393093acb/en/7c6bd6f83929aa5b9f80cfdb634b6c7e4e29854a40b93f25ff0cddace41ceaa8.pdf
+es | 2e0e8a45355b42b0057abc9a90a9e843c60f828bd2a992e9185d7618093baa95 | 364240 | kl/previews/p0fc58e62b5494073a0bd38e393093acb/es/2e0e8a45355b42b0057abc9a90a9e843c60f828bd2a992e9185d7618093baa95.pdf
+## KL: principal y rol del PO en la base de ensayo
+ERROR:  column rg.user_id does not exist
+LINE 1: ...nte FROM kl.principal pr JOIN kl.role_grant rg ON rg.user_id...
+                                                             ^
+1
+## KL: auditoría interna reciente
+ERROR:  column "occurred_at" does not exist
+LINE 1: SELECT occurred_at, action FROM kl.audit_event ORDER BY occu...
+               ^
+## Base principal (SOLO LECTURA): auditoría del Control Center para la descarga
+2026-10-22 01:40:29.369+00 | kl.edition.preview.read | ALLOWED | kl_edition
+## Base principal: sesión del PO (solo existencia y caducidad)
+2 | 2026-10-22 01:39:57.905+00
+## Rol y principal del PO en la base de ensayo
+<correo-del-PO> | activo=true | KL_REVIEWER | vigente=true
+## Roles de administración vigentes (el PO NO es KL_ADMIN en la base de ensayo)
+KL_ADMIN|1
+KL_EDITOR|2
+KL_REVIEWER|4
+SERVICE_AGENT|1
+SERVICE_KNOWLEDGE|1
+SPECIALIST_VALIDATOR|1
+## Auditoría KL de la actividad del PO
+2026-10-22 01:40:29.167859+00 | kl.principal.reactivated | active

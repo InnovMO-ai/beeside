@@ -1,0 +1,6 @@
+# Incidentes de Monitoring (API v3 alerts) leídos el 2026-10-22 ~01:51 UTC, ANTES de corregir la alerta 3:
+OPEN 2026-10-22T01:49:04Z - KL dev · kl-worker: repeated failed attempts            (alerta 2, segunda prueba tras corregir el filtro)
+OPEN 2026-10-22T00:09:34Z - KL dev · kl-worker: no executions for 20 min             (FALSO POSITIVO por serie `failed`; cerrado a las 01:50:16 tras añadir REDUCE_SUM)
+OPEN 2026-10-22T00:07:13Z - KL dev · Cloud Scheduler: error in a KL schedule         (alerta 4)
+CLOSED 2026-10-21T23:44:56Z 2026-10-21T23:49:51Z KL dev · kl-worker: execution failed (alerta 1)
+CLOSED 2026-10-21T23:39:14Z 2026-10-21T23:44:56Z KL dev · kl-worker: no executions for 20 min (alerta 3, primera prueba, con la política defectuosa)

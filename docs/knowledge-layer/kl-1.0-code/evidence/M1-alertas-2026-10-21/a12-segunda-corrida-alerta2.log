@@ -1,0 +1,6 @@
+01:44:18 — a12: 2 ejecuciones que fallan a propósito (cada una = 2 intentos por max_retries=1)
+Or visit https://console.cloud.google.com/run/jobs/executions/details/northamerica-south1/beeside-dev-kl-worker-4xwd4?project=640247497574
+Or visit https://console.cloud.google.com/run/jobs/executions/details/northamerica-south1/beeside-dev-kl-worker-nz99j?project=640247497574
+01:50:03    resultado a1: 01:44:56    alerta 17613917935254930618: CLOSED
+01:50:03    alerta 1046599909580186521: OPEN
+OPEN
