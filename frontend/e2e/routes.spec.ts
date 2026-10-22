@@ -12,7 +12,7 @@ test.describe("canonical routes", () => {
   for (const p of ROOT_MOUNT ? ["/", "/fa4"] : ["/discovery", "/discovery/", "/fa4"]) {
     test(`${p} serves Discovery`, async ({ page }) => {
       await page.goto(p);
-      await expect(page.getByRole("button", { name: UI.coverCta.es })).toBeVisible();
+      await expect(page.getByRole("button", { name: UI.coverCta.es, exact: true })).toBeVisible();
       await expect(page.getByText("Discovery", { exact: true }).first()).toBeVisible();
       if (DISCOVERY_MODE) expect(new URL(page.url()).pathname, "canonical public path").toBe(ROOT_MOUNT ? "/" : "/discovery/");
     });
@@ -20,7 +20,7 @@ test.describe("canonical routes", () => {
   test("Discovery never links to or mentions the administration routes (cover and identity)", async ({ page }) => {
     await page.goto(ROOT_MOUNT ? "/" : "/discovery");
     for (const step of ["cover", "identity"]) {
-      if (step === "identity") await page.getByRole("button", { name: UI.coverCta.es }).click();
+      if (step === "identity") await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
       expect(await page.content()).not.toMatch(/ops-control|\/admin\b|Control Center/i);
       expect(await page.locator("a[href]").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).not.toContainEqual(expect.stringMatching(/ops-control|\/admin/));
     }
@@ -31,7 +31,7 @@ test.describe("canonical routes", () => {
       expect(r.status()).toBe(404); expect(r.headers()["x-robots-tag"]).toMatch(/noindex/); expect(r.headers().location).toBeUndefined();
       await page.goto(p);
       await expect(page.locator("body")).not.toContainText(/Control Center|Sign in|Iniciar/);
-      await expect(page.getByRole("button", { name: UI.coverCta.es })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: UI.coverCta.es, exact: true })).toHaveCount(0);
     });
   }
   test("the legacy technical routes do not exist under the Discovery identity (production-style build)", async ({ request }) => {

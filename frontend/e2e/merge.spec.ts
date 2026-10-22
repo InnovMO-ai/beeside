@@ -9,7 +9,7 @@ const desktop = (page: import("@playwright/test").Page) => vp(page).width >= 102
 
 test("Multi-country: destinations + «same project?» is ONE screen; presence per country carries 3 questions; the clarity question only on the last", async ({ page }) => {
   await page.goto("/fa4");
-  await page.getByRole("button", { name: UI.coverCta.es }).click();
+  await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
   await page.getByLabel(UI.name.es).fill("Miguel"); await page.getByLabel(UI.company.es, { exact: true }).fill("InnOv"); await page.getByLabel(UI.email.es).fill("mo@innov.example");
   await page.getByRole("radio", { name: UI.deciderOpts.me.es }).check(); await page.getByLabel(UI.terms.es).check(); await page.getByLabel(UI.privacy.es).check();
   await page.getByRole("button", { name: UI.acceptContinue.es }).click();
@@ -46,7 +46,7 @@ test("Multi-country: destinations + «same project?» is ONE screen; presence pe
 });
 
 test("Single destination: no «same project?» block", async ({ page }) => {
-  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es }).click();
+  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
   await page.getByLabel(UI.name.es).fill("A"); await page.getByLabel(UI.company.es, { exact: true }).fill("B"); await page.getByLabel(UI.email.es).fill("a@b.example");
   await page.getByRole("radio", { name: UI.deciderOpts.me.es }).check(); await page.getByLabel(UI.terms.es).check(); await page.getByLabel(UI.privacy.es).check();
   await page.getByRole("button", { name: UI.acceptContinue.es }).click();
@@ -70,9 +70,8 @@ test("Sticky action bar, header and density at this viewport", async ({ page, re
   const inNav = await nav.getByRole("button", { name: UI.saveLater.es }).isVisible();
   const inHeader = await page.locator(".topbar").getByRole("button", { name: UI.saveLater.es }).isVisible();
   expect(inNav).toBe(desktop(page)); expect(inHeader).toBe(!desktop(page));
-  // Help + Talk stay reachable (links on desktop, «?» menu below 1024)
-  if (desktop(page)) { await expect(page.locator(".topbar").getByRole("link", { name: /Necesito ayuda/ })).toBeVisible(); await expect(page.locator(".topbar").getByRole("button", { name: UI.talk.es })).toBeVisible(); }
-  else await expect(page.locator(".topbar").getByRole("button", { name: UI.menu.es })).toBeVisible();
+  // Help stays reachable through the single help menu trigger
+  await expect(page.locator(".topbar").getByRole("button", { name: "Ayuda" })).toBeVisible();   // DSC-37: one help trigger at every width
   // progress names never overflow their cell
   const bad = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".progress .stage-names span, .progress .labels span")].filter((e) => e.scrollWidth > e.clientWidth + 1).length);
   expect(bad).toBe(0);
@@ -92,8 +91,7 @@ test("The panel has no decorative circles; the YEV carries no form chrome and ke
   await expect(page.locator(".res-actions, .top-actions, .navbar, .progress")).toHaveCount(0);
   const foot = page.locator(".res-footer");
   await expect(foot.getByRole("link", { name: /Necesito ayuda/ })).toHaveAttribute("href", "https://www.beeside.you/helpcenter");
-  await foot.getByRole("button", { name: UI.talk.es }).click();
-  await expect(page.getByRole("dialog").getByRole("heading", { name: UI.talkTitle.es })).toBeVisible();
+  await expect(foot.getByRole("link", { name: UI.talk.es })).toHaveAttribute("href", /^mailto:contact@beeside\.you/);   // DSC-37: «Hablar con beeside» is a mailto link, only in the YEV
   const circles = await page.evaluate(() => [...document.querySelectorAll(".deco")].map((e) => getComputedStyle(e, "::before").display + getComputedStyle(e, "::after").display));
   for (const c of circles) expect(c).toBe("nonenone");
 });

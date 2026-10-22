@@ -9,8 +9,8 @@ import { YourExpansionView } from './YourExpansionView';
 import { UI } from '../copy/ui';
 
 /** Canonical order (D-120): YourExpansionView → BeesideValueSection → PremiumContinuation. Three independent components. */
-export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRestart, email, footer, delivered }: {
-  model: YourExpansionViewModel; locale: Locale; onEdit?: () => void; email?: string; footer?: ReactNode; delivered?: boolean;
+export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRestart, email, footer, delivered, helpSlot }: {
+  model: YourExpansionViewModel; locale: Locale; onEdit?: () => void; email?: string; footer?: ReactNode; delivered?: boolean; helpSlot?: ReactNode;
   onContinue?: () => Promise<boolean>; onEmail?: () => Promise<boolean | 'unauthorized'>; onRestart?: () => void;
 }) {
   // The result is ready: announce it politely and move focus to its title (screen-reader and keyboard users do not lose their place).
@@ -18,7 +18,7 @@ export function ResultScreen({ model, locale, onEdit, onContinue, onEmail, onRes
   return (
     <div data-testid="result-screen" className="result">
       <p className="sr-only" role="status" aria-live="polite">{UI.ready[locale]}</p>
-      <YourExpansionView model={model} locale={locale} onEdit={onEdit} />
+      <YourExpansionView model={model} locale={locale} onEdit={onEdit} helpSlot={helpSlot} />
       {/* Discovery v1.0: Value of Continuing = one composed zone on the warm page (same two components, same order, D-120) */}
       <div className={`continue-zone ${model.premium.shown ? 'with-premium' : 'without-premium'}`}>
         <BeesideValueSection locale={locale} />

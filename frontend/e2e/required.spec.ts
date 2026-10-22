@@ -8,7 +8,7 @@ const keys = (page: Page) => page.$$eval('[data-req-bad="true"]', (els) => els.m
 const next = (page: Page, name: string) => page.getByRole("button", { name, exact: true }).click();
 
 test("Destinations: «not decided» is unavailable once countries are chosen, and a click can never wipe the selection; they never coexist", async ({ page }) => {
-  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es }).click();
+  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
   await page.getByLabel(UI.name.es).fill("Ana"); await page.getByLabel(UI.company.es, { exact: true }).fill("Acme"); await page.getByLabel(UI.email.es).fill("ana@acme.example");
   await page.getByRole("radio", { name: UI.deciderOpts.me.es }).check(); await page.getByLabel(UI.terms.es).check(); await page.getByLabel(UI.privacy.es).check();
   await next(page, UI.acceptContinue.es);
@@ -27,7 +27,7 @@ test("Destinations: «not decided» is unavailable once countries are chosen, an
 });
 
 test("Required answers: every screen explains what is missing, focuses the first one and does not advance; optional ones never block", async ({ page }) => {
-  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es }).click();
+  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
   const alert = page.getByRole("alert").filter({ hasText: UI.reqSummary.es });
   // identity
   await next(page, UI.acceptContinue.es);

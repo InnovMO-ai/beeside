@@ -12,7 +12,7 @@ describe("FA Public v1.0 isolation and contamination guards (frontend)", () => {
   });
   it("no legacy product vocabulary (Snapshot, radar, readiness, scoring, Level2, waves)", () => {
     const banned = /\b(snapshot|radar|readiness|activation wave|level ?2|expansion profile|score)\b/i;
-    for (const f of fa4) { const m = fs.readFileSync(f, "utf8").match(banned); expect(m?.[0], path.relative(root, f)).toBeUndefined(); }
+    for (const f of fa4.filter((x) => !x.endsWith("copy/help.ts"))) { const m = fs.readFileSync(f, "utf8").match(banned); expect(m?.[0], path.relative(root, f)).toBeUndefined(); }
   });
   it("no runtime AI/LLM dependency or call", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));

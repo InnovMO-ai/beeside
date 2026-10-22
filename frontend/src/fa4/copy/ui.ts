@@ -204,7 +204,9 @@ export const UI = {
   // ----- Presentation RC (Design): persistent access, contact, date picker, email + error/success states -----
   idOptionalTitle: L('Comunicaciones opcionales', 'Optional communications'), optionalTag: L('Opcional', 'Optional'),
   help: L('Necesito ayuda', 'I need help'), helpNewTab: L('Se abre en una pestaña nueva', 'Opens in a new tab'),
-  talk: L('Hablar con beeside', 'Talk to beeside'), menu: L('Ayuda y contacto', 'Help and contact'), close: L('Cerrar', 'Close'),
+  talk: L('Hablar con beeside', 'Talk to beeside'), helpMenuForm: L('Ayuda', 'Help'), helpMenuYev: L('Ayuda y contacto', 'Help & contact'), helpAbout: L('Sobre esta pantalla', 'About this screen'),   // DSC-37 (D16, PO)
+  continueLinkCta: L('¿Ya empezaste? Recibe un enlace para continuar', 'Already started? Get a link to continue'),   // DSC-38 (PD-29)
+  close: L('Cerrar', 'Close'),
   talkTitle: L('Hablar con beeside', 'Talk to beeside'),
   talkLead: L('Escríbenos y una persona del equipo de beeside te responderá desde {contact}.', 'Write to us and someone from the beeside team will reply from {contact}.'),
   talkMessage: L('Mensaje', 'Message'), talkSend: L('Enviar mensaje', 'Send message'), talkSending: L('Enviando…', 'Sending…'),

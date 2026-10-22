@@ -109,7 +109,7 @@ describe("Fa4App (Vite/React) against the API contract", () => {
     await user.click(screen.getByRole("button", { name: "Enviar mensaje" }));
     await screen.findByText(/Recibimos tu mensaje/);
     expect(calls.find((c) => c.url === "/api/fa4/session/contact")!.body).toMatchObject({ stage: "YEV", shareProgress: false });
-    expect(document.body.innerHTML).not.toMatch(/mailto:/);
+    expect(dialog.innerHTML).not.toMatch(/mailto:/);   // the contact dialog never uses mailto; the help menu / footer «Hablar con beeside» is the DSC-37 mailto link
   });
 
   it("an invalid or expired link shows the calm recovery screen (no raw error), drops the token, and offers a new link / a fresh start", async () => {

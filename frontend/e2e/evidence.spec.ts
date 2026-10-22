@@ -17,7 +17,7 @@ for (const loc of ["es", "en"] as const) {
     await page.goto("/fa4");
     if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
     await shot("01-cover");
-    await page.getByRole("button", { name: t(UI.coverCta) }).click();
+    await page.getByRole("button", { name: t(UI.coverCta), exact: true }).click();
     await shot("02-identity");
     // seeded screens
     const seeded = async (key: string, a: Parameters<typeof seed>[1]) => { const token = await seed(request, a, key); await page.context().clearCookies(); await page.evaluate(() => sessionStorage.clear()); await open(page, token); await page.waitForTimeout(600); };

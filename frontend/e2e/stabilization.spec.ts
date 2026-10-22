@@ -10,7 +10,7 @@ for (const loc of ["es", "en"] as const) {
     await closed(page);
     await page.goto("/fa4"); if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
     await expect(page.getByTestId("stabilization-notice")).toHaveCount(0);                    // the cover is unchanged
-    await page.getByRole("button", { name: UI.coverCta[loc] }).click();
+    await page.getByRole("button", { name: UI.coverCta[loc], exact: true }).click();
     const dlg = page.getByTestId("stabilization-notice");
     await expect(dlg).toBeVisible(); await expect(dlg.getByRole("heading", { name: UI.stabTitle[loc] })).toBeVisible();
     expect(await dlg.evaluate((d: HTMLDialogElement) => d.matches(":modal"))).toBe(true);
@@ -32,7 +32,7 @@ for (const loc of ["es", "en"] as const) {
 
 test("outside Stabilization (the open product) the notice never appears", async ({ page }) => {
   await page.route("**/config.json", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ closedTest: false, label: null }) }));
-  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es }).click(); await expect(page.getByLabel(UI.name.es)).toBeVisible();
+  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click(); await expect(page.getByLabel(UI.name.es)).toBeVisible();
   await expect(page.getByTestId("stabilization-notice")).toHaveCount(0); await expect(page.getByRole("note")).toHaveCount(0);
 });
 
@@ -43,7 +43,7 @@ async function fillIdentity(page: Page, loc: "es" | "en", email: string) {
 for (const loc of ["es", "en"] as const) {
   test(`Personal e-mail warning (${loc}): advisory — keyboard, use another / continue, corporate passes`, async ({ page }) => {
     await page.goto("/fa4"); if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
-    await page.getByRole("button", { name: UI.coverCta[loc] }).click();
+    await page.getByRole("button", { name: UI.coverCta[loc], exact: true }).click();
     await fillIdentity(page, loc, "ana@gmail.com");
     await page.getByRole("button", { name: UI.acceptContinue[loc] }).click();
     const dlg = page.getByTestId("personal-email-warning"); await expect(dlg).toBeVisible();
@@ -58,7 +58,7 @@ for (const loc of ["es", "en"] as const) {
   });
   test(`Personal e-mail (${loc}) is never rejected: «${loc === "es" ? "Continuar con este correo" : "Continue with this email"}» goes on, and the warning is not repeated for the same address`, async ({ page }) => {
     await page.goto("/fa4"); if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
-    await page.getByRole("button", { name: UI.coverCta[loc] }).click();
+    await page.getByRole("button", { name: UI.coverCta[loc], exact: true }).click();
     await fillIdentity(page, loc, "ana@outlook.com");
     await page.getByRole("button", { name: UI.acceptContinue[loc] }).click();
     await page.getByRole("button", { name: UI.personalEmailKeep[loc] }).click();

@@ -27,7 +27,8 @@ describe("Hablar con beeside", () => {
   });
   it("the Help link opens the canonical Help Center in a new tab", async () => {
     const { TopActions } = await import("./components/HelpContact");
-    render(<TopActions locale="es" prefill={prefill} />);
+    render(<TopActions locale="es" helpScreen="cover" helpFlags={{ E: false, F: false, J: true, P: true, stabilization: false }} saveSlot={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ayuda" }));
     const link = screen.getAllByRole("link", { name: /Necesito ayuda/ })[0] as HTMLAnchorElement;
     expect(link.href).toBe("https://www.beeside.you/helpcenter"); expect(link.target).toBe("_blank"); expect(link.rel).toContain("noopener");
     fireEvent.click(link);

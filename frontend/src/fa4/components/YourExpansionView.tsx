@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { Logo } from './Logo';
 import { COUNTRY_MESSAGES, STATE_MESSAGES, numberWord, type L10n } from '@beeside/fa-public-engine';
@@ -9,7 +10,7 @@ import type { YevDestination, YourExpansionViewModel } from '@beeside/fa-public-
  * YourExpansionView — dynamic, project-specific. Renders ONLY data from the stored model (self-contained stored record);
  * the fixed institutional block and the Premium continuation are separate components (D-121).
  */
-export function YourExpansionView({ model, locale, onEdit }: { model: YourExpansionViewModel; locale: Locale; onEdit?: () => void }) {
+export function YourExpansionView({ model, locale, onEdit, helpSlot }: { model: YourExpansionViewModel; locale: Locale; onEdit?: () => void; helpSlot?: ReactNode }) {
   const t = (l: L10n) => l[locale];
   const m = model;
   const dependsCount = m.counts.depends;
@@ -28,7 +29,7 @@ export function YourExpansionView({ model, locale, onEdit }: { model: YourExpans
         </picture>
         <div className="in">
           <div>
-            <Logo onDark />
+            <div className="hero-top"><Logo onDark />{helpSlot}</div>
             <p className="eyebrow" style={{ marginTop: 18 }}>{t(UI.yev)} · {m.company}</p>
             <h1 id="yev-title">{t(m.title)}</h1>
             <p className="sub">{t(m.subtitle)}</p>

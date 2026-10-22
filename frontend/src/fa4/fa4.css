@@ -334,14 +334,6 @@ select.field { appearance: none; background: #fff url("data:image/svg+xml,%3Csvg
 .ta-link:hover { background: var(--lav); }
 .ta-link svg { color: var(--purple); }
 .ta-save { margin-left: 6px; }
-.ta-wide { display: none; }
-.ta-narrow { position: relative; }
-.ta-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--purple); display: grid; place-items: center; cursor: pointer; font-size: 22px; line-height: 1; }
-.ta-menu { position: absolute; right: 0; top: 50px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(23, 24, 27, .14); padding: 6px; min-width: 230px; display: grid; }
-.ta-menu a, .ta-menu button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; border: 0; background: none; color: var(--ink); text-decoration: none; font-size: 15px; border-radius: 8px; cursor: pointer; text-align: left; }
-.ta-menu a:hover, .ta-menu button:hover { background: var(--lav); }
-.ta-menu svg { color: var(--purple); }
-@media (min-width: 900px) { .ta-wide { display: inline-flex; } .ta-narrow { display: none; } }
 .topbar { gap: 8px; }
 .topbar .linkbtn { white-space: nowrap; }
 
@@ -415,7 +407,6 @@ details.conditions summary:hover { color: var(--purple); }
   .cv-logo { height: 28px; }
   .cv-product { font-size: 12px; }
   .cv-right { gap: 4px; }
-  .cv-right .ta-icon { width: 40px; height: 40px; }
   .cv-lang { padding: 0 10px; }
 }
 @media (min-width: 1100px) { .shell.has-deco .narrow { max-width: 720px; } }
@@ -483,8 +474,6 @@ textarea.field { min-height: 88px; }
 .logo { height: 36px; }
 @media (min-width: 1024px) { .logo { height: 44px; } }
 .ta-link { font-weight: 500; }
-@media (min-width: 900px) and (max-width: 1023px) { .ta-wide { display: none; } .ta-narrow { display: block; } }
-@media (min-width: 1024px) { .ta-wide { display: inline-flex; } .ta-narrow { display: none; } .top-actions .ta-save { display: none; } .ta-wide .ico { display: none; } }
 .nav-save { display: none; margin-right: auto; font-size: 14px; }
 @media (min-width: 1024px) { .nav-save { display: inline-flex; align-items: center; } }
 
@@ -737,3 +726,49 @@ dialog.stab-notice .sheet-body p { font-size: 15px; line-height: 1.45; margin: 0
 dialog.stab-notice .sheet-actions { margin-top: 10px; }
 dialog.stab-notice:not([data-kbd]) :focus-visible { outline: none; }
 dialog.stab-notice[data-kbd] .btn:focus { outline: 3px solid var(--focus); outline-offset: 2px; }   /* keyboard use: the ring is always there (WCAG 2.4.7) */
+
+/* DSC-37 · contextual help menu (one trigger at every width, non-modal panel) */
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-menu { position: relative; }
+.ha-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; width: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--purple); font: inherit; font-size: 15px; cursor: pointer; }
+.ha-trigger .ha-lbl, .ha-trigger .ha-chev { display: none; }
+.ha-trigger[aria-expanded="true"] .ha-chev { transform: rotate(180deg); }
+.ha-chev { transition: transform .15s; }
+@media (prefers-reduced-motion: reduce) { .ha-chev { transition: none; } }
+@media (min-width: 1024px) {
+  .ha-trigger { width: auto; border-radius: 22px; padding: 0 14px; }
+  .ha-trigger .ha-lbl, .ha-trigger .ha-chev { display: inline; }
+}
+.hm-yev .ha-trigger { color: #fff; border-color: rgba(255, 255, 255, .55); background: rgba(9, 20, 58, .25); }
+@media (min-width: 1024px) { .hm-yev .ha-trigger { border-color: transparent; background: transparent; } }
+.hm-yev .ha-trigger:focus-visible, .res-hero .ha-trigger:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.ha-panel { position: fixed; left: 12px; right: 12px; top: 64px; z-index: 40; background: #fff; color: var(--ink); border: 1px solid #E2D9D1; border-radius: 14px; box-shadow: 0 12px 32px rgba(23, 24, 27, .14); display: flex; flex-direction: column; max-height: calc(100dvh - 64px - 88px); }
+@media (min-width: 600px) {
+  .ha-panel { position: absolute; left: auto; right: 0; top: calc(100% + 6px); width: 400px; max-height: min(calc(100dvh - 80px), 560px); }
+}
+.ha-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 8px 4px 16px; }
+.ha-head h2 { font-size: 17px; margin: 0; }
+.ha-x { width: 44px; height: 44px; border: 0; background: none; font-size: 26px; color: var(--ink); cursor: pointer; border-radius: 8px; }
+.ha-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 12px; }
+.ha-ctx { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--mute, #5b5d66); margin: 8px 0 4px; }
+.ha-faq { list-style: none; margin: 0; padding: 0; }
+.ha-faq h4 { margin: 0; font-size: 15px; }
+.ha-q { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 8px 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; }
+.ha-q[aria-expanded="true"] .ha-chev { transform: rotate(180deg); }
+.ha-q .ha-chev, .ha-panel .ha-chev { display: inline; flex: none; }
+.ha-ans { font-size: 14px; line-height: 1.5; padding: 0 0 10px; }
+.ha-ans p { margin: 0 0 6px; }
+.ha-sep { height: 1px; background: #E2D9D1; margin: 8px 0; }
+.ha-fixed { display: grid; }
+.ha-item { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--purple); text-decoration: none; font-size: 15px; }
+.ha-item:hover { text-decoration: underline; }
+
+/* DSC-38 · tertiary «Already started? Get a link to continue» link on the cover */
+.cv-continue { display: inline-flex; align-items: center; min-height: 44px; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: var(--purple); text-decoration: underline; cursor: pointer; }
+dialog.sheet[data-testid="continue-link-dialog"] .ha-x { flex: none; }
+@media (min-width: 600px) { dialog.sheet[data-testid="continue-link-dialog"] { width: 440px; } }
+dialog.sheet[data-testid="continue-link-dialog"] .sheet-actions .btn.primary { flex: none; min-height: 44px; }
+
+@media (min-width: 1024px) { .top-actions .ta-save { display: none; } }   /* ≥1024 the save action lives in the Back/Continue bar */
+
+.res-hero.photo .in > div:first-child { position: relative; z-index: 4; }   /* the open help panel must sit above the glance cards */

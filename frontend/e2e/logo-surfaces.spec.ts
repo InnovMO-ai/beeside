@@ -40,7 +40,7 @@ for (const [w, h] of WIDTHS) {
     const sources: Record<string, string[]> = {};
     await page.goto("/fa4"); await page.waitForTimeout(300);
     sources.cover = await checkLogos(page, "cover", w, "dark"); await shot(page, `logo-cover-${w}`);
-    await page.getByRole("button", { name: UI.coverCta.es }).click(); await page.waitForTimeout(300);
+    await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click(); await page.waitForTimeout(300);
     sources.identity = await checkLogos(page, "identity", w, "dark");
     await open(page, await seed(request, journeyNortica("es"), "decision")); await page.waitForTimeout(600);
     sources.question = await checkLogos(page, "question", w, "dark"); await shot(page, `logo-question-${w}`);

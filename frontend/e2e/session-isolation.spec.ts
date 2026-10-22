@@ -17,7 +17,7 @@ test("a tab coming back after a long pause never shows the earlier answers: cont
   await expect(page.getByText(UI.decTitle.es)).toHaveCount(0); await expect(page.getByText("Nórtica")).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem("beeside.fa4.session"))).toBeNull();
   await page.getByRole("button", { name: UI.idleNewProject.es }).click();
-  await page.getByRole("button", { name: UI.coverCta.es }).click();
+  await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();
   for (const label of [UI.name.es, UI.email.es]) await expect(page.getByLabel(label)).toHaveValue("");                         // nothing from the earlier project is pre-filled
   await expect(page.getByLabel(UI.company.es, { exact: true })).toHaveValue("");
 });

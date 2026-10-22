@@ -15,7 +15,7 @@ const BENEFITS = [
 ] as const;
 
 /** First Assessment cover (PO design). Product name fixed; side words and benefit labels follow the locale (D-143). Benefit SVGs are used for the icon only. */
-export function CoverScreen({ locale, setLocale, onStart, actions }: { locale: Locale; setLocale: (l: Locale) => void; onStart: () => void; actions?: ReactNode }) {
+export function CoverScreen({ locale, setLocale, onStart, actions, belowNote }: { locale: Locale; setLocale: (l: Locale) => void; onStart: () => void; actions?: ReactNode; belowNote?: ReactNode }) {
   const other = ({ es: 'en', en: 'es' } as const)[locale];
   return (
     <div className="cv" lang={locale}>
@@ -40,6 +40,7 @@ export function CoverScreen({ locale, setLocale, onStart, actions }: { locale: L
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 12h15M13 6l6 6-6 6" /></svg>
           </button>
           <p className="cv-note"><b>{UI.coverNoteStrong[locale]}</b><span>{UI.coverNote[locale]}</span></p>
+          {belowNote}
         </div>
         <img className="cv-globe" src={globe1672} srcSet={`${globe900} 900w, ${globe1672} 1672w`} sizes="(min-width: 1024px) 56vw, 92vw" alt="" width={1672} height={1417} fetchPriority="high" />
       </main>

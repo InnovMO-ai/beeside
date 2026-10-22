@@ -1,55 +1,39 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { UI, fill } from '../copy/ui';
-import { CANONICAL_URLS, CONTACT_EMAIL } from '../brand';
+import { CONTACT_EMAIL } from '../brand';
+import type { HelpFlags, HelpScreen } from '../copy/help';
+import { HELP_URL } from './helpUrl';
+import { HelpMenu } from './HelpMenu';
 
 /**
- * Presentation RC — persistent "Necesito ayuda" (external Help Center, new tab, D-137) and "Hablar con beeside" (D-138…D-140).
- * Help is a plain external link: no internal help page. Contact is a human request, visually separate from marketing:
- * it never touches marketingConsent. `onSend` is wired by Code to the CONTACT_REQUEST endpoint (CONTACT-4); until it is,
- * the dialog shows the honest error state — it never claims a message was sent.
+ * Help and contact. DSC-37 (Product, 2026-10-21): ONE help menu replaces the loose desktop links and the phone «?» menu (see HelpMenu). «Talk to beeside» exists only in the YEV and is a
+ * plain mailto: link to contact@beeside.you (D14, PD-31); in the form there is no contact option. The contact DIALOG below is no longer reachable from any menu; it is KEPT because the
+ * «Talk to beeside» link of the e-mailed YEV (`contact=open`) still opens it, and it is not deleted (handoff).
  */
-export const HELP_URL: Record<Locale, string> = {
-  es: (import.meta.env.VITE_FA4_HELP_URL_ES as string | undefined) || CANONICAL_URLS.help,
-  en: (import.meta.env.VITE_FA4_HELP_URL_EN as string | undefined) || CANONICAL_URLS.help,
-};
+export { HELP_URL };
 
 export interface ContactPrefill { name: string; company: string; email: string }
 export type ContactSend = (p: ContactPrefill & { message: string; shareProgress: boolean; clientRequestId: string }) => Promise<boolean>;
 
-const HelpIcon = () => <svg className="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" /><path d="M12 17h.01" /></svg>;
-const TalkIcon = () => <svg className="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 5h16v11H9l-5 4z" /></svg>;
 const Ext = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5" /></svg>;
 
-/** Result footer: Help (external, new tab) and «Hablar con beeside» as quiet text links — the YEV carries no form chrome (Final Design Delta). */
-export function HelpTalkLinks({ locale, onHelp, onTalk }: { locale: Locale; onHelp?: () => void; onTalk: () => void }) {
+/** YEV footer: «I need help» (external, new tab) and «Talk to beeside» as a mailto: link (no dialog). */
+export function HelpTalkLinks({ locale, onHelp }: { locale: Locale; onHelp?: () => void }) {
   return (
     <div className="help-talk">
       <a className="linkbtn" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={onHelp}>{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
-      <button type="button" className="linkbtn" onClick={onTalk}>{UI.talk[locale]}</button>
+      <a className="linkbtn" href={`mailto:${CONTACT_EMAIL}`}>{UI.talk[locale]}</a>
     </div>
   );
 }
 
-/** Top-bar actions. Desktop: three text actions. Phone: Save stays visible; Help + Talk sit behind one compact "?" button. */
-export function TopActions({ locale, onSave, prefill, onSend, saveSlot = true, onHelp, onOpenContact }: { locale: Locale; onSave?: () => void; prefill: ContactPrefill; onSend?: ContactSend; saveSlot?: boolean; onHelp?: () => void; onOpenContact?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [menu, setMenu] = useState(false);
+/** Top-bar actions of the FORM screens: «Save and continue later» (when the project exists) + the help menu. */
+export function TopActions({ locale, onSave, saveSlot = true, helpScreen, helpFlags, resetKey, onHelp, withHelp = true }: { locale: Locale; onSave?: () => void; saveSlot?: boolean; helpScreen: HelpScreen; helpFlags: HelpFlags; resetKey?: string; onHelp?: () => void; withHelp?: boolean }) {
   return (
     <div className="top-actions">
-      <a className="ta-link ta-wide" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={onHelp}><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
-      <button type="button" className="ta-link ta-wide" onClick={() => { setOpen(true); onOpenContact?.(); }}><TalkIcon />{UI.talk[locale]}</button>
       {saveSlot && onSave && <button type="button" className="linkbtn ta-save" onClick={onSave}>{UI.saveLater[locale]}</button>}
-      <div className="ta-narrow">
-        <button type="button" className="ta-icon" aria-expanded={menu} aria-label={UI.menu[locale]} onClick={() => setMenu((x) => !x)}><HelpIcon /></button>
-        {menu && (
-          <div className="ta-menu" role="menu">
-            <a role="menuitem" href={HELP_URL[locale]} target="_blank" rel="noopener noreferrer" onClick={() => { setMenu(false); onHelp?.(); }}><HelpIcon />{UI.help[locale]}<Ext /><span className="sr-only"> {UI.helpNewTab[locale]}</span></a>
-            <button role="menuitem" type="button" onClick={() => { setMenu(false); setOpen(true); onOpenContact?.(); }}><TalkIcon />{UI.talk[locale]}</button>
-          </div>
-        )}
-      </div>
-      {open && <ContactDialog locale={locale} prefill={prefill} onSend={onSend} onClose={() => setOpen(false)} />}
+      {withHelp && <HelpMenu locale={locale} variant="form" screen={helpScreen} flags={helpFlags} resetKey={resetKey} onHelpLink={onHelp} />}
     </div>
   );
 }
@@ -67,7 +51,7 @@ export function ContactDialog({ locale, prefill, onSend, onClose, initial = 'idl
   }
   return (
     <dialog ref={ref} className="sheet" aria-labelledby={tid} onClose={onClose} onCancel={onClose}>
-      <div className="sheet-head"><h2 id={tid}>{UI.talkTitle[locale]}</h2><button type="button" className="ta-icon" aria-label={UI.close[locale]} onClick={onClose}>×</button></div>
+      <div className="sheet-head"><h2 id={tid}>{UI.talkTitle[locale]}</h2><button type="button" className="ha-x" aria-label={UI.close[locale]} onClick={onClose}>×</button></div>
       {st === 'sent' ? (
         <div className="sheet-body"><p className="state ok" role="status">{fill(UI.talkSent, locale, { email: f.email })}</p><button type="button" className="btn" onClick={onClose}>{UI.close[locale]}</button></div>
       ) : (

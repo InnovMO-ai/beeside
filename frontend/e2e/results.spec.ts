@@ -104,29 +104,22 @@ test('Save for later: a failed send never says "sent" and offers a retry that wo
   await expect(page.getByRole('status').filter({ hasText: 'Te enviamos a k***@mueller.example' })).toBeVisible();
 });
 
-test('Hablar con beeside: real submission (success) and honest failure with retry', async ({ page, request }) => {
+test('DSC-37: the form help menu has no «Hablar con beeside»; its Help link opens the Help Center entry (PD-31)', async ({ page, request }) => {
   const token = await seed(request, journeyA(), 'company');
   await open(page, token);
-  await page.getByRole('button', { name: 'Hablar con beeside' }).or(page.getByRole('button', { name: 'Ayuda y contacto' })).first().click();
-  if (await page.getByRole('menuitem', { name: 'Hablar con beeside' }).count()) await page.getByRole('menuitem', { name: 'Hablar con beeside' }).click();
-  const dlg = page.getByRole('dialog');
-  await expect(dlg.getByLabel('Correo electrónico')).toHaveValue('laura@nubia.example');                       // prefilled
-  await dlg.getByLabel('Mensaje').fill('Quisiera hablar con alguien sobre la contratación.');
-  let fail = true;
-  await page.route('**/api/fa4/session/contact', (route) => { if (fail) { fail = false; return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'EMAIL_NOT_SENT' }) }); } return route.continue(); });
-  await dlg.getByRole('button', { name: 'Enviar mensaje' }).click();
-  await expect(dlg.getByRole('alert')).toBeVisible();
-  await expect(dlg).not.toContainText('Recibimos tu mensaje');
-  await dlg.getByRole('button', { name: 'Enviar mensaje' }).click();
-  await expect(dlg.getByText(/Recibimos tu mensaje. Te responderemos en laura@nubia.example/)).toBeVisible();
+  await page.getByRole('button', { name: 'Ayuda' }).click();
+  const panel = page.getByTestId('help-panel');
+  await expect(panel.getByRole('heading', { level: 2, name: 'Ayuda' })).toBeVisible();
+  await expect(panel.getByRole('link', { name: /Hablar con beeside/ })).toHaveCount(0);
+  await expect(panel.getByRole('link', { name: /Necesito ayuda/ })).toHaveAttribute('href', 'https://www.beeside.you/helpcenter');
 });
 
 test('Help opens the Help Center in a new tab and the assessment stays intact', async ({ page, context, request }) => {
   const token = await seed(request, journeyA(), 'company');
   await open(page, token);
   await expect(page.getByRole('heading', { name: '¿Tu empresa se encuentra operando actualmente?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Ayuda' }).click();
   const visibleHelp = page.locator('a[href*="helpcenter"]').filter({ visible: true });
-  if (!(await visibleHelp.count())) await page.getByRole('button', { name: 'Ayuda y contacto' }).click();
   const link = visibleHelp.first();
   await expect(link).toHaveAttribute('href', 'https://www.beeside.you/helpcenter');
   await expect(link).toHaveAttribute('target', '_blank');

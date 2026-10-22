@@ -11,7 +11,7 @@ for (const width of [320, 360, 375, 390]) {
       await page.setViewportSize({ width, height: 740 });
       await page.goto("/fa4"); if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
       await noHorizontalOverflow(page);                                                      // cover
-      await page.getByRole("button", { name: UI.coverCta[loc] }).click(); await noHorizontalOverflow(page);   // identity
+      await page.getByRole("button", { name: UI.coverCta[loc], exact: true }).click(); await noHorizontalOverflow(page);   // identity
       const a = journeyNortica(loc); a.locale = loc;
       await page.close();
       const p = await page.context().newPage(); await p.setViewportSize({ width, height: 740 });

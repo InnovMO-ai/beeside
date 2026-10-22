@@ -10,7 +10,7 @@ const country = (loc: Loc, es: string, en: string) => (loc === "es" ? es : en);
 export async function startNortica(page: Page, loc: Loc) {
   await page.goto("/fa4");
   if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
-  await page.getByRole("button", { name: t(UI.coverCta, loc) }).click();
+  await page.getByRole("button", { name: t(UI.coverCta, loc), exact: true }).click();
   await page.getByLabel(t(UI.name, loc)).fill("Lucía");
   await page.getByLabel(t(UI.company, loc), { exact: true }).fill("Nórtica Envases");
   await page.getByLabel(t(UI.email, loc)).fill("lucia@nortica.example");

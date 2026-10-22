@@ -13,7 +13,10 @@ import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
 import { ContactDialog, HelpTalkLinks, TopActions } from './components/HelpContact';
-import { IdleContinuation, RecoveryScreen, type IdlePhase } from './components/Recovery';
+import { HelpMenu } from './components/HelpMenu';
+import { helpScreenOf } from './components/helpScreen';
+import { HELP_FLAGS, recoveryHasHelp, type HelpFlags } from './copy/help';
+import { ContinueLinkDialog, IdleContinuation, RecoveryScreen, type IdlePhase } from './components/Recovery';
 import { focusBlock, ReqContext } from './components/required';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
@@ -77,6 +80,8 @@ export function Fa4App() {
   const [resolveFailed, setResolveFailed] = useState(false);
   const online = useOnline();
   const [resolveTick, setResolveTick] = useState(0);
+  const [continueOpen, setContinueOpen] = useState(false);   // DSC-38 · «Already started?» dialog on the cover
+  const continueLink = useRef<HTMLButtonElement>(null);
   const [contactOpen, setContactOpen] = useState(false);   // the contact dialog opened from the result footer / the YEV email's «Talk to beeside» link
   const [pendingResume, setPendingResume] = useState(false);   // an emailed single-use resume link is waiting for an explicit «continue» (scanner-safe)
   const resumeConfirmed = useRef(false);
@@ -173,6 +178,18 @@ export function Fa4App() {
     saveTimer.current = setTimeout(() => { api.save(a, stepKey(step)).catch((e) => { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setToast(UI.saveError[locale]); }); }, 500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [a, step, hasSession, locale]);
+
+  // DSC-37: publication flags of the contextual help (E/F wait for DSC-36 / DSC-38 to be validated; J, P are met) + the Stabilization line of entry E
+  const helpFlags: HelpFlags = { ...HELP_FLAGS, stabilization: closedTest };
+  // DSC-37 (D6): when the screen changes the focus goes to its title (H1); never while a modal is open and never on the very first screen of the visit
+  const lastFocusedStep = useRef<string | null>(null);
+  useEffect(() => {
+    if (booting) return; const k = stepKey(step);
+    if (lastFocusedStep.current !== null && lastFocusedStep.current !== k && !document.querySelector('dialog[open]')) {
+      const h = document.querySelector<HTMLElement>('main h1, .cv-title'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+    }
+    lastFocusedStep.current = k;
+  }, [step, booting]);
 
   // DSC-36 · case A — 30 min without interaction (keyboard, pointer, scroll, touch; a hidden tab counts as inactive): ask for the continuation link and replace the screen.
   // The check runs on a timer AND when the tab becomes visible again (timers of hidden tabs are throttled). Never for a delivered result or before the project exists.
@@ -303,7 +320,7 @@ export function Fa4App() {
   if (idle) {
     return (
       <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
-        <div className="topbar"><Logo /></div>
+        <div className="topbar"><Logo />{recoveryHasHelp(helpFlags) && <HelpMenu locale={locale} variant="form" screen="recovery" flags={helpFlags} onHelpLink={() => track('help_clicked')} />}</div>
         <IdleContinuation phase={idle} locale={locale} onRetry={() => { if (idleToken.current) void runIdle(idleToken.current, true); }} onNew={startNewFromIdle} />
       </div></div>
     );
@@ -311,7 +328,7 @@ export function Fa4App() {
   if (recovery) {
     return (
       <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
-        <div className="topbar"><Logo /></div>
+        <div className="topbar"><Logo />{recoveryHasHelp(helpFlags) && <HelpMenu locale={locale} variant="form" screen="recovery" flags={helpFlags} onHelpLink={() => track('help_clicked')} />}</div>
         <RecoveryScreen kind={recovery} locale={locale} onNew={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); setRecovery(null); setBooting(false); }} />
       </div></div>
     );
@@ -336,7 +353,8 @@ export function Fa4App() {
             </main>
           : <ResultScreen model={model} locale={locale} onEdit={delivered ? undefined : () => setStep({ id: 'destinations' })}
               delivered={delivered} onContinue={startExpansion} onEmail={sendResultEmail} email={a.identity.email}
-              footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} onTalk={() => { track('contact_opened'); setContactOpen(true); }} />}
+              footer={<HelpTalkLinks locale={locale} onHelp={() => track('help_clicked')} />}
+              helpSlot={<HelpMenu locale={locale} variant="yev" screen={delivered ? 'yevDelivered' : 'yevPreview'} flags={helpFlags} resetKey={delivered ? 'delivered' : 'preview'} onHelpLink={() => track('help_clicked')} />}
               onRestart={() => { sessionStore.clear(); setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setStep({ id: 'cover' }); }} />}
         {contactOpen && <ContactDialog locale={locale} prefill={contactPrefill} onSend={sendContact} onClose={() => setContactOpen(false)} />}
         {stabNotice}
@@ -348,7 +366,8 @@ export function Fa4App() {
   if (step.id === 'cover') {
     return (
       <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<CoverScreen locale={locale} setLocale={(l: Locale) => { track('language_selected', { props: { locale: l } }); setA((x) => ({ ...x, locale: l })); }} onStart={() => { track('start_clicked'); setStep({ id: 'identity' }); }}
-        actions={<TopActions locale={locale} prefill={{ name: '', company: '', email: '' }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} saveSlot={false} />} /></div>
+        actions={<TopActions locale={locale} helpScreen="cover" helpFlags={helpFlags} onHelp={() => track('help_clicked')} saveSlot={false} />}
+        belowNote={<><button type="button" ref={continueLink} className="cv-continue" onClick={() => setContinueOpen(true)}>{UI.continueLinkCta[locale]}</button><ContinueLinkDialog locale={locale} open={continueOpen} onClose={() => { setContinueOpen(false); continueLink.current?.focus(); }} /></>} /></div>
     );
   }
 
@@ -362,7 +381,7 @@ export function Fa4App() {
 
   return (
     <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className={`shell ${wide ? 'wide-shell' : 'has-deco'}`} lang={locale}>
-      <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} prefill={{ name: a.identity.name, company: a.identity.company, email: a.identity.email }} onSend={sendContact} onHelp={() => track('help_clicked')} onOpenContact={() => track('contact_opened')} /></div>
+      <div className="topbar"><Logo /><TopActions locale={locale} onSave={saveLater} helpScreen={helpScreenOf(step, a)} helpFlags={helpFlags} resetKey={stepKey(step)} onHelp={() => track('help_clicked')} /></div>
       {stage >= 1 && stage <= 6 && (
         <nav className="progress" aria-label={UI.progress[locale]}>
           <ol>{UI.stages.map((_, i) => <li key={i} className={i + 1 < stage ? 'done' : i + 1 === stage ? 'now' : ''} aria-current={i + 1 === stage ? 'step' : undefined} />)}</ol>

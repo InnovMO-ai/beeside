@@ -57,7 +57,7 @@ for (const loc of ["es", "en"] as const) {
   });
   test(`DSC-23 (${loc}) — role: example placeholder and help, still optional free text`, async ({ page }) => {
     await page.goto("/fa4"); if (loc === "en") await page.getByRole("button", { name: /English/ }).click();
-    await page.getByRole("button", { name: UI.coverCta[loc] }).click();
+    await page.getByRole("button", { name: UI.coverCta[loc], exact: true }).click();
     const role = page.getByLabel(UI.role[loc]);
     await expect(role).toHaveAttribute("placeholder", loc === "es" ? "Por ejemplo: director general, asesor externo" : "For example: CEO, external advisor");
     await expect(page.getByText(loc === "es" ? "Puedes indicar más de uno." : "You can list more than one.")).toBeVisible();
@@ -79,7 +79,7 @@ for (const loc of ["es", "en"] as const) {
 
 test("DSC-14 — Stabilization notice: 15 px compact text; no focus ring when opened by a click, ring visible with the keyboard; still accessible", async ({ page }, info) => {
   await page.route("**/config.json", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ closedTest: true, label: "PRUEBA CONTROLADA · datos ficticios · no comercial" }) }));
-  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es }).click();                                  // opened with the mouse
+  await page.goto("/fa4"); await page.getByRole("button", { name: UI.coverCta.es, exact: true }).click();                                  // opened with the mouse
   const dlg = page.getByTestId("stabilization-notice"); await expect(dlg).toBeVisible();
   const btn = page.getByRole("button", { name: UI.stabConfirm.es }); await expect(btn).toBeFocused();
   const sizes = await dlg.locator(".sheet-body p").evaluateAll((ps) => ps.map((p) => parseFloat(getComputedStyle(p).fontSize)));
