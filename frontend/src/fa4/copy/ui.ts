@@ -244,7 +244,15 @@ export const UI = {
   offlineTitle: L('Sin conexión', "You're offline"),
   offlineBody: L('Tu avance está guardado en este dispositivo. Cuando vuelva la conexión, seguimos.', "Your progress is kept on this device. We'll continue when you're back online."),
   staleTitle: L('Tu sesión se cerró por inactividad', 'Your session closed after inactivity'),
-  staleBody: L('Lo que respondiste está guardado. Pide un enlace para continuar donde lo dejaste.', 'Your answers are saved. Ask for a link to continue where you left off.'),
+  staleBody: L('Lo que respondiste está guardado. Si no encuentras el enlace que te enviamos, pide uno nuevo.', "Your answers are saved. If you can't find the link we sent you, ask for a new one."),   // DSC-36 (PO)
+  // DSC-36 · continuity screen after 30 min of inactivity (approved copy; the address is never shown)
+  idleTitle: L('Guardamos tu avance.', 'We saved your progress.'),
+  idleSent: L('Te enviamos un enlace al correo que registraste para que puedas continuar cuando quieras. Tu proyecto queda tal como lo dejaste.', 'We sent a link to the email address you provided so you can continue whenever you like. Your project stays exactly as you left it.'),
+  idleSending: L('Guardamos tu avance. Estamos enviando tu enlace para continuar…', "We saved your progress. We're sending your link to continue…"),
+  idleFailed: L('Tu avance está guardado, pero no pudimos enviar el enlace ahora.', "Your progress is saved, but we couldn't send the link right now."),
+  idleRetry: L('Intentar de nuevo', 'Try again'),
+  idleNotAuthorized: L('Tu avance está guardado. Durante la etapa de Estabilización sólo podemos enviar enlaces a direcciones autorizadas.', 'Your progress is saved. During Stabilization we can only send links to authorized addresses.'),
+  idleNewProject: L('Empezar un proyecto nuevo', 'Start a new project'),
   resumeContinue: L('Continuar donde lo dejaste', 'Pick up where you left off'),
   linkRequested: L('Si ese correo tiene un proyecto, te enviaremos un enlace nuevo en unos minutos.', "If that email has a project, we'll send you a new link in a few minutes."),
   topicsErrorTitle: L('No pudimos preparar esta parte', "We couldn't prepare this section"),

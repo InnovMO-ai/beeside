@@ -29,7 +29,7 @@ export type ClientEventName = keyof typeof CLIENT_EVENT_SCHEMAS;
 
 export const SERVER_EVENT_NAMES = [
   "project_created", "step_reached", "result_generated", "yev_previewed", "yev_delivered", "demand_signals_recorded",
-  "resume_email_requested", "resume_email_sent", "resume_email_failed",
+  "resume_email_requested", "resume_email_sent", "resume_email_failed", "resume_email_auto_queued",
   "yev_email_requested", "yev_email_sent", "yev_email_failed",
   "contact_submitted", "contact_email_sent", "contact_email_failed",
   "premium_continuation_requested", "marketing_opt_in_changed", "resume_link_used",

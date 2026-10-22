@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildFlow, emptyAnswers, lastProjectStep, missingRequired, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel, isLikelyPersonalEmail } from '@beeside/fa-public-engine';
-import { api, ApiError, confirmSend, sessionStore, track } from './api';
+import { api, ApiError, confirmSend, RESUME_IDLE_MS, sessionStore, track, visitLocale } from './api';
 import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
 import { PersonalEmailDialog } from './components/PersonalEmailDialog';
@@ -13,7 +13,7 @@ import { ResultScreen } from './components/ResultScreen';
 import * as S from './components/steps';
 import { UI, fill } from './copy/ui';
 import { ContactDialog, HelpTalkLinks, TopActions } from './components/HelpContact';
-import { RecoveryScreen } from './components/Recovery';
+import { IdleContinuation, RecoveryScreen, type IdlePhase } from './components/Recovery';
 import { focusBlock, ReqContext } from './components/required';
 
 const parseKey = (k: string): StepRef => { const [id, comp] = k.split(':'); return comp ? { id: id as StepRef['id'], comp } : { id: id as StepRef['id'] }; };
@@ -71,6 +71,9 @@ export function Fa4App() {
   const [catalogError, setCatalogError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [recovery, setRecovery] = useState<null | 'link' | 'stale'>(null);   // invalid / used / expired link · working session lost
+  // DSC-36: the continuity screen shown after 30 min of inactivity (and the in-memory token used ONLY to retry the same delivery; the tab's own token is already gone)
+  const [idle, setIdle] = useState<IdlePhase | null>(null);
+  const idleToken = useRef<string | null>(null);
   const [resolveFailed, setResolveFailed] = useState(false);
   const online = useOnline();
   const [resolveTick, setResolveTick] = useState(0);
@@ -81,11 +84,38 @@ export function Fa4App() {
   const desktop = useDesktop();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locale = a.locale;
-  useEffect(() => { document.documentElement.lang = locale; }, [locale]);   // <html lang> follows the language chosen on the cover (a11y)
+  useEffect(() => { document.documentElement.lang = locale; if (hasSession) visitLocale.set(locale); }, [locale, hasSession]);   // <html lang> follows the language chosen on the cover (a11y)
 
   // launch-day capture (anonymous before Identity; see docs/fa4/ANALYTICS_EVENTS.md). Never blocks the UI.
   useEffect(() => { track('visit'); }, []);
   useEffect(() => { if (!booting && !recovery) track('step_viewed', { step: step.id }); }, [step.id, booting, recovery]);
+
+  // DSC-36 · ONE continuation link for this (idle) tab's project. The answer says what really happened; the tab's token is dropped as soon as the answer arrives.
+  const runIdle = useCallback(async (token: string, retry = false) => {
+    idleToken.current = token; setIdle('sending');
+    const toCover = () => { idleToken.current = null; sessionStore.clear(); setIdle(null); setHasSession(false); setModel(null); setA(emptyAnswers(a.locale)); setStep({ id: 'cover' }); setBooting(false); };
+    try {
+      const r = await api.idleContinuation(token, retry); sessionStore.clear();
+      if (r.state === 'sent') { setIdle('sent'); return; }
+      for (const deadline = Date.now() + 40_000; Date.now() < deadline;) {            // «pending»: wait for the real outcome
+        await new Promise((res) => setTimeout(res, 2_000));
+        const st = await api.emailStatus('resume', token).catch(() => null);
+        if (st?.state === 'sent') { setIdle('sent'); return; }
+        if (st?.state === 'failed' || st?.state === 'none') { setIdle('failed'); return; }
+      }
+      setIdle('failed');
+    } catch (e) {
+      if (e instanceof ApiError) {
+        sessionStore.clear();
+        if (e.status === 401) { idleToken.current = null; setIdle(null); setRecovery('stale'); return; }          // expired (> 24 h) or unknown: the «stale» screen with the link request
+        if (e.code === 'NOT_APPLICABLE') { toCover(); return; }                                                    // delivered / closed project: nothing to continue
+        if (e.code === 'RECIPIENT_NOT_AUTHORIZED') { setIdle('unauthorized'); return; }
+        if (e.status === 429) { setIdle('failedNoRetry'); return; }                                                // the daily quota: a retry would answer 429 again
+      }
+      setIdle('failed');
+    }
+  }, [a.locale]);
+  const startNewFromIdle = useCallback(() => { idleToken.current = null; sessionStore.clear(); setIdle(null); setHasSession(false); setModel(null); setDelivered(false); setPreviewToken(null); setA(emptyAnswers(a.locale)); setStep({ id: 'cover' }); setBooting(false); }, [a.locale]);
 
   // boot: catalog + resume (emailed link fragment, or this tab's working session)
   useEffect(() => {
@@ -111,7 +141,10 @@ export function Fa4App() {
           sessionStore.set(exchanged.sessionToken);
           window.history.replaceState({}, '', window.location.pathname);
         }
-        if (sessionStore.resumable()) {          // DSC-01: only a recent visit of THIS tab is resumed; an old token is dropped and the visit starts clean
+        // DSC-36 (supersedes «30 min → cover»): a token whose visit is IDLE is never re-opened; the tab asks for ONE continuation link and shows the continuity screen
+        const stale = link ? null : sessionStore.idleToken();
+        if (stale) { setA(emptyAnswers(visitLocale.get())); void runIdle(stale); if (alive) setBooting(false); return; }
+        if (sessionStore.resumable()) {          // DSC-01: only a recent visit of THIS tab is resumed
           const s = await api.session();
           if (!alive) return;
           setA(s.answers); setHasSession(true);
@@ -140,6 +173,29 @@ export function Fa4App() {
     saveTimer.current = setTimeout(() => { api.save(a, stepKey(step)).catch((e) => { if (e instanceof ApiError && e.status === 401) setRecovery('stale'); else setToast(UI.saveError[locale]); }); }, 500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [a, step, hasSession, locale]);
+
+  // DSC-36 · case A — 30 min without interaction (keyboard, pointer, scroll, touch; a hidden tab counts as inactive): ask for the continuation link and replace the screen.
+  // The check runs on a timer AND when the tab becomes visible again (timers of hidden tabs are throttled). Never for a delivered result or before the project exists.
+  const lastActive = useRef(Date.now());
+  const idleGuard = useRef({ on: false, token: null as string | null });
+  const idleFired = useRef(false);          // one trigger per project: the timer can tick again before React has re-rendered
+  idleGuard.current = { on: hasSession && !idle && !recovery && !delivered && !booting && step.id !== 'cover', token: sessionStore.get() };
+  useEffect(() => {
+    const bump = () => { lastActive.current = Date.now(); };
+    const opts = { capture: true, passive: true } as const;
+    const evs = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'wheel', 'input'] as const;
+    for (const e of evs) window.addEventListener(e, bump, opts);
+    const check = () => {
+      const g = idleGuard.current; if (!g.on || !g.token) return;
+      if (idleFired.current || Date.now() - lastActive.current < RESUME_IDLE_MS) return;
+      idleFired.current = true;
+      setHasSession(false); setModel(null); setA(emptyAnswers(locale)); setPreviewToken(null);        // nothing of the project stays on this screen
+      void runIdle(g.token);
+    };
+    const t = setInterval(check, 15_000); document.addEventListener('visibilitychange', check);
+    return () => { for (const e of evs) window.removeEventListener(e, bump, opts); clearInterval(t); document.removeEventListener('visibilitychange', check); };
+  }, [runIdle, locale]);
+  useEffect(() => { lastActive.current = Date.now(); if (hasSession) idleFired.current = false; }, [hasSession]);
 
   const goTo = useCallback((k: string) => setStep(parseKey(k)), []);
   // Capability / coverage resolution is server-side (privacy boundary): the browser only receives the coarse facts for THIS project.
@@ -241,6 +297,14 @@ export function Fa4App() {
           <h1 className="h1">{UI.resumed[loc]}</h1>
           <button type="button" className="btn primary" style={{ flex: 'none', marginTop: 8 }} onClick={() => { resumeConfirmed.current = true; setPendingResume(false); setBooting(true); setAttempt((n) => n + 1); }}>{UI.resumeContinue[loc]}</button>
         </main>
+      </div></div>
+    );
+  }
+  if (idle) {
+    return (
+      <div className="fa4"><EnvRibbon />{!online && <OfflineBanner locale={locale} />}<div className="shell" lang={locale}>
+        <div className="topbar"><Logo /></div>
+        <IdleContinuation phase={idle} locale={locale} onRetry={() => { if (idleToken.current) void runIdle(idleToken.current, true); }} onNew={startNewFromIdle} />
       </div></div>
     );
   }

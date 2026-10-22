@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { api } from '../api';
 import { UI } from '../copy/ui';
@@ -29,6 +29,29 @@ export function RecoveryScreen({ kind, locale, onNew }: { kind: 'link' | 'stale'
           </div>
         </div>
       )}
+    </main>
+  );
+}
+
+export type IdlePhase = 'sending' | 'sent' | 'failed' | 'failedNoRetry' | 'unauthorized';
+
+/**
+ * DSC-36 — after 30 min of inactivity: the project is kept, ONE secure link is e-mailed to the registered address, and this screen says so with the REAL state of the delivery.
+ * The address is never shown. No «continue here»: the tab no longer holds the project (continuing is only through the link).
+ */
+export function IdleContinuation({ phase, locale, onRetry, onNew }: { phase: IdlePhase; locale: Locale; onRetry: () => void; onNew: () => void }) {
+  const h1 = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { h1.current?.focus({ preventScroll: true }); }, [phase]);
+  const msg = phase === 'sent' ? UI.idleSent : phase === 'unauthorized' ? UI.idleNotAuthorized : phase === 'sending' ? null : UI.idleFailed;
+  return (
+    <main className="main narrow" id="main" data-testid="idle-continuation" data-phase={phase}>
+      <h1 className="h1" tabIndex={-1} ref={h1}>{(phase === 'sending' ? UI.idleSending : UI.idleTitle)[locale]}</h1>
+      {msg && <p className="lead" role="status" aria-live="polite">{msg[locale]}</p>}
+      {phase === 'sending' && <p className="sr-only" role="status" aria-busy="true">{UI.idleSending[locale]}</p>}
+      <div className="sheet-actions">
+        {phase === 'failed' && <button type="button" className="btn primary" onClick={onRetry}>{UI.idleRetry[locale]}</button>}
+        <button type="button" className="btn" onClick={onNew}>{UI.idleNewProject[locale]}</button>
+      </div>
     </main>
   );
 }

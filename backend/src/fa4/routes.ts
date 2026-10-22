@@ -13,7 +13,7 @@ import { FaError } from "../fa/services/errors";
 import { looksLikeAccessToken } from "../fa/services/tokens";
 import { RateLimitPolicy, RateLimiter, rateLimit } from "../security/rate-limit";
 import {
-  DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, closedTestRecipientAllowed, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, latestDelivery, retryFa4Delivery, stateOfStatus,
+  DeliveryState, Fa4EmailDeps, Fa4EmailTemplate, awaitDelivery, closedTestRecipientAllowed, deliverDueFa4Emails, deliveryStatus, enqueueContact, enqueueFa4Email, enqueueIdleContinuation, latestDelivery, retryFa4Delivery, stateOfStatus,
 } from "./email";
 import { parseClientEvent, recordEvent } from "./events";
 import { cleanInput } from "./email-render";
@@ -114,9 +114,9 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
    * (HTTP 202 — the UI polls /session/email-status); `failed` otherwise (HTTP 502). A queued row is never reported as sent.
    * A repeated request while the delivery is FAILED/DEAD makes exactly one more attempt of the same delivery.
    */
-  const settle = async (res: Response, deliveryId: string, extra: Record<string, unknown> = {}, recipient?: string) => {
+  const settle = async (res: Response, deliveryId: string, extra: Record<string, unknown> = {}, recipient?: string, allowRetry = true) => {
     let status = await deliveryStatus(deps.db, deliveryId);
-    if (status === "FAILED" || status === "DEAD") { await retryFa4Delivery(deps.db, deliveryId, deps.config.now()); status = "FAILED"; }
+    if (allowRetry && (status === "FAILED" || status === "DEAD")) { await retryFa4Delivery(deps.db, deliveryId, deps.config.now()); status = "FAILED"; }
     await dispatch();
     const state: DeliveryState = await awaitDelivery(deps.db, deliveryId, waitMs);
     if (state === "sent") res.status(200).json({ state, ...extra });
@@ -204,6 +204,19 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (step !== p.stepKey) await recordEvent(deps.db, { name: "step_reached", source: "server", projectId: p.projectId, locale: a.locale, step: step.split(":")[0]! });
     if (before !== (parsed.data.identity.marketingConsent === true)) await recordEvent(deps.db, { name: "marketing_opt_in_changed", source: "server", projectId: p.projectId, locale: a.locale, props: { consented: parsed.data.identity.marketingConsent === true } });
     res.json({ ok: true });
+  }));
+
+  // DSC-36 · the tab was idle for 30 min (or came back after it): ONE continuation link per period to the registered address. Idempotent: a reload, a second tab or the worker's sweep
+  // returns the delivery that already exists (never a second e-mail); a failed one is retried ONLY when the person asks (`retry: true`) and it is the SAME delivery. The answer never
+  // carries the address, the link or any token; a refusal by the closed-test recipient policy is 403 RECIPIENT_NOT_AUTHORIZED (never a 5xx). The project is never touched.
+  router.post("/session/idle-continuation", rateLimit(limiter, lim('mail'), bearer), handle(async (req, res) => {
+    const p = await session(req);
+    const q = await enqueueIdleContinuation(deps.db, p.projectId, deps.config.now(), emailLimits);
+    if (q.notEligible === "not_in_progress") throw new FaError("NOT_APPLICABLE", "this project is not open any more");
+    if (q.blocked === "quota") { res.status(429).json({ error: "RATE_LIMITED", message: "too many emails for this address today" }); return; }
+    if (!q.deliveryId) throw new FaError("NOT_FOUND", "no such project");
+    if (q.queued) await recordEvent(deps.db, { name: "resume_email_auto_queued", source: "server", projectId: p.projectId, locale: p.answers.locale, props: { trigger: "tab" } });
+    await settle(res, q.deliveryId, {}, p.email, bodyOf(req).retry === true);
   }));
 
   // "Guardar y seguir después": a resume link to the email already captured (never asked again). The answer reflects the real delivery state.

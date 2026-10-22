@@ -11,30 +11,37 @@ export class ApiError extends Error {
 
 const ACTIVITY_KEY = 'beeside.fa4.session.at';
 /**
- * DSC-01 — a working session belongs to ONE visit. The token lives in this tab only, and it is resumed on a reload only while the visit is recent: a tab that comes back
- * after a long pause (browser restored on another day, a duplicated or old tab) starts clean instead of silently re-opening an earlier project with its answers.
- * The earlier project is never lost: «Guardar y seguir después» e-mails a private link that resumes it explicitly.
+ * DSC-01 / DSC-36 — a working session belongs to ONE visit, and a tab never silently re-opens an earlier project. The token lives in this tab only. While the visit is RECENT
+ * (< 30 min without activity) a reload resumes it. When the visit is IDLE (the tab came back after 30 min, or a restored tab without activity record) the project is NOT
+ * re-opened: the tab asks the server for ONE continuation link (DSC-36) and drops its token; the person continues from the e-mailed link.
  */
 export const RESUME_IDLE_MS = 30 * 60 * 1000;
+/** The language of the visit, kept in this tab so the continuity screen (which loads no answers) speaks it. */
+const LOCALE_KEY = 'beeside.fa4.locale';
+export const visitLocale = {
+  get(): 'es' | 'en' { try { return sessionStorage.getItem(LOCALE_KEY) === 'en' ? 'en' : 'es'; } catch { return 'es'; } },
+  set(l: 'es' | 'en') { try { sessionStorage.setItem(LOCALE_KEY, l); } catch { /* ignore */ } },
+};
+const activityAt = (): number => { try { return Number(sessionStorage.getItem(ACTIVITY_KEY)); } catch { return NaN; } };
 export const sessionStore = {
   get(): string | null { try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; } },
   set(token: string) { try { sessionStorage.setItem(SESSION_KEY, token); sessionStorage.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* storage unavailable: the session works until the tab closes */ } },
   /** Marks the visit as active (every request that carries the token). */
   touch() { try { if (sessionStorage.getItem(SESSION_KEY)) sessionStorage.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* ignore */ } },
-  /** The token to resume on load, or null (and the stale token is dropped) when the visit has been idle too long or has no activity record. */
+  /** The token to resume on load, only while the visit is recent. */
   resumable(now = Date.now()): string | null {
-    const token = this.get(); if (!token) return null;
-    let at = NaN; try { at = Number(sessionStorage.getItem(ACTIVITY_KEY)); } catch { /* ignore */ }
-    if (Number.isFinite(at) && at > 0 && now - at >= 0 && now - at <= RESUME_IDLE_MS) return token;
-    this.clear(); return null;
+    const token = this.get(); if (!token) return null; const at = activityAt();
+    return Number.isFinite(at) && at > 0 && now - at >= 0 && now - at <= RESUME_IDLE_MS ? token : null;
   },
+  /** The token of an IDLE visit (present, but not recent): never resumed, only used to ask for the continuation link. */
+  idleToken(now = Date.now()): string | null { const t = this.get(); return t && !this.resumable(now) ? t : null; },
   clear() { try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(ACTIVITY_KEY); } catch { /* ignore */ } },
 };
 
-async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, auth = true, tokenOverride?: string): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const token = auth ? sessionStore.get() : null;
+  const token = auth ? (tokenOverride ?? sessionStore.get()) : null;
   // Not `Authorization`: gateways such as Google IAP consume that header for their own credentials.
   if (token) headers['X-Fa4-Session'] = token;
   const response = await fetch(`${BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -59,7 +66,9 @@ export const api = {
   continueWithBeeside: (previewToken?: string) => request<{ ok: true; resultId: string }>('POST', '/session/continue', { previewToken }),
   /** "Hablar con beeside": a message to contact@beeside.you. `clientRequestId` makes a retry / double click idempotent. */
   contact: (p: { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string; stage?: 'FA' | 'YEV' }) => request<SendResult>('POST', sessionStore.get() ? '/session/contact' : '/contact', { ...p, locale: document.documentElement.lang === 'en' ? 'en' : 'es' }, true),
-  emailStatus: (kind: 'resume' | 'result') => request<{ state: SendState | 'failed' | 'none' }>('GET', `/session/email-status?kind=${kind}`),
+  emailStatus: (kind: 'resume' | 'result', token?: string) => request<{ state: SendState | 'failed' | 'none' }>('GET', `/session/email-status?kind=${kind}`, undefined, true, token),
+  /** DSC-36: ONE continuation link per period for this (idle) tab's project. The token is passed explicitly: the tab's own token is dropped as soon as the answer arrives. `retry` asks for one more attempt of the SAME delivery. */
+  idleContinuation: (token: string, retry = false) => request<{ state: SendState }>('POST', '/session/idle-continuation', retry ? { retry: true } : {}, true, token),
   exchangeLink: (token: string) => request<{ sessionToken: string }>('POST', '/links/continue', { token }, false),
   requestLink: (email: string) => request<{ ok: true }>('POST', '/links/request', { email }, false),
 };

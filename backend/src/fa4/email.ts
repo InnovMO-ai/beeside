@@ -72,7 +72,12 @@ export interface EnqueueResult {
  *  - per-recipient quota: at most `recipientDailyQuota` FA4 emails to one address per 24 h, whatever the project or who asked.
  */
 export async function enqueueFa4Email(db: Db, projectId: string, template: Exclude<Fa4EmailTemplate, "fa4_contact_request">, now: Date, limits: Fa4EmailLimits, discriminator = ""): Promise<EnqueueResult> {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => enqueueFa4EmailIn(tx, projectId, template, now, limits, discriminator));
+}
+
+/** The body of `enqueueFa4Email`, to be run INSIDE a transaction (the per-recipient advisory lock is transaction-scoped and re-entrant). */
+export async function enqueueFa4EmailIn(tx: Db, projectId: string, template: Exclude<Fa4EmailTemplate, "fa4_contact_request">, now: Date, limits: Fa4EmailLimits, discriminator = ""): Promise<EnqueueResult> {
+  {
     const p = (await tx.query<{ email: string }>("SELECT email FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [projectId])).rows[0];
     if (!p) return { queued: false, deliveryId: null, blocked: "unknown_project" as const };
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_email:${p.email}`]);
@@ -98,7 +103,66 @@ export async function enqueueFa4Email(db: Db, projectId: string, template: Exclu
     // lost a race for the same bucket: report the delivery that won
     const winner = (await tx.query<{ delivery_id: string }>("SELECT delivery_id FROM fa4_email_delivery WHERE dedupe_key = $1", [`${template}:${projectId}:${discriminator}${bucket}${dead ? `:r${dead}` : ""}`])).rows[0];
     return { queued: false, deliveryId: winner?.delivery_id ?? null, blocked: "cooldown" as const };
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------
+// DSC-36 · inactivity and continuity. After 30 min without saved changes Discovery keeps the project (same project_id) and sends ONE secure continuation link
+// (the approved `fa4_resume_link` template, unchanged) to the registered address. One e-mail per PERIOD (period = the project's `updated_at`), whoever asks first
+// (the tab, a worker replica…), and never more than 24 h after the last activity (no mass send on activation). Nothing here changes, closes or deletes a project.
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------
+export interface IdleSettings { idleMinutes: number; windowHours: number }
+export function idleSettings(env: NodeJS.ProcessEnv = process.env): IdleSettings {
+  const n = (v: string | undefined, d: number, min: number, max: number) => { const x = Number(v); return Number.isFinite(x) && x >= min && x <= max ? x : d; };
+  return { idleMinutes: n(env.FA4_IDLE_CONTINUATION_MINUTES, 30, 1, 1440), windowHours: n(env.FA4_IDLE_WINDOW_HOURS, 24, 1, 168) };
+}
+
+export interface IdleEnqueueResult extends EnqueueResult {
+  /** Why the project is not eligible at all (the caller answers accordingly). */
+  notEligible?: "not_in_progress" | "unknown_project";
+}
+
+/**
+ * ONE continuation e-mail per period, atomically: under the per-recipient lock, if ANY `fa4_resume_link` of this project was created since its last change
+ * (in any state — also CANCELLED by the closed-test recipient policy and DEAD) that delivery is returned and nothing new is created; otherwise one is queued with a
+ * period-specific idempotency key. A refusal or a dead delivery is therefore never retried automatically by later sweeps.
+ */
+export async function enqueueIdleContinuation(db: Db, projectId: string, now: Date, limits: Fa4EmailLimits): Promise<IdleEnqueueResult> {
+  return db.transaction(async (tx) => {
+    const p = (await tx.query<{ email: string; status: string; updated_at: Date }>("SELECT email, status, updated_at FROM fa4_project WHERE project_id = $1 AND status <> 'ANONYMIZED'", [projectId])).rows[0];
+    if (!p) return { queued: false, deliveryId: null, blocked: "unknown_project" as const, notEligible: "unknown_project" as const };
+    if (p.status !== "IN_PROGRESS") return { queued: false, deliveryId: null, notEligible: "not_in_progress" as const };
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`fa4_email:${p.email}`]);
+    // the project may have been saved / delivered while we waited for the lock: read the period again under it
+    const fresh = (await tx.query<{ status: string; updated_at: Date }>("SELECT status, updated_at FROM fa4_project WHERE project_id = $1", [projectId])).rows[0]!;
+    if (fresh.status !== "IN_PROGRESS") return { queued: false, deliveryId: null, notEligible: "not_in_progress" as const };
+    const existing = await tx.query<{ delivery_id: string }>(
+      "SELECT delivery_id FROM fa4_email_delivery WHERE project_id = $1 AND template = 'fa4_resume_link' AND created_at >= $2 ORDER BY created_at DESC LIMIT 1", [projectId, fresh.updated_at]);
+    if (existing.rows[0]) return { queued: false, deliveryId: existing.rows[0].delivery_id, blocked: "cooldown" as const };
+    return enqueueFa4EmailIn(tx, projectId, "fa4_resume_link", now, limits, `idle:${fresh.updated_at.getTime()}:`);
   });
+}
+
+/** Projects that have been idle for `idleMinutes` (and for no more than `windowHours`) and have no continuation e-mail for their current period. Read-only. */
+export async function findIdleProjects(db: Db, now: Date, opts: Partial<IdleSettings> & { limit?: number } = {}): Promise<string[]> {
+  const s = { ...idleSettings(), ...opts };
+  const { rows } = await db.query<{ project_id: string }>(
+    `SELECT p.project_id FROM fa4_project p
+      WHERE p.status = 'IN_PROGRESS' AND p.updated_at <= $1 AND p.updated_at > $2
+        AND NOT EXISTS (SELECT 1 FROM fa4_email_delivery d WHERE d.project_id = p.project_id AND d.template = 'fa4_resume_link' AND d.created_at >= p.updated_at)
+      ORDER BY p.updated_at ASC LIMIT $3`,
+    [new Date(now.getTime() - s.idleMinutes * 60_000), new Date(now.getTime() - s.windowHours * 3_600_000), opts.limit ?? 50]);
+  return rows.map((r) => r.project_id);
+}
+
+/** One sweep (the worker runs it every 60 s; safe with several replicas: each project is decided under its recipient's lock). Returns counts only. */
+export async function sweepIdleContinuations(db: Db, now: Date, limits: Fa4EmailLimits, opts: Partial<IdleSettings> & { limit?: number } = {}): Promise<{ found: number; queued: number }> {
+  const ids = await findIdleProjects(db, now, opts); let queued = 0;
+  for (const id of ids) {
+    const r = await enqueueIdleContinuation(db, id, now, limits);
+    if (r.queued) { queued++; await recordEvent(db, { name: "resume_email_auto_queued", source: "server", projectId: id, props: { trigger: "worker" } }); }
+  }
+  return { found: ids.length, queued };
 }
 
 export interface ContactInput { name: string; company: string; email: string; message: string; shareProgress: boolean; clientRequestId: string; originStage?: "FA" | "YEV" }
