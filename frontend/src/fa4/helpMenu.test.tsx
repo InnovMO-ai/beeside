@@ -21,6 +21,15 @@ describe('DSC-37 · help mapping', () => {
     expect(helpIdsFor('cover', flags())).toEqual(['A', 'T', 'D']);
     expect(helpIdsFor('yevPreview', flags())).toEqual(['I', 'J', 'P']);
   });
+  it('matches the approved final mapping (DSC-37_HELP_CONTENT_v1 §3 + S1: G never mapped), row by row', () => {
+    const approved: Record<string, string[]> = {
+      cover: ['A', 'T', 'D'], identity: ['S', 'E', 'T'], company: ['P-1', 'B'], destinations: ['O', 'P'], activity: ['B', 'R'],
+      reason: ['C', 'D'],          // «Por qué y cuándo»: the reason step AND the decision step belong to this stage
+      decision: ['C', 'D'], size: ['D', 'C'],   // «Tamaño» row: the project-size block of the decision step
+      activators: ['R', 'C'], topics: ['Q', 'P-3', 'C'], extra: [], yevPreview: ['I', 'J', 'P'], yevDelivered: ['I', 'P'], recovery: ['E', 'F'],
+    };
+    expect(HELP_MAP).toEqual(approved);
+  });
   it('flags gate E, F, J, P; F requires E', () => {
     expect(helpIdsFor('recovery', flags())).toEqual([]);
     expect(helpIdsFor('recovery', flags({ E: true }))).toEqual(['E']);

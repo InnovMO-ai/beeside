@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildFlow, emptyAnswers, lastProjectStep, missingRequired, nextStep, normalizeStepKey, prevStep, STAGE_OF, stepKey, syncComponents,
   type Answers, type ClientResolution, type FlowContext, type Locale, type PublicCatalog, type StepRef, type YourExpansionViewModel, isLikelyPersonalEmail } from '@beeside/fa-public-engine';
-import { api, ApiError, confirmSend, RESUME_IDLE_MS, sessionStore, track, visitLocale } from './api';
+import { api, ApiError, confirmSend, RESUME_IDLE_MS, ACTIVITY_BEAT_MS, sessionStore, track, visitLocale } from './api';
 import { CoverScreen } from './components/CoverScreen';
 import { EnvRibbon } from './components/EnvRibbon';
 import { PersonalEmailDialog } from './components/PersonalEmailDialog';
@@ -200,8 +200,16 @@ export function Fa4App() {
   useEffect(() => {
     const bump = () => { lastActive.current = Date.now(); };
     const opts = { capture: true, passive: true } as const;
-    const evs = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'wheel', 'input'] as const;
+    const evs = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'wheel', 'input'] as const;
     for (const e of evs) window.addEventListener(e, bump, opts);
+    // DSC-36 · activity heartbeat: every 2 min, only while the tab is visible AND the person interacted since the last beat (never for a hidden / quiet tab)
+    let lastBeat = Date.now();
+    const beat = setInterval(() => {
+      const g = idleGuard.current;
+      if (!g.on || !g.token || document.visibilityState !== 'visible' || idleFired.current) return;
+      if (lastActive.current <= lastBeat) return;
+      lastBeat = Date.now(); void api.activity().catch(() => undefined);
+    }, ACTIVITY_BEAT_MS);
     const check = () => {
       const g = idleGuard.current; if (!g.on || !g.token) return;
       if (idleFired.current || Date.now() - lastActive.current < RESUME_IDLE_MS) return;
@@ -210,7 +218,7 @@ export function Fa4App() {
       void runIdle(g.token);
     };
     const t = setInterval(check, 15_000); document.addEventListener('visibilitychange', check);
-    return () => { for (const e of evs) window.removeEventListener(e, bump, opts); clearInterval(t); document.removeEventListener('visibilitychange', check); };
+    return () => { for (const e of evs) window.removeEventListener(e, bump, opts); clearInterval(t); clearInterval(beat); document.removeEventListener('visibilitychange', check); };
   }, [runIdle, locale]);
   useEffect(() => { lastActive.current = Date.now(); if (hasSession) idleFired.current = false; }, [hasSession]);
 

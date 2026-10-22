@@ -21,6 +21,7 @@ function mockApi(idle: (c: Call, n: number) => Response, opts: { session?: boole
     if (url === "/api/fa4/session/resolution") return json(clientResolution((c.body as { answers: never }).answers, SEED_CATALOG));
     if (url === "/api/fa4/session" && c.method === "GET" && opts.session !== false) return json({ answers: a, step: "decision", status: "IN_PROGRESS" });
     if (url === "/api/fa4/session" && c.method === "PUT") return json({ ok: true });
+    if (url === "/api/fa4/session/activity") return json({ ok: true });
     if (url === "/api/fa4/session/idle-continuation") return idle(c, ++idleN);
     if (url.startsWith("/api/fa4/session/email-status")) return json({ state: "sent" });
     if (url === "/api/fa4/links/request") return json({ ok: true });
@@ -28,6 +29,7 @@ function mockApi(idle: (c: Call, n: number) => Response, opts: { session?: boole
   }));
   return calls;
 }
+const beats = (calls: Call[]) => calls.filter((c) => c.url === "/api/fa4/session/activity");
 const idleCalls = (calls: Call[]) => calls.filter((c) => c.url === "/api/fa4/session/idle-continuation");
 beforeEach(() => { resetRuntimeConfigForTests(); vi.spyOn(window, "scrollTo").mockImplementation(() => undefined); sessionStorage.clear(); window.history.replaceState({}, "", "/fa4"); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -49,6 +51,17 @@ describe("13 · the tab after 30 min without interaction", () => {
     expect(idleCalls(calls)).toHaveLength(1); expect(idleCalls(calls)[0]!.auth).toBe("T".repeat(43));
     expect(sessionStorage.getItem("beeside.fa4.session")).toBeNull(); expect(document.body.textContent).not.toMatch(/@|lucia|nortica/i);
     await advance(10 * RESUME_IDLE_MS); expect(idleCalls(calls)).toHaveLength(1);                                          // no second call by itself
+  });
+  it("14b · activity heartbeat: beats only while the tab is visible AND the person interacted since the last beat; a quiet or hidden tab sends none", async () => {
+    const calls = mockApi(() => json({ state: "sent" })); await openResumed(true);
+    await advance(3 * 60_000); expect(beats(calls)).toHaveLength(0);                                   // opened, no interaction yet
+    fireEvent.pointerMove(document.body); await advance(2 * 60_000); expect(beats(calls)).toHaveLength(1);
+    await advance(10 * 60_000); expect(beats(calls)).toHaveLength(1);                                  // quiet: no more beats
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    fireEvent.keyDown(document.body, { key: "a" }); await advance(4 * 60_000); expect(beats(calls)).toHaveLength(1);   // hidden: none
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    fireEvent.scroll(window); await advance(2 * 60_000); expect(beats(calls)).toHaveLength(2);
+    expect(beats(calls)[0]!.auth).toBe("T".repeat(43)); expect(idleCalls(calls)).toHaveLength(0);
   });
   it("14 · interaction before the 30 min restarts the timer", async () => {
     const calls = mockApi(() => json({ state: "sent" })); await openResumed(true);

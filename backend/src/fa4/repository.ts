@@ -281,6 +281,17 @@ export async function saveProject(db: Db, projectId: string, answers: Answers, s
   );
 }
 
+/**
+ * DSC-36 · activity heartbeat. `updated_at` is the project's «last activity» (saves OR this beat). Only an IN_PROGRESS project is touched, never backwards, at most once per minute;
+ * nothing else is written. The caller answers the same whether or not a row changed.
+ */
+export async function touchProjectActivity(db: Db, projectId: string, now: Date): Promise<void> {
+  await db.query(
+    "UPDATE fa4_project SET updated_at = $2 WHERE project_id = $1 AND status = 'IN_PROGRESS' AND updated_at <= $2::timestamptz - interval '60 seconds'",
+    [projectId, now],
+  );
+}
+
 /** Projects of this email (most recently active first). Resume-by-email sends one project-specific link per project; never "the latest". */
 export async function recentProjectsForEmail(db: Db, email: string, limit: number): Promise<string[]> {
   const { rows } = await db.query<{ project_id: string }>(

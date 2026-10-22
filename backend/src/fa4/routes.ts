@@ -19,7 +19,7 @@ import { parseClientEvent, recordEvent } from "./events";
 import { cleanInput } from "./email-render";
 import {
   Fa4ProjectRow, LegalConfig, createProject, isDelivered, latestMarketingConsent, recordMarketingConsent, exchangeLinkToken, latestResult, loadPublishedCatalog, normalizeEmail,
-  projectByToken, recentProjectsForEmail, requestContinuation, saveProject,
+  projectByToken, recentProjectsForEmail, requestContinuation, saveProject, touchProjectActivity,
 } from "./repository";
 import { deliverResult, previewResult } from "./service";
 
@@ -217,6 +217,13 @@ export function createFa4Router(deps: Fa4Deps, security: { limiter?: RateLimiter
     if (!q.deliveryId) throw new FaError("NOT_FOUND", "no such project");
     if (q.queued) await recordEvent(deps.db, { name: "resume_email_auto_queued", source: "server", projectId: p.projectId, locale: p.answers.locale, props: { trigger: "tab" } });
     await settle(res, q.deliveryId, {}, p.email, bodyOf(req).retry === true);
+  }));
+
+  // DSC-36 · activity heartbeat of an OPEN, interacting tab (see docs/fa4/DSC36_ACTIVITY_SEMANTICS_PROPOSAL.md): keeps `updated_at` = last activity so the idle sweep never e-mails an active person.
+  router.post("/session/activity", handle(async (req, res) => {
+    const p = await session(req);
+    await touchProjectActivity(deps.db, p.projectId, deps.config.now());
+    res.json({ ok: true });
   }));
 
   // "Guardar y seguir después": a resume link to the email already captured (never asked again). The answer reflects the real delivery state.

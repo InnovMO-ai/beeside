@@ -16,6 +16,8 @@ const ACTIVITY_KEY = 'beeside.fa4.session.at';
  * re-opened: the tab asks the server for ONE continuation link (DSC-36) and drops its token; the person continues from the e-mailed link.
  */
 export const RESUME_IDLE_MS = 30 * 60 * 1000;
+/** DSC-36 · period of the activity heartbeat (the server collapses beats to at most one write per minute). */
+export const ACTIVITY_BEAT_MS = 2 * 60 * 1000;
 /** The language of the visit, kept in this tab so the continuity screen (which loads no answers) speaks it. */
 const LOCALE_KEY = 'beeside.fa4.locale';
 export const visitLocale = {
@@ -69,6 +71,8 @@ export const api = {
   emailStatus: (kind: 'resume' | 'result', token?: string) => request<{ state: SendState | 'failed' | 'none' }>('GET', `/session/email-status?kind=${kind}`, undefined, true, token),
   /** DSC-36: ONE continuation link per period for this (idle) tab's project. The token is passed explicitly: the tab's own token is dropped as soon as the answer arrives. `retry` asks for one more attempt of the SAME delivery. */
   idleContinuation: (token: string, retry = false) => request<{ state: SendState }>('POST', '/session/idle-continuation', retry ? { retry: true } : {}, true, token),
+  /** DSC-36: activity heartbeat (best effort): keeps the project's «last activity» fresh while the person interacts with an open tab. */
+  activity: () => request<{ ok: true }>('POST', '/session/activity', {}, true),
   exchangeLink: (token: string) => request<{ sessionToken: string }>('POST', '/links/continue', { token }, false),
   requestLink: (email: string) => request<{ ok: true }>('POST', '/links/request', { email }, false),
 };

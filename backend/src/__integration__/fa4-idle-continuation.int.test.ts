@@ -134,6 +134,19 @@ describeRt("DSC-36 — idle continuation", () => {
     expect((await q("SELECT project_id FROM fa4_project WHERE email = $1", [email])).map((r) => r.project_id)).toEqual([pid]);
     expect((await app().post("/api/fa4/links/continue").send({ token: tok })).status).not.toBe(200);                                       // single use
   });
+  it("13 · activity heartbeat: an ACTIVE tab (no save for 40 min) is never swept; without beats the sweep still finds it; never backwards, 1/min, only IN_PROGRESS, constant answer", async () => {
+    const { token, pid } = await start(); await idleSince(pid, 40);
+    expect((await findIdleProjects(rtDb, new Date())).includes(pid)).toBe(true);                   // no beat: idle by the worker's definition
+    const beat = () => app().post("/api/fa4/session/activity").set(auth(token)).send({});
+    const r = await beat(); expect(r.status).toBe(200); expect(r.body).toEqual({ ok: true });
+    expect((await findIdleProjects(rtDb, new Date())).includes(pid)).toBe(false);                  // the beat moved updated_at to «now»
+    await sweep(); expect(await links(pid)).toHaveLength(0);                                       // active person: no automatic e-mail
+    const t1 = (await q("SELECT updated_at FROM fa4_project WHERE project_id=$1", [pid]))[0].updated_at as Date;
+    const r2 = await beat(); expect(r2.body).toEqual({ ok: true });                                // within 60 s: nothing written, same answer
+    expect(((await q("SELECT updated_at FROM fa4_project WHERE project_id=$1", [pid]))[0].updated_at as Date).getTime()).toBe(t1.getTime());
+    await idleSince(pid, 31); await sweep(); expect(await links(pid)).toHaveLength(1);              // then inactivity (closed browser / asleep): the worker still protects the project
+    const noAuth = await app().post("/api/fa4/session/activity").send({}); expect(noAuth.status).toBe(401);
+  });
   it("12 · no log line and no response carries a token, a private URL or an address", async () => {
     const out: string[] = []; const spy = jest.spyOn(process.stdout, "write").mockImplementation(((c: unknown) => { out.push(String(c)); return true; }) as never);
     try {
