@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars (ignored by git) and fill in. Never commit the real value.
+# Recipient of KL operational alerts (M1). Must be the SAME address already configured in DEV so that `terraform plan` shows no changes.
+alert_email = "<correo-de-alertas>"

@@ -117,9 +117,15 @@ module "kl_runtime" {
 }
 
 variable "alert_email" {
-  description = "Recipient of KL operational alerts (M1). Changeable; email channel only."
+  # Protected configuration (PO decision 22-oct-2026): the recipient is NOT versioned. Provide it from an untracked terraform.tfvars
+  # (ignored by .gitignore; see terraform.tfvars.example) or TF_VAR_alert_email. With the same value as today, `plan` must show no changes.
+  description = "Recipient of KL operational alerts (M1). Email channel only; supplied outside the repository."
   type        = string
-  default     = "mo@beeside.you"
+  sensitive   = true
+  validation {
+    condition     = can(regex("^[^@<>\\s]+@[^@<>\\s]+\\.[^@<>\\s]+$", var.alert_email))
+    error_message = "alert_email must be a real email address supplied via terraform.tfvars (untracked) or TF_VAR_alert_email."
+  }
 }
 
 module "kl_alerting" {

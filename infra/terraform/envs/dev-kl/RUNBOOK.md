@@ -3,6 +3,8 @@
 Cada fase requiere aprobación expresa del PO. Estado de cada fase: pendiente. Precondiciones: `scripts/kl/preflight.sh --gate` en OK; Terraform ≥ 1.7; `gcloud` con la cuenta del operador; `cloud-sql-proxy` (usar `--gcloud-auth`, el ADC puede estar vencido).
 
 ## Fase 0 · plan sin cambios
+
+> **Configuración protegida (22-oct-2026).** `alert_email` ya no tiene valor por defecto en el repositorio. Antes de cualquier `plan` o `apply`, copia `terraform.tfvars.example` a `terraform.tfvars` (ignorado por git) con el MISMO destinatario que ya está configurado en DEV, o exporta `TF_VAR_alert_email`. Comprobación tras el cambio: `terraform plan -lock=false -detailed-exitcode` debe salir 0, sin cambios en `module.kl_alerting`.
 ```bash
 cd infra/terraform/envs/dev-kl
 terraform init            # estado propio: prefijo dev-kl; no toca el estado de envs/dev
