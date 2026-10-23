@@ -173,7 +173,7 @@ describeWithDb("Admin/Supervisor Control Center: sign-in, RBAC, operations and a
       periodEnd: new Date(h.clock.now.getTime() + 30 * DAY).toISOString(),
     });
     expect(confirmed.status).toBe(201);
-    expect(confirmed.body).toMatchObject({ subscriptionStatus: "PREMIUM_ACTIVE", handoffGenerated: true });
+    expect(confirmed.body).toMatchObject({ subscriptionStatus: "PREMIUM_ACTIVE", premiumAccessActive: true });
     expect((await post(admin, `/projects/${projectId}/premium/events`, { eventType: "premium_activated", requestId, periodEnd: new Date(h.clock.now.getTime() + 30 * DAY).toISOString() })).status).toBe(200);
     expect((await get(admin, `/projects/${projectId}/premium`)).body.activationRequests[0].status).toBe("FULFILLED");
 

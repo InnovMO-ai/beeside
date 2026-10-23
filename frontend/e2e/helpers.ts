@@ -1,16 +1,17 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import axeSource from "axe-core";
 import type { Answers } from "@beeside/fa-public-engine";
+import { API } from "./paths";
 
 /** Create a project server-side from fixture answers (as if the identity step were done) and return its working-session token. */
 export async function seed(request: APIRequestContext, answers: Answers, step: string): Promise<string> {
-  const r = await request.post("/api/fa4/sessions", { data: { answers, step } });
+  const r = await request.post(`${API}/sessions`, { data: { answers, step } });
   expect(r.ok(), await r.text()).toBeTruthy();
   return ((await r.json()) as { sessionToken: string }).sessionToken;
 }
 /** Opens /fa4 with this tab's working session (what a returning visitor has after the emailed link is exchanged). */
 export async function open(page: Page, token: string) {
-  await page.addInitScript((t) => sessionStorage.setItem("beeside.fa4.session", t), token);
+  await page.addInitScript((t) => { sessionStorage.setItem("beeside.fa4.session", t); sessionStorage.setItem("beeside.fa4.session.at", String(Date.now())); }, token);
   await page.goto("/fa4");
 }
 

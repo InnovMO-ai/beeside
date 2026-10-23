@@ -1,0 +1,2 @@
+HTTP 200
+{"status":"revoked","revokedOn":"2026-10-22","editionCode":"2026.10","publishedOn":"2026-10-22"}

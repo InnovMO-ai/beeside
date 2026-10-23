@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Knowledge Demand</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Sin señales reales: el puerto de Precision está apagado. La fila mostrada es el caso de aceptación A03 (ferrocarril Manzanillo–Guanajuato); sus conteos son marcadores.</p>
+<h1 class="admin-title">Knowledge Layer</h1>
+<nav aria-label="Knowledge Layer"><div class="admin-tabs"><a href="KL-01-Overview.dc.html">Overview</a><a href="KL-02-Sources.dc.html">Source Registry</a><a href="KL-03-Agents.dc.html">Agent Operations</a><a href="KL-04-Repository.dc.html">Knowledge Repository</a><a href="KL-05-Demand.dc.html" aria-current="page">Knowledge Demand</a><a href="KL-06-Seed.dc.html">Seed Management</a><a href="KL-07-Products.dc.html">Knowledge Products</a><a href="KL-08-Settings.dc.html">Governance &amp; Settings</a></div></nav>
+<p class="kl-sub" lang="es">Señales anónimas agrupadas por país, región, tema, categoría, servicio y tipo de información. Sin texto del cliente ni project_id. La recurrencia nunca publica nada: informa una decisión humana.</p>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Topic</th><th scope="col">Country · region</th><th scope="col">Category</th><th scope="col">Type</th><th scope="col">Coverage</th><th scope="col">Signals</th><th scope="col">Distinct projects</th><th scope="col">Candidate</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Decide</span></th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>logistics.rail.port_hinterland</code></th><td>MX · <span class="kl-nowrap">MX-COL</span> → <span class="kl-nowrap">MX-GUA</span></td><td><code>logistics</code></td><td>Context</td><td>not_available</td><td>[n]</td><td>[n]</td><td>knowledge_candidate</td><td><span class="admin-badge" data-tone="attention">Open</span></td><td><a href="KL-05a-DemandDecide.dc.html">Decide</a></td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">"Proyectos distintos" se cuenta con una clave opaca HMAC cuyo secreto solo tiene Precision; KL no puede revertirla.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

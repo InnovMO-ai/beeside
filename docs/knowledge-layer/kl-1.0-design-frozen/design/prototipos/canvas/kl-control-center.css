@@ -1,0 +1,144 @@
+/* KL Admin · prototipo de Design.
+   PARTE 1 — copia literal de las reglas del Control Center (frontend/src/styles.css, rama feat/fa4-launch-config,
+   idénticas en a8f8f3e): tokens, base, botones, campos y bloque "control center (internal)".
+   PARTE 2 — adiciones de KL, mínimas y con los mismos tokens. Nada de un sistema de diseño paralelo. */
+
+/* ---------------- PARTE 1 · Control Center (copia) ---------------- */
+:root {
+  --purple-900: #2e0879;
+  --purple-600: #7357c1;
+  --purple-200: #b9aedd;
+  --heading: var(--purple-900);
+  --teal-700: #0f766e;
+  --teal-100: #ccece8;
+  --ink: #17181b;
+  --ink-soft: #54555c;
+  --ink-faint: #75767c;
+  --white: #ffffff;
+  --mist: #f1f1fa;
+  --border: #e3e3ea;
+  --radius: 10px;
+  --font: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--white); color: var(--ink); font-family: var(--font); font-size: 1.0625rem; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+a { color: var(--purple-900); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--purple-600); outline-offset: 3px; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lead { margin: 0 0 2rem; font-size: clamp(1.125rem, 2vw, 1.3rem); color: var(--ink-soft); }
+.helper { margin: 0.5rem 0 0; color: var(--ink-soft); font-size: 0.9375rem; }
+.field { margin: 0 0 1.5rem; }
+.field label, .field .label { display: block; margin-bottom: 0.4rem; font-weight: 700; }
+.input, .textarea, .select { width: 100%; font: inherit; color: var(--ink); background: var(--white); border: 1px solid var(--ink-faint); border-radius: var(--radius); padding: 0.75rem 0.9rem; }
+.textarea { min-height: 9rem; resize: vertical; }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--purple-900); }
+.field-error { margin: 0.4rem 0 0; color: #9b1c31; font-size: 0.9375rem; }
+.button { font: inherit; font-weight: 700; border-radius: var(--radius); padding: 0.85rem 1.6rem; border: 1px solid var(--purple-900); cursor: pointer; min-height: 3rem; }
+.button-primary { background: var(--purple-900); color: var(--white); }
+.button-primary:disabled { opacity: 0.55; cursor: progress; }
+.button-secondary { background: var(--white); color: var(--purple-900); }
+.button-text { border-color: transparent; background: transparent; color: var(--purple-900); padding-left: 0.25rem; padding-right: 0.25rem; }
+a.button { display: inline-flex; align-items: center; text-decoration: none; }
+
+.admin-shell { min-height: 100vh; background: var(--white); }
+.admin-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem clamp(1rem, 3vw, 2rem); border-bottom: 1px solid var(--mist); }
+.admin-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--purple-900); }
+.admin-logo { height: 48px; width: auto; }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.admin-nav button, .admin-tabs button { font: inherit; border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--ink); padding: 0.45rem 0.85rem; cursor: pointer; }
+.admin-nav button[aria-current="page"], .admin-tabs button[aria-selected="true"] { border-color: var(--purple-900); color: var(--purple-900); font-weight: 700; }
+.admin-user { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9375rem; }
+.admin-page { padding: 1.5rem clamp(1rem, 3vw, 2rem) 3rem; max-width: 90rem; }
+.admin-title { margin: 0.5rem 0 1rem; font-size: clamp(1.5rem, 2.5vw, 2rem); }
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0 0 1rem; }
+.admin-search, .admin-actions, .admin-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0.75rem 0; }
+.admin-search .input { max-width: 28rem; }
+.admin-actions .input { width: auto; min-width: 12rem; }
+.admin-form-row label { display: grid; gap: 0.25rem; font-size: 0.875rem; }
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem; }
+@media (max-width: 480px) { .admin-grid { grid-template-columns: 1fr; } }
+.admin-card { padding: 1rem 1.25rem; border: 1px solid #e3e3ea; border-radius: var(--radius); margin-bottom: 1rem; min-width: 0; }
+.admin-card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.admin-wide { grid-column: 1 / -1; }
+.admin-kv { display: grid; gap: 0.4rem; margin: 0; }
+.admin-kv div { display: grid; grid-template-columns: minmax(9rem, 14rem) 1fr; gap: 0.75rem; }
+.admin-kv dt { color: var(--ink-soft); font-size: 0.875rem; }
+.admin-kv dd { margin: 0; overflow-wrap: anywhere; }
+.admin-table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.admin-table th, .admin-table td { text-align: left; vertical-align: top; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--mist); }
+.admin-table th { color: var(--ink-soft); font-weight: 700; white-space: nowrap; }
+.admin-table code, .admin-kv code { font-size: 0.8rem; overflow-wrap: anywhere; }
+.admin-badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--mist); font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+.admin-badge[data-role="ADMIN"] { background: var(--purple-900); color: var(--white); }
+.admin-badge[data-outcome="DENIED"], .admin-badge[data-outcome="FAILED"] { background: #fff1f3; color: #be123c; }
+.admin-link { font: inherit; border: 0; background: none; padding: 0; color: var(--purple-900); text-decoration: underline; cursor: pointer; text-align: left; }
+.admin-notice { padding: 0.6rem 0.9rem; border-radius: var(--radius); background: var(--mist); }
+.admin-error { color: #9b1c31; }
+.admin-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ---------------- PARTE 2 · adiciones de KL ---------------- */
+/* Navegación del prototipo con enlaces: misma apariencia que los botones del Control Center. */
+.admin-nav a, .admin-tabs a { display: inline-block; font: inherit; border: 1px solid transparent; border-radius: var(--radius); color: var(--ink); padding: 0.45rem 0.85rem; text-decoration: none; }
+.admin-nav a[aria-current="page"], .admin-tabs a[aria-current="page"] { border-color: var(--purple-900); color: var(--purple-900); font-weight: 700; }
+/* Tonos de estado: los mismos valores ya validados en styles.css (tone ok / attention / error / neutral). Texto siempre presente: el color nunca es la única señal. */
+.admin-badge[data-tone="ok"] { background: #e8f6f4; color: #0f766e; }
+.admin-badge[data-tone="attention"] { background: #fff9db; color: #8a6800; }
+.admin-badge[data-tone="error"] { background: #fff1f3; color: #be123c; }
+.admin-badge[data-tone="info"] { background: var(--mist); color: var(--purple-900); }
+.admin-badge[data-tone="muted"] { background: #f4f4f5; color: #52525b; }
+.kl-proto { margin: 0 0 1rem; font-size: 0.875rem; }
+.kl-sub { margin: -0.5rem 0 1rem; color: var(--ink-soft); font-size: 0.9375rem; }
+.kl-stat { display: grid; gap: 0.15rem; }
+.kl-stat b { font-size: 1.6rem; line-height: 1.1; color: var(--purple-900); }
+.kl-stat span { color: var(--ink-soft); font-size: 0.875rem; }
+.kl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
+.kl-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.kl-checks li { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; align-items: start; }
+.kl-guard { padding: 0.6rem 0.9rem; border-radius: var(--radius); border: 1px solid #f3de7a; background: #fff9db; color: #5c4600; }
+.kl-steps { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; margin: 0 0 1rem; padding: 0; list-style: none; font-size: 0.875rem; color: var(--ink-soft); }
+.kl-steps li[aria-current="step"] { color: var(--purple-900); font-weight: 700; }
+.kl-split { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.kl-split > .kl-main { flex: 999 1 34rem; min-width: 0; }
+.kl-split > .kl-side { flex: 1 1 18rem; min-width: 0; }
+.admin-table tbody th { color: var(--ink); white-space: normal; }
+.kl-muted { color: var(--ink-soft); }
+.kl-row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+@media (max-width: 480px) { .admin-kv div { grid-template-columns: 1fr; gap: 0.1rem; } .button { width: 100%; justify-content: center; } }
+
+/* ---------------- PARTE 3 · corrección responsive (16-oct-2026) ----------------
+   Causa raíz: la regla copiada del Control Center `.admin-kv div { grid-template-columns: minmax(9rem, 14rem) 1fr }`
+   reserva hasta 14rem para la etiqueta y deja el valor en `1fr`, cuyo mínimo es el min-content del <dd>; como el <dd>
+   lleva `overflow-wrap: anywhere`, ese mínimo es un solo carácter. En los paneles laterales (~18rem: Review, Editorial
+   approval) el valor queda en ~1rem y el texto se parte letra por letra. Además el selector descendiente `div`
+   alcanzaba divs anidados. Corrección: texto normal sin cortes arbitrarios, ancho mínimo legible por componente y
+   reflujo (apilar) por ancho del contenedor, no del viewport. Solo los identificadores largos se cortan en cualquier punto. */
+.admin-kv { container-type: inline-size; }
+.admin-kv div { display: block; }
+.admin-kv > div { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr); gap: 0.75rem; }
+@container (max-width: 30rem) { .admin-kv > div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; } }
+.admin-kv dd { overflow-wrap: break-word; min-width: 0; }
+.admin-kv .admin-badge { white-space: normal; }
+/* Identificadores, hashes, claves y correos: corte en cualquier punto, solo ellos. */
+.admin-table code, .admin-kv code, .kl-id { overflow-wrap: anywhere; word-break: normal; }
+/* Tablas: nunca comprimir por debajo de una palabra legible; si no caben, desplazamiento horizontal local. */
+.admin-table-wrap { overflow-x: auto; max-width: 100%; }
+.admin-table th, .admin-table td { overflow-wrap: normal; }
+/* Ancho mínimo de tabla según número de columnas (las celdas de tabla ignoran min-width): por debajo, desplazamiento local. */
+.admin-table:has(thead th:nth-child(3)) { min-width: 34rem; }
+.admin-table:has(thead th:nth-child(5)) { min-width: 46rem; }
+.admin-table:has(thead th:nth-child(7)) { min-width: 58rem; }
+.admin-table:has(thead th:nth-child(9)) { min-width: 72rem; }
+.admin-table td code { display: inline-block; min-width: 12ch; }
+/* Paneles: ancho mínimo legible y apilado cuando no caben. */
+.kl-split > .kl-main { flex: 999 1 34rem; min-width: min(100%, 22rem); }
+.kl-split > .kl-side { flex: 1 1 20rem; min-width: min(100%, 18rem); }
+.admin-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.kl-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+.kl-checks li { grid-template-columns: auto minmax(0, 1fr); }
+.admin-page, .admin-card, .kl-main, .kl-side { min-width: 0; }
+/* El texto accesible oculto (.visually-hidden, posición absoluta) dentro de una tabla desplazable debe quedar contenido en ella, no en la página. */
+.admin-table-wrap { position: relative; }
+/* Fechas y códigos con guion (25-nov-2026, AC-02, MX-GUA): no se parten en el guion. */
+.kl-nowrap { white-space: nowrap; }

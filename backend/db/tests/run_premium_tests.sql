@@ -204,9 +204,23 @@ BEGIN
   PERFORM pg_temp.assert_that('S18', v_ent.premium_access_active AND v_ent.effective_until = v_end,
     'a scheduled cancellation keeps premium_access_active=true until current_period_end (Phase 2 sync corrected)');
 
+  -- A cancellation can be WITHDRAWN (recurring billing), but only as a whole: the cancellation fields must be cleared.
   PERFORM pg_temp.expect_error('S19',
     format($q$UPDATE subscription SET status = 'PREMIUM_ACTIVE' WHERE subscription_id = %L$q$, v_sub),
-    'BV409', 'cannot move from CANCELLATION_SCHEDULED to PREMIUM_ACTIVE');
+    'BV409', 'carries no scheduled cancellation');
+  PERFORM pg_temp.expect_error('S19b',
+    format($q$UPDATE subscription SET current_period_end = current_period_end - interval '1 day' WHERE subscription_id = %L$q$, v_sub),
+    'BV409', 'only moves forward');
+  PERFORM pg_temp.expect_error('S19c',
+    format($q$UPDATE subscription SET auto_renews = NOT auto_renews WHERE subscription_id = %L$q$, v_sub),
+    'BV409', 'renewal mode are immutable');
+  UPDATE subscription SET status = 'PREMIUM_ACTIVE', cancel_at_period_end = false, cancellation_requested_at = NULL WHERE subscription_id = v_sub;
+  SELECT * INTO v_ent FROM entitlement WHERE project_id = v_project;
+  PERFORM pg_temp.assert_that('S19d', v_ent.premium_access_active AND v_ent.effective_until IS NULL
+      AND (SELECT count(*) FROM subscription_state_transition WHERE subscription_id = v_sub AND from_state = 'CANCELLATION_SCHEDULED' AND to_state = 'PREMIUM_ACTIVE') = 1,
+    'withdrawing the cancellation restores the open paid term and leaves the transition in the ledger');
+  UPDATE subscription SET current_period_end = current_period_end + interval '30 days', updated_at = now() WHERE subscription_id = v_sub;
+  UPDATE subscription SET status = 'CANCELLATION_SCHEDULED', cancel_at_period_end = true, cancellation_requested_at = now() WHERE subscription_id = v_sub;
   PERFORM pg_temp.expect_error('S20',
     format($q$UPDATE subscription SET status = 'PREMIUM_INACTIVE' WHERE subscription_id = %L$q$, v_sub),
     'BV409', 'records ended_at');
@@ -245,7 +259,7 @@ BEGIN
     v_ent.premium_access_active AND v_ent.effective_from = v_start AND v_ent.effective_until IS NULL
       AND (SELECT count(*) FROM subscription WHERE project_id = v_project) = 2
       AND (SELECT count(*) FROM precision_handoff_package WHERE project_id = v_project) = 1
-      AND (SELECT count(*) FROM subscription_state_transition WHERE project_id = v_project) = 4,
+      AND (SELECT count(*) FROM subscription_state_transition WHERE project_id = v_project) = 6, -- insert, cancel, withdraw, cancel, end, reactivation
     'reactivation: same project_id, a second subscription row, access active again, still exactly one handoff package');
 
   PERFORM pg_temp.expect_error('S25',

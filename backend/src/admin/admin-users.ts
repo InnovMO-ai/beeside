@@ -50,11 +50,13 @@ export async function listAdminUsers(db: Db): Promise<AdminUserView[]> {
   return rows.map(view);
 }
 
-export async function provisionAdminUser(db: Db, input: { email: unknown; role: unknown }, now: Date): Promise<AdminUserView> {
+export async function provisionAdminUser(db: Db, input: { email: unknown; role: unknown }, now: Date, actorRole: AdminRole | "SYSTEM" = "SYSTEM"): Promise<AdminUserView> {
   const email = typeof input.email === "string" ? normalizeEmail(input.email) : "";
   if (!isValidEmail(email)) throw new FaError("INVALID_INPUT", "a valid work email is required", { fields: ["email"] });
   if (email.endsWith("@beeside.internal")) throw new FaError("INVALID_INPUT", "technical identities cannot sign in", { fields: ["email"] });
-  if (!isAdminRole(input.role)) throw new FaError("INVALID_INPUT", "role must be ADMIN or SUPERVISOR", { fields: ["role"] });
+  if (!isAdminRole(input.role)) throw new FaError("INVALID_INPUT", "role must be ADMIN, SUPER_ADMIN or SUPERVISOR", { fields: ["role"] });
+  // Privilege escalation guard: only a SUPER_ADMIN (or the system bootstrap) can create one.
+  if (input.role === "SUPER_ADMIN" && actorRole !== "SUPER_ADMIN" && actorRole !== "SYSTEM") throw new FaError("NOT_APPLICABLE", "only a SUPER_ADMIN can provision a SUPER_ADMIN");
   const existing = await db.query<AdminUserRow>("SELECT admin_user_id, auth_identity, role, active, login_enabled, auth_subject, last_login_at, created_at FROM admin_user WHERE auth_identity = $1", [email]);
   if (existing.rows[0]) throw new FaError("NOT_APPLICABLE", "this person is already provisioned");
   const { rows } = await db.query<AdminUserRow>(
@@ -76,7 +78,7 @@ export async function updateAdminUser(
   input: { role?: unknown; active?: unknown },
   now: Date,
 ): Promise<{ user: AdminUserView; before: AdminUserView; sessionsRevoked: number }> {
-  if (input.role !== undefined && !isAdminRole(input.role)) throw new FaError("INVALID_INPUT", "role must be ADMIN or SUPERVISOR", { fields: ["role"] });
+  if (input.role !== undefined && !isAdminRole(input.role)) throw new FaError("INVALID_INPUT", "role must be ADMIN, SUPER_ADMIN or SUPERVISOR", { fields: ["role"] });
   if (input.active !== undefined && typeof input.active !== "boolean") throw new FaError("INVALID_INPUT", "active must be true or false", { fields: ["active"] });
   if (targetId === actorAdminUserId) throw new FaError("NOT_APPLICABLE", "you cannot change your own role or access");
   const current = await db.query<AdminUserRow>(
@@ -85,6 +87,11 @@ export async function updateAdminUser(
   );
   const before = current.rows[0];
   if (!before || !before.login_enabled) throw new FaError("NOT_FOUND", "admin user not found");
+  // Privilege escalation guard: only a SUPER_ADMIN may grant, remove or touch SUPER_ADMIN.
+  const actorRow = await db.query<{ role: AdminRole }>("SELECT role FROM admin_user WHERE admin_user_id = $1", [actorAdminUserId]);
+  if (actorRow.rows[0]?.role !== "SUPER_ADMIN" && (before.role === "SUPER_ADMIN" || input.role === "SUPER_ADMIN")) {
+    throw new FaError("NOT_APPLICABLE", "only a SUPER_ADMIN can change a SUPER_ADMIN");
+  }
   const role = (input.role as AdminRole | undefined) ?? before.role;
   const active = (input.active as boolean | undefined) ?? before.active;
   try {

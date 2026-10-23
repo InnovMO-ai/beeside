@@ -1,0 +1,1068 @@
+{
+ "schema": "value-labels.v1",
+ "status": "PROVISIONAL_PENDING_CONTENT_APPROVAL",
+ "values": {
+  "3pl": {
+   "en": "Third-party logistics",
+   "es": "Logística con terceros"
+  },
+  "CAP_SA_GS_BOARD": {
+   "en": "Strategic advisory board support",
+   "es": "Asesoría estratégica externa periódica"
+  },
+  "CAP_SA_GS_GTM": {
+   "en": "Commercial and go-to-market strategy",
+   "es": "Estrategia comercial y de entrada al mercado"
+  },
+  "CAP_SA_GS_PARTNERSHIP": {
+   "en": "Partnership and capability strategy",
+   "es": "Estrategia de alianzas y capacidades"
+  },
+  "CAP_SA_GS_PLAYBOOK": {
+   "en": "Growth strategy playbook",
+   "es": "Estrategia para un reto de crecimiento"
+  },
+  "CAP_SA_ME_APPETITE": {
+   "en": "Opportunity fit",
+   "es": "Encaje de la oportunidad"
+  },
+  "CAP_SA_ME_COUNTRY_BRIEF": {
+   "en": "Country and market brief",
+   "es": "Panorama del país y del mercado"
+  },
+  "CAP_SA_ME_FEASIBILITY": {
+   "en": "Feasibility report",
+   "es": "Informe de viabilidad"
+  },
+  "CAP_SA_ME_MARKET_ACCESS": {
+   "en": "Market access strategy",
+   "es": "Estrategia de acceso al mercado"
+  },
+  "CAP_SA_RC_BUSINESS_CHECK": {
+   "en": "Business check",
+   "es": "Verificación de una empresa"
+  },
+  "CAP_SA_RC_COI": {
+   "en": "Conflict of interest review",
+   "es": "Revisión de conflictos de interés"
+  },
+  "CAP_SA_RC_DEEP_DIVE": {
+   "en": "Deep-dive assessment",
+   "es": "Evaluación a fondo de una contraparte"
+  },
+  "CAP_SA_RC_QUALIFICATION": {
+   "en": "Third-party qualification",
+   "es": "Calificación de proveedores o socios"
+  },
+  "CFR": {
+   "en": "CFR",
+   "es": "CFR"
+  },
+  "CIF": {
+   "en": "CIF",
+   "es": "CIF"
+  },
+  "CIP": {
+   "en": "CIP",
+   "es": "CIP"
+  },
+  "CPT": {
+   "en": "CPT",
+   "es": "CPT"
+  },
+  "DAP": {
+   "en": "DAP",
+   "es": "DAP"
+  },
+  "DDP": {
+   "en": "DDP",
+   "es": "DDP"
+  },
+  "DPU": {
+   "en": "DPU",
+   "es": "DPU"
+  },
+  "EXW": {
+   "en": "EXW",
+   "es": "EXW"
+  },
+  "FAS": {
+   "en": "FAS",
+   "es": "FAS"
+  },
+  "FCA": {
+   "en": "FCA",
+   "es": "FCA"
+  },
+  "FOB": {
+   "en": "FOB",
+   "es": "FOB"
+  },
+  "accounting_bookkeeping": {
+   "en": "Accounting and bookkeeping",
+   "es": "Contabilidad"
+  },
+  "administrative_support": {
+   "en": "Administrative support",
+   "es": "Apoyo administrativo"
+  },
+  "agent": {
+   "en": "Agent",
+   "es": "Agente"
+  },
+  "agreed_upon_procedures": {
+   "en": "Agreed-upon procedures",
+   "es": "Procedimientos acordados"
+  },
+  "agreed_upon_procedures_and_assurance": {
+   "en": "Agreed-upon procedures and assurance",
+   "es": "Procedimientos acordados y aseguramiento"
+  },
+  "air": {
+   "en": "Air",
+   "es": "Aéreo"
+  },
+  "apa_safe_harbor_support": {
+   "en": "Advance pricing agreement (APA) and safe harbor support",
+   "es": "Apoyo en acuerdos anticipados de precios (APA) y puerto seguro"
+  },
+  "apostille_and_document_legalization": {
+   "en": "Apostille and document legalization",
+   "es": "Apostilla y legalización de documentos"
+  },
+  "application_filed": {
+   "en": "Application filed",
+   "es": "Solicitud presentada"
+  },
+  "applied": {
+   "en": "Applied for",
+   "es": "Solicitado"
+  },
+  "as_needed": {
+   "en": "As needed",
+   "es": "Según se requiera"
+  },
+  "asset_transfer": {
+   "en": "Asset transfer",
+   "es": "Transferencia de activos"
+  },
+  "audits_and_inspections": {
+   "en": "Audits and inspections",
+   "es": "Auditorías e inspecciones"
+  },
+  "beps_compliance": {
+   "en": "BEPS compliance (base erosion and profit shifting)",
+   "es": "Cumplimiento BEPS (erosión de la base imponible y traslado de beneficios)"
+  },
+  "bonded_warehouse": {
+   "en": "Bonded warehouse",
+   "es": "Recinto fiscalizado"
+  },
+  "both": {
+   "en": "Both",
+   "es": "Ambas"
+  },
+  "branch_closure": {
+   "en": "Branch closure",
+   "es": "Cierre de sucursal"
+  },
+  "business_document_translation": {
+   "en": "Business document translation",
+   "es": "Traducción de documentos empresariales"
+  },
+  "certificate_of_origin": {
+   "en": "Certificate of origin",
+   "es": "Certificado de origen"
+  },
+  "certified": {
+   "en": "Certified",
+   "es": "Certificado"
+  },
+  "certified_sworn_translation": {
+   "en": "Certified or sworn translation",
+   "es": "Traducción certificada o jurada"
+  },
+  "channel": {
+   "en": "Channel",
+   "es": "Canal"
+  },
+  "classified": {
+   "en": "Classified",
+   "es": "Clasificada"
+  },
+  "clinic_on_site": {
+   "en": "On-site clinic",
+   "es": "Consultorio en las instalaciones"
+  },
+  "commercial_contracts": {
+   "en": "Commercial contracts",
+   "es": "Contratos comerciales"
+  },
+  "commercial_invoice": {
+   "en": "Commercial invoice",
+   "es": "Factura comercial"
+  },
+  "company": {
+   "en": "Company",
+   "es": "Empresa"
+  },
+  "company_incorporation_corporate_setup": {
+   "en": "Company incorporation and corporate setup",
+   "es": "Constitución de empresa y configuración corporativa"
+  },
+  "compensation_studies": {
+   "en": "Compensation studies",
+   "es": "Estudios de compensación"
+  },
+  "competition": {
+   "en": "Competition",
+   "es": "Competencia"
+  },
+  "compliant": {
+   "en": "Compliant",
+   "es": "Al corriente"
+  },
+  "contract_review": {
+   "en": "Contract review",
+   "es": "Revisión de contratos"
+  },
+  "contractor": {
+   "en": "Contractor",
+   "es": "Contratista"
+  },
+  "copyright": {
+   "en": "Copyright",
+   "es": "Derecho de autor"
+  },
+  "corporate_governance": {
+   "en": "Corporate governance",
+   "es": "Gobierno corporativo"
+  },
+  "corporate_secretarial_support": {
+   "en": "Corporate secretarial support",
+   "es": "Apoyo de secretaría corporativa"
+  },
+  "corporate_transactional_advisory": {
+   "en": "Corporate and transactional advisory",
+   "es": "Asesoría corporativa y transaccional"
+  },
+  "cost_sharing": {
+   "en": "Cost sharing",
+   "es": "Reparto de costos"
+  },
+  "counterparty_draft_to_review": {
+   "en": "Counterparty draft to review",
+   "es": "Borrador de la contraparte por revisar"
+  },
+  "courier_parcel_delivery": {
+   "en": "Courier and parcel delivery",
+   "es": "Mensajería y paquetería"
+  },
+  "covered": {
+   "en": "Covered",
+   "es": "Cubierto"
+  },
+  "cross_border_transfers": {
+   "en": "Cross-border transfers",
+   "es": "Transferencias transfronterizas"
+  },
+  "cross_docking": {
+   "en": "Cross-docking",
+   "es": "Transbordo directo"
+  },
+  "customer": {
+   "en": "Customer",
+   "es": "Cliente"
+  },
+  "customer_data": {
+   "en": "Customer data",
+   "es": "Datos de clientes"
+  },
+  "customs_advisory": {
+   "en": "Customs advisory",
+   "es": "Asesoría aduanera"
+  },
+  "customs_brokerage": {
+   "en": "Customs brokerage",
+   "es": "Agenciamiento aduanal"
+  },
+  "customs_compliance_reviews": {
+   "en": "Customs compliance reviews",
+   "es": "Revisiones de cumplimiento aduanero"
+  },
+  "customs_valuation": {
+   "en": "Customs valuation",
+   "es": "Valoración aduanera"
+  },
+  "data_privacy_support": {
+   "en": "Data privacy support",
+   "es": "Apoyo en privacidad de datos"
+  },
+  "decided_to_incorporate": {
+   "en": "Decided to incorporate",
+   "es": "Decidido a constituir una entidad"
+  },
+  "dedicated_transportation": {
+   "en": "Dedicated transportation",
+   "es": "Transporte dedicado"
+  },
+  "direct_entity": {
+   "en": "Direct hiring through a local entity",
+   "es": "Contratación directa mediante entidad local"
+  },
+  "distribution": {
+   "en": "Distribution",
+   "es": "Distribución"
+  },
+  "distribution_center_operations": {
+   "en": "Distribution center operations",
+   "es": "Operación de centros de distribución"
+  },
+  "distributor": {
+   "en": "Distributor",
+   "es": "Distribuidor"
+  },
+  "distributor_or_agent": {
+   "en": "Distributor or agent",
+   "es": "Distribuidor o agente"
+  },
+  "domain_name": {
+   "en": "Domain name",
+   "es": "Nombre de dominio"
+  },
+  "draft_exists": {
+   "en": "A draft exists",
+   "es": "Existe un borrador"
+  },
+  "drawback": {
+   "en": "Duty drawback",
+   "es": "Devolución de aranceles"
+  },
+  "duty_drawback": {
+   "en": "Duty drawback",
+   "es": "Devolución de aranceles"
+  },
+  "electronic_accounting": {
+   "en": "Electronic accounting",
+   "es": "Contabilidad electrónica"
+  },
+  "employee": {
+   "en": "Employee",
+   "es": "Persona empleada"
+  },
+  "employee_benefits": {
+   "en": "Employee benefits",
+   "es": "Prestaciones al personal"
+  },
+  "employee_data": {
+   "en": "Employee data",
+   "es": "Datos de personal"
+  },
+  "employer_of_record_eor": {
+   "en": "Employer of record",
+   "es": "Empleador de registro"
+  },
+  "employment": {
+   "en": "Employment",
+   "es": "Laboral"
+  },
+  "engaged": {
+   "en": "Engaged",
+   "es": "Contratado"
+  },
+  "enrolled": {
+   "en": "Enrolled",
+   "es": "Inscrito"
+  },
+  "entity_closure": {
+   "en": "Entity closure",
+   "es": "Cierre de la entidad"
+  },
+  "entity_in_process": {
+   "en": "Entity in process",
+   "es": "Entidad en proceso"
+  },
+  "entity_registered": {
+   "en": "Entity registered",
+   "es": "Entidad registrada"
+  },
+  "entry": {
+   "en": "Entry level",
+   "es": "Nivel inicial"
+  },
+  "eor_peo": {
+   "en": "Employer of record or professional employer organization (PEO)",
+   "es": "Empleador de registro u organización de empleadores profesionales (PEO)"
+  },
+  "evaluating": {
+   "en": "Evaluating",
+   "es": "En evaluación"
+  },
+  "evaluating_options": {
+   "en": "Evaluating options",
+   "es": "Evaluando opciones"
+  },
+  "executive": {
+   "en": "Executive",
+   "es": "Directivo"
+  },
+  "executive_search": {
+   "en": "Executive search",
+   "es": "Búsqueda de ejecutivos"
+  },
+  "exists": {
+   "en": "Exists",
+   "es": "Existe"
+  },
+  "exploring": {
+   "en": "Exploring options",
+   "es": "Explorando opciones"
+  },
+  "export": {
+   "en": "Export",
+   "es": "Exportación"
+  },
+  "financial_reporting": {
+   "en": "Financial reporting",
+   "es": "Reportes financieros"
+  },
+  "financial_statements_audit": {
+   "en": "Financial statements audit",
+   "es": "Auditoría de estados financieros"
+  },
+  "financial_statements_review": {
+   "en": "Financial statements review",
+   "es": "Revisión de estados financieros"
+  },
+  "financing": {
+   "en": "Financing",
+   "es": "Financiamiento"
+  },
+  "fixed": {
+   "en": "Fixed date",
+   "es": "Fecha fija"
+  },
+  "flexible": {
+   "en": "Flexible",
+   "es": "Flexible"
+  },
+  "food_beverage_perishable": {
+   "en": "Perishable food and beverage",
+   "es": "Alimentos y bebidas perecederos"
+  },
+  "free_trade_agreements": {
+   "en": "Free trade agreements",
+   "es": "Tratados de libre comercio"
+  },
+  "free_zone": {
+   "en": "Free zone",
+   "es": "Zona franca"
+  },
+  "freight_transportation": {
+   "en": "Freight transportation",
+   "es": "Transporte de carga"
+  },
+  "from_scratch": {
+   "en": "From scratch",
+   "es": "Desde cero"
+  },
+  "fulfillment": {
+   "en": "Order fulfillment",
+   "es": "Surtido de pedidos"
+  },
+  "full_time": {
+   "en": "Full time",
+   "es": "Tiempo completo"
+  },
+  "general_cargo": {
+   "en": "General cargo",
+   "es": "Carga general"
+  },
+  "goods": {
+   "en": "Goods",
+   "es": "Bienes"
+  },
+  "have_address": {
+   "en": "Address in place",
+   "es": "Con domicilio"
+  },
+  "have_valid": {
+   "en": "Valid one in place",
+   "es": "Vigente"
+  },
+  "hazardous_regulated": {
+   "en": "Hazardous or regulated",
+   "es": "Peligroso o regulado"
+  },
+  "high": {
+   "en": "High",
+   "es": "Alta"
+  },
+  "hr_administration": {
+   "en": "Human resources administration",
+   "es": "Administración de recursos humanos"
+  },
+  "hybrid": {
+   "en": "Hybrid",
+   "es": "Mixta"
+  },
+  "ifrs": {
+   "en": "International Financial Reporting Standards (IFRS)",
+   "es": "Normas Internacionales de Información Financiera (NIIF)"
+  },
+  "ifrs_reporting_adoption": {
+   "en": "Reporting and adoption of IFRS",
+   "es": "Reporte y adopción de NIIF"
+  },
+  "immex": {
+   "en": "IMMEX",
+   "es": "IMMEX"
+  },
+  "import": {
+   "en": "Import",
+   "es": "Importación"
+  },
+  "import_export_compliance": {
+   "en": "Import and export compliance",
+   "es": "Cumplimiento de importación y exportación"
+  },
+  "import_export_permits": {
+   "en": "Import and export permits",
+   "es": "Permisos de importación y exportación"
+  },
+  "in_preparation": {
+   "en": "In preparation",
+   "es": "En preparación"
+  },
+  "in_process": {
+   "en": "In process",
+   "es": "En proceso"
+  },
+  "in_selection": {
+   "en": "In selection",
+   "es": "En selección"
+  },
+  "independent_contractors": {
+   "en": "Independent contractors",
+   "es": "Contratistas independientes"
+  },
+  "individual": {
+   "en": "Individual",
+   "es": "Persona física"
+  },
+  "industrial_design": {
+   "en": "Industrial design",
+   "es": "Diseño industrial"
+  },
+  "industry": {
+   "en": "Industry",
+   "es": "Industria"
+  },
+  "intellectual_property": {
+   "en": "Intellectual property",
+   "es": "Propiedad intelectual"
+  },
+  "intermodal_transportation": {
+   "en": "Intermodal transportation",
+   "es": "Transporte intermodal"
+  },
+  "internal_audit": {
+   "en": "Internal audit",
+   "es": "Auditoría interna"
+  },
+  "inventory_management": {
+   "en": "Inventory management",
+   "es": "Gestión de inventario"
+  },
+  "inward_processing": {
+   "en": "Inward processing",
+   "es": "Transformación bajo régimen"
+  },
+  "joint_venture": {
+   "en": "Joint venture",
+   "es": "Empresa conjunta"
+  },
+  "labor_legal_support": {
+   "en": "Labor legal support",
+   "es": "Apoyo legal laboral"
+  },
+  "landlord": {
+   "en": "Landlord",
+   "es": "Arrendador"
+  },
+  "last_mile_delivery": {
+   "en": "Last-mile delivery",
+   "es": "Entrega de última milla"
+  },
+  "lease": {
+   "en": "Lease",
+   "es": "Arrendamiento"
+  },
+  "lender_or_investor": {
+   "en": "Lender or investor",
+   "es": "Entidad financiera o inversionista"
+  },
+  "local_gaap": {
+   "en": "Local accounting standards",
+   "es": "Normas contables locales"
+  },
+  "local_law": {
+   "en": "Local law",
+   "es": "Ley local"
+  },
+  "location": {
+   "en": "Location",
+   "es": "Ubicación"
+  },
+  "low": {
+   "en": "Low",
+   "es": "Baja"
+  },
+  "manufacturer": {
+   "en": "Manufacturer",
+   "es": "Fabricante"
+  },
+  "market": {
+   "en": "Market",
+   "es": "Mercado"
+  },
+  "medical_exams": {
+   "en": "Medical exams",
+   "es": "Exámenes médicos"
+  },
+  "medium": {
+   "en": "Medium",
+   "es": "Media"
+  },
+  "mergers_acquisitions": {
+   "en": "Mergers and acquisitions",
+   "es": "Fusiones y adquisiciones"
+  },
+  "mid": {
+   "en": "Mid level",
+   "es": "Nivel intermedio"
+  },
+  "monthly": {
+   "en": "Monthly",
+   "es": "Mensual"
+  },
+  "multimodal": {
+   "en": "Multimodal",
+   "es": "Multimodal"
+  },
+  "nda": {
+   "en": "Confidentiality agreement",
+   "es": "Acuerdo de confidencialidad"
+  },
+  "needs_classification": {
+   "en": "Needs classification",
+   "es": "Requiere clasificación"
+  },
+  "needs_corporate_address": {
+   "en": "Needs a corporate address",
+   "es": "Necesita un domicilio corporativo"
+  },
+  "needs_to_be_obtained": {
+   "en": "Needs to be obtained",
+   "es": "Debe obtenerse"
+  },
+  "no_entity_planned": {
+   "en": "No entity planned",
+   "es": "Sin entidad prevista"
+  },
+  "no_local_entity": {
+   "en": "No local entity",
+   "es": "Sin entidad local"
+  },
+  "no_personal_data_yet": {
+   "en": "No personal data yet",
+   "es": "Aún sin datos personales"
+  },
+  "none": {
+   "en": "None",
+   "es": "Ninguna"
+  },
+  "not_applicable": {
+   "en": "Not applicable",
+   "es": "No aplica"
+  },
+  "not_applicable_no_sg_citizens_prs": {
+   "en": "Not applicable, no citizens or permanent residents",
+   "es": "No aplica, sin ciudadanos ni residentes permanentes"
+  },
+  "not_covered": {
+   "en": "Not covered",
+   "es": "Sin cobertura"
+  },
+  "not_decided": {
+   "en": "Not decided",
+   "es": "Sin decidir"
+  },
+  "not_needed": {
+   "en": "Not needed",
+   "es": "No requerido"
+  },
+  "not_present": {
+   "en": "Not present",
+   "es": "No existe"
+  },
+  "not_provisioned": {
+   "en": "Not provisioned",
+   "es": "Sin provisionar"
+  },
+  "not_started": {
+   "en": "Not started",
+   "es": "Sin iniciar"
+  },
+  "not_yet_reviewed": {
+   "en": "Not yet reviewed",
+   "es": "Aún sin revisar"
+  },
+  "obtained": {
+   "en": "Obtained",
+   "es": "Obtenido"
+  },
+  "occupational_health": {
+   "en": "Occupational health",
+   "es": "Salud ocupacional"
+  },
+  "ocean": {
+   "en": "Ocean",
+   "es": "Marítimo"
+  },
+  "one_time": {
+   "en": "One time",
+   "es": "Una sola vez"
+  },
+  "ongoing": {
+   "en": "Ongoing",
+   "es": "Continuo"
+  },
+  "open_review": {
+   "en": "Open review",
+   "es": "Revisión abierta"
+  },
+  "operational": {
+   "en": "Operational",
+   "es": "En operación"
+  },
+  "organizational_design": {
+   "en": "Organizational design",
+   "es": "Diseño organizacional"
+  },
+  "origin_certification": {
+   "en": "Origin certification",
+   "es": "Certificación de origen"
+  },
+  "original_available": {
+   "en": "Original available",
+   "es": "Original disponible"
+  },
+  "other": {
+   "en": "Other",
+   "es": "Otro"
+  },
+  "own_importer_of_record": {
+   "en": "Own importer of record",
+   "es": "Importador de registro propio"
+  },
+  "packaging_repacking": {
+   "en": "Packaging and repacking",
+   "es": "Empaque y reempaque"
+  },
+  "packing_list": {
+   "en": "Packing list",
+   "es": "Lista de empaque"
+  },
+  "parent_local_gaap": {
+   "en": "Parent company's local standards",
+   "es": "Normas locales de la matriz"
+  },
+  "parent_requirement": {
+   "en": "Parent company requirement",
+   "es": "Requisito de la matriz"
+  },
+  "part_time": {
+   "en": "Part time",
+   "es": "Medio tiempo"
+  },
+  "partial_wind_down": {
+   "en": "Partial wind-down",
+   "es": "Cierre parcial"
+  },
+  "past_review_closed": {
+   "en": "Past review, closed",
+   "es": "Revisión previa, concluida"
+  },
+  "patent": {
+   "en": "Patent",
+   "es": "Patente"
+  },
+  "payroll_processing": {
+   "en": "Payroll processing",
+   "es": "Procesamiento de nómina"
+  },
+  "personnel_transportation": {
+   "en": "Personnel transportation",
+   "es": "Transporte de personal"
+  },
+  "pharma_medical": {
+   "en": "Pharmaceutical and medical",
+   "es": "Farmacéutico y médico"
+  },
+  "present": {
+   "en": "Present",
+   "es": "Existe"
+  },
+  "prior_customs_declarations": {
+   "en": "Prior customs declarations",
+   "es": "Declaraciones aduaneras previas"
+  },
+  "product": {
+   "en": "Product",
+   "es": "Producto"
+  },
+  "product_specifications": {
+   "en": "Product specifications",
+   "es": "Especificaciones del producto"
+  },
+  "prosec": {
+   "en": "PROSEC",
+   "es": "PROSEC"
+  },
+  "provisioned": {
+   "en": "Provisioned",
+   "es": "Provisionado"
+  },
+  "quarterly": {
+   "en": "Quarterly",
+   "es": "Trimestral"
+  },
+  "rail": {
+   "en": "Rail",
+   "es": "Ferroviario"
+  },
+  "raw_material": {
+   "en": "Raw material",
+   "es": "Materia prima"
+  },
+  "rece_certification_scheme": {
+   "en": "RECE and certification scheme",
+   "es": "RECE y esquema de certificación"
+  },
+  "recruitment": {
+   "en": "Recruitment",
+   "es": "Reclutamiento"
+  },
+  "refrigerated_transportation": {
+   "en": "Refrigerated transportation",
+   "es": "Transporte refrigerado"
+  },
+  "registered": {
+   "en": "Registered",
+   "es": "Registrado"
+  },
+  "restructuring": {
+   "en": "Restructuring",
+   "es": "Reestructuración"
+  },
+  "reverse_logistics": {
+   "en": "Reverse logistics",
+   "es": "Logística inversa"
+  },
+  "review": {
+   "en": "Review",
+   "es": "Revisión"
+  },
+  "reviewed": {
+   "en": "Reviewed",
+   "es": "Revisado"
+  },
+  "road": {
+   "en": "Road",
+   "es": "Terrestre"
+  },
+  "royalties_ip": {
+   "en": "Royalties and intellectual property",
+   "es": "Regalías y propiedad intelectual"
+  },
+  "rules_of_origin": {
+   "en": "Rules of origin",
+   "es": "Reglas de origen"
+  },
+  "safety_program": {
+   "en": "Safety program",
+   "es": "Programa de seguridad"
+  },
+  "safety_training": {
+   "en": "Safety training",
+   "es": "Capacitación en seguridad"
+  },
+  "self_managed": {
+   "en": "Self-managed",
+   "es": "Operación propia"
+  },
+  "senior": {
+   "en": "Senior",
+   "es": "Sénior"
+  },
+  "services": {
+   "en": "Services",
+   "es": "Servicios"
+  },
+  "set_up": {
+   "en": "Set up",
+   "es": "Configurado"
+  },
+  "statutory_audit": {
+   "en": "Statutory audit",
+   "es": "Auditoría estatutaria"
+  },
+  "supplier": {
+   "en": "Supplier",
+   "es": "Proveedor"
+  },
+  "supply": {
+   "en": "Supply",
+   "es": "Suministro"
+  },
+  "sustainability_assurance": {
+   "en": "Sustainability assurance",
+   "es": "Aseguramiento de sostenibilidad"
+  },
+  "tariff_classification": {
+   "en": "Tariff classification",
+   "es": "Clasificación arancelaria"
+  },
+  "tax_advisory": {
+   "en": "Tax advisory",
+   "es": "Asesoría fiscal"
+  },
+  "tax_audit": {
+   "en": "Tax audit",
+   "es": "Auditoría fiscal"
+  },
+  "tax_audit_defense": {
+   "en": "Tax audit defense",
+   "es": "Defensa ante auditorías fiscales"
+  },
+  "tax_compliance": {
+   "en": "Tax compliance",
+   "es": "Cumplimiento fiscal"
+  },
+  "tax_credits_refund_management": {
+   "en": "Tax credits and refund management",
+   "es": "Gestión de créditos y devoluciones fiscales"
+  },
+  "tax_due_diligence": {
+   "en": "Tax review ahead of a transaction",
+   "es": "Revisión fiscal previa a una operación"
+  },
+  "temporary_import_export": {
+   "en": "Temporary import or export",
+   "es": "Importación o exportación temporal"
+  },
+  "temporary_staffing": {
+   "en": "Temporary staffing",
+   "es": "Personal temporal"
+  },
+  "third_party_logistics": {
+   "en": "Third-party logistics provider",
+   "es": "Proveedor logístico externo"
+  },
+  "trade_compliance_outsourcing": {
+   "en": "Trade compliance outsourcing",
+   "es": "Externalización del cumplimiento de comercio exterior"
+  },
+  "trade_secret": {
+   "en": "Trade secret",
+   "es": "Secreto comercial"
+  },
+  "trademark": {
+   "en": "Trademark",
+   "es": "Marca"
+  },
+  "training": {
+   "en": "Training",
+   "es": "Capacitación"
+  },
+  "transfer_pricing_advisory": {
+   "en": "Transfer pricing advisory",
+   "es": "Asesoría en precios de transferencia"
+  },
+  "transfer_pricing_documentation": {
+   "en": "Transfer pricing documentation",
+   "es": "Documentación de precios de transferencia"
+  },
+  "undecided": {
+   "en": "Undecided",
+   "es": "Sin decidir"
+  },
+  "unregistered": {
+   "en": "Unregistered",
+   "es": "Sin registro"
+  },
+  "us_gaap": {
+   "en": "US generally accepted accounting principles (US GAAP)",
+   "es": "Principios de contabilidad generalmente aceptados de EE. UU. (US GAAP)"
+  },
+  "us_gaap_conversion": {
+   "en": "Conversion to US GAAP",
+   "es": "Conversión a US GAAP"
+  },
+  "valuation": {
+   "en": "Valuation",
+   "es": "Valuación"
+  },
+  "via_broker_or_partner": {
+   "en": "Through a broker or partner",
+   "es": "A través de un agente o socio"
+  },
+  "voluntary": {
+   "en": "Voluntary",
+   "es": "Voluntario"
+  },
+  "warehousing": {
+   "en": "Warehousing",
+   "es": "Almacenaje"
+  },
+  "weekly": {
+   "en": "Weekly",
+   "es": "Semanal"
+  },
+  "wind_down_closure": {
+   "en": "Wind-down and closure",
+   "es": "Cierre de operaciones"
+  },
+  "workplace_safety": {
+   "en": "Workplace safety",
+   "es": "Seguridad en el trabajo"
+  }
+ },
+ "field_overrides": {
+  "customs_special_regimes_interest": {
+   "other": {
+    "en": "Other regime",
+    "es": "Otro régimen"
+   }
+  }
+ },
+ "units": {
+  "units": {
+   "en": "units",
+   "es": "unidades"
+  },
+  "kg": {
+   "en": "kg",
+   "es": "kg"
+  },
+  "pallets": {
+   "en": "pallets",
+   "es": "pallets"
+  },
+  "containers": {
+   "en": "containers",
+   "es": "contenedores"
+  }
+ }
+}

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>KL 1.0 · Hallazgos y decisiones del PO</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/beesidedesignsystem_5ba1bd/styles.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@600;700&amp;family=Public+Sans:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F1F1FA}
+a{color:#7654C8}a:hover{color:#2E0879}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1760px; box-sizing: border-box; padding: 56px 64px; background: #F1F1FA; font-family: 'Public Sans', 'Open Sans', sans-serif; color: #00303F; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">Design · versión 3 · 16-oct-2026 · PO-1 a PO-7 incorporadas · listo para congelar</div>
+<h1 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 700; font-size: 36px; line-height: 44px; letter-spacing: -0.02em; color: #2E0879">Hallazgos y decisiones para el PO</h1>
+<p style="margin: 0; max-width: 1100px; font-size: 16px; line-height: 24px; color: #4A6B77">La arquitectura congelada se sostiene. Diez hallazgos: siete resueltos en Design y tres por el PO; cuatro decisiones más del paquete Doing Business (PO-4 a PO-7).</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; flex-grow: 1">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 22px; line-height: 28px; color: #2E0879">Resueltos en Design</h2>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 21px">
+<div><b style="color: #2E0879">H1 · Dos escalas de riesgo.</b> content_risk de la unidad (low, medium, high) y review_level del cambio (1, 2, 3) son campos distintos; el nivel de revisión es el máximo de ambos.</div>
+<div><b style="color: #2E0879">H3 · Un rol por persona en el Control Center.</b> Concesiones KL aditivas en kl.role_grant; el rol de plataforma no cambia.</div>
+<div><b style="color: #2E0879">H4 · Separación de funciones.</b> Se impone en base de datos. Requiere al menos dos personas internas con roles KL.</div>
+<div><b style="color: #2E0879">H5 · AC-10 y Chromium.</b> PDF congelado al publicar; fecha e ID normalizados a la edición para comparar byte a byte.</div>
+<div><b style="color: #2E0879">H6 · Caída de KL ≠ dato ausente.</b> Campo availability aparte; una caída nunca genera demanda.</div>
+<div><b style="color: #2E0879">H7 · Demanda sin texto.</b> Taxonomía controlada kl.topic; la consulta normalizada nunca se guarda.</div>
+<div><b style="color: #2E0879">H9 · Referencia a v1.3</b> en el handoff a Precision: se reporta a Workspace; v1.4 prevalece.</div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 22px; line-height: 28px; color: #2E0879">Resoluciones del PO</h2>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-1 · Aprobada con ajuste de seguridad</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Endurecer el comparador de R10 en Precision</div>
+<div>Hoy R10 aprueba una frase si contiene el texto de una fuente; con fuentes cortas desde KL, una frase más larga con una afirmación falsa pasaría.</div>
+<div><b>Resultado:</b> afirmaciones completas, identificables y versionadas; R10 aprueba solo por igualdad exacta y registra qué afirmación aprobó. Change request CR-KL-001: propuesta técnica aprobada, pendiente de aceptación del responsable de Precision; hasta entonces KL no entrega afirmaciones a R10.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-2 · Aprobada</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Entrega y verificación del PDF</div>
+<div>Descarga autenticada en Precision, sin URLs firmadas. Falta dónde vive el enlace "verificar edición vigente" del PDF.</div>
+<div><b>Resultado:</b> página pública solo de estado con identificador aleatorio de 128 bits; aviso de revocación en Precision; descarga solo autenticada.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-3 · Aprobada con precisiones</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Idioma y validación vencida en fichas HIGH</div>
+<div>El canon no dice qué recibe Precision si la variante en inglés no está aprobada o la validación especializada venció.</div>
+<div><b>Resultado:</b> LOW/MEDIUM con respaldo en español identificado solo para consulta; HIGH sin respaldo; HIGH con validación vencida, cobertura parcial sin afirmaciones; productos siempre ES y EN juntos.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-4 · Doing Business · dirección visual</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Opción B sobre la referencia v3</div>
+<div>El PDF v3 en inglés es la referencia; se comparó A (v3 corregida) con B (misma estructura, mejor lectura).</div>
+<div><b>Resultado:</b> tema B en A4 vertical; Public Sans provisional y Lato solo tras verificar disponibilidad, licencia y compatibilidad; el PDF carta anterior queda como artefacto técnico de AC-10.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-5 · Terminología</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Términos canónicos en el journey</div>
+<div>v3 usaba «Category Service Packs», «Your Service Map» y «First Assessment».</div>
+<div><b>Resultado:</b> Category Requirement Pack (CRP), My Service Map y Discovery; cambios registrados frente a v3.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-6 · Periodicidad</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Seleccionable, sin revisión diaria</div>
+<div>El Excel pedía cada 6 meses y la configuración inicial revisaba el DOF a diario.</div>
+<div><b>Resultado:</b> semanal, mensual, trimestral, semestral, anual o no actualizar, por producto y por fuente; Doing Business semestral; revisión fuera de ciclo solo manual y auditada.</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DAD6EE; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 21px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #5B3EA8">PO-7 · Enlace de inicio</div>
+<div style="font-size: 16px; font-weight: 600; color: #2E0879">Discovery en beeside.you</div>
+<div>El CTA de v3 no tenía enlace.</div>
+<div><b>Resultado:</b> kl.links.discovery_start = https://beeside.you durante la estabilización; se cambia en configuración al pasar a producción.</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1760}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

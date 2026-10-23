@@ -15,6 +15,8 @@ export const OPERATION_HUB_EVENTS: ReadonlySet<string> = new Set([
   "subscription.cancellation_requested",
   "subscription.subscription_period_ended",
   "subscription.premium_reactivated",
+  "subscription.subscription_renewed",
+  "subscription.cancellation_withdrawn",
 ]);
 
 export type OperationHubCommand =

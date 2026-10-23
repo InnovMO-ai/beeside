@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Unit</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Registro real de ICE 2025 (candidato). La primaria ENOE aún no está cargada.</p>
+<p><a href="KL-04-Repository.dc.html">← Knowledge Repository</a></p>
+<h1 class="admin-title"><code style="font-size: 0.8em">imco.ice2025.informalidad.<span class="kl-nowrap">MX-NLE</span></code></h1>
+<p class="kl-sub" lang="es">Vista derivada de un intermediario: responde solo preguntas de posición relativa, con nota metodológica (T10).</p>
+<div class="admin-grid">
+<section class="admin-card" aria-labelledby="un-val">
+<h2 id="un-val">Value and provenance</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Value</dt><dd>35% · posición 2 de 32</dd></div>
+<div><dt>Unit</dt><dd>Porcentaje de la población ocupada que se encuentra en condición de informalidad laboral</dd></div>
+<div><dt>Statistical period</dt><dd>2024 · <span class="admin-badge" data-tone="attention">inferido del anexo</span></dd></div>
+<div><dt>Source publication date</dt><dd><span class="kl-nowrap">9-jun-2025</span></dd></div>
+<div><dt>Locator</dt><dd>Boletas p. 73 (PDF 39)</dd></div>
+<div><dt>Intermediary · class</dt><dd>IMCO · B</dd></div>
+<div><dt>Primary concept</dt><dd><code>[mx.stat.enoe.informalidad_laboral.<span class="kl-nowrap">MX-NLE</span>.2024]</code> · no cargado</dd></div>
+<div><dt>Permitted use</dt><dd>Cita y paráfrasis; sin reproducir tablas</dd></div>
+<div><dt>Content risk</dt><dd>low</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="un-ver">
+<h2 id="un-ver">Versions</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Origin</th><th scope="col">Author · approver</th><th scope="col">Content hash</th></tr></thead>
+<tbody lang="es"><tr><th scope="row">1</th><td><span class="admin-badge" data-tone="attention">Candidate</span></td><td>Carga del equipo</td><td>[editor] · —</td><td><code>[sha256 del contenido]</code></td></tr></tbody>
+</table></div>
+<p class="helper" lang="es">Las versiones son inmutables. Un cambio crea la versión 2 ligada a la 1; nada se sobrescribe.</p>
+</section>
+<section class="admin-card" aria-labelledby="un-use">
+<h2 id="un-use">Where it is used</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>RAM packages</dt><dd>Ninguno (no publicada)</dd></div>
+<div><dt>Product sections</dt><dd>Doing Business México · cap. 10 · Nuevo León · posición relativa (borrador)</dd></div>
+<div><dt>Precision usage (30 days)</dt><dd>[sin datos]</dd></div>
+</dl>
+</section>
+<section class="admin-card" aria-labelledby="un-act">
+<h2 id="un-act">Actions</h2>
+<div class="kl-row-actions">
+<button type="button" class="button button-secondary" disabled>Withdraw</button>
+<button type="button" class="button button-secondary" disabled>Compare versions</button>
+<button type="button" class="button button-text" disabled>Mark requires review</button>
+</div>
+<p class="helper" lang="es">Disponibles cuando la unidad esté publicada. Retirar invalida en el acto los paquetes de RAM que la contienen y genera avisos en productos.</p>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

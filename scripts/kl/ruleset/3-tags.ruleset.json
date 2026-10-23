@@ -1,0 +1,8 @@
+{
+  "name": "etiquetas de Design y publicación de KL (PROPUESTO, no aplicado)",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/tags/kl-design-1.0-frozen", "refs/tags/kl-publish-*", "refs/tags/pre-consolidation-main"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [ { "type": "deletion" }, { "type": "update" } ]
+}

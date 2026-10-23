@@ -3,16 +3,23 @@ import { recordJourneyEvent } from "../fa/services/analytics";
 import { BundleStore } from "../fa/services/bundle-store";
 import { FaError } from "../fa/services/errors";
 import { enqueueEmail } from "../operations/email-outbox";
-import { buildPrecisionHandoffPackage } from "./precision-handoff";
 
 /**
  * Provider-agnostic subscription lifecycle (Technical Change Note v1.1 §G, Technical Architecture
- * v1.1 §4.2/§10). Any future payment provider is translated into these four events by a thin
- * adapter; no provider is selected here. None of the handlers writes assessment_state, answers,
+ * v1.1 §4.2/§10). Any payment provider is translated into these events by a thin adapter; no provider is selected here.
+ * Two events serve recurring billing: `subscription_renewed` (a collected renewal moves the paid-through date forward) and
+ * `cancellation_withdrawn` (a scheduled cancellation is taken back, so renewal continues). None of the handlers writes assessment_state, answers,
  * findings, the Snapshot or the Internal Assessment — Premium can never reopen First Assessment.
  */
 
-export const SUBSCRIPTION_EVENT_TYPES = ["premium_activated", "cancellation_requested", "subscription_period_ended", "premium_reactivated"] as const;
+export const SUBSCRIPTION_EVENT_TYPES = [
+  "premium_activated",
+  "cancellation_requested",
+  "subscription_period_ended",
+  "premium_reactivated",
+  "subscription_renewed",
+  "cancellation_withdrawn",
+] as const;
 export type SubscriptionEventType = (typeof SUBSCRIPTION_EVENT_TYPES)[number];
 
 export interface SubscriptionEventInput {
@@ -26,7 +33,10 @@ export interface SubscriptionEventInput {
   idempotencyKey?: string | null;
   /** Required when a subscription row is created (activation / reactivation). */
   periodStart?: Date | null;
+  /** Activation / reactivation: the paid term's end. Renewal: the NEW paid-through date. */
   periodEnd?: Date | null;
+  /** Activation / reactivation: the provider renews (and ends) this subscription (recurring billing). */
+  autoRenews?: boolean;
 }
 
 export interface SubscriptionEventResult {
@@ -38,33 +48,30 @@ export interface SubscriptionEventResult {
   premiumAccessActive: boolean;
   premiumEverActivated: boolean;
   precisionState: string;
-  handoffPackageId: string | null;
-  handoffGenerated: boolean;
 }
 
 interface SubscriptionRow {
   subscription_id: string;
   status: "PREMIUM_ACTIVE" | "CANCELLATION_SCHEDULED" | "PREMIUM_INACTIVE";
+  current_period_end: Date;
 }
 
 export function isSubscriptionEventType(value: unknown): value is SubscriptionEventType {
   return typeof value === "string" && (SUBSCRIPTION_EVENT_TYPES as readonly string[]).includes(value);
 }
 
-async function currentState(tx: Db, projectId: string, eventId: string, duplicate: boolean, handoffGenerated: boolean): Promise<SubscriptionEventResult> {
+async function currentState(tx: Db, projectId: string, eventId: string, duplicate: boolean): Promise<SubscriptionEventResult> {
   const { rows } = await tx.query<{
     subscription_id: string | null;
     status: string | null;
     premium_access_active: boolean | null;
     premium_ever_activated: boolean;
     precision_state: string;
-    package_id: string | null;
   }>(
-    `SELECT s.subscription_id, s.status, e.premium_access_active, p.premium_ever_activated, p.precision_state, h.package_id
+    `SELECT s.subscription_id, s.status, e.premium_access_active, p.premium_ever_activated, p.precision_state
        FROM project p
        LEFT JOIN LATERAL (SELECT subscription_id, status FROM subscription WHERE project_id = p.project_id ORDER BY created_at DESC, current_period_start DESC LIMIT 1) s ON true
        LEFT JOIN entitlement e ON e.project_id = p.project_id
-       LEFT JOIN precision_handoff_package h ON h.project_id = p.project_id
       WHERE p.project_id = $1`,
     [projectId],
   );
@@ -78,8 +85,6 @@ async function currentState(tx: Db, projectId: string, eventId: string, duplicat
     premiumAccessActive: row?.premium_access_active === true,
     premiumEverActivated: row?.premium_ever_activated === true,
     precisionState: row?.precision_state ?? "NOT_STARTED",
-    handoffPackageId: row?.package_id ?? null,
-    handoffGenerated,
   };
 }
 
@@ -101,13 +106,13 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
     const previous = seen.rows[0];
     if (previous) {
       if (previous.project_id !== input.projectId) throw new FaError("INVALID_INPUT", "idempotency key already used for another project");
-      return currentState(tx, input.projectId, previous.event_id, true, false);
+      return currentState(tx, input.projectId, previous.event_id, true);
     }
   }
 
   const latest = (
     await tx.query<SubscriptionRow>(
-      "SELECT subscription_id, status FROM subscription WHERE project_id = $1 ORDER BY created_at DESC, current_period_start DESC LIMIT 1 FOR UPDATE",
+      "SELECT subscription_id, status, current_period_end FROM subscription WHERE project_id = $1 ORDER BY created_at DESC, current_period_start DESC LIMIT 1 FOR UPDATE",
       [input.projectId],
     )
   ).rows[0];
@@ -123,18 +128,27 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
   };
   const createSubscription = async () => {
     if (!input.periodEnd || Number.isNaN(input.periodEnd.getTime())) throw new FaError("INVALID_INPUT", "current_period_end is required", { fields: ["current_period_end"] });
-    const start = input.periodStart && !Number.isNaN(input.periodStart.getTime()) ? input.periodStart : at;
-    if (input.periodEnd.getTime() <= start.getTime()) throw new FaError("INVALID_INPUT", "current_period_end must be after current_period_start", { fields: ["current_period_end"] });
+    let start = input.periodStart && !Number.isNaN(input.periodStart.getTime()) ? input.periodStart : at;
+    let end = input.periodEnd;
+    if (end.getTime() <= start.getTime()) throw new FaError("INVALID_INPUT", "current_period_end must be after current_period_start", { fields: ["current_period_end"] });
+    // THE STACKING RULE: a paid term starts when the access the project already holds (free, sponsored, trial, ...) ends, so the
+    // client keeps every free day and is never charged for a day already covered. With no other access this is a no-op.
+    const held = (await tx.query<{ t: Date }>("SELECT entitlement_covered_until($1, $2) AS t", [input.projectId, at])).rows[0]?.t;
+    // Only access that is really still ahead counts: a provider term that began before this event was processed (late webhook) keeps its own dates.
+    if (held && held.getTime() > Math.max(start.getTime(), at.getTime())) {
+      const length = end.getTime() - start.getTime();
+      start = held;
+      end = new Date(held.getTime() + length);
+    }
     const { rows } = await tx.query<{ subscription_id: string }>(
-      `INSERT INTO subscription (project_id, status, current_period_start, current_period_end, created_at, updated_at)
-       VALUES ($1, 'PREMIUM_ACTIVE', $2, $3, $4, $4) RETURNING subscription_id`,
-      [input.projectId, start, input.periodEnd, at],
+      `INSERT INTO subscription (project_id, status, current_period_start, current_period_end, auto_renews, created_at, updated_at)
+       VALUES ($1, 'PREMIUM_ACTIVE', $2, $3, $4, $5, $5) RETURNING subscription_id`,
+      [input.projectId, start, end, input.autoRenews === true, at],
     );
     return rows[0]?.subscription_id as string;
   };
 
   let eventId: string;
-  let handoffGenerated = false;
   switch (input.eventType) {
     case "premium_activated": {
       if (project.assessment_state !== "COMPLETED_LOCKED") throw new FaError("NOT_APPLICABLE", "Premium continues a completed First Assessment");
@@ -154,21 +168,11 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
         enqueuedBy: "premium.subscription_event",
         now: at,
       });
-      // Exactly-once initial handoff, gated by precision_state (Technical Architecture v1.1 §10).
+      // Premium entered. The legacy FA-3.0 handoff package (build + precision_handoff_package row + outbox event) is
+      // SUPERSEDED by the Precision F5 pull model: Precision reads its context through its own ports and is gated by the
+      // Core entitlement. precision_state remains the Core "Precision available" milestone (written once, as before).
       if (project.precision_state === "NOT_STARTED") {
         await tx.query("UPDATE project SET precision_state = 'STARTED', precision_started_at = $2, updated_at = $2 WHERE project_id = $1", [input.projectId, at]);
-        const pkg = await buildPrecisionHandoffPackage(tx, bundles, input.projectId, at);
-        const inserted = await tx.query<{ package_id: string }>(
-          `INSERT INTO precision_handoff_package (project_id, generated_at, content, contract_version, source_snapshot_id, source_internal_assessment_id, generated_by_event_id)
-           VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7) RETURNING package_id`,
-          [input.projectId, at, JSON.stringify(pkg.content), pkg.content.contractVersion, pkg.sourceSnapshotId, pkg.sourceInternalAssessmentId, eventId],
-        );
-        handoffGenerated = true;
-        await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, 'precision.handoff_package_generated', $2::jsonb, $3)", [
-          input.projectId,
-          JSON.stringify({ package_id: inserted.rows[0]?.package_id, project_id: input.projectId, contract_version: pkg.content.contractVersion }),
-          at,
-        ]);
       }
       break;
     }
@@ -176,6 +180,27 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       if (!latest || latest.status !== "PREMIUM_ACTIVE") throw new FaError("NOT_APPLICABLE", "there is no active Premium subscription to cancel");
       await tx.query(
         `UPDATE subscription SET status = 'CANCELLATION_SCHEDULED', cancel_at_period_end = true, cancellation_requested_at = $2, updated_at = $2
+          WHERE subscription_id = $1`,
+        [latest.subscription_id, at],
+      );
+      eventId = await insertEvent(latest.subscription_id);
+      break;
+    }
+    case "subscription_renewed": {
+      if (!latest || latest.status === "PREMIUM_INACTIVE") throw new FaError("NOT_APPLICABLE", "there is no running subscription to renew");
+      if (!input.periodEnd || Number.isNaN(input.periodEnd.getTime())) throw new FaError("INVALID_INPUT", "current_period_end is required", { fields: ["current_period_end"] });
+      // Forward only: a renewal that does not move the paid-through date (a replay with a different key, a late duplicate) is
+      // recorded but changes nothing, so the date can never go backwards.
+      if (input.periodEnd.getTime() > latest.current_period_end.getTime()) {
+        await tx.query("UPDATE subscription SET current_period_end = $2, updated_at = $3 WHERE subscription_id = $1", [latest.subscription_id, input.periodEnd, at]);
+      }
+      eventId = await insertEvent(latest.subscription_id);
+      break;
+    }
+    case "cancellation_withdrawn": {
+      if (!latest || latest.status !== "CANCELLATION_SCHEDULED") throw new FaError("NOT_APPLICABLE", "there is no scheduled cancellation to withdraw");
+      await tx.query(
+        `UPDATE subscription SET status = 'PREMIUM_ACTIVE', cancel_at_period_end = false, cancellation_requested_at = NULL, updated_at = $2
           WHERE subscription_id = $1`,
         [latest.subscription_id, at],
       );
@@ -192,7 +217,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       if (!project.premium_ever_activated || !latest || latest.status !== "PREMIUM_INACTIVE") {
         throw new FaError("NOT_APPLICABLE", "only a project whose Premium access has ended can be reactivated");
       }
-      // A new cycle on the same project_id: never reopens the ended row, never a second handoff package.
+      // A new cycle on the same project_id: never reopens the ended row.
       const subscriptionId = await createSubscription();
       eventId = await insertEvent(subscriptionId);
       await enqueueEmail(tx, {
@@ -212,7 +237,7 @@ export async function processSubscriptionEvent(tx: Db, bundles: BundleStore, inp
       WHERE project_id = $1 AND status = 'REQUESTED' AND $4 IN ('premium_activated', 'premium_reactivated')`,
     [input.projectId, at, eventId, input.eventType],
   );
-  const state = await currentState(tx, input.projectId, eventId, false, handoffGenerated);
+  const state = await currentState(tx, input.projectId, eventId, false);
   await tx.query("INSERT INTO outbox_event (project_id, event_type, payload, occurred_at) VALUES ($1, $2, $3::jsonb, $4)", [
     input.projectId,
     `subscription.${input.eventType}`,

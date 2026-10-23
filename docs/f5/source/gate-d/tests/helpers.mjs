@@ -1,0 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const here = path.dirname(fileURLToPath(import.meta.url));
+export const MAN = path.join(here, "..", "manifests");
+export const load = (k) => JSON.parse(fs.readFileSync(path.join(MAN, `${k}.json`), "utf8"));
+export const PM = () => load("project_manifest_v2");
+export const projection = JSON.parse(fs.readFileSync(path.join(here, "..", "..", "services_projection.json"), "utf8"));
+export const catalog = {};
+for (const [, cat, key] of projection) (catalog[cat] ||= []).push(key);
+export const A = (value, state = "ANSWERED") => ({ answerState: state, value });
+export const NO = () => ({ answerState: "EXPLICIT_NO", value: false });
+export const UNK = () => ({ answerState: "UNKNOWN", value: null });
+export const ALL = ["logistics", "international_trade_customs", "people_payroll_employment", "corporate_legal_admin", "tax_accounting_audit", "strategic_advisory", "ecosystem_development", "_generic"];

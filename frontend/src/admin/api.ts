@@ -5,7 +5,7 @@
  */
 const BASE = "/api/admin";
 
-export type AdminRole = "ADMIN" | "SUPERVISOR";
+export type AdminRole = "ADMIN" | "SUPERVISOR" | "SUPER_ADMIN";
 export type Permission =
   | "projects.read"
   | "config.read"
@@ -16,7 +16,10 @@ export type Permission =
   | "operations.execute"
   | "premium.manage"
   | "audit.read"
-  | "admin_users.manage";
+  | "admin_users.manage"
+  | "entitlement.manage"
+  | "entitlement.programs.manage"
+  | "privacy.manage";
 
 export interface Me {
   email: string;
@@ -108,6 +111,39 @@ export const adminApi = {
     key: string,
     patch: { locale: "en" | "es"; subject: string; body: string; cta: string; secondaryCta?: string; active?: boolean },
   ) => call<Json>("PUT", `/communications/templates/${source}/${encodeURIComponent(key)}`, patch),
+
+  // ---- entitlement / programs / sponsors / privacy (Precision V1.0)
+  entitlement: (id: string) => call<Json>("GET", `/projects/${id}/entitlement`),
+  issueGrant: (id: string, input: { source: "complimentary" | "manual"; days: number; reason: string; requestId?: string }) => call<Json>("POST", `/projects/${id}/entitlement/grants`, input),
+  issueCompanyGrant: (companyId: string, input: { source: "complimentary" | "manual" | "partner"; companyScope: "current_projects" | "projects_created_in_period"; days: number; maxProjects?: number; reason: string }) =>
+    call<Json>("POST", `/companies/${companyId}/entitlement/grants`, input),
+  extendGrant: (grantId: string, input: { days: number; reason: string }) => call<Json>("POST", `/entitlement/grants/${grantId}/extend`, input),
+  terminateGrant: (grantId: string, reason: string) => call<Json>("POST", `/entitlement/grants/${grantId}/terminate`, { reason }),
+  sponsors: () => call<{ sponsors: Json[] }>("GET", "/entitlement/sponsors"),
+  createSponsor: (input: { name: string; kind: string; country?: string }) => call<Json>("POST", "/entitlement/sponsors", input),
+  programs: () => call<{ programs: Json[] }>("GET", "/entitlement/programs"),
+  program: (id: string) => call<Json>("GET", `/entitlement/programs/${id}`),
+  createProgram: (input: Json) => call<Json>("POST", "/entitlement/programs", input),
+  searchCompanies: (q: string) => call<{ companies: { companyId: string; name: string; domain: string | null }[] }>("GET", `/companies/search?q=${encodeURIComponent(q)}`),
+  addEligibleCompany: (programId: string, companyId: string) => call<Json>("POST", `/entitlement/programs/${programId}/eligibility`, { companyId }),
+  activateProgram: (programId: string) => call<Json>("POST", `/entitlement/programs/${programId}/activate`, {}),
+  closeProgram: (programId: string) => call<Json>("POST", `/entitlement/programs/${programId}/close`, {}),
+  redeemProgram: (programId: string, input: { projectId: string; market?: string }) => call<Json>("POST", `/entitlement/programs/${programId}/redeem`, input),
+  recordPrivacyEvent: (projectId: string, input: { event: "access_blocked" | "access_restored"; reasonCode: string }) => call<Json>("POST", `/projects/${projectId}/privacy`, input),
+  privacyPolicy: () => call<{ policy: Json | null }>("GET", "/privacy/policy"),
+  approvePrivacyPolicy: (input: { minDaysAfterBlock: number; retainLegalAcceptance: boolean }) => call<Json>("POST", "/privacy/policy", input),
+  erasurePlan: (projectId: string) => call<{ plan: Json; runs: Json[] }>("GET", `/projects/${projectId}/privacy/erasure`),
+  executeErasure: (projectId: string, confirmProjectId: string) => call<Json>("POST", `/projects/${projectId}/privacy/erasure`, { confirmProjectId }),
+
+  // ---- Precision links and routes (Admin-managed configuration)
+  precisionConfig: () => call<{ entries: Json[]; locales: string[] }>("GET", "/precision/config"),
+  setPrecisionConfig: (key: string, input: { locale: string; value: string; reason: string }) => call<Json>("PUT", `/precision/config/${encodeURIComponent(key)}`, input),
+  resetPrecisionConfig: (key: string, locale: string) => call<Json>("DELETE", `/precision/config/${encodeURIComponent(key)}?locale=${encodeURIComponent(locale)}`),
+
+  precisionDeliveries: (status: string) => call<{ deliveries: Json[]; counts: Record<string, number> }>("GET", `/precision/deliveries${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+
+  // ---- Precision statistics (same event layer Tableau reads)
+  precisionMetrics: (view: "catalog" | "funnel" | "quality" | "ai" | "commercial", query: string) => call<Json>("GET", `/analytics/precision/${view}${query}`),
 
   audit: (projectId?: string) => call<{ events: Json[] }>("GET", `/audit${projectId ? `?projectId=${projectId}` : ""}`),
   adminUsers: () => call<{ users: Json[] }>("GET", "/admin-users"),

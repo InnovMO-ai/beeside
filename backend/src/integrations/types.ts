@@ -16,6 +16,8 @@ export const ROUTABLE_EVENTS = [
   "subscription.cancellation_requested",
   "subscription.subscription_period_ended",
   "subscription.premium_reactivated",
+  "subscription.subscription_renewed",
+  "subscription.cancellation_withdrawn",
   "precision.handoff_package_generated",
   "retention.project_purged",
 ] as const;

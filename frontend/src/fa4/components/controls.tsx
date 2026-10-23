@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 import type { Locale } from '@beeside/fa-public-engine';
 import { allCountries } from '../copy/countries';
 import { UI } from '../copy/ui';
+import { useReqBlock, type ReqMark } from './required';
 
 export function Label({ children, id }: { children: ReactNode; id?: string }) { return <span className="label" id={id}>{children}</span>; }
 
@@ -21,14 +22,15 @@ export function TextField({ label, value, onChange, type = 'text', placeholder, 
 }
 
 /** Single choice (radio group) */
-export function RadioGroup<T extends string>({ legend, value, options, onChange, two }: {
-  legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean;
+export function RadioGroup<T extends string>({ legend, value, options, onChange, two, three, help, req }: {
+  req?: ReqMark; help?: ReactNode; legend?: ReactNode; value: T | null; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T) => void; two?: boolean; three?: boolean;
 }) {
-  const name = useId();
+  const name = useId(); const r = useReqBlock<HTMLFieldSetElement>(req);
   return (
-    <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+    <fieldset ref={r.ref} {...r.attrs} style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
-      <div className={`choices ${two ? 'two' : ''}`}>
+      {help && <p className="help">{help}</p>}
+      <div className={`choices ${two ? 'two' : ''} ${three ? 'three' : ''}`}>
         {options.map((o) => (
           <label key={o.value} className={`choice ${value === o.value ? 'on' : ''}`}>
             <input type="radio" name={name} checked={value === o.value} onChange={() => onChange(o.value)} />
@@ -36,17 +38,20 @@ export function RadioGroup<T extends string>({ legend, value, options, onChange,
           </label>
         ))}
       </div>
+      {r.msg}
     </fieldset>
   );
 }
 
 /** Multiple choice (checkbox group) */
-export function CheckGroup<T extends string>({ legend, values, options, onChange, two }: {
-  legend?: ReactNode; values: T[]; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T[]) => void; two?: boolean;
+export function CheckGroup<T extends string>({ legend, values, options, onChange, two, req, help }: {
+  req?: ReqMark; help?: ReactNode; legend?: ReactNode; values: T[]; options: Array<{ value: T; label: ReactNode; sub?: ReactNode }>; onChange: (v: T[]) => void; two?: boolean;
 }) {
+  const r = useReqBlock<HTMLFieldSetElement>(req);
   return (
-    <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+    <fieldset ref={r.ref} {...r.attrs} style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
+      {help && <p className="help">{help}</p>}
       <div className={`choices ${two ? 'two' : ''}`}>
         {options.map((o) => {
           const on = values.includes(o.value);
@@ -58,17 +63,20 @@ export function CheckGroup<T extends string>({ legend, values, options, onChange
           );
         })}
       </div>
+      {r.msg}
     </fieldset>
   );
 }
 
-export function ChipGroup<T extends string>({ legend, value, options, onChange }: { legend?: ReactNode; value: T | null; options: Array<{ value: T; label: string }>; onChange: (v: T) => void }) {
+export function ChipGroup<T extends string>({ legend, value, options, onChange, req }: { req?: ReqMark; legend?: ReactNode; value: T | null; options: Array<{ value: T; label: string }>; onChange: (v: T) => void }) {
+  const r = useReqBlock<HTMLFieldSetElement>(req);
   return (
-    <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+    <fieldset ref={r.ref} {...r.attrs} style={{ border: 0, padding: 0, margin: 0 }}>
       {legend && <legend className="label">{legend}</legend>}
       <div className="chips" role="radiogroup">
         {options.map((o) => <button type="button" key={o.value} role="radio" aria-checked={value === o.value} className={`chip ${value === o.value ? 'on' : ''}`} onClick={() => onChange(o.value)}>{o.label}</button>)}
       </div>
+      {r.msg}
     </fieldset>
   );
 }
@@ -116,7 +124,7 @@ export function CountryPicker({ locale, selected, onChange, single, disabledOpen
         {selected.map((iso) => (
           <span key={iso} className="chip on" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {name(iso)}
-            <button type="button" aria-label={`${UI.remove[locale]} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 28, minHeight: 28 }}>×</button>
+            <button type="button" aria-label={`${UI.remove[locale]} ${name(iso)}`} onClick={() => onChange(selected.filter((x) => x !== iso))} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', minWidth: 44, minHeight: 44, margin: '-10px -14px -10px -6px' }}>×</button>
           </span>
         ))}
       </div>

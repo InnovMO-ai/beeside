@@ -1,18 +1,29 @@
-import express from "express";
+import express, { Router } from "express";
 import { Pool } from "pg";
+import { corePoolConfig, precisionPoolConfig } from "./db/pool-config";
 import { AdminDeps, createAdminRouter } from "./admin/admin-router";
+import { KlAdminDeps, createKlAdminRouter } from "./admin/kl/router";
 import { OidcIdentityProvider } from "./admin/oidc";
 import { createConfigVersioningService } from "./config-versioning/service";
 import { Db, createPoolDb } from "./db/database";
-import { LogEmailTransport } from "./fa/email/email-adapter";
+import { EmailTransport, LogEmailTransport } from "./fa/email/email-adapter";
+import { SmtpEmailTransport, smtpConfigFromEnv } from "./fa/email/smtp-transport";
 import { createFaRouter } from "./fa/routes";
 import { FA4_RATE_LIMITS, Fa4Deps, createFa4Router } from "./fa4/routes";
 import { LegalConfig } from "./fa4/repository";
 import { BundleStore } from "./fa/services/bundle-store";
 import { FaDeps } from "./fa/services/repository";
 import { integrationsFromEnv } from "./integrations/config";
+import { klRuntimeFromEnv } from "./kl/wiring";
 import { BillingDeps, createBillingRouter } from "./premium/billing-router";
 import { devSimulatedCheckout } from "./premium/premium-service";
+import { premiumPolicyFromEnv } from "./premium/premium-policy";
+import { StripeCheckout } from "./premium/stripe/checkout-adapter";
+import { StripeClient } from "./premium/stripe/client";
+import { stripeConfigFromEnv, stripeLivemodeExpected } from "./premium/stripe/config";
+import { createPaymentStateRouter } from "./premium/stripe/payment-state";
+import { StripeWebhookDeps, createStripeWebhookRouter } from "./premium/stripe/webhook";
+import { createPrecisionRuntime } from "./precision/api/wiring";
 import { healthRouter } from "./routes/health";
 import { readinessRouter, shippedMigrationCount } from "./routes/readiness";
 import { MAX_REQUEST_BYTES, errorHandler, notFoundJson, originGuard, rejectOversizedBodies, requestContext, securityHeaders } from "./security/http-hardening";
@@ -39,8 +50,16 @@ export interface AppOptions {
   fa4?: Fa4Deps;
   /** Provider-agnostic subscription event endpoint; mounted only when provided. */
   billing?: BillingDeps;
+  /** Stripe webhook endpoint (STRIPE_CHECKOUT_ENABLED=true); mounted only when provided. */
+  stripe?: StripeWebhookDeps;
   /** Admin/Supervisor Control Center API; mounted only when provided (identity provider configured). */
   admin?: AdminDeps;
+  /** Precision Center API (`/api/precision/*`, absolute paths); mounted only when provided (PRECISION_API_ENABLED=true). */
+  precision?: { router: Router };
+  /** Knowledge Layer admin API (/api/admin/kl/*); mounted only when KL_DB_URL_APP / KL_DB_URL_READER are configured. */
+  kl?: KlAdminDeps;
+  /** Knowledge Layer public edition-status route (PO-2); mounted only when KL is configured. */
+  klPublic?: Router;
   /** Readiness probe: reports ready only when the shipped migrations are applied. */
   readiness?: { db: Db; expectedMigrations: number };
   security?: SecurityOptions;
@@ -55,14 +74,24 @@ export function createApp(options: AppOptions = {}) {
   app.set("trust proxy", security.trustProxyHops ?? 0);
   app.use(requestContext());
   app.use(securityHeaders({ production: security.production === true }));
-  app.use(rejectOversizedBodies(MAX_REQUEST_BYTES));
+  // Precision enforces its own (smaller) body cap and answers in its own error shape.
+  const oversized = rejectOversizedBodies(MAX_REQUEST_BYTES);
+  app.use((req, res, next) => (req.path.startsWith("/api/precision/") ? next() : oversized(req, res, next)));
   if (security.allowedOrigins) app.use(originGuard(security.allowedOrigins));
   app.use(healthRouter);
   if (options.readiness) app.use(readinessRouter(options.readiness.db, options.readiness.expectedMigrations));
+  // Payment-confirmation read model for the client's return page: one word, same session auth as /api/fa/session.
+  if (options.fa) app.use("/api/fa/session/premium/payment-state", rateLimit(security.limiter, RATE_LIMITS.faAddress), createPaymentStateRouter(options.fa));
   if (options.fa) app.use("/api/fa", createFaRouter(options.fa, { limiter: security.limiter }));
   if (options.fa4) app.use("/api/fa4", createFa4Router(options.fa4, { limiter: security.limiter }));
+  // Raw-body Stripe webhook (signature verified in the handler). Mounted before the generic billing router.
+  if (options.stripe) app.use("/api/billing/stripe", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createStripeWebhookRouter(options.stripe));
   if (options.billing) app.use("/api/billing", rateLimit(security.limiter, RATE_LIMITS.billingAddress), createBillingRouter(options.billing));
+  // KL goes first: /api/admin/kl/* resolves its own session and certification before the generic admin router sees the path.
+  if (options.kl) app.use("/api/admin/kl", createKlAdminRouter(options.kl, { limiter: security.limiter }));
+  if (options.klPublic) app.use("/api/public/editions", options.klPublic);
   if (options.admin) app.use("/api/admin", createAdminRouter(options.admin, { limiter: security.limiter }));
+  if (options.precision) app.use(options.precision.router);
   app.use(notFoundJson());
   app.use(errorHandler(log));
   return app;
@@ -75,7 +104,7 @@ export function createApp(options: AppOptions = {}) {
  */
 export function baseDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps {
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("DATABASE_URL and APP_BASE_URL are required");
-  const db = createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = createPoolDb(new Pool(corePoolConfig(env)));
   const cooldown = Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5);
   return {
     db,
@@ -103,6 +132,11 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
   const base = baseDepsFromEnv(env);
   const simulate = env.PREMIUM_DEV_SIMULATION === "true" && env.NODE_ENV !== "production";
+  if (simulate && env.STRIPE_CHECKOUT_ENABLED === "true") throw new Error("PREMIUM_DEV_SIMULATION and STRIPE_CHECKOUT_ENABLED are mutually exclusive");
+  if (env.STRIPE_CHECKOUT_ENABLED === "true") {
+    // Stripe Hosted Checkout: redirect only. Premium is activated solely by the verified webhook / reconciliation.
+    return { ...base, premium: { checkout: new StripeCheckout(new StripeClient(stripeConfigFromEnv(env)), jsonLogger) } };
+  }
   return { ...base, ...(simulate ? { premium: { checkout: devSimulatedCheckout({ bundles: base.bundles }) } } : {}) };
 }
 
@@ -113,23 +147,66 @@ export function faDepsFromEnv(env: NodeJS.ProcessEnv = process.env): FaDeps | un
 export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): Fa4Deps | undefined {
   if (env.FA4_API_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL || !env.APP_BASE_URL) throw new Error("FA4_API_ENABLED requires DATABASE_URL and APP_BASE_URL");
-  const db = shared ?? createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const staging = fa4IsInternalStaging(env);
+  const db = shared ?? createPoolDb(new Pool(corePoolConfig(env)));
   return {
     db,
-    email: new LogEmailTransport(env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"),
+    email: fa4EmailTransportFromEnv(env, staging),
     config: {
       appBaseUrl: env.APP_BASE_URL,
+      publicPath: env.FA4_PUBLIC_PATH || undefined,
       sessionTtlHours: Number(env.FA4_SESSION_TTL_HOURS ?? 24),
       resumeLinkDays: Number(env.FA4_RESUME_LINK_DAYS ?? 30),
       emailCooldownMinutes: Number(env.EMAIL_RESEND_COOLDOWN_MINUTES ?? 5),
       emailRecipientDailyQuota: Number(env.FA4_EMAIL_RECIPIENT_DAILY_QUOTA ?? 6),
       resumeProjectsPerRequest: Number(env.FA4_RESUME_PROJECTS_PER_REQUEST ?? 3),
+      contactAddress: env.FA4_CONTACT_ADDRESS ?? FA4_CONTACT_ADDRESS,
+      premiumResourceUrl: { es: env.FA4_PREMIUM_RESOURCE_URL_ES || undefined, en: env.FA4_PREMIUM_RESOURCE_URL_EN || undefined },
+      premiumCommercialContentAllowed: env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true",
+      yevLinkDays: Number(env.FA4_YEV_LINK_DAYS ?? 14),
+      emailConfirmWaitMs: Number(env.FA4_EMAIL_CONFIRM_WAIT_MS ?? 8000),
       legal: fa4LegalFromEnv(env),
+      ...(env.FA4_EDGE_DIAGNOSTIC === "true" ? (fa4ClosedTestFromEnv(env) || env.NODE_ENV !== "production" ? { edgeDiagnostic: true } : (() => { throw new Error("FA4_EDGE_DIAGNOSTIC is only allowed in CLOSED TEST mode (or outside production)"); })()) : {}),
+      ...(fa4ClosedTestFromEnv(env) ? { closedTest: fa4ClosedTestFromEnv(env), legalMode: "closed-test" as const } : { legalMode: "final" as const }),
       rateLimits: fa4RateLimitOverrides(env),
       now: () => new Date(),
     },
-    emailDispatch: "deferred",
+    // Internal staging delivers inline (no worker needed); everywhere else the FA4 worker delivers the outbox. FA4_EMAIL_DISPATCH=inline
+    // forces inline delivery (local end-to-end runs / smoke checks); the answer to the person is truthful either way (sent / pending / failed).
+    emailDispatch: staging || env.FA4_EMAIL_DISPATCH === "inline" ? "inline" : "deferred",
   };
+}
+
+/** The single operational mailbox of FA4: sender, Reply-To and the recipient of "Hablar con beeside". */
+export const FA4_CONTACT_ADDRESS = "contact@beeside.you";
+
+/**
+ * FA4_EMAIL_TRANSPORT=log|smtp. Production must use smtp (a log-only transport would report emails as sent that nobody received), so it
+ * refuses to start otherwise. Internal staging defaults to log (links visible to testers) and may be switched to smtp for verification.
+ * SMTP_PASSWORD comes from Secret Manager; it is read here and never logged.
+ */
+export function fa4EmailTransportFromEnv(env: NodeJS.ProcessEnv, staging: boolean): EmailTransport {
+  const mode = env.FA4_EMAIL_TRANSPORT ?? (staging ? "log" : env.NODE_ENV === "production" ? "smtp" : "log");
+  if (mode === "smtp") {
+    const { config, missing } = smtpConfigFromEnv({ ...env, MAIL_FROM: env.MAIL_FROM ?? FA4_CONTACT_ADDRESS, SMTP_USER: env.SMTP_USER ?? FA4_CONTACT_ADDRESS });
+    if (!config) throw new Error(`FA4_EMAIL_TRANSPORT=smtp requires ${missing.join(", ")}`);
+    return new SmtpEmailTransport({ ...config, replyTo: env.MAIL_REPLY_TO ?? FA4_CONTACT_ADDRESS });
+  }
+  if (mode !== "log") throw new Error("FA4_EMAIL_TRANSPORT must be log or smtp");
+  if (env.NODE_ENV === "production" && !staging) throw new Error("FA4_EMAIL_TRANSPORT=log is refused in production: use smtp");
+  return new LogEmailTransport(staging || (env.DEV_LOG_EMAIL_LINKS === "true" && env.NODE_ENV !== "production"));
+}
+
+/**
+ * INTERNAL STAGING (not a public launch): explicit opt-in FA4_ENV=staging. It is refused for the public beeside.you hosts and it enables
+ * only TEST legal placeholders, log-only email and inline delivery. Public production (FA4_ENV unset) keeps every guard.
+ */
+export function fa4IsInternalStaging(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.FA4_ENV !== "staging") return false;
+  let host = "";
+  try { host = new URL(env.APP_BASE_URL ?? "").hostname.toLowerCase(); } catch { /* validated by the caller */ }
+  if (host === "beeside.you" || host === "www.beeside.you") throw new Error("FA4_ENV=staging is refused for the public host (" + host + "): staging must run on its own internal host");
+  return true;
 }
 
 /**
@@ -137,14 +214,62 @@ export function fa4DepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db
  * are launch blocker LEGAL-1 / CHK-1. In production they MUST be set (startup fails otherwise); elsewhere a clearly marked placeholder
  * is recorded so no environment silently stores a plausible-looking version.
  */
+const OFFICIAL_TERMS = { version: "1.0-2026-08-27", url: "https://beeside.you/termsandconditions" } as const;
+/** Canonical Privacy page. Its document VERSION is not supplied: it stays an explicit launch configuration (FA4_PRIVACY_VERSION), never defaulted. */
+const OFFICIAL_PRIVACY_URL = "https://www.beeside.you/privacy";
+/**
+ * CLOSED TEST MODE (controlled launch, fictitious data, no final Privacy version yet). Explicit opt-in FA4_CLOSED_TEST_MODE=true. It exists so infrastructure and the product can be
+ * validated in the final production environment without inventing a legal value:
+ *  - only valid for a CLOSED deployment: never together with FA4_ENV=staging, commercial Premium content, or a final FA4_PRIVACY_VERSION (that value ends test mode);
+ *  - e-mail is restricted to FA4_CLOSED_TEST_EMAIL_DOMAINS (default beeside.you) and/or the individual addresses in FA4_CLOSED_TEST_EMAIL_ADDRESSES (named reviewers):
+ *    no prospect can be mailed. Lists accept «,» «;» or spaces. An explicit empty FA4_CLOSED_TEST_EMAIL_DOMAINS drops the domain; both empty is refused (fail closed);
+ *  - every acceptance it records carries the marker version CLOSED-TEST-NOT-LEGAL, so test data is identifiable and never mistaken for real consent;
+ *  - the web tier refuses to run open while the backend reports this mode (see /api/fa4/legal-mode).
+ */
+export function fa4ClosedTestFromEnv(env: NodeJS.ProcessEnv = process.env): { emailDomains: string[]; emailAddresses: string[] } | undefined {
+  if (env.FA4_CLOSED_TEST_MODE !== "true") return undefined;
+  if (env.FA4_ENV === "staging") throw new Error("FA4_CLOSED_TEST_MODE is for the closed production deployment, not internal staging");
+  if (env.FA4_PRIVACY_VERSION) throw new Error("FA4_CLOSED_TEST_MODE must be removed once the final FA4_PRIVACY_VERSION is set (a final version ends test mode)");
+  if (env.FA4_PREMIUM_COMMERCIAL_CONTENT_ALLOWED === "true") throw new Error("FA4_CLOSED_TEST_MODE forbids commercial Premium content");
+  const list = (v: string) => v.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const domains = list(env.FA4_CLOSED_TEST_EMAIL_DOMAINS ?? "beeside.you");
+  const addresses = list(env.FA4_CLOSED_TEST_EMAIL_ADDRESSES ?? "");
+  if (!domains.every((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))) throw new Error("FA4_CLOSED_TEST_EMAIL_DOMAINS must be a list of domains");
+  // the offending value is never echoed: these are people's addresses
+  if (!addresses.every((x) => /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(x))) throw new Error("FA4_CLOSED_TEST_EMAIL_ADDRESSES must be a list of e-mail addresses");
+  if (!domains.length && !addresses.length) throw new Error("FA4_CLOSED_TEST_MODE needs at least one allowed e-mail domain or address (fail closed)");
+  return { emailDomains: domains, emailAddresses: addresses };
+}
+
 export function fa4LegalFromEnv(env: NodeJS.ProcessEnv = process.env): LegalConfig {
-  const names = ["FA4_TERMS_VERSION", "FA4_TERMS_URL_ES", "FA4_TERMS_URL_EN", "FA4_PRIVACY_VERSION", "FA4_PRIVACY_URL_ES", "FA4_PRIVACY_URL_EN"];
-  const missing = names.filter((n) => !env[n]);
+  // Terms (CHK-1, closed): the official page is the same document for both languages in version 1.0; env vars override it for a future version.
+  // Privacy is still pending (CHK-1): in production the API refuses to start until its version and URLs are configured.
+  // FA4_TERMS_URL / FA4_PRIVACY_URL set one document for both languages (FA4_*_URL_ES|EN still override per language).
+  const privacyEs = env.FA4_PRIVACY_URL_ES ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL; const privacyEn = env.FA4_PRIVACY_URL_EN ?? env.FA4_PRIVACY_URL ?? OFFICIAL_PRIVACY_URL;
+  // INTERNAL STAGING only: an explicit, visibly non-legal TEST value is recorded as the acceptance evidence for Privacy.
+  if (fa4IsInternalStaging(env) && !env.FA4_PRIVACY_VERSION) {
+    const base = (env.APP_BASE_URL ?? "").replace(/\/$/, "");
+    const test = `${base}/staging/privacy-test`;
+    return {
+      termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+      termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+      privacyVersion: "STAGING-TEST-NOT-LEGAL", privacyUrl: { es: test, en: test },
+    };
+  }
+  if (fa4ClosedTestFromEnv(env)) {
+    return {
+      termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+      termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+      privacyVersion: "CLOSED-TEST-NOT-LEGAL", privacyUrl: { es: privacyEs, en: privacyEn },
+    };
+  }
+  const missing = [!env.FA4_PRIVACY_VERSION && "FA4_PRIVACY_VERSION", !privacyEs && "FA4_PRIVACY_URL_ES (or FA4_PRIVACY_URL)", !privacyEn && "FA4_PRIVACY_URL_EN (or FA4_PRIVACY_URL)"].filter(Boolean);
   if (missing.length && env.NODE_ENV === "production") throw new Error(`FA4_API_ENABLED requires ${missing.join(", ")} in production (LEGAL-1: final Terms / Privacy version and URL)`);
   const ph = "UNSET-LEGAL-1";
   return {
-    termsVersion: env.FA4_TERMS_VERSION ?? ph, termsUrl: { es: env.FA4_TERMS_URL_ES ?? ph, en: env.FA4_TERMS_URL_EN ?? ph },
-    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: env.FA4_PRIVACY_URL_ES ?? ph, en: env.FA4_PRIVACY_URL_EN ?? ph },
+    termsVersion: env.FA4_TERMS_VERSION ?? OFFICIAL_TERMS.version,
+    termsUrl: { es: env.FA4_TERMS_URL_ES ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url, en: env.FA4_TERMS_URL_EN ?? env.FA4_TERMS_URL ?? OFFICIAL_TERMS.url },
+    privacyVersion: env.FA4_PRIVACY_VERSION ?? ph, privacyUrl: { es: privacyEs ?? ph, en: privacyEn ?? ph },
   };
 }
 
@@ -163,8 +288,20 @@ export function billingDepsFromEnv(env: NodeJS.ProcessEnv = process.env): Billin
   if (env.BILLING_EVENTS_ENABLED !== "true") return undefined;
   if (!env.DATABASE_URL) throw new Error("BILLING_EVENTS_ENABLED requires DATABASE_URL");
   if (!env.BILLING_WEBHOOK_SECRET || env.BILLING_WEBHOOK_SECRET.length < 32) throw new Error("BILLING_EVENTS_ENABLED requires a BILLING_WEBHOOK_SECRET of at least 32 characters");
-  const db = createPoolDb(new Pool({ connectionString: env.DATABASE_URL }));
+  const db = createPoolDb(new Pool(corePoolConfig(env)));
   return { db, bundles: new BundleStore(db), secret: env.BILLING_WEBHOOK_SECRET };
+}
+
+/**
+ * Stripe webhook (STRIPE_CHECKOUT_ENABLED=true). Core owns the Premium duration (PREMIUM_ACCESS_PERIOD_DAYS) and the
+ * read-only window (PRECISION_READONLY_GRACE_DAYS); Stripe only reports that a payment happened.
+ */
+export function stripeDepsFromEnv(env: NodeJS.ProcessEnv = process.env, shared?: Db): StripeWebhookDeps | undefined {
+  if (env.STRIPE_CHECKOUT_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL) throw new Error("STRIPE_CHECKOUT_ENABLED requires DATABASE_URL");
+  const config = stripeConfigFromEnv(env);
+  const db = shared ?? createPoolDb(new Pool(corePoolConfig(env)));
+  return { db, bundles: new BundleStore(db), webhookSecrets: config.webhookSecrets, livemode: stripeLivemodeExpected(config), policy: premiumPolicyFromEnv(env), log: jsonLogger };
 }
 
 /**
@@ -230,24 +367,56 @@ export function securityOptionsFromEnv(env: NodeJS.ProcessEnv = process.env, db:
   };
 }
 
+/**
+ * Precision Center API. Off unless PRECISION_API_ENABLED=true. It uses its own connection pool because the conversation store
+ * takes a session-level lock per project on a dedicated connection. Providers default to the isolated ones (see api/wiring.ts).
+ */
+export function precisionPoolFromEnv(env: NodeJS.ProcessEnv = process.env): Pool | undefined {
+  if (env.PRECISION_API_ENABLED !== "true") return undefined;
+  if (!env.DATABASE_URL) throw new Error("PRECISION_API_ENABLED requires DATABASE_URL");
+  return new Pool(precisionPoolConfig(env));
+}
+
+export async function precisionFromEnv(env: NodeJS.ProcessEnv = process.env, limiter?: RateLimiter, existingPool?: Pool): Promise<{ router: Router } | undefined> {
+  const pool = existingPool ?? precisionPoolFromEnv(env);
+  if (!pool) return undefined;
+  const runtime = await createPrecisionRuntime({ env, pool, ...(limiter ? { limiter } : {}) });
+  return { router: runtime.router };
+}
+
 /* istanbul ignore next -- exercised by real deployment, not unit tests */
 if (require.main === module) {
+  void main();
+}
+
+async function main(): Promise<void> {
   assertRuntimeConfig(process.env, (level, message) => jsonLogger(level, message));
   const fa = faDepsFromEnv();
   const billing = billingDepsFromEnv();
   const admin = adminDepsFromEnv();
-  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
-  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? fa4?.db ?? null;
+  const klRuntime = klRuntimeFromEnv(process.env, admin);
+  const stripe = stripeDepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db);
+  const fa4 = fa4DepsFromEnv(process.env, fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db);
+  // When only Precision is enabled there is no other database handle: its own pool then backs the shared rate-limit counters and
+  // the readiness probe too, so limits are shared by all instances and /ready reflects the real database.
+  const precisionPool = precisionPoolFromEnv(process.env);
+  const db: Db | null = fa?.db ?? admin?.fa.db ?? billing?.db ?? stripe?.db ?? fa4?.db ?? (precisionPool ? createPoolDb(precisionPool) : null);
+  const security = securityOptionsFromEnv(process.env, db);
+  const precision = await precisionFromEnv(process.env, security.limiter, precisionPool);
   const app = createApp({
+    ...(precision ? { precision } : {}),
     fa,
     fa4,
     billing,
+    stripe,
     admin,
-    security: securityOptionsFromEnv(process.env, db),
+    ...(klRuntime ? { kl: klRuntime.admin, klPublic: klRuntime.publicEditions(security.limiter) } : {}),
+    security,
     ...(db ? { readiness: { db, expectedMigrations: shippedMigrationCount() } } : {}),
   });
   const port = Number(process.env.PORT ?? 8080);
   const server = app.listen(port, () => jsonLogger("info", "beeside backend listening", { port }));
+  klRuntime?.startBackground((message, fields) => jsonLogger("info", message, fields));
   // Slow-request protections (a request may not hold a connection open indefinitely).
   server.requestTimeout = 30_000;
   server.headersTimeout = 35_000;

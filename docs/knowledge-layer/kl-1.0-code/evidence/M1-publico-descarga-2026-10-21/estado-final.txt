@@ -1,0 +1,6 @@
+# Estado tras las pruebas (2026-10-22T02:19:40Z)
+beeside-dev-kl-worker-tick: ENABLED
+beeside-dev-kl-daily-export: ENABLED
+servicio beeside-dev-kl-verify presente: 0
+bases: postgres beeside_kl 
+usuarios: kl_agent kl_app kl_knowledge kl_owner kl_reader_precision postgres 

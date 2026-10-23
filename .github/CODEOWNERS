@@ -1,0 +1,41 @@
+# Code owners (ADR-003; decisión D1 del PO, 21-oct-2026: castaneda-a es la segunda identidad humana de revisión).
+# Regla: todo cambio a main lo aprueba una persona distinta de su autor. Cada ruta tiene DOS owners para que la revisión sea siempre
+# posible y siempre independiente: un PR de @InnovMO-ai lo aprueba @castaneda-a y viceversa (GitHub no deja aprobar el propio PR, y el
+# ruleset exige además que apruebe alguien distinto de quien hizo el último push). Sin privilegios administrativos: basta acceso de escritura.
+# En CODEOWNERS gana la ÚLTIMA línea que coincide; las secciones repiten los owners a propósito, como inventario de lo protegido.
+*                                               @InnovMO-ai @castaneda-a
+
+# Controles de CI/CD, gate y despliegue (lo que decide si un cambio entra o se publica)
+/.github/                                       @InnovMO-ai @castaneda-a
+/scripts/ci/                                    @InnovMO-ai @castaneda-a
+/scripts/kl/                                    @InnovMO-ai @castaneda-a
+/scripts/secrets-scan.sh                        @InnovMO-ai @castaneda-a
+/scripts/fa4-copy-inventory.js                  @InnovMO-ai @castaneda-a
+/scripts/migrate.js                             @InnovMO-ai @castaneda-a
+/deploy/                                        @InnovMO-ai @castaneda-a
+/infra/                                         @InnovMO-ai @castaneda-a
+/backend/Dockerfile                             @InnovMO-ai @castaneda-a
+/frontend/Dockerfile                            @InnovMO-ai @castaneda-a
+
+# Datos y migraciones (ADR-002)
+/backend/db/migrations/                         @InnovMO-ai @castaneda-a
+/backend/src/kl/db/migrations/                  @InnovMO-ai @castaneda-a
+/backend/src/scripts/migration-target.ts        @InnovMO-ai @castaneda-a
+/backend/src/scripts/domain-roles-prepare.ts    @InnovMO-ai @castaneda-a
+
+# Contratos compartidos entre plataformas (ADR-003: kl.v1, fa4-precision-context/1, campos canónicos)
+/backend/src/kl/contract/                       @InnovMO-ai @castaneda-a
+/backend/src/knowledge-layer/                   @InnovMO-ai @castaneda-a
+/backend/src/precision-context/                 @InnovMO-ai @castaneda-a
+/shared/                                        @InnovMO-ai @castaneda-a
+
+# Composición del backend y dependencias
+/backend/src/index.ts                           @InnovMO-ai @castaneda-a
+/backend/src/admin/admin-router.ts              @InnovMO-ai @castaneda-a
+/package.json                                   @InnovMO-ai @castaneda-a
+/package-lock.json                              @InnovMO-ai @castaneda-a
+/backend/package.json                           @InnovMO-ai @castaneda-a
+/frontend/package.json                          @InnovMO-ai @castaneda-a
+
+# Decisiones de arquitectura
+/docs/adr/                                      @InnovMO-ai @castaneda-a

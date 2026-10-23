@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Upload review</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>{{who}}</span><span class="admin-badge">{{role}}</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Informe de QA y registros reales de la prueba ICE 2025 (candidatos). Cambia quién mira para ver la doble intervención:
+<label style="margin-left: 0.5rem">Viewing as <select class="select" style="width: auto; padding: 0.3rem 0.5rem" value="{{viewer}}" onChange="{{pickViewer}}"><option value="uploader">the uploader</option><option value="reviewer">another KL_REVIEWER</option></select></label></p>
+<p><a href="KL-04-Repository.dc.html">← Knowledge Repository</a></p>
+<h1 class="admin-title" lang="es">ICE 2025 · boletas y anexo <span class="admin-badge" data-tone="attention">{{status}}</span></h1>
+<ol class="kl-steps" aria-label="Upload steps"><li>1 · File and source</li><li>2 · Extraction</li><li>3 · Quality report</li><li aria-current="step">4 · Review by another person</li><li>5 · Publication</li></ol>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="ur-qa">
+<h2 id="ur-qa">Quality report</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Effect</th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row">Completitud 53 indicadores × 32 entidades</th><td><span class="admin-badge" data-tone="ok">1,696 / 1,696</span></td><td>—</td></tr>
+<tr><th scope="row">Posiciones fuera de 1–32</th><td><span class="admin-badge" data-tone="ok">0</span></td><td>—</td></tr>
+<tr><th scope="row">Coherencia valor–posición</th><td><span class="admin-badge" data-tone="ok">0 violaciones</span></td><td>Dirección inferida y guardada</td></tr>
+<tr><th scope="row">Empates de posición</th><td><span class="admin-badge" data-tone="info">19 grupos en 7 indicadores</span></td><td>La posición no identifica un registro</td></tr>
+<tr><th scope="row">Valores nulos</th><td><span class="admin-badge" data-tone="info">1</span></td><td>Costo de deuda · Tlaxcala: "no disponible", nunca cero</td></tr>
+<tr><th scope="row">Unidad boleta vs anexo</th><td><span class="admin-badge" data-tone="attention">Diferencias de redacción</span></td><td>Revisión editorial; no cambian el dato</td></tr>
+<tr><th scope="row">Percepción</th><td><span class="admin-badge" data-tone="info">64 excluidos</span></td><td>No consumibles (D2)</td></tr>
+<tr><th scope="row">Índices compuestos</th><td><span class="admin-badge" data-tone="info">64 solo contexto</span></td><td>Nunca recalculados</td></tr>
+<tr><th scope="row">Periodo</th><td><span class="admin-badge" data-tone="attention">544 inferidos · 64 estimados · 1,088 no declarados</span></td><td>Marca de confianza del periodo (T12)</td></tr>
+</tbody></table></div>
+</section>
+<section class="admin-card" aria-labelledby="ur-rows">
+<h2 id="ur-rows">Extracted records · Nuevo León (sample)</h2>
+<div class="admin-table-wrap"><table class="admin-table">
+<thead><tr><th scope="col">Record</th><th scope="col">Value</th><th scope="col">Position</th><th scope="col">Period</th><th scope="col">Original source</th><th scope="col">Locator</th><th scope="col">Consumable</th></tr></thead>
+<tbody lang="es">
+<tr><th scope="row"><code>informalidad.<span class="kl-nowrap">MX-NLE</span></code></th><td>35%</td><td>2</td><td>2024 (inferido)</td><td>INEGI · ENOE</td><td>p. 73</td><td>Posición relativa</td></tr>
+<tr><th scope="row"><code>ingreso_promedio.<span class="kl-nowrap">MX-NLE</span></code></th><td>14,191</td><td>4</td><td>2024 (inferido)</td><td>INEGI · ENOE</td><td>p. 73</td><td>Posición relativa</td></tr>
+<tr><th scope="row"><code>pib_per_capita.<span class="kl-nowrap">MX-NLE</span></code></th><td>$428,950</td><td>2</td><td>2024 (estimado)</td><td>INEGI · PIBE</td><td>p. 72</td><td>Con marca de estimado</td></tr>
+<tr><th scope="row"><code>complejidad.<span class="kl-nowrap">MX-NLE</span></code></th><td>100.00</td><td>1</td><td>2022 (inferido)</td><td>Agregador</td><td>p. 72</td><td>Solo contexto</td></tr>
+<tr><th scope="row"><code>percepcion_seguridad.<span class="kl-nowrap">MX-NLE</span></code></th><td>26%</td><td>14</td><td>2024 (inferido)</td><td>INEGI · ENVIPE</td><td>p. 72</td><td>No · percepción</td></tr>
+</tbody></table></div>
+<p class="helper" lang="es">El revisor no edita valores: corrige el mapeo o pide reextracción. Se extrae todo para control de calidad; solo el subconjunto objetivo aprobado queda consumible (T11).</p>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="ur-dec">
+<h2 id="ur-dec">Review</h2>
+<sc-if value="{{isUploader}}" hint-placeholder-val="{{true}}"><p class="kl-guard" lang="es">Tú subiste esta carga. Otra persona con KL_REVIEWER debe aprobarla; la base de datos rechaza la aprobación del mismo usuario.</p></sc-if>
+<div class="field"><label for="ur-sub">Consumable subset</label><select id="ur-sub" class="select"><option>15 objective indicators proposed (5 labor, 4 infrastructure, 6 economy)</option><option>None (keep as context only)</option></select></div>
+<div class="admin-actions">
+<button type="button" class="button button-primary" disabled="{{cannotApprove}}" onClick="{{approve}}">Approve subset</button>
+<button type="button" class="button button-secondary" disabled="{{isUploader}}">Request re-extraction</button>
+<button type="button" class="button button-text" disabled="{{isUploader}}">Reject</button>
+</div>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><p class="admin-notice" role="status" lang="es">Aprobada por [reviewer]@beeside. Se publicará como vista derivada de IMCO ligada a las primarias, con uso permitido "cita y paráfrasis".</p></sc-if>
+<dl class="admin-kv" style="margin-top: 1rem" lang="es">
+<div><dt>Uploaded by</dt><dd>[editor]@beeside</dd></div>
+<div><dt>Original</dt><dd>Inmutable · <span class="kl-nowrap">SHA-256</span> registrado</dd></div>
+<div><dt>Extraction errors fixed</dt><dd>4, antes de cerrar 1,696 / 1,696</dd></div>
+</dl>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { viewer: 'uploader', done: false }; }
+renderVals() {
+const s = this.state, up = s.viewer === 'uploader';
+return {
+viewer: s.viewer, isUploader: up, done: s.done,
+who: up ? '[editor]@beeside' : '[reviewer]@beeside', role: up ? 'KL_EDITOR · KL_REVIEWER' : 'KL_REVIEWER',
+cannotApprove: up || s.done,
+status: s.done ? 'Approved' : 'In review',
+pickViewer: (e) => this.setState({ viewer: e.target.value }),
+approve: () => this.setState({ done: true })
+};
+}
+}
+</script>
+</body>
+</html>

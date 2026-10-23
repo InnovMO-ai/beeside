@@ -1,0 +1,1 @@
+sin cookie 401 | cookie inválida 401

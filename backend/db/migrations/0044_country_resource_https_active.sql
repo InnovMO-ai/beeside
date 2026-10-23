@@ -1,0 +1,3 @@
+-- V1 has no document management: a resource that cannot be opened must not be active for customers. Existing rows are deactivated first (never deleted).
+UPDATE "country_resource" SET "active" = false WHERE "destination_kind" <> 'url' AND "active";--> statement-breakpoint
+ALTER TABLE "country_resource" ADD CONSTRAINT "country_resource_active_resolvable" CHECK (NOT "country_resource"."active" OR "country_resource"."destination_kind" = 'url');

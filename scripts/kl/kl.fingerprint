@@ -1,0 +1,26 @@
+# KL 1.0 · Fingerprint técnico (verificado por scripts/kl/preflight.sh)
+# Identidad de la plataforma
+platform=knowledge-layer
+code_platform=knowledge-layer-code
+contract=kl.v1
+repo=InnovMO-ai/beeside
+branch=feat/kl-1.0-code
+worktree=~/Developer/beeside-kl
+# Referencia de Design congelada
+design_tag=kl-design-1.0-frozen
+design_tag_object=02198ebd426a1935cad9c8176edc65586bfb7e20
+design_commit=69f211a11f9c95ea5f5288c61b4d263d354910fa
+design_base=bc3f52760a5c427c0b057a1e2bb0d71d8d0034d3
+design_manifest_sha256=8901ecfa25db28acde1445399774ab614f9e046fbefb935a86214d17ad5f4afe
+# Módulo de implementación (DD-01). planned → active cuando exista backend/src/kl/
+module_path=backend/src/kl
+module_status=active
+schema=kl
+port_flag=PRECISION_KNOWLEDGE_PROVIDER
+# Persistencia (CR-KL-002): base propia en la instancia Cloud SQL existente
+database=beeside_kl
+migrations=backend/src/kl/db/migrations
+migrations_journal=beeside_kl:kl.__kl_migrations
+# Addenda aprobados (prevalecen solo dentro de su alcance)
+addenda=CR-KL-002
+addendum_cr_kl_002_manifest_sha256=08520b6a42721521c77b72b0920d1be1006f5a00a08c33cd21e3ac37049dbc6b

@@ -1,0 +1,31 @@
+{
+  "displayName": "Discovery \u2014 ERROR logs",
+  "combiner": "OR",
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "conditions": [
+    {
+      "displayName": "ERROR log entries",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/discovery_error_logs\" AND resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "documentation": {
+    "content": "See deploy/production/RUNBOOK.md (alerts section).",
+    "mimeType": "text/markdown"
+  }
+}

@@ -1,0 +1,10 @@
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+plan tras aplicar: exit=0 (0 = sin deriva)
+01:50:03    resultado a1: 01:44:56    alerta 17613917935254930618: CLOSED
+CLOSED · a2: 01:44:57    alerta 1046599909580186521: NONE
+01:50:03    alerta 1046599909580186521: OPEN
+OPEN
+01:50:03    alerta 1046599909580186521: OPEN
+OPEN
+
+[exited with code 0]

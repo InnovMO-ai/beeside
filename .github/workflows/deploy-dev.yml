@@ -80,21 +80,36 @@ jobs:
     if: |
       needs.gate.outputs.enabled == 'true' &&
       (
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-        github.event_name == 'workflow_dispatch'
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+         github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository) ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
       )
     runs-on: ubuntu-latest
     environment: dev
+    # L1 0005: the triggering run must be ci.yml itself (workflow_run matches by display name, and any workflow can call itself "CI").
+    # H3: the commit that PASSED CI (workflow_run.head_sha), never the moving head of main. Fork pull requests whose branch
+    # is also called "main" are excluded above (event must be a push to this repository). Dev deploys only main (ADR-004).
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Log manual dispatch context
         if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_REASON: ${{ github.event.inputs.reason }}
         run: |
           echo "Manual dev deploy requested by ${{ github.actor }}"
           echo "Branch/ref: ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
-          echo "Reason: ${{ github.event.inputs.reason }}"
+          printf 'Reason: %s\n' "$DISPATCH_REASON"
 
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Verify the checked-out commit is the authorized one
+        run: test "$(git rev-parse HEAD)" = "$DEPLOY_SHA" || { echo "checked out $(git rev-parse HEAD), authorized $DEPLOY_SHA"; exit 1; }
 
       - uses: actions/setup-node@v4
         with:
@@ -113,19 +128,22 @@ jobs:
 
       # Both images build from the repository root: the backend depends on the
       # @beeside/canonical-fields workspace and ships backend/db/migrations.
-      # github.sha is always the commit this run actually checked out -- the
-      # head of main on the automatic path, the head of the dispatched branch
-      # on a manual run -- so the backend image, the frontend image, the
-      # migration job and both Cloud Run deploys below are guaranteed to come
-      # from that same single SHA.
+      # DEPLOY_SHA is the single commit of this run (the CI-verified head_sha on the automatic path, main's head on a manual run);
+      # both images are built once from it and every later step uses their immutable digests.
       - name: Build and push images
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
-          docker build -f backend/Dockerfile -t $REGISTRY/backend-api:${{ github.sha }} .
-          docker push $REGISTRY/backend-api:${{ github.sha }}
-          docker build -f frontend/Dockerfile -t $REGISTRY/frontend-app:${{ github.sha }} .
-          docker push $REGISTRY/frontend-app:${{ github.sha }}
+          docker build -f backend/Dockerfile --label org.opencontainers.image.revision=$DEPLOY_SHA -t $REGISTRY/backend-api:$DEPLOY_SHA .
+          docker push $REGISTRY/backend-api:$DEPLOY_SHA
+          docker build -f frontend/Dockerfile --label org.opencontainers.image.revision=$DEPLOY_SHA -t $REGISTRY/frontend-app:$DEPLOY_SHA .
+          docker push $REGISTRY/frontend-app:$DEPLOY_SHA
+          # From here on everything is addressed by immutable digest, never by tag.
+          for n in backend-api frontend-app; do
+            d=$(gcloud artifacts docker images describe "$REGISTRY/$n:$DEPLOY_SHA" --format='value(image_summary.digest)')
+            case "$d" in sha256:*) ;; *) echo "no digest for $n:$DEPLOY_SHA"; exit 1;; esac
+            echo "$(echo $n | tr a-z- A-Z_)_REF=$REGISTRY/$n@$d" >> "$GITHUB_ENV"; echo "$n@$d"
+          done
 
       - name: Apply database migrations
         run: |
@@ -135,7 +153,7 @@ jobs:
           fi
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run jobs update ${{ vars.MIGRATION_JOB_NAME }} \
-            --image $REGISTRY/backend-api:${{ github.sha }} \
+            --image "$BACKEND_API_REF" \
             --command node --args dist/scripts/migrate.js \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           gcloud run jobs execute ${{ vars.MIGRATION_JOB_NAME }} --wait \
@@ -156,16 +174,26 @@ jobs:
           # not get this flag.
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run deploy beeside-dev-backend-api \
-            --image $REGISTRY/backend-api:${{ github.sha }} \
+            --image "$BACKEND_API_REF" \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet \
             --no-invoker-iam-check
           gcloud run deploy beeside-dev-frontend-app \
-            --image $REGISTRY/frontend-app:${{ github.sha }} \
+            --image "$FRONTEND_APP_REF" \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet \
             --no-invoker-iam-check
           if [ -n "${{ vars.WORKER_SERVICE_NAME }}" ]; then
             gcloud run deploy ${{ vars.WORKER_SERVICE_NAME }} \
-              --image $REGISTRY/backend-api:${{ github.sha }} \
+              --image "$BACKEND_API_REF" \
               --command node --args dist/worker.js \
               --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           fi
+
+      - name: Verify the running revisions are exactly the authorized digests
+        run: |
+          for pair in "beeside-dev-backend-api:$BACKEND_API_REF" "beeside-dev-frontend-app:$FRONTEND_APP_REF"; do
+            svc=${pair%%:*}; want=${pair#*:}; want=${want##*@}
+            rev=$(gcloud run services describe "$svc" --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --format='value(status.latestReadyRevisionName)')
+            got=$(gcloud run revisions describe "$rev" --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --format='value(status.imageDigest)'); got=${got##*@}
+            [ "$got" = "$want" ] || { echo "$svc runs $got, authorized $want"; exit 1; }
+            echo "$svc $rev = $want"
+          done

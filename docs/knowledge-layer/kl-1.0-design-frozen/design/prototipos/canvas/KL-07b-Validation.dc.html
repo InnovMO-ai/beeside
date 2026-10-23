@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · Record external validation</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[reviewer]@beeside</span><span class="admin-badge">KL_REVIEWER</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design · R2.</b> Ficha y validador son marcadores. El código de verificación de ejemplo es <code>4F2A9C71D0B3</code>; escribe otro para ver el rechazo.</p>
+<p><a href="KL-07-Products.dc.html">← Knowledge Products</a></p>
+<h1 class="admin-title">Record external validation</h1>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="va-unit">
+<h2 id="va-unit">Version to validate</h2>
+<dl class="admin-kv" lang="es">
+<div><dt>Unit</dt><dd><code>[mx.card.customs.padron_importadores]</code> · versión [n] · español</dd></div>
+<div><dt>Domain</dt><dd>Aduanas y comercio exterior · nivel 3</dd></div>
+<div><dt>Author</dt><dd>[editor]@beeside</dd></div>
+<div><dt>Verification code</dt><dd><code>4F2A9C71D0B3</code> (primeros 12 caracteres de la huella del contenido)</dd></div>
+</dl>
+<div class="admin-actions"><a class="button button-secondary" href="#">Download validation sheet (PDF)</a></div>
+<p class="helper" lang="es">La hoja incluye texto, enunciados citables, fuentes primarias, alcance y el código. El especialista la devuelve firmada o responde desde su dominio profesional citando el código.</p>
+</section>
+<section class="admin-card" aria-labelledby="va-ev">
+<h2 id="va-ev">Evidence</h2>
+<div class="field"><label for="va-who">Registered validator</label><select id="va-who" class="select"><option>[Especialista externo] · [organización] · aduanas</option><option>Register a new validator (KL_ADMIN)</option></select></div>
+<div class="field"><label for="va-file">Signed sheet or e-mail exported to PDF</label><input id="va-file" class="input" type="file" accept=".pdf"></div>
+<div class="field"><label for="va-code">Verification code as it appears in the evidence</label><input id="va-code" class="input" style="max-width: 18rem; font-family: ui-monospace, Menlo, monospace" value="{{code}}" onChange="{{setCode}}" aria-invalid="{{invalid}}" aria-describedby="va-code-msg">
+<sc-if value="{{invalid}}" hint-placeholder-val="{{false}}"><p id="va-code-msg" class="field-error" role="alert">The code does not match this version. The evidence may refer to another version: request a new signature.</p></sc-if>
+<sc-if value="{{match}}" hint-placeholder-val="{{false}}"><p id="va-code-msg" class="helper" role="status">Code matches version [n].</p></sc-if></div>
+<div class="admin-form-row">
+<label>Verdict<select class="select"><option>Approved</option><option>Approved with required changes</option><option>Rejected</option></select></label>
+<label>Validated on<input class="input" type="date" value="2026-10-16"></label>
+<label>Expires<input class="input" value="16-oct-2027 (máximo 12 meses)" readonly></label>
+</div>
+<div class="field"><label for="va-scope">Scope stated by the specialist</label><textarea id="va-scope" class="textarea" style="min-height: 5rem">[Alcance: secciones y enunciados revisados]</textarea></div>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="va-go">
+<h2 id="va-go">Record</h2>
+<ul class="kl-checks" lang="es">
+<li><span class="admin-badge" data-tone="ok">OK</span><span>Tú no eres el autor de la ficha</span></li>
+<li><span class="admin-badge" data-tone="{{codeTone}}">{{codeLabel}}</span><span>Código de verificación</span></li>
+<li><span class="admin-badge" data-tone="muted">—</span><span>Evidencia: PDF validado y guardado inmutable</span></li>
+</ul>
+<div class="admin-actions"><button type="button" class="button button-primary" disabled="{{blocked}}" onClick="{{record}}">Record validation</button></div>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><p class="admin-notice" role="status" lang="es">Validación registrada. La ficha pasa a publicada; vence el <span class="kl-nowrap">16-oct-2027</span> o antes si el monitoreo del DOF detecta una reforma.</p></sc-if>
+<p class="helper" lang="es">El especialista externo nunca entra a KL Admin. Su identidad no aparece en el PDF.</p>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { code: '', done: false }; }
+renderVals() {
+const s = this.state;
+const c = s.code.trim().toUpperCase();
+const match = c === '4F2A9C71D0B3';
+const invalid = c.length > 0 && !match;
+return {
+code: s.code, match, invalid, done: s.done,
+codeTone: match ? 'ok' : (invalid ? 'error' : 'muted'),
+codeLabel: match ? 'OK' : (invalid ? 'No' : '—'),
+blocked: !match || s.done,
+setCode: (e) => this.setState({ code: e.target.value, done: false }),
+record: () => this.setState({ done: true })
+};
+}
+}
+</script>
+</body>
+</html>

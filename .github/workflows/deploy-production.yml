@@ -8,7 +8,7 @@ name: Deploy — production
 # Vendor: GCP, via Workload Identity Federation — see deploy-dev.yml's header
 # for the mechanism. Real steps only run once this Environment's GCP_*
 # variables are set (README.md), and per Mike's instruction this environment
-# is not to be created/applied until explicitly approved and until Phase 15.
+# is not to be created/applied until explicitly approved (STABILIZATION DEPLOYMENT APPROVAL).
 # Order is always: build -> migrate (migration database user) -> deploy.
 
 on:
@@ -26,7 +26,22 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    # L1 0005: el input entra por env y se valida; nunca se interpola dentro de run: (inyección de expresiones).
+    env:
+      IMAGE_REF: ${{ inputs.ref }}
     steps:
+      # Fail-safe (L0 2026-10-20): every GCP_* variable is repository-level and points at the DEV project, and the "production" GitHub environment
+      # does not exist (GitHub would create it unprotected on first run). This workflow refuses unless the "production" environment itself declares
+      # DEPLOY_TARGET_ENVIRONMENT=production. It also stays disabled until the promotion-by-digest pipeline replaces it (ADR-004).
+      - name: Refuse unless the production environment is explicitly configured
+        run: |
+          if [ "${{ vars.DEPLOY_TARGET_ENVIRONMENT }}" != "production" ]; then
+            echo "Refusing: vars.DEPLOY_TARGET_ENVIRONMENT must be 'production', defined on the 'production' GitHub environment (not at repository level)."
+            exit 1
+          fi
+      - name: Validate the requested ref
+        run: |
+          [[ "$IMAGE_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || { echo "Refusing: ref must be a commit SHA or tag ([A-Za-z0-9._-])"; exit 1; }
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -34,7 +49,7 @@ jobs:
       - name: Not yet configured
         if: vars.GCP_PROJECT_ID == ''
         run: |
-          echo "Live deployment to production is blocked pending GCP setup and Phase 15's go/no-go sign-off. See README.md and docs/deployment/README.md."
+          echo "Live deployment to production is blocked pending GCP setup and the STABILIZATION DEPLOYMENT APPROVAL. See README.md and docs/deployment/README.md."
 
       - uses: actions/setup-node@v4
         if: vars.GCP_PROJECT_ID != ''
@@ -63,10 +78,10 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
-          docker build -f backend/Dockerfile -t $REGISTRY/backend-api:${{ inputs.ref }} .
-          docker push $REGISTRY/backend-api:${{ inputs.ref }}
-          docker build -f frontend/Dockerfile -t $REGISTRY/frontend-app:${{ inputs.ref }} .
-          docker push $REGISTRY/frontend-app:${{ inputs.ref }}
+          docker build -f backend/Dockerfile -t $REGISTRY/backend-api:"$IMAGE_REF" .
+          docker push $REGISTRY/backend-api:"$IMAGE_REF"
+          docker build -f frontend/Dockerfile -t $REGISTRY/frontend-app:"$IMAGE_REF" .
+          docker push $REGISTRY/frontend-app:"$IMAGE_REF"
 
       - name: Apply database migrations
         if: vars.GCP_PROJECT_ID != ''
@@ -77,7 +92,7 @@ jobs:
           fi
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run jobs update ${{ vars.MIGRATION_JOB_NAME }} \
-            --image $REGISTRY/backend-api:${{ inputs.ref }} \
+            --image $REGISTRY/backend-api:"$IMAGE_REF" \
             --command node --args dist/scripts/migrate.js \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           gcloud run jobs execute ${{ vars.MIGRATION_JOB_NAME }} --wait \
@@ -88,14 +103,14 @@ jobs:
         run: |
           REGISTRY=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}
           gcloud run deploy beeside-production-backend-api \
-            --image $REGISTRY/backend-api:${{ inputs.ref }} \
+            --image $REGISTRY/backend-api:"$IMAGE_REF" \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           gcloud run deploy beeside-production-frontend-app \
-            --image $REGISTRY/frontend-app:${{ inputs.ref }} \
+            --image $REGISTRY/frontend-app:"$IMAGE_REF" \
             --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           if [ -n "${{ vars.WORKER_SERVICE_NAME }}" ]; then
             gcloud run deploy ${{ vars.WORKER_SERVICE_NAME }} \
-              --image $REGISTRY/backend-api:${{ inputs.ref }} \
+              --image $REGISTRY/backend-api:"$IMAGE_REF" \
               --command node --args dist/worker.js \
               --region ${{ vars.GCP_REGION }} --project ${{ vars.GCP_PROJECT_ID }} --quiet
           fi

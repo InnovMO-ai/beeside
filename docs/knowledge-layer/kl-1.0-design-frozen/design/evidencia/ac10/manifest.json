@@ -1,0 +1,13 @@
+{
+  "product": "doing_business_mx",
+  "edition": "PROTOTIPO",
+  "locale": "es",
+  "cutoffDate": "[fecha de corte]",
+  "note": "Manifiesto de prototipo. Las referencias imco.ice2025.* existen como registros candidatos del paquete de evidencia ICE 2025 (no publicados). Las demás son marcadores.",
+  "sections": {
+    "ch10.nle.key_data": ["[mx.stat.pibe.MX-NLE@n]", "[mx.stat.enoe.informalidad_laboral.MX-NLE@n]", "[mx.stat.enoe.ingreso_promedio.MX-NLE@n]", "[mx.stat.imss.puestos_afiliados.MX-NLE@n]"],
+    "ch10.nle.relative_position": ["imco.ice2025.informalidad.MX-NLE", "imco.ice2025.ingreso_promedio.MX-NLE", "imco.ice2025.crecimiento_imss.MX-NLE", "imco.ice2025.terminales_pv.MX-NLE", "imco.ice2025.carga_aerea.MX-NLE"],
+    "ch08.obligations": ["[mx.card.customs.padron_importadores@n]"],
+    "ch08.decide_with": ["[mx.card.customs.limits@n]"]
+  }
+}

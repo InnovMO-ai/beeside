@@ -1,4 +1,4 @@
-import { bigserial, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -95,7 +95,7 @@ export const fa4AccessToken = pgTable(
   (t) => [
     uniqueIndex("fa4_access_token_hash_unique").on(t.tokenHash),
     index("fa4_access_token_project_idx").on(t.projectId, t.kind),
-    check("fa4_access_token_kind", sql`${t.kind} IN ('SESSION','RESUME')`),
+    check("fa4_access_token_kind", sql`${t.kind} IN ('SESSION','RESUME','YEV_LINK')`),
   ],
 );
 
@@ -107,10 +107,26 @@ export const fa4Result = pgTable(
     resultSeq: bigserial("result_seq", { mode: "number" }).notNull(),
     projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
     catalogVersion: text("catalog_version").notNull().references(() => fa4CatalogVersion.version),
+    /** Historical YEV model (presentation, for the client). NOT the contract for Precision. */
     model: jsonb("model").notNull(),
+    /**
+     * A+ historical envelope (Public v1.0, D-157): a DELIVERED result is self-sufficient and immutable. `created_at` = the explicit delivery moment.
+     * Rows written before Public v1.0 (previews that were stored as results) are flagged `legacy_unsealed`: never eligible for Precision, never back-filled.
+     */
+    rulesVersion: text("rules_version"),
+    sourceSchemaVersion: integer("source_schema_version"),
+    sourceSnapshot: jsonb("source_snapshot"),
+    resolutionSchemaVersion: integer("resolution_schema_version"),
+    resolutionSnapshot: jsonb("resolution_snapshot"),
+    legacyUnsealed: boolean("legacy_unsealed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("fa4_result_project_idx").on(t.projectId, t.resultSeq), uniqueIndex("fa4_result_seq_unique").on(t.resultSeq)],
+  (t) => [
+    index("fa4_result_project_idx").on(t.projectId, t.resultSeq), uniqueIndex("fa4_result_seq_unique").on(t.resultSeq),
+    // v1.0: ONE canonical delivered result per project (a future Result B drops this index in its own migration)
+    uniqueIndex("fa4_result_one_sealed_per_project").on(t.projectId).where(sql`NOT ${t.legacyUnsealed}`),
+    check("fa4_result_sealed_envelope", sql`${t.legacyUnsealed} OR (${t.rulesVersion} IS NOT NULL AND ${t.sourceSchemaVersion} IS NOT NULL AND ${t.sourceSnapshot} IS NOT NULL AND ${t.resolutionSchemaVersion} IS NOT NULL AND ${t.resolutionSnapshot} IS NOT NULL AND jsonb_typeof(${t.sourceSnapshot}) = 'object' AND jsonb_typeof(${t.resolutionSnapshot}) = 'object')`),
+  ],
 );
 
 export const fa4DemandSignal = pgTable(
@@ -149,7 +165,8 @@ export const fa4EmailDelivery = pgTable(
   {
     deliveryId: uuid("delivery_id").primaryKey().default(sql`gen_random_uuid()`),
     dedupeKey: text("dedupe_key").notNull(),
-    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    /** Null only for a contact message written before Identity. */
+    projectId: uuid("project_id").references(() => fa4Project.projectId),
     template: text("template").notNull(),
     status: text("status").notNull().default("PENDING"),
     attempts: integer("attempts").notNull().default(0),
@@ -159,6 +176,8 @@ export const fa4EmailDelivery = pgTable(
     lastError: text("last_error"),
     providerName: text("provider_name"),
     providerReference: text("provider_reference"),
+    /** Set only for template fa4_contact_request: the message to deliver lives in fa4_contact_request. */
+    contactRequestId: uuid("contact_request_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -168,7 +187,7 @@ export const fa4EmailDelivery = pgTable(
     index("fa4_email_delivery_due_idx").on(t.status, t.nextAttemptAt),
     index("fa4_email_delivery_project_idx").on(t.projectId, t.template, t.createdAt),
     check("fa4_email_delivery_status", sql`${t.status} IN ('PENDING','SENDING','SENT','FAILED','DEAD','CANCELLED')`),
-    check("fa4_email_delivery_template", sql`${t.template} IN ('fa4_resume_link','fa4_result_link')`),
+    check("fa4_email_delivery_template", sql`${t.template} IN ('fa4_resume_link','fa4_result_link','fa4_contact_request')`),
   ],
 );
 
@@ -218,4 +237,83 @@ export const fa4PrivacyErasureLog = pgTable(
     performedAt: timestamp("performed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("fa4_privacy_erasure_mode", sql`${t.mode} IN ('ANONYMIZE')`)],
+);
+
+/**
+ * OPTIONAL commercial-communications consent, kept apart from the legal acceptances (Terms / Privacy never imply it). Append-only history:
+ * the first row is the decision taken at project creation (consented true OR false), later rows record every change.
+ * `wording_ref` identifies the exact checkbox wording shown; no IP or other personal data is stored.
+ */
+export const fa4MarketingConsent = pgTable(
+  "fa4_marketing_consent",
+  {
+    consentId: uuid("consent_id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id").notNull().references(() => fa4Project.projectId),
+    consented: boolean("consented").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    language: text("language").notNull(),
+    wordingRef: text("wording_ref").notNull(),
+  },
+  (t) => [
+    index("fa4_marketing_consent_project_idx").on(t.projectId, t.decidedAt),
+    check("fa4_marketing_consent_language", sql`${t.language} IN ('es','en')`),
+  ],
+);
+
+/**
+ * "Hablar con beeside": an operational message from the user to contact@beeside.you. Not marketing, not a provider referral, not The Hive.
+ * Personal data lives here only (name / company / email / message) and is scrubbed by fa4_anonymize_project().
+ * `share_progress` = the user ticked "Compartir mi avance" for THIS message only (no standing consent).
+ */
+export const fa4ContactRequest = pgTable(
+  "fa4_contact_request",
+  {
+    contactId: uuid("contact_id").primaryKey().default(sql`gen_random_uuid()`),
+    /** Null when the message is written before Identity (the cover offers "Hablar con beeside" too). */
+    projectId: uuid("project_id").references(() => fa4Project.projectId),
+    name: text("name").notNull(),
+    company: text("company").notNull(),
+    email: text("email").notNull(),
+    message: text("message").notNull(),
+    shareProgress: boolean("share_progress").notNull().default(false),
+    language: text("language").notNull(),
+    /** Client-generated idempotency key: a double click / retry of the same form never creates a second message. */
+    clientRequestId: text("client_request_id").notNull(),
+    /** Where the person wrote from: 'FA' (First Assessment) or 'YEV' (the result, including the YEV email's "Talk to beeside" link). */
+    originStage: text("origin_stage").notNull().default("FA"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("fa4_contact_request_project_idx").on(t.projectId, t.createdAt),
+    uniqueIndex("fa4_contact_request_idem_unique").on(t.clientRequestId),
+    check("fa4_contact_request_language", sql`${t.language} IN ('es','en')`),
+    check("fa4_contact_request_stage", sql`${t.originStage} IN ('FA','YEV')`),
+  ],
+);
+
+/**
+ * Minimal launch-day event capture (see docs/fa4/ANALYTICS_EVENTS.md). Append-only. No IP, no user agent, no fingerprint, no free text, no
+ * email: `visit_id` is a random per-tab id generated by the browser (sessionStorage) and `props` holds only catalog codes / counts.
+ * `project_id` is null for anonymous pre-Identity events.
+ */
+export const fa4Event = pgTable(
+  "fa4_event",
+  {
+    eventId: uuid("event_id").primaryKey().default(sql`gen_random_uuid()`),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    name: text("name").notNull(),
+    source: text("source").notNull(),
+    visitId: uuid("visit_id"),
+    projectId: uuid("project_id").references(() => fa4Project.projectId),
+    locale: text("locale"),
+    step: text("step"),
+    catalogVersion: text("catalog_version"),
+    props: jsonb("props").notNull().default(sql`'{}'::jsonb`),
+  },
+  (t) => [
+    index("fa4_event_name_time_idx").on(t.name, t.occurredAt),
+    index("fa4_event_project_idx").on(t.projectId, t.occurredAt),
+    index("fa4_event_visit_idx").on(t.visitId, t.occurredAt),
+    check("fa4_event_source", sql`${t.source} IN ('client','server')`),
+  ],
 );

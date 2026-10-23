@@ -114,7 +114,21 @@ export async function requestPremiumActivation(
   return deps.db.transaction(async (tx) => {
     await tx.query("SELECT project_id FROM project WHERE project_id = $1 FOR UPDATE", [projectId]);
     const status = await getPremiumStatus(tx, projectId, deps.bundles);
-    if (status.pendingRequest) return { outcome: { kind: "pending_confirmation" as const }, status };
+    if (status.pendingRequest) {
+      // A provider that can continue the same attempt (Stripe: the same open Checkout Session) is asked to; the others keep waiting.
+      if (checkout.resume) {
+        const open = (
+          await tx.query<{ request_id: string; kind: "activation" | "reactivation" }>("SELECT request_id, kind FROM premium_activation_request WHERE project_id = $1 AND status = 'REQUESTED'", [projectId])
+        ).rows[0];
+        const resumed = open ? await checkout.resume(tx, { requestId: open.request_id, projectId, kind: open.kind, now }) : null;
+        if (resumed) {
+          // The request keeps its FIRST reference (write-once); later attempts are all recorded by the provider's own table.
+          if (resumed.reference) await tx.query("UPDATE premium_activation_request SET checkout_reference = $2 WHERE request_id = $1 AND checkout_reference IS NULL", [open?.request_id, resumed.reference]);
+          return { outcome: resumed.outcome, status };
+        }
+      }
+      return { outcome: { kind: "pending_confirmation" as const }, status };
+    }
     if (!status.canActivate && !status.canReactivate) throw new FaError("NOT_APPLICABLE", "Premium cannot be requested for this project right now");
     const kind = status.canActivate ? "activation" : "reactivation";
     const inserted = await tx.query<{ request_id: string }>(

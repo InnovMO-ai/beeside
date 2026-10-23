@@ -19,3 +19,4 @@ frontend/test-results/
 frontend/playwright-report/
 .data/
 docs/fa4/visual/
+deploy/production/production.env

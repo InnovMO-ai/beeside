@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KL Admin · New upload</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="kl-control-center.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2e0879}a:hover{color:#17181b}
+</style>
+</helmet>
+<div class="admin-shell">
+<header class="admin-header">
+<div class="admin-brand"><img src="/_blob/8f3b3336a973ff01b1033357f12e1646" alt="beeside" style="height: 28px; width: auto"><span>Control Center</span></div>
+<nav aria-label="Control Center"><ul class="admin-nav"><li><a href="#">Projects</a></li><li><a href="#">Configuration</a></li><li><a href="#">Communications</a></li><li><a href="#">Analytics</a></li><li><a href="#">Operations</a></li><li><a href="KL-01-Overview.dc.html" aria-current="page">Knowledge</a></li><li><a href="#">Audit</a></li><li><a href="#">People</a></li></ul></nav>
+<div class="admin-user"><span>[editor]@beeside</span><span class="admin-badge">KL_EDITOR</span><button type="button" class="button button-text">Sign out</button></div>
+</header>
+<main class="admin-page">
+<p class="admin-notice kl-proto" lang="es"><b>Prototipo de Design.</b> Elige el archivo de prueba para ver la validación previa al guardado (caso A08).</p>
+<p><a href="KL-04-Repository.dc.html">← Knowledge Repository</a></p>
+<h1 class="admin-title">New upload</h1>
+<ol class="kl-steps" aria-label="Upload steps"><li aria-current="step">1 · File and source</li><li>2 · Extraction</li><li>3 · Quality report</li><li>4 · Review by another person</li><li>5 · Publication</li></ol>
+<p class="kl-guard" lang="es">Subir no autoriza una fuente ni publica nada. Sin fuente aprobada, la carga queda "en espera de fuente".</p>
+<div class="kl-split">
+<div class="kl-main">
+<section class="admin-card" aria-labelledby="up-meta">
+<h2 id="up-meta">Source and metadata</h2>
+<div class="field"><label for="up-src">Registered source</label><select id="up-src" class="select"><option>S01 · IMCO · ICE 2025 (histórico)</option><option>S05 · INEGI · ENOE (candidata · quedará en espera de fuente)</option><option>Propose a new source…</option></select></div>
+<div class="admin-form-row">
+<label>Edition<input class="input" value="2025"></label>
+<label>Source publication date<input class="input" type="date" value="2025-06-09"></label>
+</div>
+<div class="field"><label for="up-url">Provenance URL</label><input id="up-url" class="input" type="url" value="https://imco.org.mx/" ></div>
+<div class="field"><label for="up-lic">Declared license</label><input id="up-lic" class="input" value="Derechos reservados: citar y parafrasear; reproducir tablas requiere permiso"></div>
+<div class="field"><label for="up-file">File (PDF, DOCX, XLSX or CSV · max 50 MB)</label><input id="up-file" class="input" type="file" accept=".pdf,.docx,.xlsx,.csv"></div>
+<div class="field"><label for="up-sim">Prototype: simulate this file</label><select id="up-sim" class="select" value="{{sim}}" onChange="{{pick}}"><option value="ok">ICE-2025_Boletas-.pdf (válido)</option><option value="xlsm">datos_estatales.xlsm (con macros)</option><option value="pdfjs">anexo.pdf con /JavaScript</option><option value="dup">ICE-2025_Boletas-.pdf (ya cargado)</option></select></div>
+</section>
+</div>
+<div class="kl-side">
+<section class="admin-card" aria-labelledby="up-val" aria-live="polite">
+<h2 id="up-val">Checks before saving</h2>
+<ul class="kl-checks">
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="6">
+<li><span class="admin-badge" data-tone="{{c.tone}}">{{c.result}}</span><span>{{c.label}}</span></li>
+</sc-for>
+</ul>
+<sc-if value="{{rejected}}" hint-placeholder-val="{{false}}"><p class="admin-error" role="alert">{{reason}}</p></sc-if>
+<div class="admin-actions"><button type="button" class="button button-primary" disabled="{{rejected}}">Upload and extract</button></div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+constructor(p) { super(p); this.state = { sim: 'ok' }; }
+renderVals() {
+const s = this.state.sim;
+const ok = { tone: 'ok', result: 'Pass' }, bad = { tone: 'error', result: 'Fail' }, skip = { tone: 'muted', result: '—' };
+const r = {
+ok: [ok, ok, ok, ok, ok, ok],
+xlsm: [bad, ok, skip, skip, skip, skip],
+pdfjs: [ok, ok, bad, skip, skip, skip],
+dup: [ok, ok, ok, ok, ok, bad]
+}[s];
+const labels = ['Real type by file signature (PDF, DOCX, XLSX, CSV only)', 'Size within 50 MB', 'No encryption, macros or active content', 'Antimalware scan', 'Decompression limits', 'SHA-256 fingerprint not already stored'];
+const reasons = { ok: '', xlsm: 'Rejected before saving: XLSM files with macros are not accepted. Only the reason and fingerprint are kept.', pdfjs: 'Rejected before saving: the PDF contains active content (/JavaScript).', dup: 'This exact file was already uploaded (same fingerprint). Open the existing upload instead.' };
+return {
+sim: s,
+checks: labels.map((label, i) => ({ label, tone: r[i].tone, result: r[i].result })),
+rejected: s !== 'ok',
+reason: reasons[s],
+pick: (e) => this.setState({ sim: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import { FA_SNAPSHOT_TEMPLATE_VERSION } from "../snapshot/template";
 import { MANUFACTURER, describeWithDb, identity, lastLinkToken, runJourney, useHarness } from "./fa-harness";
 
 const INTERNAL_NAMES = /Hive|Business Check|Market Brief|Trade & Market Access|Supplier Search|Partner Search|STRONG|SUPPORTING|POSSIBLE|CRITICAL_GAP|NEEDS_ATTENTION|NOT_APPLICABLE|re-1\.0\.0/;
@@ -21,7 +22,7 @@ describeWithDb("Rules + Snapshot at COMPLETED_LOCKED (PostgreSQL, rolled back)",
 
   it("generates findings, alignment, capability ranks, Snapshot and Internal Assessment in the completion transaction", async () => {
     const { project } = await completedProject();
-    expect(project).toMatchObject({ rules_engine_version: "re-1.0.0", snapshot_template_version: "st-1.0.0", assessment_state: "COMPLETED_LOCKED" });
+    expect(project).toMatchObject({ rules_engine_version: "re-1.0.0", snapshot_template_version: FA_SNAPSHOT_TEMPLATE_VERSION, assessment_state: "COMPLETED_LOCKED" });
 
     const findings = await h.client.query("SELECT * FROM finding WHERE project_id = $1 ORDER BY area_id", [project.project_id]);
     expect(findings.rows).toHaveLength(14);

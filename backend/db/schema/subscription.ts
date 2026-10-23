@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { subscriptionEventTypeEnum, subscriptionStatusEnum } from "./enums";
 import { person } from "./identity";
@@ -13,6 +13,9 @@ export const subscription = pgTable(
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    // Recurring billing: the provider renews (and ends) this subscription. The Core sweep then waits a safety margin past the
+    // paid-through date instead of ending it at that instant, so a renewal that is a few minutes late never flickers access.
+    autoRenews: boolean("auto_renews").notNull().default(false),
     cancellationRequestedAt: timestamp("cancellation_requested_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -53,6 +56,14 @@ export const entitlement = pgTable("entitlement", {
   effectiveFrom: timestamp("effective_from", { withTimezone: true }),
   effectiveUntil: timestamp("effective_until", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // F5 Track B — Precision access state (Core-owned, contract §G): FULL | READ_ONLY | REVOKED. Driven by the
+  // subscription sync trigger (0029) and the Core sweep; the coherence CHECKs live in 0029 (backfill first).
+  precisionAccessMode: text("precision_access_mode").notNull().default("FULL"),
+  premiumEndedAt: timestamp("premium_ended_at", { withTimezone: true }),
+  readonlyUntil: timestamp("readonly_until", { withTimezone: true }),
+  // Snapshot of the configurable read-only window (days) that was applied when readonly_until was set.
+  graceDaysApplied: integer("grace_days_applied"),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
 
 export const operationHubLink = pgTable(

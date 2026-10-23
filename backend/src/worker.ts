@@ -1,7 +1,12 @@
 import { baseDepsFromEnv, fa4DepsFromEnv } from "./index";
 import { deliverDueFa4Emails } from "./fa4/email";
+import { purgeExpiredOrphanContacts } from "./fa4/retention";
 import { integrationsFromEnv } from "./integrations/config";
 import { JobName, runJob } from "./operations/jobs";
+import { premiumPolicyFromEnv } from "./premium/premium-policy";
+import { StripeClient } from "./premium/stripe/client";
+import { stripeConfigFromEnv } from "./premium/stripe/config";
+import { runBillingJobs } from "./premium/stripe/jobs";
 import { jsonLogger } from "./security/redact";
 import { assertRuntimeConfig } from "./security/runtime-config";
 
@@ -48,18 +53,48 @@ if (require.main === module) {
   // FA Public v1.0 email outbox (own table; same lease / backoff semantics as the legacy outbox). Only when FA4_API_ENABLED=true.
   const fa4 = fa4DepsFromEnv(process.env, deps.db);
   if (fa4) {
+    let fa4Busy = false;   // never overlap two ticks of this process (other processes are safe too: FOR UPDATE SKIP LOCKED + lease)
     const tickFa4 = async () => {
+      if (fa4Busy) return;
+      fa4Busy = true;
       try {
-        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now } });
+        const r = await deliverDueFa4Emails({ db: fa4.db, email: fa4.email, config: { appBaseUrl: fa4.config.appBaseUrl, resumeLinkDays: fa4.config.resumeLinkDays, now: fa4.config.now, contactAddress: fa4.config.contactAddress, premiumResourceUrl: fa4.config.premiumResourceUrl, premiumCommercialContentAllowed: fa4.config.premiumCommercialContentAllowed, yevLinkDays: fa4.config.yevLinkDays } });
         // eslint-disable-next-line no-console
         if (r.sent + r.failed + r.dead > 0) console.log(`[worker] fa4_email_outbox ${JSON.stringify(r)}`);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error(`[worker] fa4_email_outbox crashed: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        fa4Busy = false;
       }
     };
+    const purgeFa4 = () => void purgeExpiredOrphanContacts(fa4.db, new Date(), Number(process.env.FA4_ORPHAN_CONTACT_RETENTION_DAYS ?? 180)).catch(() => undefined);
+    purgeFa4(); timers.push(setInterval(purgeFa4, 3_600_000));
     void tickFa4();
-    timers.push(setInterval(() => void tickFa4(), 30_000));
+    // 5 s: a person is waiting on "Guardar y seguir después" / "Hablar con beeside"; an empty poll is a single indexed query.
+    timers.push(setInterval(() => void tickFa4(), Number(process.env.FA4_WORKER_POLL_MS ?? 5_000)));
+  }
+  // Premium/Stripe: Core access sweep (always) + Stripe reconciliation (only when Stripe is configured). Idempotent.
+  {
+    const policy = premiumPolicyFromEnv(process.env);
+    const client = process.env.STRIPE_CHECKOUT_ENABLED === "true" ? new StripeClient(stripeConfigFromEnv(process.env)) : undefined;
+    let billingRunning = false;
+    const tickBilling = async () => {
+      if (billingRunning) return;
+      billingRunning = true;
+      try {
+        const result = await runBillingJobs({ db: deps.db, bundles: deps.bundles, policy, ...(client ? { client } : {}) });
+        // eslint-disable-next-line no-console
+        console.log(`[worker] billing_jobs ${JSON.stringify(result)}`);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`[worker] billing_jobs crashed: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        billingRunning = false;
+      }
+    };
+    void tickBilling();
+    timers.push(setInterval(() => void tickBilling(), 10 * 60_000));
   }
   for (const job of Object.keys(DEFAULT_INTERVALS) as JobName[]) {
     void tick(job);

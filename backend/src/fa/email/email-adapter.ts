@@ -18,6 +18,11 @@ export interface EmailMessage {
   /** Optional secondary call to action (never the primary one). */
   secondaryCtaLabel?: string;
   secondaryCtaUrl?: string;
+  /** Overrides the transport's default Reply-To (contact messages reply to the person who wrote). */
+  replyTo?: string;
+  /** Fully rendered bodies (FA4 templates). When absent the transport builds a minimal one from body / CTA. */
+  html?: string;
+  text?: string;
   projectId: string | null;
 }
 

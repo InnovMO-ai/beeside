@@ -85,7 +85,9 @@ describeWithDb("Operations & lifecycle control: outbox, jobs, reminders, recover
     const recoveryLink = lastLinkToken(h);
     const recovered = await h.api().post("/api/fa/links/extend").send({ token: recoveryLink, days: 15, reason: "missing_information" });
     expect(new Date(recovered.body.accessUntil).getTime()).toBe(day0 + 45 * DAY);
-    expect(h.email.messages).toHaveLength(sentSoFar);
+    // The extension is confirmed immediately (new date + fresh link); the contextual help still comes the next day.
+    expect(h.email.messages).toHaveLength(sentSoFar + 1);
+    expect(h.email.messages[h.email.messages.length - 1]).toMatchObject({ template: "access_extension_confirmed" });
     h.advanceDays(1);
     await run("email_outbox");
     const followup = h.email.messages[h.email.messages.length - 1];

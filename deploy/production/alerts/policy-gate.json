@@ -1,0 +1,31 @@
+{
+  "displayName": "Discovery \u2014 access-gate brute force",
+  "combiner": "OR",
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "conditions": [
+    {
+      "displayName": "429 from the gate",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/discovery_gate_bruteforce\" AND resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0.02,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "documentation": {
+    "content": "See deploy/production/RUNBOOK.md (alerts section).",
+    "mimeType": "text/markdown"
+  }
+}

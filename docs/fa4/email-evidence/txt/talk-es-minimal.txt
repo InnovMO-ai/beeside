@@ -1,0 +1,22 @@
+Subject: Hablar con beeside — Lucía
+
+SOLICITUD DESDE FIRST ASSESSMENT
+
+Lucía quiere hablar con beeside sobre su proyecto.
+
+Hola, equipo beeside:
+
+Se recibió una nueva solicitud desde First Assessment.
+
+Tema: Hablar con beeside
+Mensaje: Hola,
+quisiera hablar con alguien de beeside sobre la logística.
+
+Gracias.
+Nombre: Lucía
+Empresa: 
+Correo: lucia@nortica.example
+Etapa: First Assessment
+Idioma de FA: Español
+
+Responder a este correo debe dirigirse automáticamente a la persona que envió la solicitud (Reply-To).

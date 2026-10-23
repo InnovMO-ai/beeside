@@ -186,8 +186,9 @@ export function reflectionParagraphs(a: Answers): Seg[][] {
   const company: Seg[] = [];
   const name = a.identity.company.trim();
   if (name) company.push({ text: L(name, name), edit: 'identity' });
-  const what = c.sector.trim();
-  const size = c.size ? sizeLabel(c.size) : null;
+  const operating = c.hasExistingBusiness === true;            // DSC-01: nothing typed before answering «No» is reflected
+  const what = operating ? c.sector.trim() : '';
+  const size = operating && c.size ? sizeLabel(c.size) : null;
   if (what) company.push({ text: L(what, what), edit: 'company', ...(name ? { br: true } : {}) });
   if (size) {
     if (what) company.push(seg(' · ', ' · '));
@@ -222,6 +223,10 @@ export function buildNotApplicable(
   if (!comp || !(destinationCount === 1 || comp.presence !== 'open')) return [];
   return plan.notApplicable.slice(0, 3).map((g) => ({ fronts: NA_DISPLAY_FRONTS[g].map((f) => topic(f)), reason: naReason(g, comp) }));
 }
+
+/** "8" → "8 personas" / "8 people"; free text ("3 a 5 personas") is kept as the user wrote it. */
+const peopleText = (t: string): L10n => /^\s*\d+\s*$/.test(t) ? L(`${t.trim()} personas`, `${t.trim()} people`) : L(t.trim(), t.trim());
+const teamLabel = (t: string): L10n => { const p = peopleText(t); return L(`Equipo previsto: ${p.es}`, `Planned team: ${p.en}`); };
 
 export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new Date(), resolution?: Resolution): YourExpansionViewModel {
   const res = resolution ?? resolveAll(a, catalog);
@@ -330,13 +335,14 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
       decided.push(L(`${componentPhrase(c, a).es} en ${joinL(c.destinations.map((d) => countryL10n(d))).es}, de forma permanente`, `${componentPhrase(c, a).en} in ${joinL(c.destinations.map((d) => countryL10n(d))).en}, permanently`));
     if (c.permanence === 'temporary') decided.push(L(`${cap1(presenceTail(c).es.replace(/^durante /, 'Unos ').replace(/^Unos unos /, 'Unos '))}`, `${cap1(presenceTail(c).en.replace(/^for about/, 'About'))}`));
   }
-  const noOwnSpace = a.components.length > 0 && a.components.every((c) => c.presence !== 'own_physical');
+  // VT-02: "no premises of your own" only from a DECLARED negative; "not sure yet" (presence open/null) is never turned into a decision.
+  const noOwnSpace = a.components.length > 0 && a.components.every((c) => c.presence !== null && c.presence !== 'open' && c.presence !== 'acquisition' && c.presence !== 'own_physical');
   if (noOwnSpace) decided.push(L('Sin espacio propio', 'No premises of your own'));
   if (a.startWhen && a.startWhen !== 'unknown') decided.push(START_LABEL[a.startWhen]);
   if (a.externalDate.has && a.externalDate.date) decided.push(L(`Fecha clave: ${formatKeyDate(a.externalDate.date, 'es')}`, `Key date: ${formatKeyDate(a.externalDate.date, 'en')}`));
   else if (a.externalDate.has) decided.push(L('Con calendario contractual', 'With a contractual schedule'));
-  if (a.components.length === 1 && a.scale[a.components[0]!.id]?.proxy === 'people' && a.scale[a.components[0]!.id]!.text)
-    decided.push(L(a.scale[a.components[0]!.id]!.text, a.scale[a.components[0]!.id]!.text));
+  if (a.components.length === 1 && a.scale[a.components[0]!.id]?.proxy === 'people' && a.scale[a.components[0]!.id]!.text && !a.scale[a.components[0]!.id]!.declined)
+    decided.push(teamLabel(a.scale[a.components[0]!.id]!.text));
 
   const stillOpen: L10n[] = [];
   for (const d of destinations) {
@@ -356,9 +362,9 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
   const projectSize: L10n[] = [];
   for (const c of a.components) {
     const s = a.scale[c.id]; const dn = joinL(c.destinations.map((d) => countryL10n(d)));
-    if (!s || s.proxy === 'people') continue;
+    if (!s || (s.proxy === 'people' && a.components.length === 1)) continue;
     if (s.declined) projectSize.push(L(`En ${dn.es}: prefieres no decirlo.`, `In ${dn.en}: you prefer not to say.`));
-    else if (s.text) projectSize.push(s.proxy === 'investment' ? L(`Inversión preliminar en ${dn.es}: ${s.text}.`, `Preliminary investment in ${dn.en}: ${s.text}.`) : L(`En ${dn.es}: ${s.text}.`, `In ${dn.en}: ${s.text}.`));
+    else if (s.text) projectSize.push(s.proxy === 'people' ? L(`Equipo previsto en ${dn.es}: ${peopleText(s.text).es}.`, `Planned team in ${dn.en}: ${peopleText(s.text).en}.`) : s.proxy === 'investment' ? L(`Inversión preliminar en ${dn.es}: ${s.text}.`, `Preliminary investment in ${dn.en}: ${s.text}.`) : L(`En ${dn.es}: ${s.text}.`, `In ${dn.en}: ${s.text}.`));
     else projectSize.push(L(`En ${dn.es}: aún sin definir.`, `In ${dn.en}: not yet defined.`));
   }
 
@@ -369,9 +375,11 @@ export function buildYourExpansionView(a: Answers, catalog: Catalog, now = new D
     contract: L('Ejecutar un contrato ganado', 'Executing a contract you won'), partner: L('Una plataforma para crecer con otros clientes', 'A platform to grow with other customers'), other: L('Otro motivo', 'Another reason'),
   };
 
-  const sectorL: L10n | null = a.company.sector ? L(a.company.sector, a.company.sector) : null;
-  const sizeL = a.company.size ? sizeLabel(a.company.size) : null;
-  const sub = [sectorL, a.company.operatesIn.length ? joinL(a.company.operatesIn.map(countryL10n)) : null, sizeL,
+  // DSC-01: company facts are shown ONLY when the person declared an operating company; anything typed before answering «No» is never reflected. The size is labelled as the company's.
+  const operating = a.company.hasExistingBusiness === true;
+  const sectorL: L10n | null = operating && a.company.sector ? L(a.company.sector, a.company.sector) : null;
+  const sizeL: L10n | null = operating && a.company.size ? ((z) => L(`Tu empresa: ${z.es}`, `Your company: ${z.en}`))(sizeLabel(a.company.size)) : null;
+  const sub = [sectorL, operating && a.company.operatesIn.length ? joinL(a.company.operatesIn.map(countryL10n)) : null, sizeL,
     a.externalDate.has && a.externalDate.date ? L(`Fecha clave: ${formatKeyDate(a.externalDate.date, 'es')}`, `Key date: ${formatKeyDate(a.externalDate.date, 'en')}`) : null].filter((x): x is L10n => !!x);
 
   return {
