@@ -49,13 +49,16 @@ d("data-domain isolation (real migrated database, rolled back)", () => {
   }
 
   const registry = async (): Promise<Array<{ table_name: string; domain: string; discovery_privileges: string }>> =>
-    (await client.query("SELECT table_name, domain, discovery_privileges FROM db_domain_registry ORDER BY table_name")).rows;
+    (await client.query("SELECT table_name, domain, discovery_privileges FROM db_domain_registry ORDER BY table_name COLLATE \"C\"")).rows;
 
   it("registers every table exactly once and agrees with the privacy inventory (a new table cannot slip past either)", async () => {
-    const tables = (await client.query("SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r','p') ORDER BY 1")).rows.map((r) => r.relname as string);
+    // The three lists are compared element by element, so they must be sorted with the SAME byte-wise collation. pg_class.relname is of
+    // type name (always "C"); the registries are text and would otherwise follow the database collation (en_US.UTF-8 in the CI service and in
+    // Cloud SQL), which orders "fa_access_extension" before "fa4_access_token". Exact equality is kept: nothing is filtered or deduplicated.
+    const tables = (await client.query("SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r','p') ORDER BY c.relname COLLATE \"C\"")).rows.map((r) => r.relname as string);
     const reg = (await registry()).map((r) => r.table_name);
     expect(reg).toEqual(tables);
-    const privacy = (await client.query("SELECT table_name FROM privacy_erasure_registry ORDER BY 1")).rows.map((r) => r.table_name as string);
+    const privacy = (await client.query("SELECT table_name FROM privacy_erasure_registry ORDER BY table_name COLLATE \"C\"")).rows.map((r) => r.table_name as string);
     expect(privacy).toEqual(tables);
     const byDomain = (await registry()).reduce<Record<string, number>>((m, r) => ({ ...m, [r.domain]: (m[r.domain] ?? 0) + 1 }), {});
     expect(byDomain).toEqual({ DISCOVERY: 14, PLATFORM: 1, PRECISION: tables.length - 15 });
