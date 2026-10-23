@@ -91,7 +91,12 @@ echo "[$(rv castaneda-a APPROVED)]" > "$K"; echo '[{"author":null,"committer":{"
 python3 -c 'import json;print(json.dumps([{"author":{"login":"InnovMO-ai"},"committer":{"login":"InnovMO-ai"}}]*250))' > "$CK"; expect "V16 250 commits (límite de la API) => missing" 0 "^missing$" "$(va InnovMO-ai)"
 
 echo "── El registro de revisores es un control protegido"
-sc feature/cod; sed -i 's/ @castaneda-a//' .github/CODEOWNERS; c x; expect "G1 PR que quita a castaneda-a de CODEOWNERS sin aprobación verificada" 1 "sin aprobación verificada.*CODEOWNERS" "$(pf feature/cod missing)"
+# Edición portable (GNU y BSD/macOS): `sed -i` sin sufijo no es válido en BSD sed. Se comprueba que la manipulación quedó aplicada y confirmada
+# antes de evaluar el gate, para que G1 no pueda pasar ni fallar por un cambio que nunca ocurrió.
+sc feature/cod; sed -i.bak 's/ @castaneda-a//' .github/CODEOWNERS && rm -f .github/CODEOWNERS.bak; c x
+! grep -q '@castaneda-a' .github/CODEOWNERS && [ "$(git diff --name-only origin/main HEAD)" = .github/CODEOWNERS ]; check "G1-pre la rama quita a castaneda-a de CODEOWNERS (único cambio, confirmado)" $?
+expect "G1 PR que quita a castaneda-a de CODEOWNERS sin aprobación verificada" 1 "sin aprobación verificada.*CODEOWNERS" "$(pf feature/cod missing)"
+expect "G1b mismo PR con aprobación verificada: el gate lo detecta y lo deja en REVISAR" 0 "aprobación VERIFICADA.*CODEOWNERS" "$(pf feature/cod verified)"
 sc kl/ap; echo intruso >> scripts/kl/po-approvers.txt; c x; expect "G2 rama kl/* que añade un aprobador sin aprobación verificada" 1 "STOP" "$(pf kl/ap missing)"
 sc feature/ap; echo intruso >> scripts/kl/po-approvers.txt; c x; expect "G3 PR ajeno que añade un aprobador" 1 "modifica rutas de KL" "$(pf feature/ap verified)"
 echo "──"; echo "RESULTADO: $PASS pruebas correctas, $FAIL fallidas"; [ "$FAIL" = 0 ]
